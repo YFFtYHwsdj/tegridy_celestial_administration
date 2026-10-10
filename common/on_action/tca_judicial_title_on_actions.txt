@@ -1,0 +1,42 @@
+﻿# Additive hooks; do not replace vanilla effect blocks.
+on_game_start_after_lobby = { on_actions = { tca_judicial_setup } }
+yearly_global_pulse = { on_actions = { tca_judicial_setup } }
+on_title_gain = { on_actions = { tca_judicial_title_gain tca_judicial_position_gain } }
+on_government_change = { on_actions = { tca_judicial_government_change } }
+on_title_destroyed = { on_actions = { tca_judicial_title_destroyed } }
+
+tca_judicial_setup = {
+    effect = { tca_refresh_all_judicial_titles_effect = yes }
+}
+
+tca_judicial_title_gain = {
+    trigger = { scope:title = { tier = tier_kingdom } }
+    events = { tca_judicial_titles.1 }
+}
+
+tca_judicial_government_change = {
+    trigger = { highest_held_title_tier >= tier_kingdom }
+    events = { tca_judicial_titles.1 }
+}
+
+tca_judicial_title_destroyed = {
+    effect = {
+        save_scope_as = tca_lifecycle_actor
+        scope:landed_title = {
+            if = {
+                limit = { has_variable = tca_judicial_title }
+                tca_unlink_judicial_title_effect = yes
+            }
+            else_if = {
+                limit = { has_variable = song_judicial_title }
+                tca_destroy_judicial_title_effect = yes
+            }
+        }
+    }
+}
+
+# Fires on initial grant and later inheritance of an actual judicial title.
+tca_judicial_position_gain = {
+    trigger = { scope:title = { has_variable = tca_judicial_title } }
+    effect = { trigger_event = { id = tca_judicial_titles.3 days = 1 } }
+}

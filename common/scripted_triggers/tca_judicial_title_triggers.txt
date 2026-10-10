@@ -1,0 +1,45 @@
+﻿# Title scope. Initial scope: ordinary celestial kingdom-level circuits only.
+tca_is_judicial_circuit_trigger = {
+    tier = tier_kingdom
+    is_landless_type_title = no
+    is_noble_family_title = no
+    exists = holder
+    # Engine requires a preferred capital before a dynamic title can be landless.
+    OR = {
+        exists = title_capital_county
+        exists = holder.capital_county
+    }
+    holder = {
+        is_alive = yes
+        government_has_flag = government_is_celestial
+        is_independent_ruler = no
+        highest_held_title_tier = tier_kingdom
+        NOT = { vassal_contract_has_flag = celestial_province_military }
+        NOT = { vassal_contract_has_flag = celestial_province_protectorate }
+    }
+}
+
+# Title scope. The persistent pointer must point back to this circuit.
+tca_has_judicial_title_trigger = {
+    exists = var:song_judicial_title
+    var:song_judicial_title = {
+        has_variable = tca_judicial_title
+        exists = var:song_judicial_circuit
+        var:song_judicial_circuit = prev
+    }
+}
+
+# Character scope; scope:tca_appointment_liege is the associated circuit holder.
+# Existing characters keep their merit unchanged. Generated fallback is separate.
+tca_is_initial_judicial_candidate_trigger = {
+    NOT = { has_character_flag = tca_history_defined_character }
+    is_alive = yes
+    is_landed = no
+    highest_held_title_tier < tier_duchy
+    merit_level >= merit_level_expected_duchy_value
+    tgp_can_be_a_minister_trigger = { COURT_OWNER = scope:tca_appointment_liege }
+    liege_or_court_owner ?= {
+        top_liege = scope:tca_appointment_liege.top_liege
+    }
+    NOT = { tgp_is_any_minister = yes }
+}

@@ -1,0 +1,191 @@
+﻿# Title scope. Create/bind, fill the initial holder, then use native realm succession.
+tca_ensure_judicial_title_effect = {
+    tca_register_historical_characters_effect = yes
+    if = {
+        limit = {
+            tca_is_judicial_circuit_trigger = yes
+            NOT = { has_variable = tca_judicial_disabled }
+            NOT = { tca_has_judicial_title_trigger = yes }
+        }
+        save_scope_as = tca_circuit
+        # Forget a missing object. A valid reverse-bound position is never replaced.
+        remove_variable = song_judicial_title
+        holder = {
+            create_dynamic_title = {
+                tier = duchy
+                name = tca_judicial_title_name
+                adj = tca_judicial_title_adj
+            }
+        }
+        scope:new_title = {
+            save_scope_as = tca_position
+            tca_configure_judicial_title_location_effect = yes
+            set_no_automatic_claims = yes
+            set_can_be_named_after_dynasty = no
+            set_can_use_nomadic_naming = no
+            set_delete_on_destroy = no
+            set_destroy_on_succession = no
+            set_variable = { name = tca_judicial_title value = yes }
+            set_variable = { name = song_judicial_circuit value = scope:tca_circuit }
+            set_coa = scope:tca_circuit
+            # No de-jure counties; initial appointment follows after binding.
+            # Explicitly disable destruction on succession; this is a persistent office.
+        }
+        set_variable = { name = song_judicial_title value = scope:tca_position }
+        if = {
+            limit = { NOT = { has_variable = tca_judicial_registered } }
+            add_to_global_variable_list = { name = tca_judicial_circuits target = this }
+            set_variable = { name = tca_judicial_registered value = yes }
+        }
+    }
+    # Refresh previously generated titles and follow subsequent circuit renames.
+    if = {
+        limit = { tca_has_judicial_title_trigger = yes }
+        save_scope_as = tca_circuit
+        var:song_judicial_title = {
+            # Repair objects from the version that omitted the preferred capital.
+            tca_configure_judicial_title_location_effect = yes
+            set_definitive_form = yes
+            set_title_name_dynamic = tca_judicial_title_name
+        }
+        tca_fill_initial_judicial_holder_effect = yes
+        var:song_judicial_title = {
+            holder ?= { tca_ensure_judicial_holder_family_effect = yes }
+            tca_sync_judicial_holder_liege_effect = yes
+            # Set native civilian realm succession after all setup has settled.
+            holder ?= { tca_ensure_native_judicial_realm_succession_effect = yes }
+            # Active offices must disable both destruction flags, including old save objects.
+            set_delete_on_destroy = no
+            set_destroy_on_succession = no
+        }
+    }
+}
+
+# Judicial title scope, scope:tca_circuit = associated circuit.
+# This is an engine location reference, not land ownership or an office building.
+# Order matters: set_capital_county MUST precede set_landless_title.
+tca_configure_judicial_title_location_effect = {
+    if = {
+        limit = { exists = scope:tca_circuit.title_capital_county }
+        set_capital_county = scope:tca_circuit.title_capital_county
+        set_landless_title = yes
+    }
+    else_if = {
+        limit = { exists = scope:tca_circuit.holder.capital_county }
+        set_capital_county = scope:tca_circuit.holder.capital_county
+        set_landless_title = yes
+    }
+}
+
+# Position title scope. Must also work when called by on_title_destroyed.
+tca_unlink_judicial_title_effect = {
+    save_scope_as = tca_position_to_unlink
+    if = {
+        limit = { exists = var:song_judicial_circuit }
+        var:song_judicial_circuit = {
+            if = {
+                limit = { var:song_judicial_title ?= scope:tca_position_to_unlink }
+                remove_variable = song_judicial_title
+                remove_list_global_variable = { name = tca_judicial_circuits target = this }
+                remove_variable = tca_judicial_registered
+            }
+        }
+    }
+    remove_variable = song_judicial_circuit
+}
+
+# Circuit title scope; scope:tca_lifecycle_actor must be a character.
+# Unlink BEFORE destruction to avoid recursive cleanup through the engine hook.
+tca_destroy_judicial_title_effect = {
+    if = {
+        limit = { tca_has_judicial_title_trigger = yes }
+        var:song_judicial_title = {
+            save_scope_as = tca_position_to_destroy
+            tca_unlink_judicial_title_effect = yes
+            # Enable object deletion only immediately before explicit destruction.
+            # Keeping this flag on an active office makes IsDestroyedOnSuccession true.
+            set_delete_on_destroy = yes
+        }
+        if = {
+            limit = { exists = scope:tca_position_to_destroy.holder }
+            scope:tca_position_to_destroy.holder = { destroy_title = scope:tca_position_to_destroy }
+        }
+        else = {
+            scope:tca_lifecycle_actor = { destroy_title = scope:tca_position_to_destroy }
+        }
+    }
+    else = {
+        remove_variable = song_judicial_title
+        remove_list_global_variable = { name = tca_judicial_circuits target = this }
+        remove_variable = tca_judicial_registered
+    }
+}
+
+# Explicit abolition keeps the yearly repair from immediately recreating the position.
+# Call from circuit title scope, with a character in scope:tca_lifecycle_actor.
+tca_abolish_judicial_title_effect = {
+    set_variable = { name = tca_judicial_disabled value = yes }
+    tca_destroy_judicial_title_effect = yes
+}
+
+tca_restore_judicial_title_effect = {
+    remove_variable = tca_judicial_disabled
+    tca_ensure_judicial_title_effect = yes
+}
+
+# Character scope: run after title transfers and government changes have settled.
+tca_refresh_character_circuits_effect = {
+    save_scope_as = tca_lifecycle_actor
+    every_held_title = {
+        limit = { tier = tier_kingdom }
+        if = {
+            limit = { tca_is_judicial_circuit_trigger = yes }
+            tca_ensure_judicial_title_effect = yes
+        }
+        else_if = {
+            limit = { has_variable = song_judicial_title }
+            tca_destroy_judicial_title_effect = yes
+        }
+    }
+}
+
+# Empty/global scope: bounded yearly repair, not a daily world scan.
+tca_refresh_all_judicial_titles_effect = {
+    # destroy_title is called from character scope, even for an empty position.
+    # Pick one surviving ruler as the effect context; this grants them no position.
+    every_independent_ruler = {
+        limit = { NOT = { exists = scope:tca_lifecycle_actor } }
+        save_scope_as = tca_lifecycle_actor
+    }
+    if = {
+        limit = {
+            exists = scope:tca_lifecycle_actor
+            has_global_variable_list = tca_judicial_circuits
+        }
+        every_in_global_list = {
+            variable = tca_judicial_circuits
+            if = {
+                limit = {
+                    OR = {
+                        NOT = { tca_is_judicial_circuit_trigger = yes }
+                        has_variable = tca_judicial_disabled
+                    }
+                }
+                tca_destroy_judicial_title_effect = yes
+            }
+        }
+    }
+    every_independent_ruler = {
+        if = {
+            limit = { government_has_flag = government_is_celestial }
+            tca_refresh_character_circuits_effect = yes
+        }
+        every_vassal_or_below = {
+            limit = {
+                government_has_flag = government_is_celestial
+                highest_held_title_tier = tier_kingdom
+            }
+            tca_refresh_character_circuits_effect = yes
+        }
+    }
+}

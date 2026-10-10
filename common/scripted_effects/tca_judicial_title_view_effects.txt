@@ -1,0 +1,79 @@
+﻿# Circuit title scope. Viewer supplied by the debug decision.
+tca_show_judicial_title_effect = {
+    save_scope_as = tca_viewed_circuit
+    var:song_judicial_title = {
+        save_scope_as = tca_viewed_title
+        # Evaluate the same Title data function used by window_title.gui in localization.
+        # No guessed script trigger or mutation is needed to inspect it.
+        tca_judicial_status_message_effect = {
+            TITLE = tca_judicial_destroyed_on_succession_title
+            DESC = tca_judicial_destroyed_on_succession_desc
+        }
+        if = {
+            limit = { exists = holder }
+            holder = { save_scope_as = tca_viewed_holder }
+            if = {
+                limit = { exists = holder.liege }
+                holder.liege = { save_scope_as = tca_viewed_actual_liege }
+                if = {
+                    limit = { holder.liege = scope:tca_viewed_circuit.holder }
+                    tca_judicial_status_message_effect = { DESC = tca_judicial_status_held TITLE = tca_judicial_status_held_title }
+                }
+                else = {
+                    tca_judicial_status_message_effect = { DESC = tca_judicial_status_wrong_liege TITLE = tca_judicial_status_wrong_liege_title }
+                }
+            }
+            else = {
+                tca_judicial_status_message_effect = { DESC = tca_judicial_status_independent TITLE = tca_judicial_status_wrong_liege_title }
+            }
+        }
+        else = {
+            tca_judicial_status_message_effect = { DESC = tca_judicial_status_vacant TITLE = tca_judicial_status_vacant_title }
+        }
+        if = {
+            limit = { exists = holder }
+            tca_judicial_status_message_effect = {
+                TITLE = tca_judicial_succession_law_title
+                DESC = tca_judicial_succession_law_desc
+            }
+            tca_show_judicial_succession_effect = yes
+        }
+    }
+}
+
+# Judicial title scope. No law changes or title grants in the view itself.
+tca_judicial_status_message_effect = {
+    scope:tca_title_viewer = {
+        send_interface_message = {
+            type = tca_judicial_diagnostic_message
+            title = $TITLE$
+            desc = $DESC$
+            left_icon = scope:tca_viewed_title
+        }
+    }
+}
+
+# Inspect this office's succession, not the holder's primary/player/family heir.
+tca_show_judicial_succession_effect = {
+    if = {
+        limit = { NOT = { has_order_of_succession = appointment } }
+        tca_judicial_status_message_effect = {
+            TITLE = tca_judicial_succession_message_title
+            DESC = tca_judicial_succession_not_appointment
+        }
+    }
+    else_if = {
+        limit = { exists = current_heir }
+        current_heir = { save_scope_as = tca_viewed_office_heir }
+        tca_judicial_status_message_effect = {
+            TITLE = tca_judicial_succession_message_title
+            DESC = tca_judicial_succession_has_heir
+        }
+    }
+    else = {
+        tca_judicial_status_message_effect = {
+            TITLE = tca_judicial_succession_message_title
+            DESC = tca_judicial_succession_no_heir
+        }
+    }
+}
