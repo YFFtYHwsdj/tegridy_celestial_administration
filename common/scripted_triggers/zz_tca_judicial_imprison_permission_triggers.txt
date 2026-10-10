@@ -1,0 +1,39 @@
+﻿# Snapshot of the native common arrest checks. tools/check_judicial_upstream.py
+# compares this body and the saved baseline against the installed game.
+tca_judicial_arrest_native_common_valid_trigger = {
+	scope:puppet_or_actor.liege = {
+		trigger_if = {
+			limit = { has_realm_law_flag = imprisonment_toggle_enable }
+			# TIT-43801
+			#has_realm_law_flag = imprisonment_toggle_on
+			NOT = { has_realm_law = tribal_authority_0 }
+		}
+	}
+	scope:puppet_or_actor = { is_imprisoned = no }
+	custom_description = {
+		text = cannot_imprison_almohad_leader
+		subject = scope:recipient
+		NOT = {
+			scope:recipient = { has_character_modifier = almohad_leader_modifier }
+		}
+	}
+}
+
+# Keep native checks, then restrict the ordinary interaction for judicial actors.
+# Native diarch arrests have a liege intermediary and retain their own rules.
+imprison_neutral_is_valid_showing_failures_only_triggers_trigger = {
+    tca_judicial_arrest_native_common_valid_trigger = yes
+    custom_tooltip = {
+        text = tca_judicial_arrest_use_office_interaction
+        OR = {
+            scope:puppet_or_actor = { tca_uses_judicial_arrest_trigger = no }
+            AND = {
+                exists = scope:intermediary
+                scope:actor = {
+                    is_diarch_of_target = liege
+                    liege = scope:intermediary
+                }
+            }
+        }
+    }
+}

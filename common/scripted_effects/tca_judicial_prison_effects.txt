@@ -1,0 +1,167 @@
+﻿# Recreate named effect scopes from the engine's standard saved interaction roles.
+tca_restore_judicial_arrest_context_effect = {
+    scope:actor = { save_scope_as = tca_authority }
+    scope:secondary_actor ?= { save_scope_as = tca_governor }
+    scope:secondary_recipient ?= {
+        save_scope_as = tca_commissioner
+        primary_title = {
+            save_scope_as = tca_position
+            var:song_judicial_circuit ?= { save_scope_as = tca_circuit }
+        }
+    }
+}
+
+# Use engine-saved roles directly for approval feedback, including human replies.
+# Approval uses the feed; veto uses the upper-screen toast with visible text.
+tca_judicial_arrest_approved_effect = {
+    scope:actor = {
+        send_interface_message = {
+            type = tca_judicial_arrest_approval_message
+            title = tca_judicial_arrest_approved
+            desc = tca_judicial_arrest_approved_message
+            left_icon = scope:intermediary
+            right_icon = scope:recipient
+        }
+    }
+}
+
+# A veto never counts as the target resisting arrest.
+tca_judicial_arrest_veto_effect = {
+    # A visible preview keeps the native effects container and its tabs present.
+    scope:actor = {
+        custom_tooltip = tca_judicial_arrest_veto_preview
+        remove_character_flag = flag_hostile_actions_disabled_delay
+        send_interface_message = {
+            type = tca_judicial_arrest_veto_message
+            title = tca_judicial_arrest_vetoed
+            desc = tca_judicial_arrest_veto_message
+            left_icon = scope:intermediary
+            right_icon = scope:recipient
+        }
+    }
+}
+
+tca_judicial_arrest_invalidated_effect = {
+    scope:tca_authority ?= {
+        remove_character_flag = flag_hostile_actions_disabled_delay
+        send_interface_toast = {
+            type = event_toast_effect_neutral
+            title = tca_judicial_arrest_invalidated
+            left_icon = scope:recipient
+        }
+    }
+}
+
+# Prisoner character scope. Keep an office-indexed list, not a world scan.
+tca_register_judicial_prisoner_effect = {
+    set_variable = { name = tca_judicial_prison_title value = scope:tca_position }
+    save_scope_as = tca_registered_prisoner
+    scope:tca_position = {
+        if = {
+            limit = { NOT = { is_target_in_variable_list = { name = tca_judicial_prisoners target = scope:tca_registered_prisoner } } }
+            add_to_variable_list = { name = tca_judicial_prisoners target = scope:tca_registered_prisoner }
+        }
+    }
+}
+
+tca_unregister_judicial_prisoner_effect = {
+    save_scope_as = tca_released_prisoner
+    var:tca_judicial_prison_title ?= {
+        remove_list_variable = { name = tca_judicial_prisoners target = scope:tca_released_prisoner }
+    }
+    remove_variable = tca_judicial_prison_title
+}
+
+# Prisoner scope, scope:tca_custodian is the next keeper.
+# Use only the engine effect: never reapply arrest opinions, tyranny or reason checks.
+# Engine behavior for an already imprisoned target remains a required in-game check.
+tca_transfer_judicial_prisoner_effect = {
+    if = {
+        limit = {
+            is_alive = yes
+            is_imprisoned = yes
+            exists = scope:tca_custodian
+            NOT = { is_imprisoned_by = scope:tca_custodian }
+        }
+        save_scope_as = tca_transferred_prisoner
+        add_character_flag = tca_judicial_transfer_in_progress
+        if = {
+            limit = { is_in_prison_type = house_arrest }
+            scope:tca_custodian = { imprison = { target = scope:tca_transferred_prisoner type = house_arrest } }
+        }
+        else = {
+            scope:tca_custodian = { imprison = { target = scope:tca_transferred_prisoner type = dungeon } }
+        }
+        remove_character_flag = tca_judicial_transfer_in_progress
+    }
+}
+
+# Judicial title scope. Runs after existing appointment/liege maintenance.
+tca_reconcile_judicial_prisoners_effect = {
+    if = {
+        limit = { exists = var:song_judicial_circuit.holder has_variable_list = tca_judicial_prisoners }
+        var:song_judicial_circuit.holder = { save_scope_as = tca_custodian }
+        if = {
+            limit = { tca_is_valid_judicial_holder_trigger = yes }
+            holder = { save_scope_as = tca_custodian }
+        }
+        every_in_list = {
+            variable = tca_judicial_prisoners
+            if = {
+                limit = { is_alive = yes is_imprisoned = yes }
+                tca_transfer_judicial_prisoner_effect = yes
+            }
+            else = { tca_unregister_judicial_prisoner_effect = yes }
+        }
+    }
+}
+
+# Judicial title scope; called BEFORE unlinking/destroying the office.
+tca_retire_judicial_prisoners_effect = {
+    if = {
+        limit = { has_variable_list = tca_judicial_prisoners }
+        var:song_judicial_circuit.holder ?= { save_scope_as = tca_custodian }
+        every_in_list = {
+            variable = tca_judicial_prisoners
+            tca_transfer_judicial_prisoner_effect = yes
+            tca_unregister_judicial_prisoner_effect = yes
+        }
+    }
+}
+
+# Prisoner scope, after the native refusal war or battle has actually captured them.
+tca_resolve_pending_judicial_capture_effect = {
+    if = {
+        limit = {
+            exists = var:tca_pending_judicial_title
+            exists = var:tca_pending_judicial_governor
+            is_imprisoned_by = var:tca_pending_judicial_governor
+        }
+        var:tca_pending_judicial_title = { save_scope_as = tca_position }
+        if = {
+            limit = {
+                scope:tca_position = {
+                    tca_is_valid_judicial_holder_trigger = yes
+                    var:song_judicial_circuit = {
+                        tca_is_judicial_circuit_trigger = yes
+                        tca_has_judicial_title_trigger = yes
+                    }
+                }
+                tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:tca_position.var:song_judicial_circuit }
+            }
+            scope:tca_position.holder = { save_scope_as = tca_custodian }
+            # Clear before transfer, since imprison can fire another on_imprison.
+            remove_variable = tca_pending_judicial_title
+            remove_variable = tca_pending_judicial_governor
+            tca_transfer_judicial_prisoner_effect = yes
+            if = {
+                limit = { is_imprisoned_by = scope:tca_custodian }
+                tca_register_judicial_prisoner_effect = yes
+            }
+        }
+        else = {
+            remove_variable = tca_pending_judicial_title
+            remove_variable = tca_pending_judicial_governor
+        }
+    }
+}

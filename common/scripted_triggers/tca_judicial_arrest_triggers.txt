@@ -1,0 +1,128 @@
+﻿# Character scope. Only the mod's ordinary civilian circuits lose the native entry.
+tca_is_judicial_governor_trigger = {
+    any_held_title = {
+        tca_is_judicial_circuit_trigger = yes
+        NOT = { has_variable = tca_judicial_disabled }
+    }
+    NOT = { tgp_is_any_minister = yes }
+}
+
+tca_is_judicial_commissioner_trigger = {
+    exists = primary_title
+    primary_title ?= {
+        has_variable = tca_judicial_title
+        tca_is_valid_judicial_holder_trigger = yes
+        exists = var:song_judicial_circuit
+        var:song_judicial_circuit = {
+            tca_is_judicial_circuit_trigger = yes
+            tca_has_judicial_title_trigger = yes
+            NOT = { has_variable = tca_judicial_disabled }
+        }
+    }
+}
+
+tca_uses_judicial_arrest_trigger = {
+    OR = {
+        tca_is_judicial_governor_trigger = yes
+        tca_is_judicial_commissioner_trigger = yes
+        AND = {
+            exists = primary_title
+            primary_title ?= { has_variable = tca_judicial_title }
+        }
+    }
+}
+
+# Character scope. Follow actual title hierarchy, never location or de-jure borders.
+# A governor's own court belongs to their primary circuit when they hold several.
+tca_is_judicial_target_in_circuit_trigger = {
+    save_temporary_scope_as = tca_jurisdiction_target
+    $CIRCUIT$ = { save_temporary_scope_as = tca_target_circuit }
+    this != scope:tca_target_circuit.holder
+    NOT = { tgp_is_any_minister = yes }
+    # Judicial office holders are outside this local arrest interaction.
+    NOT = { any_held_title = { has_variable = tca_judicial_title } }
+    OR = {
+        AND = {
+            is_ruler = yes
+            primary_title = { target_is_de_facto_liege_or_above = scope:tca_target_circuit }
+        }
+        AND = {
+            is_ruler = no
+            liege_or_court_owner ?= {
+                primary_title = {
+                    OR = {
+                        this = scope:tca_target_circuit
+                        target_is_de_facto_liege_or_above = scope:tca_target_circuit
+                    }
+                }
+            }
+        }
+    }
+    # Merely being a guest or traveller does not establish jurisdiction.
+    is_foreign_court_guest = no
+    trigger_if = {
+        limit = { is_courtier = yes }
+        NOT = { host ?= { any_foreign_court_guest = { this = scope:tca_jurisdiction_target } } }
+    }
+}
+
+# Only documented interaction scopes survive redirect into menu/AI checks.
+# Guard evaluation: missing scopes must never expand into null-title tooltips.
+tca_judicial_arrest_context_valid_trigger = {
+    exists = scope:secondary_actor
+    exists = scope:secondary_recipient
+    trigger_if = {
+        limit = { exists = scope:secondary_actor exists = scope:secondary_recipient }
+        scope:secondary_actor = {
+            is_alive = yes
+            is_imprisoned = no
+            tca_is_judicial_governor_trigger = yes
+        }
+        scope:secondary_recipient = {
+            tca_is_judicial_commissioner_trigger = yes
+            liege = scope:secondary_actor
+            is_imprisoned = no
+            primary_title.var:song_judicial_circuit = { holder = scope:secondary_actor }
+        }
+        scope:actor = scope:puppet_or_actor
+        OR = {
+            AND = {
+                scope:actor = scope:secondary_actor
+                scope:intermediary ?= scope:secondary_recipient
+            }
+            scope:actor = scope:secondary_recipient
+        }
+        scope:recipient = {
+            is_alive = yes
+            this != scope:actor
+            this != scope:secondary_recipient
+            tca_is_judicial_target_in_circuit_trigger = {
+                CIRCUIT = scope:secondary_recipient.primary_title.var:song_judicial_circuit
+            }
+        }
+    }
+}
+
+tca_judicial_arrest_still_valid_trigger = {
+    tca_judicial_arrest_context_valid_trigger = yes
+    trigger_if = {
+        limit = { tca_judicial_arrest_context_valid_trigger = yes }
+        scope:puppet_or_actor = {
+            advanced_allowed_to_imprison_character_trigger = { CHARACTER = scope:recipient }
+        }
+        scope:secondary_actor = {
+            basic_allowed_to_imprison_character_trigger = { CHARACTER = scope:recipient }
+            NOT = { is_at_war_with = scope:recipient }
+        }
+        tca_judicial_arrest_native_common_valid_trigger = yes
+        NOT = { scope:recipient ?= scope:puppet_or_actor.diarch }
+        NOT = { scope:recipient ?= scope:secondary_actor.diarch }
+        scope:recipient = {
+            NOT = { is_close_or_extended_family_of = scope:secondary_actor.top_liege }
+        }
+        trigger_if = {
+            limit = { scope:hook ?= yes }
+            scope:puppet_or_actor = { has_usable_hook = scope:recipient }
+        }
+    }
+}

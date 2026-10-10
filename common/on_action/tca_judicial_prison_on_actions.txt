@@ -1,0 +1,58 @@
+﻿on_imprison = { on_actions = { tca_judicial_capture } }
+on_release_from_prison = { on_actions = { tca_judicial_prison_release } }
+on_death = { on_actions = { tca_judicial_prison_death } }
+on_war_won_attacker = { on_actions = { tca_judicial_refusal_war_ended } }
+on_war_won_defender = { on_actions = { tca_judicial_refusal_war_ended } }
+on_war_white_peace = { on_actions = { tca_judicial_refusal_war_ended } }
+on_war_invalidated = { on_actions = { tca_judicial_refusal_war_ended } }
+
+tca_judicial_capture = {
+    trigger = {
+        has_variable = tca_pending_judicial_title
+        is_imprisoned_by = var:tca_pending_judicial_governor
+        is_at_war_with = var:tca_pending_judicial_governor
+    }
+    effect = { trigger_event = { id = tca_judicial_prison.1 days = 1 } }
+}
+
+# Defer until native CB effects have imprisoned the defeated rebel.
+# Always clear the pending designation on peace, victory or invalidation.
+tca_judicial_refusal_war_ended = {
+    trigger = {
+        scope:attacker ?= {
+            has_variable = tca_pending_judicial_title
+            var:tca_pending_judicial_governor ?= scope:defender
+        }
+    }
+    effect = { scope:attacker = { trigger_event = { id = tca_judicial_prison.1 days = 1 } } }
+}
+
+tca_judicial_prison_release = {
+    trigger = {
+        NOT = { has_character_flag = tca_judicial_transfer_in_progress }
+        has_variable = tca_judicial_prison_title
+    }
+    effect = { tca_unregister_judicial_prisoner_effect = yes }
+}
+
+tca_judicial_prison_death = {
+    effect = {
+        if = {
+            limit = { has_variable = tca_judicial_prison_title }
+            tca_unregister_judicial_prisoner_effect = yes
+        }
+        # on_death runs before death: secure only office prisoners with the governor.
+        if = {
+            limit = { tca_is_judicial_commissioner_trigger = yes }
+            primary_title = { save_scope_as = tca_dying_judicial_title }
+            primary_title.var:song_judicial_circuit.holder = { save_scope_as = tca_custodian }
+            every_prisoner = {
+                limit = {
+                    has_variable = tca_judicial_prison_title
+                    var:tca_judicial_prison_title = scope:tca_dying_judicial_title
+                }
+                tca_transfer_judicial_prisoner_effect = yes
+            }
+        }
+    }
+}

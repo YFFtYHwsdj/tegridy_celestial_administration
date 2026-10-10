@@ -1,0 +1,303 @@
+﻿tca_request_imprison_interaction = {
+    desc = tca_request_imprison_interaction_desc
+    redirect = {
+        scope:actor = {
+            random_held_title = {
+                limit = {
+                    tca_is_judicial_circuit_trigger = yes
+                    tca_has_judicial_title_trigger = yes
+                    scope:recipient = { tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = prev } }
+                }
+                holder = { save_scope_as = secondary_actor }
+                var:song_judicial_title = {
+                    holder ?= { save_scope_as = secondary_recipient save_scope_as = intermediary }
+                }
+            }
+        }
+    }
+    is_shown = {
+        scope:puppet_or_actor = { tca_is_judicial_governor_trigger = yes }
+        scope:recipient = { this != scope:puppet_or_actor is_imprisoned = no }
+        scope:puppet_or_actor = {
+            any_held_title = {
+                tca_is_judicial_circuit_trigger = yes
+                scope:recipient = { tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = prev } }
+            }
+        }
+    }
+    intermediary_notification_text = tca_judicial_approval_notification
+    intermediary_breakdown_yes = tca_judicial_approval_yes
+    intermediary_breakdown_no = tca_judicial_approval_no
+    intermediary_breakdown_maybe = tca_judicial_approval_maybe
+    intermediary_answer_accept_key = REPLY_ANSWER_ALLOW
+    intermediary_answer_reject_key = REPLY_ANSWER_VETO
+    ai_intermediary_maybe = no
+    ai_intermediary_accept = {
+        base = -25
+        modifier = { add = 75 desc = tca_judicial_approval_reason scope:actor = { has_imprisonment_reason = scope:recipient } }
+        opinion_modifier = { who = scope:intermediary opinion_target = scope:actor multiplier = 0.5 desc = AI_OPINION_REASON }
+        opinion_modifier = { who = scope:intermediary opinion_target = scope:recipient multiplier = -0.5 desc = tca_judicial_approval_target_opinion }
+        ai_value_modifier = {
+            who = scope:intermediary
+            ai_honor = {
+                if = {
+                    limit = { scope:actor = { NOT = { has_imprisonment_reason = scope:recipient } } }
+                    value = -0.5
+                }
+            }
+        }
+    }
+    on_intermediary_accept = { tca_judicial_arrest_approved_effect = yes }
+    on_intermediary_decline = { tca_restore_judicial_arrest_context_effect = yes tca_judicial_arrest_veto_effect = yes }
+
+    interface_priority = 121
+    common_interaction = yes
+    icon = prison
+    category = interaction_category_hostile
+    cooldown_against_recipient = { days = 10 }
+    ai_maybe = yes
+    ai_min_reply_days = 4
+    ai_max_reply_days = 9
+    can_send_despite_rejection = yes
+    popup_on_receive = yes
+    pause_on_receive = yes
+    greeting = negative
+    notification_text = tca_judicial_arrest_notification
+    pre_answer_maybe_key = ANSWER_MIGHT_SUCCEED
+    pre_answer_no_key = ANSWER_CANT_SUCCEED
+    pre_answer_yes_key = ANSWER_WILL_SUCCEED
+    pre_answer_maybe_breakdown_key = ANSWER_SUM_CHANCE
+    on_decline_summary = tca_judicial_arrest_decline_summary
+    secondary_scopes_optional = yes
+    is_valid = { tca_judicial_arrest_context_valid_trigger = yes }
+    is_valid_showing_failures_only = {
+        custom_tooltip = { text = tca_judicial_arrest_eligible tca_judicial_arrest_still_valid_trigger = yes }
+        custom_tooltip = { text = tca_judicial_arrest_not_puppet NOT = { scope:is_puppet_action ?= yes } }
+    }
+    can_send = {
+        custom_tooltip = { text = tca_judicial_arrest_eligible tca_judicial_arrest_still_valid_trigger = yes }
+        scope:puppet_or_actor = {
+            custom_description = {
+                text = character_interactions_hostile_actions_disabled_delay
+                NOT = { has_character_flag = flag_hostile_actions_disabled_delay }
+            }
+            trigger_if = {
+                limit = { is_ai = yes }
+                has_imprisonment_reason = scope:recipient
+            }
+        }
+    }
+    is_highlighted = { scope:puppet_or_actor = { has_imprisonment_reason = scope:recipient } }
+    send_option = {
+		is_valid = {
+			exists = scope:recipient
+			scope:puppet_or_actor = {
+				has_usable_hook = scope:recipient
+			}
+		}
+		flag = hook
+		localization = SCHEME_HOOK
+	}
+    should_use_extra_icon = { scope:puppet_or_actor = { has_usable_hook = scope:recipient } }
+    extra_icon = "gfx/interface/icons/character_interactions/hook_icon.dds"
+    send_options_exclusive = no
+    cost = { prestige = liege_diarchy_surcharge_interaction_imprison_interaction_value }
+    on_send = {
+        tca_restore_judicial_arrest_context_effect = yes
+        scope:puppet_or_actor = { add_character_flag = { flag = flag_hostile_actions_disabled_delay days = 10 } }
+    }
+    on_accept = {
+        tca_restore_judicial_arrest_context_effect = yes
+        if = {
+            limit = { tca_judicial_arrest_still_valid_trigger = yes }
+            tca_judicial_arrest_success_native_effect = yes
+        }
+        else = { tca_judicial_arrest_invalidated_effect = yes }
+    }
+    on_decline = {
+        tca_restore_judicial_arrest_context_effect = yes
+        if = {
+            limit = { tca_judicial_arrest_still_valid_trigger = yes }
+            tca_judicial_arrest_decline_native_effect = yes
+        }
+        else = { tca_judicial_arrest_invalidated_effect = yes }
+    }
+    auto_accept = {trigger_if = {
+			limit = {
+				scope:recipient = {
+					is_landed = no
+					# Landless prelates: a cardinalate or clerical region cannot sustain the refusal war
+					OR = {
+						exists = clerical_elector_title
+						any_held_title = {
+							OR = {
+								is_noble_family_title = yes
+								has_clerical_region = yes
+							}
+						}
+					}
+				}
+			}
+			custom_description = {
+				text = noble_family_head_cannot_refuse_your_power
+				scope:recipient = {
+					is_landed = no
+					OR = {
+						exists = clerical_elector_title
+						any_held_title = {
+							OR = {
+								is_noble_family_title = yes
+								has_clerical_region = yes
+							}
+						}
+					}
+				}
+			}
+		}
+		trigger_else = {
+			always = no
+		}
+	}
+    ai_accept = { base = 0 tca_judicial_target_acceptance = { GOVERNOR = scope:secondary_actor } }
+    ai_will_do = { base = -100 tca_judicial_arrest_ai_will_do = { GOVERNOR = scope:secondary_actor } }
+    ai_frequency_by_tier = { barony = 0 county = 36 duchy = 10 kingdom = 10 empire = 10 hegemony = 10 }
+    ai_targets = { ai_recipients = vassals chance = 0.5 }
+    ai_targets = { ai_recipients = courtiers chance = 0.25 }
+}
+
+tca_judicial_imprison_interaction = {
+    desc = tca_judicial_imprison_interaction_desc
+    redirect = {
+        scope:actor = {
+            save_scope_as = secondary_recipient
+            primary_title = {
+                var:song_judicial_circuit ?= {
+                    holder ?= { save_scope_as = secondary_actor }
+                }
+            }
+        }
+    }
+    is_shown = {
+        scope:puppet_or_actor = { tca_is_judicial_commissioner_trigger = yes }
+        scope:recipient = {
+            this != scope:puppet_or_actor
+            is_imprisoned = no
+            tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:puppet_or_actor.primary_title.var:song_judicial_circuit }
+        }
+    }
+
+    interface_priority = 121
+    common_interaction = yes
+    icon = prison
+    category = interaction_category_hostile
+    cooldown_against_recipient = { days = 10 }
+    ai_maybe = yes
+    ai_min_reply_days = 4
+    ai_max_reply_days = 9
+    can_send_despite_rejection = yes
+    popup_on_receive = yes
+    pause_on_receive = yes
+    greeting = negative
+    notification_text = tca_judicial_arrest_notification
+    pre_answer_maybe_key = ANSWER_MIGHT_SUCCEED
+    pre_answer_no_key = ANSWER_CANT_SUCCEED
+    pre_answer_yes_key = ANSWER_WILL_SUCCEED
+    pre_answer_maybe_breakdown_key = ANSWER_SUM_CHANCE
+    on_decline_summary = tca_judicial_arrest_decline_summary
+    secondary_scopes_optional = yes
+    is_valid = { tca_judicial_arrest_context_valid_trigger = yes }
+    is_valid_showing_failures_only = {
+        custom_tooltip = { text = tca_judicial_arrest_eligible tca_judicial_arrest_still_valid_trigger = yes }
+        custom_tooltip = { text = tca_judicial_arrest_not_puppet NOT = { scope:is_puppet_action ?= yes } }
+    }
+    can_send = {
+        custom_tooltip = { text = tca_judicial_arrest_eligible tca_judicial_arrest_still_valid_trigger = yes }
+        scope:puppet_or_actor = {
+            custom_description = {
+                text = character_interactions_hostile_actions_disabled_delay
+                NOT = { has_character_flag = flag_hostile_actions_disabled_delay }
+            }
+            trigger_if = {
+                limit = { is_ai = yes }
+                has_imprisonment_reason = scope:recipient
+            }
+        }
+    }
+    is_highlighted = { scope:puppet_or_actor = { has_imprisonment_reason = scope:recipient } }
+    send_option = {
+		is_valid = {
+			exists = scope:recipient
+			scope:puppet_or_actor = {
+				has_usable_hook = scope:recipient
+			}
+		}
+		flag = hook
+		localization = SCHEME_HOOK
+	}
+    should_use_extra_icon = { scope:puppet_or_actor = { has_usable_hook = scope:recipient } }
+    extra_icon = "gfx/interface/icons/character_interactions/hook_icon.dds"
+    send_options_exclusive = no
+    cost = { prestige = liege_diarchy_surcharge_interaction_imprison_interaction_value }
+    on_send = {
+        tca_restore_judicial_arrest_context_effect = yes
+        scope:puppet_or_actor = { add_character_flag = { flag = flag_hostile_actions_disabled_delay days = 10 } }
+    }
+    on_accept = {
+        tca_restore_judicial_arrest_context_effect = yes
+        if = {
+            limit = { tca_judicial_arrest_still_valid_trigger = yes }
+            tca_judicial_arrest_success_native_effect = yes
+        }
+        else = { tca_judicial_arrest_invalidated_effect = yes }
+    }
+    on_decline = {
+        tca_restore_judicial_arrest_context_effect = yes
+        if = {
+            limit = { tca_judicial_arrest_still_valid_trigger = yes }
+            tca_judicial_arrest_decline_native_effect = yes
+        }
+        else = { tca_judicial_arrest_invalidated_effect = yes }
+    }
+    auto_accept = {trigger_if = {
+			limit = {
+				scope:recipient = {
+					is_landed = no
+					# Landless prelates: a cardinalate or clerical region cannot sustain the refusal war
+					OR = {
+						exists = clerical_elector_title
+						any_held_title = {
+							OR = {
+								is_noble_family_title = yes
+								has_clerical_region = yes
+							}
+						}
+					}
+				}
+			}
+			custom_description = {
+				text = noble_family_head_cannot_refuse_your_power
+				scope:recipient = {
+					is_landed = no
+					OR = {
+						exists = clerical_elector_title
+						any_held_title = {
+							OR = {
+								is_noble_family_title = yes
+								has_clerical_region = yes
+							}
+						}
+					}
+				}
+			}
+		}
+		trigger_else = {
+			always = no
+		}
+	}
+    ai_accept = { base = 0 tca_judicial_target_acceptance = { GOVERNOR = scope:secondary_actor } }
+    ai_will_do = { base = -100 tca_judicial_arrest_ai_will_do = { GOVERNOR = scope:secondary_actor } }
+    ai_frequency_by_tier = { barony = 0 county = 36 duchy = 10 kingdom = 10 empire = 10 hegemony = 10 }
+
+    ai_targets = { ai_recipients = peer_vassals chance = 0.5 }
+    ai_targets = { ai_recipients = scripted_relations chance = 0.25 }
+}

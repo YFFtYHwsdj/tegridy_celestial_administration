@@ -1,0 +1,673 @@
+﻿# Adapted vanilla on_accept/on_decline and war_for_imprison_effect.
+# These bodies run only after tca_judicial_arrest_still_valid_trigger.
+# tca_authority is the actual initiator, tca_governor provides military backing.
+tca_judicial_arrest_success_native_effect = {
+		if = {
+			limit = { scope:is_puppet_action ?= yes }
+			scope:puppet_or_actor = {
+				if = {
+					limit = { liege_diarchy_surcharge_interaction_imprison_interaction_value > 0 }
+					add_prestige = { value = { add = liege_diarchy_surcharge_interaction_imprison_interaction_value max = prestige multiply = -1 } }
+				}
+				if = {
+					limit = {
+						has_title = title:e_minister_of_justice
+						scope:recipient = {
+							NOT = { is_courtier_of = scope:puppet_or_actor }
+						}
+					}
+					remove_treasury = scope:puppet_or_actor.major_treasury_value
+				}
+			}
+		}
+		scope:puppet_or_actor = {
+			if = {
+				limit = {
+					has_title = title:e_minister_of_justice
+				}
+				if = {
+					limit = {
+						NOR = {
+							has_imprisonment_reason = scope:recipient
+							scope:recipient.liege = {
+								has_imprisonment_reason = scope:recipient
+							}
+							scope:hook = yes
+						}
+						any_character_situation = {
+							situation_type = dynastic_cycle
+							situation_top_has_catalyst = catalyst_minister_imprison
+						}
+					}
+					save_scope_value_as = {
+						name = use_strife_not_tyranny
+						value = yes
+					}
+					situation:dynastic_cycle = {
+						trigger_situation_catalyst = {
+							catalyst = catalyst_minister_imprison
+							character = scope:recipient
+						}
+					}
+				}
+				if = {
+					limit = {
+						government_allows = merit
+					}
+					change_merit = {
+						value = minor_merit_gain
+						multiply = scope:recipient.highest_held_title_tier
+					}
+				}
+				if = {
+					limit = {
+						government_has_flag = government_has_influence
+					}
+					change_influence = {
+						value = minor_influence_gain
+						multiply = scope:recipient.highest_held_title_tier
+					}
+				}
+				scope:recipient.liege = {
+					if = {
+						limit = { has_imprisonment_reason = scope:recipient }
+						consume_imprisonment_reasons = scope:recipient
+					}
+				}
+			}
+		}
+		if = {
+			limit = { scope:hook = yes }
+			scope:puppet_or_actor = { use_hook = scope:recipient }
+		}
+		illegal_imprisonment_dread_effect = yes
+		imprison_court_chaplain_consequences_effect = yes
+		imprison_HoF_consequences_effect = yes
+		scope:recipient = {
+			if = {
+				limit = {
+					is_a_faction_member = yes
+					liege = scope:puppet_or_actor
+				}
+				joined_faction = { save_scope_as = retaliating_faction }
+			}
+		}
+		# Tyranny remains with the initiator.
+		# Custody split (Plan A):
+		# - Governor-initiated arrest (approved by commissioner): held directly by governor.
+		# - Commissioner-initiated arrest: held by commissioner and registered to judicial office.
+        scope:puppet_or_actor = { imprison_tyranny_effect = yes }
+        save_scope_value_as = { name = disable_display_rightful_imprisonment_tooltip value = yes }
+        if = {
+            limit = { scope:puppet_or_actor = { tca_is_judicial_governor_trigger = yes } }
+            scope:puppet_or_actor = { save_scope_as = tca_custodian }
+            rightfully_imprison_character_effect = {
+                TARGET = scope:recipient
+                IMPRISONER = scope:tca_custodian
+            }
+        }
+        else = {
+            scope:tca_commissioner = { save_scope_as = tca_custodian }
+            rightfully_imprison_character_effect = {
+                TARGET = scope:recipient
+                IMPRISONER = scope:tca_custodian
+            }
+            scope:recipient = { tca_register_judicial_prisoner_effect = yes }
+        }
+		# If they recently revoked your title, or asked for your excommunication, they become your rival
+		imprison_attempt_escalates_rivalry_effect = yes
+		scope:puppet_or_actor = {
+			# Native event previews imprisonment by the initiator, so use a custody-aware toast below.
+			if = {
+				limit = {
+					has_imprisonment_reason = scope:recipient
+				}
+				stress_and_fulfillment_impact = {
+					compassionate = minor_stress_impact_gain
+					forgiving = minor_stress_impact_gain
+				}
+			}
+			else = {
+				stress_and_fulfillment_impact = {
+					just = medium_stress_impact_gain
+					compassionate = medium_stress_impact_gain
+				}
+				if = {
+					limit = { exists = scope:retaliating_faction}
+					scope:retaliating_faction = {
+						imprisonment_retribution_start_faction_war_if_valid = yes
+					}
+				}
+			}
+		}
+		if = {
+			limit = {
+				scope:puppet_or_actor = { has_character_flag = flag_hostile_actions_disabled_delay }
+			}
+			scope:puppet_or_actor = { remove_character_flag = flag_hostile_actions_disabled_delay }
+		}
+
+		# If we're a clan this interaction affects unity
+		if = { # If you don't have an imprisonment reason, and the target is landed, you lose more unity
+			limit = {
+				NOT = { scope:puppet_or_actor = { has_imprisonment_reason = scope:recipient } }
+				scope:recipient = { is_landed_or_landless_administrative_or_theocratic = yes }
+			}
+			add_clan_unity_interaction_effect = {
+				CHARACTER = scope:puppet_or_actor
+				TARGET = scope:recipient
+				VALUE = major_unity_loss
+				DESC = clan_unity_imprison.desc
+				REVERSE_NON_HOUSE_TARGET = no
+			}
+		}
+		else_if = { # If you don't have an imprisonment reason, and the target is unlanded, you lose slightly less unity
+			limit = {
+				NOT = { scope:puppet_or_actor = { has_imprisonment_reason = scope:recipient } }
+				scope:recipient = { is_landed_or_landless_administrative_or_theocratic = no }
+			}
+			add_clan_unity_interaction_effect = {
+				CHARACTER = scope:puppet_or_actor
+				TARGET = scope:recipient
+				VALUE = medium_unity_loss
+				DESC = clan_unity_imprison.desc
+				REVERSE_NON_HOUSE_TARGET = no
+			}
+		}
+		else = { # If you have a valid reason, you lose only a tiny bit of unity (criminal or not, they are still family)
+			add_clan_unity_interaction_effect = {
+				CHARACTER = scope:puppet_or_actor
+				TARGET = scope:recipient
+				VALUE = minor_unity_loss
+				DESC = clan_unity_imprison.desc
+				REVERSE_NON_HOUSE_TARGET = no
+			}
+		}
+
+		# Harrying logic.
+		scope:puppet_or_actor = {
+			if = {
+				limit = {
+					character_is_valid_for_harrying_of_the_north_trigger = yes
+					scope:recipient = {
+						character_is_valid_for_harrying_of_the_north_trigger = yes
+						is_important_or_vip_struggle_character = yes
+					}
+					culture != scope:recipient.culture
+				}
+				global_var:harrying_of_the_north = { save_scope_as = story }
+				if = {
+					limit = {
+						character_is_valid_norman_for_harrying_of_the_north_trigger = yes
+						scope:recipient = { character_is_valid_anglo_saxon_for_harrying_of_the_north_trigger = yes }
+					}
+					ep3_increase_pacification_effect = { AMOUNT = harrying_minor_increase_value }
+				}
+				else_if = {
+					limit = {
+						character_is_valid_anglo_saxon_for_harrying_of_the_north_trigger = yes
+						scope:recipient = { character_is_valid_norman_for_harrying_of_the_north_trigger = yes }
+					}
+					ep3_increase_resistance_effect = { AMOUNT = harrying_minor_increase_value }
+				}
+			}
+		}
+
+    scope:puppet_or_actor = {
+        send_interface_toast = { type = event_toast_effect_good title = tca_judicial_arrest_success left_icon = scope:recipient right_icon = scope:tca_custodian }
+    }
+}
+
+tca_judicial_arrest_decline_native_effect = {
+		#Close family might get rival progress
+		if = {
+			limit = {
+				scope:recipient = {
+					is_close_family_of = scope:puppet_or_actor
+				}
+				#Legal imprisonment
+				trigger_if = {
+					limit = {
+						scope:puppet_or_actor = {
+							has_imprisonment_reason = scope:recipient
+						}
+					}
+					scope:recipient = {
+						NOR = {
+							has_trait = forgiving
+							ai_honor >= low_positive_ai_value
+						}
+					}
+				}
+				#Illegal imprisonment
+				trigger_else = {
+					scope:recipient = {
+						NOT = {
+							has_trait = forgiving
+						}
+					}
+				}
+			}
+			scope:recipient = {
+				progress_towards_rival_effect = {
+					CHARACTER = scope:puppet_or_actor
+					REASON = rival_imprisoned_family
+					OPINION = 0
+				}
+			}
+		}
+		if = {
+			limit = {
+				scope:puppet_or_actor = {
+					NOT = { has_title = title:e_minister_of_justice }
+				}
+			}
+			if = {
+				limit = {
+					scope:recipient = {
+						has_government = landless_adventurer_government
+					}
+				}
+				scope:recipient = {
+					if = {
+						limit = { current_military_strength >= ep3_interactions_events_0500_troops_count_value }
+						start_war = {
+							cb = ep3_laamp_apprehend_adventurer_cb
+							target = scope:puppet_or_actor
+						}
+					}
+					else = {
+						# Remove them immediately.
+						remove_laamp_from_exiled_county_automatically_effect = {
+							PROVINCE = scope:recipient.location
+							LAAMP = scope:recipient
+						}
+					}
+				}
+			}
+			else = {
+				scope:puppet_or_actor = {
+					imprison_HoF_consequences_effect = yes
+					imprison_tyranny_effect = yes
+				}
+				scope:recipient = {
+					#If target is count or higher, start war.
+					if = {
+						limit = {
+							is_playable_character = yes
+							primary_title.tier > tier_barony
+						}
+						if = {
+							limit = {
+								is_a_faction_member = yes
+                                scope:tca_authority = scope:tca_governor
+								liege = scope:tca_governor
+								joined_faction = {
+									faction_target = scope:tca_governor
+									NOT = { faction_is_type = populist_faction }
+								}
+							}
+							joined_faction = {
+								save_scope_as = retaliating_faction # For loc
+								imprisonment_retribution_start_faction_war_if_valid = yes
+							}
+							hidden_effect = {
+								if = {
+									limit = { NOT = { exists = joined_faction.faction_war } }
+									tca_judicial_war_for_imprison_effect = {
+										LIEGE = scope:tca_governor
+										REBEL = scope:recipient
+									}
+								}
+							}
+						}
+						else = {
+							tca_judicial_war_for_imprison_effect = {
+								LIEGE = scope:tca_governor
+								REBEL = scope:recipient
+							}
+						}
+					}
+					#If target is a baron or unlanded, have them escape.
+					else = {
+						if = { #To block them from being instantly rehired
+							limit = {
+								is_councillor_of = scope:puppet_or_actor
+								can_be_fired_from_council_trigger = { COURT_OWNER = scope:puppet_or_actor }
+							}
+							set_variable = {
+								name = escaped_imprisonment_from
+								value = scope:puppet_or_actor
+								years = 20
+							}
+						}
+						imprison_court_chaplain_consequences_effect = yes
+						if = {
+							limit = {
+								is_landed_or_landless_administrative_or_theocratic = yes
+							}
+							depose_effect = { DEPOSER = scope:puppet_or_actor }
+						}
+						else_if  = {
+							limit = {
+								is_hostage = yes
+								warden = scope:puppet_or_actor
+							}
+							save_scope_as = imprison_failure
+							save_scope_as = hostage
+							warden = { save_scope_as = warden }
+							home_court = { save_scope_as = home_court }
+							scope:warden = { trigger_event = bp2_hostage_system.0400 }
+							scope:home_court = { trigger_event = bp2_hostage_system.0401 }
+							return_hostage = yes
+						}
+						else_if = {
+							limit = {
+								is_landed_or_landless_administrative_or_theocratic = no
+								trigger_if = {
+									limit = {
+										is_councillor = yes
+									}
+									can_be_fired_from_council_trigger = { COURT_OWNER = scope:recipient.liege }
+								}
+								trigger_if = {
+									limit = {
+										exists = scope:puppet_or_actor.faith.religious_head
+									}
+									scope:puppet_or_actor.faith.religious_head != scope:recipient
+								}
+							}
+							select_and_move_to_pool_effect = yes
+						}
+						add_opinion = {
+							target = scope:puppet_or_actor
+							modifier = attempted_imprisonment_opinion
+						}
+					}
+				}
+
+				if = {
+					limit = {
+						scope:puppet_or_actor = { has_realm_law_flag = vassal_refusal_is_treason }
+					}
+					scope:puppet_or_actor = {
+						add_opinion = {
+							target = scope:recipient
+							modifier = treasonous_imprison_refusal
+						}
+					}
+				}
+			}
+
+			#Remove them as guardian/ward for any courtier (feedback given in char_interaction.0230)
+			scope:puppet_or_actor = {
+				if = {
+					limit = {
+						any_courtier = {
+							has_relation_guardian = scope:recipient
+						}
+					}
+					every_courtier = {
+						limit = {
+							has_relation_guardian = scope:recipient
+						}
+						save_scope_as = ward
+						scope:recipient = { remove_relation_ward = scope:ward }
+
+						scope:ward = {
+							if = {
+								limit = {
+									host != liege
+								}
+								return_to_court = yes
+							}
+							guardian_remove_opinion_effect = {
+								GUARDIAN = scope:recipient
+								WARD = this
+								WARD_LIEGE = scope:puppet_or_actor
+							}
+						}
+
+						add_to_list = ward_children
+					}
+				}
+				if = {
+					limit = {
+						any_courtier = {
+							has_relation_ward = scope:recipient
+						}
+					}
+					random_courtier = {
+						limit = {
+							has_relation_ward = scope:recipient
+						}
+						save_scope_as = guardian
+						scope:guardian = { remove_relation_ward = scope:recipient }
+
+						scope:guardian = {
+							if = {
+								limit = {
+									host != liege
+								}
+								return_to_court = yes
+							}
+							guardian_remove_opinion_effect = {
+								GUARDIAN = this
+								WARD = scope:recipient
+								WARD_LIEGE = scope:puppet_or_actor
+							}
+						}
+
+						add_to_list = guardian_list
+					}
+
+					hidden_effect = {
+						scope:guardian = {
+							send_interface_message = {
+								type = event_childhood_neutral
+								title = remove_guardian_interaction_notification
+								left_icon = scope:recipient
+								right_icon = scope:guardian
+								remove_guardian_effect = {
+									GUARDIAN = scope:guardian
+									WARD = scope:recipient
+									RETURN_WARD = yes
+									HIDE_OPINION = no
+								}
+							}
+						}
+					}
+				}
+				if = {
+					limit = {
+						scope:recipient = {
+							OR = {
+								is_playable_character = no
+								AND = {
+									is_playable_character = yes
+									primary_title.tier = tier_barony
+								}
+							}
+						}
+					}
+					trigger_event = char_interaction.0230
+				}
+
+				if = {
+					limit = {
+						has_character_flag = flag_hostile_actions_disabled_delay
+					}
+					remove_character_flag = flag_hostile_actions_disabled_delay
+				}
+			}
+
+			# If we're a clan this interaction affects unity
+			if = { # If you don't have an imprisonment reason, and the target is landed, you lose more unity
+				limit = {
+					NOT = {
+						scope:puppet_or_actor = { has_imprisonment_reason = scope:recipient }
+					}
+					scope:recipient = { is_landed_or_landless_administrative_or_theocratic  = yes }
+				}
+				add_clan_unity_interaction_effect = {
+					CHARACTER = scope:puppet_or_actor
+					TARGET = scope:recipient
+					VALUE = major_unity_loss
+					DESC = clan_unity_imprison.desc
+					REVERSE_NON_HOUSE_TARGET = no
+				}
+			}
+			else_if = { # If you don't have an imprisonment reason, and the target is unlanded, you lose slightly less unity
+				limit = {
+					NOT = {
+						scope:puppet_or_actor = { has_imprisonment_reason = scope:recipient }
+					}
+					scope:recipient = { is_landed_or_landless_administrative_or_theocratic  = no }
+				}
+				add_clan_unity_interaction_effect = {
+					CHARACTER = scope:puppet_or_actor
+					TARGET = scope:recipient
+					VALUE = medium_unity_loss
+					DESC = clan_unity_imprison.desc
+					REVERSE_NON_HOUSE_TARGET = no
+				}
+			}
+			else = { # If you have a valid reason, you lose only a tiny bit of unity (criminal or not, they are still family)
+				add_clan_unity_interaction_effect = {
+					CHARACTER = scope:puppet_or_actor
+					TARGET = scope:recipient
+					VALUE = miniscule_unity_loss
+					DESC = clan_unity_imprison.desc
+					REVERSE_NON_HOUSE_TARGET = no
+				}
+			}
+		}
+
+    scope:tca_authority = { save_scope_as = actor save_scope_as = puppet_or_actor }
+    scope:recipient = {
+        if = {
+            limit = {
+                is_at_war_with = scope:tca_governor
+                scope:tca_authority = { tca_is_judicial_commissioner_trigger = yes }
+            }
+            set_variable = { name = tca_pending_judicial_title value = scope:tca_position }
+            set_variable = { name = tca_pending_judicial_governor value = scope:tca_governor }
+        }
+    }
+}
+
+# Native refusal CB, faction allies and bloc behavior; only reason-owner checks differ.
+tca_judicial_war_for_imprison_effect = {
+	$LIEGE$ = { save_temporary_scope_as = liege_temp }
+	$REBEL$ = {
+		save_temporary_scope_as = rebel_temp
+		save_scope_value_as = {
+			name = war_for_imprisonment_flavour
+			value = yes
+		}
+		start_war = {
+			casus_belli = refused_liege_demand_war
+			target = scope:liege_temp
+		}
+	}
+	# Disgruntled vassals
+	if = {
+		limit = {
+			scope:tca_authority = { NOT = { has_imprisonment_reason = scope:rebel_temp } }
+		}
+		scope:liege_temp = {
+			every_vassal = { #Vassals joining the rebel.
+				limit = {
+					vassal_would_join_rebel_faction_base_trigger = yes
+					OR = {
+						#Lovers and friends always back rebel (unless also lovers/friends of the liege)
+						vassal_would_join_rebel_faction_relation_trigger = yes
+						#Vassals that either like recipient or have high honor will rally if the liege is being tyrannical.
+						AND = {
+							# Special imprisonment checks
+							NOT = {
+								scope:tca_authority = { has_imprisonment_reason = scope:rebel_temp }
+							}
+							# If they can't join a faction against the liege they should not revolt
+							vassal_would_join_rebel_faction_tyranny_trigger = yes
+						}
+						#And finally, vassals that really hate their liege will join regardless (provided that they also do not hate recipient).
+						AND = {
+							OR = {
+								opinion = {
+									target = scope:rebel_temp
+									value >= -25
+								}
+								AND = {
+									has_game_rule = hard_difficulty
+									scope:liege_temp = { is_ai = no }
+									opinion = {
+										target = scope:rebel_temp
+										value >= -50
+									}
+								}
+								AND = {
+									has_game_rule = very_hard_difficulty
+									scope:liege_temp = { is_ai = no }
+									opinion = {
+										target = scope:rebel_temp
+										value >= -75
+									}
+								}
+							}
+							OR = {
+								opinion = {
+									target = scope:liege_temp
+									value <= -40
+								}
+								AND = {
+									has_game_rule = hard_difficulty
+									scope:liege_temp = { is_ai = no }
+									opinion = {
+										target = scope:liege_temp
+										value <= -20
+									}
+								}
+								AND = {
+									has_game_rule = very_hard_difficulty
+									scope:liege_temp = { is_ai = no }
+									opinion = {
+										target = scope:liege_temp
+										value <= 0
+									}
+								}
+							}
+						}
+					}
+					# TGP bloc members follow their leader
+					trigger_if = {
+						limit = { exists = house.house_confederation.leading_house.house_head }
+						house.house_confederation.leading_house.house_head = this
+					}
+				}
+				add_to_list = joining_vassals
+			}
+		}
+	}
+	# Bloc members join despite legality
+	bloc_member_join_war_effect = yes
+	every_in_list = {
+		list = joining_vassals
+		vassal_join_rebel_war_effect = yes
+	}
+	every_player = {
+		limit = { is_vassal_of = scope:liege_temp }
+		scope:liege_temp = {
+			save_scope_as = actor
+			save_scope_as = puppet_or_actor
+		}
+		scope:rebel_temp = { save_scope_as = recipient }
+		trigger_event = char_interaction.0232
+	}
+	scope:rebel_temp = {
+		add_opinion = {
+			target = scope:liege_temp
+			modifier = attempted_arrest_opinion
+		}
+	}
+}

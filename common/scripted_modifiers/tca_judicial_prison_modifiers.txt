@@ -1,0 +1,763 @@
+﻿# Vanilla imprison_interaction scores. Only military backing and war reserve use the governor.
+tca_judicial_target_acceptance = {
+
+
+		modifier = {
+			add = -25
+			scope:recipient = {
+				has_personal_tenet_flag = tenet_false_conversion_sanction_elusive
+			}
+			desc = SANCTIONED_FALSE_CONVERSION_IMPRISONMENT_RESISTANCE
+		}
+
+		legalism_lawful_authority_acceptance_modifier = {
+			ACTOR = scope:puppet_or_actor
+		}
+
+		celestial_hierarchy_acceptance_modifier = {
+			ACTOR = scope:puppet_or_actor
+			RECIPIENT = scope:recipient
+		}
+		modifier = {
+			add = {
+				value = scope:puppet_or_actor.learning
+				multiply = 2
+			}
+			scope:puppet_or_actor = {
+				has_personal_tenet_flag = tenet_religious_law_imprisonment_bonus
+				has_imprisonment_reason = scope:recipient
+			}
+			desc = RELIGIOUS_LAW_IMPRISONMENT_LEARNING_REASON
+		}
+
+		modifier = {
+			add = {
+				value = scope:puppet_or_actor.intrigue
+				multiply = 1
+			}
+			desc = IMPRISON_INTRIGUE_ACTOR
+		}
+		modifier = {
+			add = {
+				value = scope:recipient.intrigue
+				multiply = -2
+			}
+			desc = IMPRISON_INTRIGUE_RECIPIENT
+		}
+
+		modifier = {
+			add = 30
+			scope:hook = yes
+			desc = SCHEME_HOOK_USED
+		}
+		opinion_modifier = { # Opinion Factor
+			who = scope:recipient
+			opinion_target = scope:puppet_or_actor
+			multiplier = 0.5
+			desc = AI_OPINION_REASON
+		}
+		ai_value_modifier = {
+			who = scope:recipient
+			ai_boldness = {
+				if = {
+					limit = {
+						scope:recipient = { NOT = { ai_boldness = 0 } }
+					}
+					value = -0.5
+				}
+			}
+			ai_honor = {
+				if = {
+					limit = {
+						scope:recipient = { #If AI is honorable and the law compels to obey the liege, AI will be more likely to obey.
+							ai_honor > 0
+						}
+						scope:puppet_or_actor = {
+							has_imprisonment_reason = scope:recipient
+							has_realm_law_flag = vassal_refusal_is_treason
+						}
+					}
+					value = 0.75
+				}
+			}
+		}
+		modifier = {
+			add = 20
+			scope:puppet_or_actor = {
+				any_vassal_or_below = { this = scope:recipient }
+				has_realm_law_flag = vassal_refusal_is_treason
+			}
+			desc = AI_REFUSAL_IS_TREASON
+		}
+		modifier = {
+			add = 50
+			scope:puppet_or_actor = {
+				has_perk = prison_feudal_complex_perk
+			}
+			desc = AI_PRISON_FEUDAL_COMPLEX_PERK
+		}
+		modifier = { #I am a King!
+			desc = offer_vassalization_interaction_aibehavior_hightier_tt
+			scope:recipient = { highest_held_title_tier = tier_kingdom }
+			add = -40
+		}
+		modifier = { #Courtiers.
+			desc = AI_REFUSAL_COURTIER
+			scope:recipient = { is_ruler = no }
+			add = 50
+		}
+		modifier = {
+			desc = AI_REFUSAL_HUMAN_SACRIFICE_COURTIER
+			scope:puppet_or_actor = {
+				has_personal_tenet_flag = tenet_human_sacrifice_courtier_imprisonment_chance
+			}
+			scope:recipient = { is_ruler = no }
+			add = 25
+		}
+		modifier = { # Your young children can't really stop you
+			desc = AI_REFUSAL_YOUNG_CHILD
+			scope:recipient = {
+				is_child_of = scope:puppet_or_actor
+				is_courtier_of = scope:puppet_or_actor
+				is_adult = no
+			}
+			add = 200
+		}
+		modifier = { #They're a claimant against you
+			desc = AI_CLAIMANT_PENALTY
+			scope:puppet_or_actor = {
+				OR = {
+					any_targeting_faction = {
+						faction_type = claimant_faction
+						faction_is_at_war = yes
+						special_character ?= scope:recipient
+					}
+					AND = {
+						exists = var:claimant_faction_sent_demand
+						var:claimant_faction_sent_demand = scope:recipient
+					}
+				}
+			}
+			add = -70
+		}
+		modifier = { #Rank difference.
+			desc = AI_REFUSAL_RANK_DIFFERENCE
+			scope:recipient = {
+				is_ruler = yes
+				is_landed = yes
+				highest_held_title_tier < tier_kingdom
+			}
+			add = {
+				value = -15
+				if = {
+					limit = {
+						scope:puppet_or_actor = {
+							tier_difference = {
+								target = scope:recipient
+								value >= 2
+							}
+						}
+					}
+					add = 5
+				}
+				if = {
+					limit = {
+						scope:puppet_or_actor = {
+							tier_difference = {
+								target = scope:recipient
+								value >= 3
+							}
+						}
+					}
+					add = 5
+				}
+				if = { #King asking Baron, modifier becomes positive.
+					limit = {
+						scope:puppet_or_actor = {
+							tier_difference = {
+								target = scope:recipient
+								value >= 4
+							}
+						}
+					}
+					add = 10
+				}
+			}
+		}
+		modifier = {
+			add = intimidated_halved_reason_value
+			scope:recipient = {
+				target_is_liege_or_above = scope:puppet_or_actor
+				has_dread_level_towards = {
+					target = scope:puppet_or_actor
+					level = 1
+				}
+			}
+			desc = INTIMIDATED_REASON
+		}
+		modifier = {
+			add = cowed_halved_reason_value
+			scope:recipient = {
+				target_is_liege_or_above = scope:puppet_or_actor
+				has_dread_level_towards = {
+					target = scope:puppet_or_actor
+					level = 2
+				}
+			}
+			desc = COWED_REASON
+		}
+
+		modifier = {
+			add = intimidated_external_reason_value
+			scope:recipient = {
+				NOT = { target_is_liege_or_above = scope:puppet_or_actor }
+				has_dread_level_towards = {
+					target = scope:puppet_or_actor
+					level = 1
+				}
+			}
+			desc = INTIMIDATED_REASON
+		}
+		modifier = {
+			add = cowed_external_reason_value
+			scope:recipient = {
+				NOT = { target_is_liege_or_above = scope:puppet_or_actor }
+				has_dread_level_towards = {
+					target = scope:puppet_or_actor
+					level = 2
+				}
+			}
+			desc = COWED_REASON
+		}
+		modifier = { #Comparative military strength.
+			desc = offer_vassalization_interaction_aibehavior_power_tt
+			trigger = {
+				scope:puppet_or_actor = { is_ruler = yes }
+				scope:recipient = { is_ruler = yes }
+			}
+			add = {
+				value = 1
+				subtract = {
+					value = scope:recipient.current_military_strength
+					divide = { value = $GOVERNOR$.current_military_strength min = 1 }
+				}
+				multiply = 100
+				min = -1000
+				# This max needs to match the loc in offer_vassalization_interaction_aibehavior_power_tt
+				max = 20
+			}
+		}
+		modifier = { #Rivalry modifier.
+			desc = offer_vassalization_interaction_aibehavior_rival_tt
+			trigger = {
+				scope:recipient = {
+					has_relation_rival = scope:puppet_or_actor
+					NOT = { has_relation_nemesis = scope:puppet_or_actor }
+				}
+			}
+			add = -50
+		}
+		modifier = { #Nemesis modifier.
+			desc = offer_vassalization_interaction_aibehavior_nemesis_tt
+			trigger = {
+				scope:recipient = {
+					has_relation_nemesis = scope:puppet_or_actor
+				}
+			}
+			add = -100
+		}
+		modifier = {
+			add = 10
+			scope:puppet_or_actor = {
+				has_royal_court = yes
+				has_dlc_feature = royal_court
+				is_liege_or_above_of = scope:recipient
+				court_grandeur_current_level >= 7
+				court_grandeur_current_level < 9
+			}
+			desc = GRANDEUR_REASON
+		}
+		modifier = {
+			add = 20
+			scope:puppet_or_actor = {
+				has_royal_court = yes
+				has_dlc_feature = royal_court
+				is_liege_or_above_of = scope:recipient
+				court_grandeur_current_level >= 9
+			}
+			desc = GRANDEUR_REASON
+		}
+		modifier = { # Legalistic tradition
+			desc = tradition_legalistic_name
+			scope:puppet_or_actor = {
+				has_imprisonment_reason = scope:recipient
+				culture = { has_cultural_parameter = vassals_more_likely_accept_punishments }
+			}
+			add = legalistic_vassal_punishment_acceptance
+		}
+		modifier = { # AI Mongols, tyranny wars just delay the inevitable fun!
+			scope:puppet_or_actor = {
+				is_ai = yes
+				OR = {
+					has_trait = greatest_of_khans
+					has_character_modifier = the_great_khan_modifier
+				}
+			}
+			scope:recipient = {
+				is_ai = yes
+			}
+			add = 500
+		}
+		# Thug accolade increases imprison chance because they scary
+		modifier = {
+			scope:puppet_or_actor = {
+				any_active_accolade = {
+					accolade_parameter = accolade_imprisonment_chance
+				}
+			}
+			desc = THUG_REASON
+			add = accolade_imprisonment_chance_value
+		}
+		modifier = {
+			scope:puppet_or_actor = {
+				any_active_accolade = {
+					accolade_parameter = accolade_imprisonment_chance_high
+				}
+			}
+			desc = THUG_REASON_HIGH
+			add = accolade_imprisonment_chance_value_high
+		}
+		evaluate_action_decreasing_house_unity = {
+			VALUE = 100
+		}
+		modifier = {
+			add = -25
+			scope:recipient = {
+				culture = { has_cultural_parameter = vassals_more_likely_to_refuse_demands }
+			}
+			desc = VASSALS_REFUSAL_indomitable_azatani
+		}
+		modifier = {
+			add = 10
+			scope:recipient = { has_character_modifier = ach_intent_imprisonment_modifier }
+			desc = ach_host_intent_imprison_reason
+		}
+	}
+
+tca_judicial_arrest_ai_will_do = {
+
+
+		modifier = { # Make sure the AI uses hooks for this as it's % based
+			scope:hook = yes
+			add = 1
+		}
+
+		modifier = { # Default imprisonment reason weight
+			add = 200
+			scope:puppet_or_actor = {
+				has_imprisonment_reason = scope:recipient
+			}
+		}
+
+		modifier = { # More likely to imprison criminal Soryo's if Ritsuryo
+			add = 200
+			scope:puppet_or_actor = {
+				has_imprisonment_reason = scope:recipient
+				government_has_flag = government_is_japan_administrative
+			}
+			scope:recipient = {
+				government_has_flag = government_is_japan_feudal
+			}
+		}
+
+		modifier = { # Even more imprisonment reason if you are a danger to the Kampaku
+			add = 400
+			scope:puppet_or_actor = {
+				primary_title = title:e_japan
+				has_imprisonment_reason = scope:recipient
+			}
+			scope:recipient = {
+				exists = house.house_confederation
+				house.house_confederation.combined_military_strength > $GOVERNOR$.current_military_strength
+			}
+		}
+
+		modifier = { # Avoid Tyranny wars at inopportune times
+			add = -190
+			scope:puppet_or_actor = {
+				ai_rationality > -100 # Lunatics can do whatever, let the world burn...
+				is_at_war = yes
+			}
+			scope:recipient = {
+				is_playable_character = yes
+			}
+		}
+
+		modifier = { # Avoid imprisonments in certain circumstances
+			add = -190
+			scope:puppet_or_actor = {
+				ai_rationality > -100 # Lunatics can do whatever, let the world burn...
+				NOR = {
+					AND = {
+						intrigue > scope:recipient.intrigue
+						intrigue >= 12
+					}
+					has_perk = prison_feudal_complex_perk
+					scope:recipient = {
+						has_dread_level_towards = {
+							target = scope:puppet_or_actor
+							level >= 1
+						}
+					}
+					culture = { has_cultural_parameter = vassals_more_likely_accept_punishments }
+					$GOVERNOR$.current_military_strength >= scope:recipient.twice_current_military_strength
+					scope:recipient.ai_boldness <= -100
+				}
+			}
+			scope:recipient = {
+				is_playable_character = yes
+			}
+		}
+
+		modifier = { # If the AI is not very bold, avoid imprisoning people unless you're more powerful
+			add = -190
+			scope:puppet_or_actor.ai_rationality > -100 # Lunatics can do whatever, let the world burn...
+			scope:puppet_or_actor.ai_boldness <= 25
+			$GOVERNOR$.current_military_strength < scope:recipient.one_and_a_half_times_current_military_strength
+		}
+
+		modifier = { # Avoid imprisoning people that would destroy you
+			add = -190
+			scope:puppet_or_actor.ai_rationality > -100 # Lunatics can do whatever, let the world burn...
+			$GOVERNOR$.current_military_strength < scope:recipient.current_military_strength
+		}
+
+		modifier = { # Do not imprison when the chance of success if exceedingly low
+			add = -190
+			scope:puppet_or_actor.ai_rationality > -100 # Lunatics can do whatever, let the world burn...
+			scope:recipient = {
+				is_playable_character = yes
+			}
+			NOT = {
+				scope:recipient = {
+					highest_held_title_tier = tier_barony
+				}
+			}
+			scope:puppet_or_actor = {
+				$GOVERNOR$.gold < minimum_ai_gold_value_for_tyranny_wars
+			}
+		}
+
+		modifier = { # Don't imprison people you like
+			scope:puppet_or_actor = {
+				NOT = {
+					has_trait = sadistic
+				}
+				OR = {
+					has_secret_relation_lover = scope:recipient
+					has_relation_lover = scope:recipient
+					has_relation_soulmate = scope:recipient
+					has_relation_friend = scope:recipient
+					has_relation_best_friend = scope:recipient
+					opinion = {
+						target = scope:recipient
+						value > very_high_positive_opinion
+					}
+				}
+			}
+			add = -1000
+		}
+
+		modifier = { # Don't imprison your own children... unless they're your rival/nemesis
+			scope:recipient = {
+				is_child_of = scope:puppet_or_actor
+				NOR = {
+					has_relation_rival = scope:puppet_or_actor
+					has_relation_nemesis = scope:puppet_or_actor
+				}
+			}
+			add = -1000
+		}
+
+		modifier = { # Don't imprison your spouse, unless they're your rival/have cheated on you
+			scope:recipient = {
+				is_spouse_of = scope:puppet_or_actor
+				NOR = {
+					has_relation_rival = scope:puppet_or_actor
+					has_relation_nemesis = scope:puppet_or_actor
+					exposed_cheating_on_spouse_trigger = { SPOUSE = scope:puppet_or_actor }
+				}
+			}
+			add = -1000
+		}
+
+		modifier = { # Try to avoid pointless imprisonments
+			scope:recipient = {
+				NOR = {
+					scope:puppet_or_actor = { # Sadists want people to torture
+						has_trait = sadistic
+					}
+					AND = { # Imprisoning vassals you have revoke reasons on is relevant
+						is_playable_character = yes
+						scope:puppet_or_actor = { has_revoke_title_reason = scope:recipient }
+					}
+					is_a_faction_member = yes
+					has_relation_rival = scope:puppet_or_actor
+					has_relation_nemesis = scope:puppet_or_actor
+					exposed_cheating_on_spouse_trigger = { SPOUSE = scope:puppet_or_actor }
+					scope:puppet_or_actor = { # Scheme Agents should be imprisoned indiscriminately
+						any_targeting_scheme = {
+							hostile_scheme_trigger = yes
+							is_scheme_agent_exposed = scope:recipient
+						}
+					}
+					AND = { # Zealots will imprison characters of other faiths
+						scope:puppet_or_actor.ai_zeal >= medium_positive_ai_value
+						scope:puppet_or_actor.faith != scope:recipient.faith
+					}
+					scope:puppet_or_actor = {
+						has_opinion_modifier = {
+							modifier = murdered_close_family_crime
+							target = scope:recipient
+						}
+					}
+					scope:puppet_or_actor = {
+						has_opinion_modifier = {
+							modifier = attempted_murder_close_family_crime
+							target = scope:recipient
+						}
+					}
+					scope:puppet_or_actor = {
+						has_opinion_modifier = {
+							modifier = executed_close_family
+							target = scope:recipient
+						}
+					}
+					scope:puppet_or_actor = {
+						has_opinion_modifier = {
+							modifier = slept_with_spouse_discovered_opinion
+							target = scope:recipient
+						}
+					}
+					scope:puppet_or_actor = {
+						has_opinion_modifier = {
+							modifier = slept_with_spouse_exposed_opinion
+							target = scope:recipient
+						}
+					}
+					scope:puppet_or_actor = {
+						has_opinion_modifier = {
+							modifier = unfaithful_spouse_discovered_opinion
+							target = scope:recipient
+						}
+					}
+					scope:puppet_or_actor = {
+						has_opinion_modifier = {
+							modifier = unfaithful_spouse_exposed_opinion
+							target = scope:recipient
+						}
+					}
+					scope:puppet_or_actor = {
+						has_opinion_modifier = {
+							modifier = refused_to_renounce_lover_opinion
+							target = scope:recipient
+						}
+					}
+					scope:puppet_or_actor = {
+						has_opinion_modifier = {
+							modifier = betrayed_our_promise
+							target = scope:recipient
+						}
+					}
+					scope:puppet_or_actor = {
+						has_opinion_modifier = {
+							modifier = botched_my_treatment_crime_opinion
+							target = scope:recipient
+						}
+					}
+					scope:puppet_or_actor = {
+						has_opinion_modifier = {
+							modifier = botched_treatment_of_kin_crime_opinion
+							target = scope:recipient
+						}
+					}
+					scope:puppet_or_actor = {
+						has_opinion_modifier = {
+							modifier = smeared_opinion
+							target = scope:recipient
+						}
+					}
+					scope:puppet_or_actor = {
+						has_opinion_modifier = {
+							modifier = insulted_opinion
+							target = scope:recipient
+						}
+					}
+					scope:puppet_or_actor = {
+						has_opinion_modifier = {
+							modifier = mocked_me_in_time_of_need
+							target = scope:recipient
+						}
+					}
+					scope:puppet_or_actor = {
+						has_opinion_modifier = {
+							modifier = loved_one_dungeon_death
+							target = scope:recipient
+						}
+					}
+					scope:puppet_or_actor = {
+						has_opinion_modifier = {
+							modifier = abandoned_me_opinion
+							target = scope:recipient
+						}
+					}
+					scope:puppet_or_actor = {
+						has_opinion_modifier = {
+							modifier = reason_child_died
+							target = scope:recipient
+						}
+					}
+					scope:puppet_or_actor = {
+						has_opinion_modifier = {
+							modifier = falsely_accused
+							target = scope:recipient
+						}
+					}
+				}
+			}
+			add = -1000
+		}
+
+		modifier = {
+			exists = scope:recipient.primary_title
+			add = scope:recipient.primary_title.tier
+		}
+
+		# Agenda impact
+		modifier = {
+			scope:recipient = {
+				is_important_or_vip_struggle_character = yes
+				any_character_struggle = {
+					involvement = involved
+				}
+			}
+			add = {
+				value = 0
+				if = {
+					limit = {
+						scope:puppet_or_actor = {
+							any_character_struggle = {
+								phase_has_catalyst = catalyst_imprison_important
+							}
+							has_character_flag = agenda_towards_escalation
+						}
+					}
+					add = 200
+				}
+				else_if = {
+					limit = {
+						scope:puppet_or_actor = {
+							any_character_struggle = {
+								phase_has_catalyst = catalyst_imprison_important
+							}
+						}
+					}
+					add = -100
+				}
+			}
+		}
+		modifier = {
+			scope:recipient = {
+				has_trait = fp3_struggle_supporter
+				any_character_struggle = {
+					involvement = involved
+				}
+			}
+			add = {
+				value = 0
+				if = {
+					limit = {
+						scope:puppet_or_actor = {
+							any_character_struggle = {
+								phase_has_catalyst = catalyst_imprison_supporter
+							}
+							has_trait = fp3_struggle_detractor
+						}
+					}
+					add = 200
+				}
+				else_if = {
+					limit = {
+						scope:puppet_or_actor = {
+							any_character_struggle = {
+								phase_has_catalyst = catalyst_imprison_supporter
+							}
+						}
+					}
+					add = -100
+				}
+			}
+		}
+		modifier = {
+			scope:recipient = {
+				has_trait = fp3_struggle_detractor
+				any_character_struggle = {
+					involvement = involved
+				}
+			}
+			add = {
+				value = 0
+				if = {
+					limit = {
+						scope:puppet_or_actor = {
+							any_character_struggle = {
+								phase_has_catalyst = catalyst_imprison_detractor
+							}
+							has_trait = fp3_struggle_supporter
+						}
+					}
+					add = 200
+				}
+				else_if = {
+					limit = {
+						scope:puppet_or_actor = {
+							any_character_struggle = {
+								phase_has_catalyst = catalyst_imprison_detractor
+							}
+						}
+					}
+					add = -100
+				}
+			}
+		}
+
+		# TGP Be more careful with blocs generally
+		house_bloc_tyranny_war_modifiers = yes
+
+		modifier = { # Avoid triggering Tyranny wars mid-grand activity
+			factor = 0
+			scope:puppet_or_actor = {
+				has_ongoing_grand_activity_trigger = yes
+			}
+			scope:recipient = {
+				highest_held_title_tier >= tier_county
+			}
+		}
+
+		modifier = { # Expel first, even if they criminals
+			factor = 0
+			scope:puppet_or_actor = {
+				NOT = {
+					has_opinion_modifier = {
+						target = scope:recipient
+						modifier = eviction_ignored_opinion
+					}
+				}
+			}
+			scope:recipient = { government_has_flag = government_is_landless_adventurer }
+		}
+
+		evaluate_action_decreasing_house_unity = {
+			VALUE = 100
+		}
+	}
