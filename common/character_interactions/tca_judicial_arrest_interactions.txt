@@ -31,30 +31,38 @@
     intermediary_breakdown_maybe = tca_judicial_approval_maybe
     intermediary_answer_accept_key = REPLY_ANSWER_ALLOW
     intermediary_answer_reject_key = REPLY_ANSWER_VETO
-    ai_intermediary_maybe = no
+    ai_intermediary_maybe = yes
     ai_intermediary_accept = {
-        base = -25
-        modifier = { add = 75 desc = tca_judicial_approval_reason scope:actor = { has_imprisonment_reason = scope:recipient } }
-        opinion_modifier = { who = scope:intermediary opinion_target = scope:actor multiplier = 0.5 desc = AI_OPINION_REASON }
-        opinion_modifier = { who = scope:intermediary opinion_target = scope:recipient multiplier = -0.5 desc = tca_judicial_approval_target_opinion }
+        base = 20
+        modifier = { add = 80 desc = tca_judicial_approval_reason scope:actor = { has_imprisonment_reason = scope:recipient } }
+        opinion_modifier = { who = scope:intermediary opinion_target = scope:actor multiplier = 0.25 desc = AI_OPINION_REASON }
+        opinion_modifier = { who = scope:intermediary opinion_target = scope:recipient multiplier = -0.25 desc = tca_judicial_approval_target_opinion }
         ai_value_modifier = {
             who = scope:intermediary
             ai_honor = {
                 if = {
                     limit = { scope:actor = { NOT = { has_imprisonment_reason = scope:recipient } } }
-                    value = -0.5
+                    value = -0.25
                 }
             }
         }
     }
     on_intermediary_accept = { tca_judicial_arrest_approved_effect = yes }
-    on_intermediary_decline = { tca_restore_judicial_arrest_context_effect = yes tca_judicial_arrest_veto_effect = yes }
+    on_intermediary_decline = {
+        tca_restore_judicial_arrest_context_effect = yes
+        if = {
+            limit = { tca_judicial_arrest_still_valid_trigger = yes }
+            tca_judicial_arrest_veto_effect = yes
+        }
+        else = { tca_judicial_arrest_invalidated_effect = yes }
+    }
 
     interface_priority = 121
     common_interaction = yes
     icon = prison
     category = interaction_category_hostile
-    cooldown_against_recipient = { days = 10 }
+    cooldown = { months = 3 }
+    cooldown_against_recipient = { years = 1 }
     ai_maybe = yes
     ai_min_reply_days = 4
     ai_max_reply_days = 9
