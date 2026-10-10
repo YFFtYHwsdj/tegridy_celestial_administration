@@ -19,3 +19,5 @@ CK3 天朝行政体系重做 mod。普通文官路生成动态无地提刑官职
 - 相邻的 `tegridy_celestial_administration.mod`：本地启动器描述，引用本目录。
 
 首次任命实验与操作步骤：[提刑任命验证](docs/judicial_appointment_test.md)。
+
+无地官员契约及验证说明：[官员义务、俸禄与预算](docs/official_contracts.md)。
