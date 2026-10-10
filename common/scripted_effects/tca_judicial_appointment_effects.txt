@@ -10,13 +10,20 @@ tca_collect_judicial_candidates_effect = {
     }
 }
 
-# Circuit title scope. Repeated maintenance never replaces a sitting officer.
+# Circuit title scope. Keep eligible officers; repair vacancies and invalid holders.
 tca_fill_initial_judicial_holder_effect = {
     if = {
         limit = {
             tca_is_judicial_circuit_trigger = yes
             tca_has_judicial_title_trigger = yes
-            var:song_judicial_title = { NOT = { exists = holder } }
+            var:song_judicial_title = { NOT = { tca_is_valid_judicial_holder_trigger = yes } }
+        }
+        # Transfer only the office; the outgoing holder keeps land and family.
+        var:song_judicial_title = {
+            if = {
+                limit = { exists = holder }
+                debug_log = "TCA: judicial holder failed eligibility; appointing replacement"
+            }
         }
         holder = { save_scope_as = tca_appointment_liege }
         var:song_judicial_title = { save_scope_as = tca_appointment_title }
@@ -102,6 +109,7 @@ tca_fill_initial_judicial_holder_effect = {
                 holder ?= { tca_ensure_native_judicial_realm_succession_effect = yes }
                 set_delete_on_destroy = no
                 set_destroy_on_succession = no
+                tca_restore_judicial_title_identity_effect = yes
             }
         }
         every_in_list = {
@@ -172,25 +180,35 @@ tca_sync_judicial_holder_liege_effect = {
     }
 }
 
-# Character scope, used by a delayed judicial-title gain hook.
-tca_refresh_held_judicial_positions_effect = {
-    every_held_title = {
+# Title scope, after the engine has finished title/vassal transactions.
+tca_refresh_judicial_position_effect = {
+    if = {
         limit = {
             has_variable = tca_judicial_title
             exists = var:song_judicial_circuit
             var:song_judicial_circuit = { tca_is_judicial_circuit_trigger = yes }
         }
-        var:song_judicial_circuit = { save_scope_as = tca_circuit }
-        holder = { tca_ensure_judicial_holder_family_effect = yes }
+        var:song_judicial_circuit = {
+            save_scope_as = tca_circuit
+            tca_fill_initial_judicial_holder_effect = yes
+        }
+        holder ?= { tca_ensure_judicial_holder_family_effect = yes }
         tca_sync_judicial_holder_liege_effect = yes
         holder ?= { tca_ensure_native_judicial_realm_succession_effect = yes }
-        set_delete_on_destroy = no
-        set_destroy_on_succession = no
+        tca_restore_judicial_title_identity_effect = yes
     }
 }
 
-# Character scope: use the native CIVILIAN REALM law, not a title-specific law.
-# Noble-family titles retain their separate native family succession law.
+# Character scope; delayed gain/government hooks and quarterly maintenance.
+tca_refresh_held_judicial_positions_effect = {
+    every_held_title = {
+        limit = { has_variable = tca_judicial_title }
+        tca_refresh_judicial_position_effect = yes
+    }
+}
+
+# Character scope: keep the native civilian realm law as the holder default.
+# The office inherits this native realm law; family titles keep their own laws.
 tca_ensure_native_judicial_realm_succession_effect = {
     if = {
         limit = {

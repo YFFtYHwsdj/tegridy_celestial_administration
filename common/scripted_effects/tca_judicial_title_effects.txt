@@ -1,4 +1,4 @@
-﻿# Title scope. Create/bind, fill the initial holder, then use native realm succession.
+﻿# Title scope. Create/bind, then maintain native realm succession and office identity.
 tca_ensure_judicial_title_effect = {
     tca_register_historical_characters_effect = yes
     if = {
@@ -42,22 +42,7 @@ tca_ensure_judicial_title_effect = {
     if = {
         limit = { tca_has_judicial_title_trigger = yes }
         save_scope_as = tca_circuit
-        var:song_judicial_title = {
-            # Repair objects from the version that omitted the preferred capital.
-            tca_configure_judicial_title_location_effect = yes
-            set_definitive_form = yes
-            set_title_name_dynamic = tca_judicial_title_name
-        }
-        tca_fill_initial_judicial_holder_effect = yes
-        var:song_judicial_title = {
-            holder ?= { tca_ensure_judicial_holder_family_effect = yes }
-            tca_sync_judicial_holder_liege_effect = yes
-            # Set native civilian realm succession after all setup has settled.
-            holder ?= { tca_ensure_native_judicial_realm_succession_effect = yes }
-            # Active offices must disable both destruction flags, including old save objects.
-            set_delete_on_destroy = no
-            set_destroy_on_succession = no
-        }
+        var:song_judicial_title = { tca_refresh_judicial_position_effect = yes }
     }
 }
 
@@ -186,6 +171,31 @@ tca_refresh_all_judicial_titles_effect = {
                 highest_held_title_tier = tier_kingdom
             }
             tca_refresh_character_circuits_effect = yes
+        }
+    }
+}
+
+# Title scope. Restore identity LAST: native title/liege callbacks can rename
+# titles or update CoAs. Applies equally to existing objects in older saves.
+tca_restore_judicial_title_identity_effect = {
+    if = {
+        limit = {
+            has_variable = tca_judicial_title
+            exists = var:song_judicial_circuit
+        }
+        var:song_judicial_circuit = { save_scope_as = tca_circuit }
+        tca_configure_judicial_title_location_effect = yes
+        set_definitive_form = yes
+        set_title_name_dynamic = tca_judicial_title_name
+        set_coa = scope:tca_circuit
+        set_delete_on_destroy = no
+        set_destroy_on_succession = no
+        # Old saves may retain the office-specific override. The holder's native
+        # realm law is ensured by the appointment/maintenance caller before this.
+        # Remove only our legacy law; family and other title laws stay untouched.
+        if = {
+            limit = { has_title_law = tca_judicial_appointment_succession_law }
+            remove_title_law = tca_judicial_appointment_succession_law
         }
     }
 }

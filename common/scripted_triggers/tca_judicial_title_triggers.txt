@@ -36,10 +36,35 @@ tca_is_initial_judicial_candidate_trigger = {
     is_alive = yes
     is_landed = no
     highest_held_title_tier < tier_duchy
+    # Repair candidates must also satisfy the dedicated-office rule after grant.
+    NOT = { any_held_title = { is_noble_family_title = no } }
     merit_level >= merit_level_expected_duchy_value
     tgp_can_be_a_minister_trigger = { COURT_OWNER = scope:tca_appointment_liege }
     liege_or_court_owner ?= {
         top_liege = scope:tca_appointment_liege.top_liege
     }
     NOT = { tgp_is_any_minister = yes }
+}
+
+# Title scope. A sitting commissioner may hold this office and a noble-family
+# title, but no landed holdings or second non-family office. Historical officers
+# already in post are retained; historical filtering only applies to new grants.
+tca_is_valid_judicial_holder_trigger = {
+    exists = holder
+    holder = {
+        is_alive = yes
+        government_has_flag = government_is_celestial
+        is_landed = no
+        highest_held_title_tier = tier_duchy
+        primary_title = prev
+        NOT = {
+            any_held_title = {
+                is_noble_family_title = no
+                # PREV here is the holder. Repeated global links (prev.prev)
+                # are invalid in CK3; the primary-title check above identifies
+                # this commission, so compare via the holder's primary title.
+                NOT = { this = prev.primary_title }
+            }
+        }
+    }
 }
