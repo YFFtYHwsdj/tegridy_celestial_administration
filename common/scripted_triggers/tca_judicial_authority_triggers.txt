@@ -1,0 +1,229 @@
+﻿# Title scope. Family/camp/other landless titles never confer administrative jurisdiction.
+tca_is_local_administrative_title_trigger = {
+    tier >= tier_county
+    tier <= tier_kingdom
+    is_landless_type_title = no
+    is_noble_family_title = no
+    exists = holder
+    holder = {
+        government_has_flag = government_is_celestial
+        is_independent_ruler = no
+        NOT = { tgp_is_any_minister = yes }
+        NOT = { vassal_contract_has_flag = celestial_province_military }
+        NOT = { vassal_contract_has_flag = celestial_province_protectorate }
+    }
+}
+
+# Character scope. Primary office determines court affiliation, not physical location.
+tca_is_target_in_administrative_title_trigger = {
+    $TITLE$ = { save_temporary_scope_as = tca_jurisdiction_title }
+    exists = scope:tca_jurisdiction_title
+    trigger_if = {
+        limit = { exists = scope:tca_jurisdiction_title }
+        OR = {
+            AND = {
+                tca_is_hosted_court_guest_trigger = yes
+                host.primary_title ?= {
+                    OR = {
+                        this = scope:tca_jurisdiction_title
+                        target_is_de_facto_liege_or_above = scope:tca_jurisdiction_title
+                    }
+                }
+            }
+            AND = {
+                tca_is_hosted_court_guest_trigger = no
+                is_ruler = yes
+                primary_title ?= {
+                    OR = {
+                        this = scope:tca_jurisdiction_title
+                        target_is_de_facto_liege_or_above = scope:tca_jurisdiction_title
+                    }
+                }
+            }
+            AND = {
+                tca_is_hosted_court_guest_trigger = no
+                is_ruler = no
+                liege_or_court_owner ?= {
+                    primary_title ?= {
+                        OR = {
+                            this = scope:tca_jurisdiction_title
+                            target_is_de_facto_liege_or_above = scope:tca_jurisdiction_title
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+# Character scope. Used by the scoring values, including relatives who are not initiators.
+tca_has_central_office_trigger = { tgp_is_any_minister = yes }
+tca_has_regional_office_trigger = {
+    OR = {
+        any_held_title = { has_variable = tca_judicial_title }
+        any_held_title = { tca_is_local_administrative_title_trigger = yes tier = tier_kingdom }
+    }
+}
+tca_has_state_office_trigger = {
+    any_held_title = { tca_is_local_administrative_title_trigger = yes tier <= tier_duchy }
+}
+tca_has_noble_family_trigger = {
+    house.house_head ?= { any_held_title = { is_noble_family_title = yes } }
+}
+# Only spouse/parents/children; siblings and extended kin do not inherit this bonus.
+tca_has_official_relative_trigger = {
+    OR = {
+        any_spouse = { is_alive = yes tca_is_in_scored_target_realm_trigger = { TARGET = prev } $CLASS$ = yes }
+        any_close_family_member = {
+            is_alive = yes
+            OR = { is_parent_of = prev is_child_of = prev }
+            tca_is_in_scored_target_realm_trigger = { TARGET = prev }
+            $CLASS$ = yes
+        }
+    }
+}
+# A hosted guest is a court guest awaiting recruitment, not a passing traveler.
+tca_is_hosted_court_guest_trigger = {
+    exists = host
+    OR = { is_foreign_court_guest = yes is_pool_guest = yes }
+    trigger_if = {
+        limit = { exists = host }
+        is_foreign_court_or_pool_guest_of = host
+    }
+}
+# Candidate character scope; score relatives against the guest host's realm.
+tca_is_in_scored_target_realm_trigger = {
+    trigger_if = {
+        limit = { $TARGET$ = { tca_is_hosted_court_guest_trigger = yes } }
+        top_liege = $TARGET$.host.top_liege
+    }
+    trigger_else = { top_liege = $TARGET$.top_liege }
+}
+tca_is_emperor_first_degree_kin_trigger = {
+    trigger_if = {
+        limit = { tca_is_hosted_court_guest_trigger = yes }
+        OR = { is_spouse_of = host.top_liege is_parent_of = host.top_liege is_child_of = host.top_liege }
+    }
+    trigger_else = {
+        OR = { is_spouse_of = top_liege is_parent_of = top_liege is_child_of = top_liege }
+    }
+}
+
+# Character scope. Extend only native basic affiliation to subordinate hosted guests.
+# Interaction jurisdiction, advanced restrictions and native common rules remain mandatory.
+tca_basic_allowed_to_arrest_character_trigger = {
+    save_temporary_scope_as = tca_basic_arrest_authority
+    OR = {
+        basic_allowed_to_imprison_character_trigger = { CHARACTER = $CHARACTER$ }
+        $CHARACTER$ = {
+            tca_is_hosted_court_guest_trigger = yes
+            host = {
+                OR = {
+                    this = scope:tca_basic_arrest_authority
+                    target_is_liege_or_above = scope:tca_basic_arrest_authority
+                }
+            }
+        }
+    }
+}
+
+# Candidate scope. Central offices are resolved inside the relevant emperor's council.
+tca_is_available_judicial_approver_trigger = { is_alive = yes is_imprisoned = no }
+tca_has_available_justice_trigger = {
+    any_councillor = { has_council_position = minister_justice tca_is_available_judicial_approver_trigger = yes }
+}
+tca_has_available_censor_trigger = {
+    any_councillor = { has_council_position = councillor_spymaster tca_is_available_judicial_approver_trigger = yes }
+}
+tca_has_available_chancellor_trigger = {
+    any_councillor = { has_council_position = councillor_chancellor tca_is_available_judicial_approver_trigger = yes }
+}
+# Candidate scope, COURT is a character. First available office, not a worldwide title holder.
+tca_is_current_central_approver_trigger = {
+    tca_is_available_judicial_approver_trigger = yes
+    trigger_if = {
+        limit = { $COURT$ = { tca_has_available_justice_trigger = yes } }
+        is_councillor_of = $COURT$
+        has_council_position = minister_justice
+    }
+    trigger_else_if = {
+        limit = { $COURT$ = { tca_has_available_censor_trigger = yes } }
+        is_councillor_of = $COURT$
+        has_council_position = councillor_spymaster
+    }
+    trigger_else_if = {
+        limit = { $COURT$ = { tca_has_available_chancellor_trigger = yes } }
+        is_councillor_of = $COURT$
+        has_council_position = councillor_chancellor
+    }
+    trigger_else = { this = $COURT$ }
+}
+
+# Circuit TITLE scope.
+tca_has_available_tixing_trigger = {
+    tca_has_judicial_title_trigger = yes
+    var:song_judicial_title = {
+        tca_is_valid_judicial_holder_trigger = yes
+        holder = { tca_is_available_judicial_approver_trigger = yes }
+    }
+}
+# Actor scope. Limit to an ordinary circuit or its subordinate civilian offices.
+tca_has_judicial_circuit_context_trigger = {
+    OR = {
+        any_held_title = { tca_is_judicial_circuit_trigger = yes NOT = { has_variable = tca_judicial_disabled } }
+        any_liege_or_above = {
+            any_held_title = { tca_is_judicial_circuit_trigger = yes NOT = { has_variable = tca_judicial_disabled } }
+        }
+    }
+}
+# Interaction scope. Actual jurisdiction never expands because of a high score.
+tca_judicial_actor_has_jurisdiction_trigger = {
+    scope:recipient = {
+        is_alive = yes
+        is_imprisoned = no
+        this != scope:actor
+        this != scope:actor.top_liege
+        trigger_if = {
+            limit = { tca_is_hosted_court_guest_trigger = yes }
+            host.top_liege = scope:actor.top_liege
+        }
+        trigger_else = { top_liege = scope:actor.top_liege }
+    }
+    trigger_if = {
+        limit = { scope:actor = { tca_is_judicial_commissioner_trigger = yes } }
+        scope:recipient = {
+            tca_is_target_in_administrative_title_trigger = { TITLE = scope:actor.primary_title.var:song_judicial_circuit }
+        }
+    }
+    trigger_else = {
+        scope:actor = {
+            tca_is_judicial_governor_trigger = yes
+            any_held_title = {
+                tca_is_local_administrative_title_trigger = yes
+                scope:recipient = {
+                    this != prev.holder
+                    tca_is_target_in_administrative_title_trigger = { TITLE = prev }
+                }
+            }
+        }
+    }
+
+}
+# Interaction scope, valid only after restoring/resolving tca_circuit.
+tca_judicial_requires_central_trigger = {
+    OR = {
+        scope:recipient = { tca_judicial_authority_score >= tca_judicial_central_threshold }
+        scope:tca_checked_circuit = { tca_has_available_tixing_trigger = no }
+    }
+}
+tca_judicial_direct_authorized_trigger = {
+    scope:recipient = {
+        OR = {
+            tca_judicial_authority_score < tca_judicial_tixing_threshold
+            AND = {
+                tca_judicial_authority_score < tca_judicial_central_threshold
+                scope:actor = { tca_is_judicial_commissioner_trigger = yes }
+            }
+        }
+    }
+}

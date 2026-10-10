@@ -1,0 +1,83 @@
+﻿# Character scope: the relevant emperor, not a global minister title.
+# Resolve only the first available office. A target cannot approve their own arrest.
+tca_resolve_central_judicial_authority_effect = {
+    if = {
+        limit = { tca_has_available_justice_trigger = yes }
+        random_councillor = {
+            limit = { has_council_position = minister_justice tca_is_available_judicial_approver_trigger = yes }
+            save_scope_as = tca_approver
+        }
+    }
+    else_if = {
+        limit = { tca_has_available_censor_trigger = yes }
+        random_councillor = {
+            limit = { has_council_position = councillor_spymaster tca_is_available_judicial_approver_trigger = yes }
+            save_scope_as = tca_approver
+        }
+    }
+    else_if = {
+        limit = { tca_has_available_chancellor_trigger = yes }
+        random_councillor = {
+            limit = { has_council_position = councillor_chancellor tca_is_available_judicial_approver_trigger = yes }
+            save_scope_as = tca_approver
+        }
+    }
+    else = { save_scope_as = tca_approver }
+}
+
+# Character scope. Walk actual lieges until reaching the matching circuit.
+# The recipient has already passed the actor's narrower jurisdiction check.
+tca_find_arrest_circuit_effect = {
+    if = {
+        limit = {
+            any_held_title = {
+                tca_is_judicial_circuit_trigger = yes
+                NOT = { has_variable = tca_judicial_disabled }
+                scope:recipient = { tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = prev } }
+            }
+        }
+        random_held_title = {
+            limit = {
+                tca_is_judicial_circuit_trigger = yes
+                NOT = { has_variable = tca_judicial_disabled }
+                scope:recipient = { tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = prev } }
+            }
+            save_scope_as = tca_circuit
+        }
+    }
+    else_if = { limit = { exists = liege } liege = { tca_find_arrest_circuit_effect = yes } }
+}
+
+# Internal context is reconstructed; do not put backing officials in UI participant slots.
+tca_setup_judicial_arrest_roles_effect = {
+    clear_saved_scope = tca_circuit
+    if = {
+        limit = {
+            scope:actor = { OR = { tca_is_judicial_governor_trigger = yes tca_is_judicial_commissioner_trigger = yes } }
+            tca_judicial_actor_has_jurisdiction_trigger = yes
+        }
+        scope:actor = {
+            save_scope_as = tca_governor
+            if = {
+                limit = { tca_is_judicial_commissioner_trigger = yes }
+                primary_title.var:song_judicial_circuit = { save_scope_as = tca_circuit }
+                scope:tca_circuit.holder = { save_scope_as = tca_governor }
+                if = { limit = { scope:recipient = scope:tca_circuit.holder } top_liege = { save_scope_as = tca_governor } }
+            }
+            else = { tca_find_arrest_circuit_effect = yes }
+        }
+    }
+}
+
+tca_setup_judicial_approval_effect = {
+    clear_saved_scope = tca_approver
+    if = {
+        limit = { exists = scope:tca_circuit }
+        if = {
+            limit = { OR = { scope:recipient = { tca_judicial_authority_score >= tca_judicial_central_threshold } scope:tca_circuit = { tca_has_available_tixing_trigger = no } } }
+            scope:actor.top_liege = { tca_resolve_central_judicial_authority_effect = yes }
+        }
+        else = { scope:tca_circuit.var:song_judicial_title.holder = { save_scope_as = tca_approver } }
+        scope:tca_approver ?= { save_scope_as = intermediary }
+    }
+}

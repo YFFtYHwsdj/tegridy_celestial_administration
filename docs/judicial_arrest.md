@@ -1,30 +1,31 @@
 # 司法拘捕与公职囚犯交接
 
-2026-10-10。本文说明当前脚本行为；完整制度目标见 `song_judicial_title_spec.md`。
+2026-10-10。确认界面及作用域修复记录见 `judicial_authority.md`；本文说明当前脚本行为；完整制度目标见 `song_judicial_title_spec.md`。
 
 ## 当前实现
 
-- 观察使使用 `tca_request_imprison_interaction` 请求提刑批准。AI 审批改用原生概率判定：审批分数处于0～100之间时表示批准概率，低于或等于0时否决，高于或等于100时批准；人工审批仍由玩家选择。有效请求被否决时，请求者损失100威望与50影响力，并产生3年关系后果；提刑不承担资源代价。否决终止请求，不当作目标拒捕；批准后继续原版式拘捕判定。成功后观察使关押，不登记为提刑公职囚犯。
-- 提刑使用 `tca_judicial_imprison_interaction` 拘捕本路目标。成功后提刑关押，并在官职头衔的 `tca_judicial_prisoners` 列表登记；目标同时记录 `tca_judicial_prison_title`。
-- 两种互动均以实际发起人的合法拘捕理由、牵制和相关原版后果为依据。批准不自动提供合法理由，也不豁免暴政。AI 发起人必须拥有拘捕理由。
-- 辖区按实际头衔隶属与宫廷所属判断，排除观察使本人、中央大臣、其他提刑及外来宾客。多路兼任者的本宫廷按主要辖区归属。
-- 有地可玩目标拒捕时，由观察使承担原版 `refused_liege_demand_war`。提刑发起的拒捕战争在实际俘获目标后延迟处理引渡；观察使发起的拘捕不登记引渡。男爵和普通无地目标沿用逃脱分支。
-- 释放与囚犯死亡清理登记。维护流程将公职囚犯交给当前合格持有者，空缺时交观察使；撤销官职前转交并注销。死亡处理只转交登记属于该官职的囚犯，不转交私人囚犯。
+- 分层权限、身份评分、州／路管辖与中央替补审批见[judicial_authority.md](judicial_authority.md)，该文档是当前权限规则入口。
+- 伯爵／公爵级文官州主管、路主官与提刑分别在本人辖区发起。地方低分对象直接拘捕，中层请求提刑，高层请求中央；提刑中层可直接，高层也需中央批准。
+- 中央按刑部→御史→宰相→皇帝解析；提刑缺位的中层请求上送中央。审批与关押分离，成功后由发起人收押，只有提刑本人发起的囚犯登记为提刑公职囚犯。
+- 合法理由、牵制、暴政仍归实际发起人；AI必须拥有拘捕理由。请求批准不保证拘捕成功。
+- 州／路主官承担本人发起的拒捕战争。提刑由所属路主官军事支持；若目标就是路主官，则由皇帝支持。实际捕获后延迟交给提刑；普通地方官发起的拘捕不登记引渡。
+- 公职囚犯释放、死亡、换任、空缺与撤销时沿用登记清理及交接；不交接提刑私人囚犯。
+- 原版普通及摄政囚禁对纳入新机制的官员均受限制；皇帝及中央大臣的原版入口保留。权限变化后的旧请求重新检查，而不是自动转发。
 
 ## 实现入口与兼容影响
 
-- `common/character_interactions/tca_judicial_arrest_interactions.txt`：两种互动、审批、资格、回复与 AI。
+- `common/character_interactions/tca_judicial_arrest_interactions.txt`：直接／请求两种互动、审批、资格、回复与 AI。
 - 请求拘捕的 `ai_intermediary_accept` 直接保留原生评分结构：基础值20、合法理由+80、审批人对发起人好感×0.25、对目标好感×−0.25；仅无合法理由时 `ai_honor` ×−0.25。审批与拘捕均开启随机开关，不再使用端点转换、独立审批脚本值或显示修正。
 - `localization/{simp_chinese,english}/tca_judicial_arrest_l_*.yml`：审批使用将批准／否决／可能批准三种提示，可能批准时显示百分比；自定义评分理由保留 `$VALUE|=+0$`，逐项明细自动生成。不新增或覆盖 GUI。
 - `common/opinion_modifiers/tca_judicial_arrest_opinions.txt`：否决后的三项3年、不叠加好感修正。
 - `common/scripted_triggers/tca_judicial_arrest_triggers.txt`：官员身份、辖区与发送/回复时资格复查。
 - `common/scripted_effects/tca_judicial_arrest_native_effects.txt`、`common/scripted_modifiers/tca_judicial_prison_modifiers.txt`：从本机原版拘捕流程改写的结果、拒捕与 AI 分数。
 - `common/scripted_effects/tca_judicial_prison_effects.txt`、`common/on_action/tca_judicial_prison_on_actions.txt`、`events/tca_judicial_prison_events.txt`：登记、交接、延迟引渡。
-- 仅覆盖原版 `imprison_neutral_is_valid_showing_failures_only_triggers_trigger`，保留原版检查并限制司法官员使用普通拘捕入口；合法摄政拘捕例外保留。其他 mod 覆盖同名 trigger 时存在加载顺序冲突。更新检查步骤见 `judicial_upstream_check.md`。
+- 仅覆盖原版 `imprison_neutral_is_valid_showing_failures_only_triggers_trigger`，保留原版检查并限制地方／司法官员使用普通与摄政拘捕入口。其他 mod 覆盖同名 trigger 时存在加载顺序冲突。更新检查步骤见 `judicial_upstream_check.md`。
 
 原版参考（本机 1.20.0.4）：`game/common/character_interactions/00_prison_interactions.txt` 的 `imprison_interaction`，`game/common/scripted_triggers/00_scripted_triggers.txt` 的 basic/advanced 囚禁资格，`game/common/scripted_effects/00_prison_effects.txt` 的暴政、合法收押与拒捕战争，以及 `game/common/on_action/prison_on_actions.txt` / `war_on_actions.txt` 的角色作用域。
 
-## 本次审查与验证范围
+## 历史记录：此前版本审查与验证范围
 
 静态检查：6 项 Python 单元测试通过；安装游戏权限 trigger、保存基线与 mod 副本一致；脚本括号、模组标识引用、中英拘捕本地化键及 BOM、Git 空白检查通过。不能据此确认引擎加载或游戏内结果。
 
@@ -32,14 +33,14 @@
 
 既有日志还显示原版 `tgp_chinese_naming_tier_trigger` 在 `scope:title`（头衔）下读取 `capital_county`，经官职任命调用 `on_rank_up` 时产生类型错误。这属于已有生命周期路径触发的原版脚本问题，本次未覆盖原版对象；是否影响官职称号需重载核对。
 
-## 可复现游戏验收
+## 拘捕执行与交接验收（配合分层权限文档）
 
 1. 重启并加载启用本 mod 的天朝存档；检查新生成的 `error.log`，验证互动身份检查和无主头衔角色死亡不再产生上述作用域错误。
 2. 观察使分别针对有合法理由与无合法理由的本路目标请求拘捕，测试人工/AI 提刑批准与否决：批准不保证成功；无理由批准仍有暴政；否决无拘捕、无拒捕战争。
-3. 提刑主动拘捕成功后检查囚禁者与官职登记；请求拘捕成功后检查囚禁者为观察使且没有公职登记。跨路、宾客、中央大臣和官职持有者不能作为目标。
+3. 提刑主动拘捕成功后检查囚禁者与官职登记；请求拘捕成功后检查囚禁者为观察使且没有公职登记。外辖区不能作为目标，自己及实际下属宫廷的成员、等待招募宾客均在范围内，提刑还包括路主官宫廷；本辖区受保护官员须转入相应审批路径。
 4. 测试提刑主动拘捕有地目标拒捕，确认战争针对观察使，战中俘获与战胜收押分别在次日转交提刑；白和平、战败、战争失效后清理待引渡标记。
 5. 为提刑同时准备公职囚犯与私人囚犯，测试死亡、换任、空缺、撤销官职：只交接登记囚犯，保留软禁/地牢，不重复施加拘捕后果；释放、死亡后移除登记。
-6. 发送后更换提刑、改变辖区或目标状态，确认回复时取消已失效拘捕；核对普通人物、皇帝、刑部尚书及合法摄政的原版入口，并在中英文检查通知和动态官衔。
+6. 发送后更换提刑、改变辖区或目标状态，确认回复时取消已失效拘捕；核对普通人物、皇帝、中央大臣的原版入口，以及地方／提刑摄政入口不能绕过审批，并在中英文检查通知和动态官衔。
 7. 保存重载，复查官职绑定、囚犯登记及延迟引渡；记录其他 mod 同名覆盖和原版称号错误的影响。
 
 ## 概率审批（2026-10-10，当前实现）
@@ -51,7 +52,7 @@
 - 批准分 = 20 + 合法理由80 + 提刑对请求者好感×0.25 − 提刑对目标好感×0.25；仅无合法理由时增加提刑 `ai_honor` ×−0.25。中立关系有合法理由时为100，无理由且性格项为0时为20。法律项不再使用旧的+75。
 - `on_intermediary_decline` 先恢复互动角色并复查有效性；有效否决执行请求者 `add_prestige = -100`、`change_influence = -50`。审批官员不扣威望、影响力或功绩。失效请求走取消分支，不执行否决惩罚。
 - 请求者对提刑−15；目标对请求者−10、对提刑+20。三项修正固定持续3年且不叠加，也应用于玩家角色，不赋予任何额外犯罪或拘捕理由。
-- 请求互动使用原生 `cooldown = { months = 3 }` 与 `cooldown_against_recipient = { years = 1 }`。发送后，请求者3个月内不能再使用此互动，1年内不能对同一目标再次使用，批准、否决均不退还冷却。提刑本人仍可审核其他官员的请求。
+- 请求互动使用原生 `cooldown = { months = 3 }` 与 `cooldown_against_recipient = { years = 1 }`。发送后，请求者3个月内不能再使用此互动，1年内不能对同一目标再次使用，批准、否决均不退还冷却。提刑及中央审批者仍可审核其他官员的请求。
 - 冷却属于角色与互动，不属于官职或审批人；换请求者不继承旧请求者的冷却。提刑主动“辖区拘捕”保持原来的同目标10天冷却，没有新增3个月全局冷却。
 - 取消或否决时清除的是既有10天敌对行动锁，不清除原生请求冷却。否决惩罚不进入目标拒捕分支，也不触发拒捕战争。原有摄政附加发送成本保持不变，没有另加此前讨论过的25威望发送费。
 

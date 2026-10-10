@@ -1,29 +1,12 @@
 ﻿tca_request_imprison_interaction = {
     desc = tca_request_imprison_interaction_desc
     redirect = {
-        scope:actor = {
-            random_held_title = {
-                limit = {
-                    tca_is_judicial_circuit_trigger = yes
-                    tca_has_judicial_title_trigger = yes
-                    scope:recipient = { tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = prev } }
-                }
-                holder = { save_scope_as = secondary_actor }
-                var:song_judicial_title = {
-                    holder ?= { save_scope_as = secondary_recipient save_scope_as = intermediary }
-                }
-            }
-        }
+        tca_setup_judicial_arrest_roles_effect = yes
+        tca_setup_judicial_approval_effect = yes
     }
     is_shown = {
-        scope:puppet_or_actor = { tca_is_judicial_governor_trigger = yes }
-        scope:recipient = { this != scope:puppet_or_actor is_imprisoned = no }
-        scope:puppet_or_actor = {
-            any_held_title = {
-                tca_is_judicial_circuit_trigger = yes
-                scope:recipient = { tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = prev } }
-            }
-        }
+        exists = scope:intermediary
+        tca_judicial_arrest_context_valid_trigger = yes
     }
     intermediary_notification_text = tca_judicial_approval_notification
     intermediary_breakdown_yes = tca_judicial_approval_yes
@@ -47,7 +30,14 @@
             }
         }
     }
-    on_intermediary_accept = { tca_judicial_arrest_approved_effect = yes }
+    on_intermediary_accept = {
+        tca_restore_judicial_arrest_context_effect = yes
+        if = {
+            limit = { tca_judicial_arrest_still_valid_trigger = yes }
+            tca_judicial_arrest_approved_effect = yes
+        }
+        else = { tca_judicial_arrest_invalidated_effect = yes }
+    }
     on_intermediary_decline = {
         tca_restore_judicial_arrest_context_effect = yes
         if = {
@@ -166,8 +156,8 @@
 			always = no
 		}
 	}
-    ai_accept = { base = 0 tca_judicial_target_acceptance = { GOVERNOR = scope:secondary_actor } }
-    ai_will_do = { base = -100 tca_judicial_arrest_ai_will_do = { GOVERNOR = scope:secondary_actor } }
+    ai_accept = { base = 0 tca_judicial_target_acceptance = { GOVERNOR = scope:actor } }
+    ai_will_do = { base = -100 tca_judicial_arrest_ai_will_do = { GOVERNOR = scope:actor } }
     ai_frequency_by_tier = { barony = 0 county = 36 duchy = 10 kingdom = 10 empire = 10 hegemony = 10 }
     ai_targets = { ai_recipients = vassals chance = 0.5 }
     ai_targets = { ai_recipients = courtiers chance = 0.25 }
@@ -175,24 +165,8 @@
 
 tca_judicial_imprison_interaction = {
     desc = tca_judicial_imprison_interaction_desc
-    redirect = {
-        scope:actor = {
-            save_scope_as = secondary_recipient
-            primary_title = {
-                var:song_judicial_circuit ?= {
-                    holder ?= { save_scope_as = secondary_actor }
-                }
-            }
-        }
-    }
-    is_shown = {
-        scope:puppet_or_actor = { tca_is_judicial_commissioner_trigger = yes }
-        scope:recipient = {
-            this != scope:puppet_or_actor
-            is_imprisoned = no
-            tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:puppet_or_actor.primary_title.var:song_judicial_circuit }
-        }
-    }
+    redirect = { tca_setup_judicial_arrest_roles_effect = yes }
+    is_shown = { tca_judicial_arrest_context_valid_trigger = yes }
 
     interface_priority = 121
     common_interaction = yes
@@ -302,8 +276,8 @@ tca_judicial_imprison_interaction = {
 			always = no
 		}
 	}
-    ai_accept = { base = 0 tca_judicial_target_acceptance = { GOVERNOR = scope:secondary_actor } }
-    ai_will_do = { base = -100 tca_judicial_arrest_ai_will_do = { GOVERNOR = scope:secondary_actor } }
+    ai_accept = { base = 0 tca_judicial_target_acceptance = { GOVERNOR = scope:actor } }
+    ai_will_do = { base = -100 tca_judicial_arrest_ai_will_do = { GOVERNOR = scope:actor } }
     ai_frequency_by_tier = { barony = 0 county = 36 duchy = 10 kingdom = 10 empire = 10 hegemony = 10 }
 
     ai_targets = { ai_recipients = peer_vassals chance = 0.5 }

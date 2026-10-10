@@ -1,12 +1,19 @@
 ﻿# Recreate named effect scopes from the engine's standard saved interaction roles.
 tca_restore_judicial_arrest_context_effect = {
-    scope:actor = { save_scope_as = tca_authority }
-    scope:secondary_actor ?= { save_scope_as = tca_governor }
-    scope:secondary_recipient ?= {
-        save_scope_as = tca_commissioner
-        primary_title = {
-            save_scope_as = tca_position
-            var:song_judicial_circuit ?= { save_scope_as = tca_circuit }
+    clear_saved_scope = tca_position
+    clear_saved_scope = tca_commissioner
+    tca_setup_judicial_arrest_roles_effect = yes
+    scope:actor = { save_scope_as = tca_authority save_scope_as = tca_governor }
+    scope:actor = {
+        if = {
+            limit = { tca_is_judicial_commissioner_trigger = yes exists = scope:tca_circuit }
+            save_scope_as = tca_commissioner
+            primary_title = { save_scope_as = tca_position }
+            scope:tca_circuit.holder ?= { save_scope_as = tca_governor }
+            if = {
+                limit = { scope:recipient = scope:tca_circuit.holder }
+                top_liege = { save_scope_as = tca_governor }
+            }
         }
     }
 }

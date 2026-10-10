@@ -93,25 +93,15 @@ tca_judicial_arrest_success_native_effect = {
 			}
 		}
 		# Tyranny remains with the initiator.
-		# Custody split (Plan A):
-		# - Governor-initiated arrest (approved by commissioner): held directly by governor.
-		# - Commissioner-initiated arrest: held by commissioner and registered to judicial office.
-        scope:puppet_or_actor = { imprison_tyranny_effect = yes }
+        # Approval never changes custody: the actual initiator imprisons.
+        scope:puppet_or_actor = { imprison_tyranny_effect = yes save_scope_as = tca_custodian }
         save_scope_value_as = { name = disable_display_rightful_imprisonment_tooltip value = yes }
-        if = {
-            limit = { scope:puppet_or_actor = { tca_is_judicial_governor_trigger = yes } }
-            scope:puppet_or_actor = { save_scope_as = tca_custodian }
-            rightfully_imprison_character_effect = {
-                TARGET = scope:recipient
-                IMPRISONER = scope:tca_custodian
-            }
+        rightfully_imprison_character_effect = {
+            TARGET = scope:recipient
+            IMPRISONER = scope:tca_custodian
         }
-        else = {
-            scope:tca_commissioner = { save_scope_as = tca_custodian }
-            rightfully_imprison_character_effect = {
-                TARGET = scope:recipient
-                IMPRISONER = scope:tca_custodian
-            }
+        if = {
+            limit = { scope:puppet_or_actor = { tca_is_judicial_commissioner_trigger = yes } }
             scope:recipient = { tca_register_judicial_prisoner_effect = yes }
         }
 		# If they recently revoked your title, or asked for your excommunication, they become your rival
