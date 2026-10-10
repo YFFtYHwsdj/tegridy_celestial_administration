@@ -1,0 +1,196 @@
+﻿# Object override based on CK3 1.20.0.4 tgp_values.txt.
+# ROOT remains the title evaluated for appointment in both branches.
+appointment_title_value = {
+    if = {
+        limit = { has_variable = tca_judicial_title }
+        value = tca_judicial_appointment_value
+    }
+    else = {
+            value = 0
+            # We value titles differently depending on if it is a civilian or military appointment
+            if = {
+                limit = {
+                    OR = {
+                        holder ?= { vassal_contract_has_flag = meritocratic_civil_appointment }
+                        holder ?= { vassal_contract_has_flag = celestial_civil_appointment }
+                    }
+                }
+                # General gold income
+                if = {
+                    limit = {
+                        tier >= tier_duchy
+                    }
+                    add = {
+                        every_de_jure_county = {
+                            add = {
+                                value = title_province.monthly_income
+                                multiply = 24
+                            }
+                        }
+                        desc = appointment_title_value.county_income
+                    }
+                }
+                else = {
+                    add = {
+                        value = title_province.monthly_income
+                        multiply = 24
+                        desc = appointment_title_value.capital_income
+                    }
+                }
+
+                # Distance to capital
+                add = {
+                    value = 500
+                    subtract = {
+                        value = "title_province.squared_distance(root.holder.top_liege.capital_province)"
+                        multiply = 0.0001
+                    }
+                    min = 0
+                    desc = appointment_title_value.distance_to_capital
+                }
+            }
+            else_if = {
+                limit = {
+                    holder ?= {
+                        OR = {
+                            vassal_contract_has_flag = meritocratic_military_appointment
+                            vassal_contract_has_flag = celestial_military_appointment
+                            vassal_contract_has_flag = celestial_grand_marshal_obligation
+                        }
+                    }
+                }
+
+                # Army size
+                add = {
+                    every_owned_title_maa_regiment = {
+                        add = {
+                            value = maa_size
+                        }
+                    }
+                    desc = appointment_title_value.maa_size
+                }
+
+                # Province size (to make larger provinces more attractive)
+                if = {
+                    limit = {
+                        tier >= tier_duchy
+                    }
+                    add = {
+                        every_de_jure_county = {
+                            add = 10
+                        }
+                        desc = appointment_title_value.counties
+                    }
+                }
+                add = {
+                    every_title_to_title_neighboring_county = {
+                        limit = {
+                            holder.top_liege != prev.holder.top_liege
+                        }
+                        add = {
+                            value = 10
+                        }
+                    }
+                    desc = appointment_title_value.neighboring_enemy_counties
+                }
+                # A protectorate is more attractive
+                if = {
+                    limit = {
+                        holder = { vassal_contract_has_flag = celestial_province_protectorate }
+                    }
+                    multiply = {
+                        value = 2
+                        desc = appointment_title_value.protectorate
+                    }
+                }
+            }
+
+            # Minister titles
+            if = {
+                limit = {
+                    holder ?= {
+                        tgp_is_any_minister = yes
+                    }
+                }
+                add = {
+                    value = holder.top_liege.capital_province.monthly_income
+                    multiply = 1000
+                    desc = appointment_title_value.capital_income
+                }
+                if = {
+                    limit = {
+                        title:h_china.holder = {
+                            has_diarchy_type = grand_secretariat
+                            OR = {
+                                AND = {
+                                    has_realm_law = grand_chancellor_law
+                                    root = title:e_minister_chancellor
+                                }
+                                AND = {
+                                    has_realm_law = grand_marshal_law
+                                    root = title:e_minister_grand_marshal
+                                }
+                                AND = {
+                                    has_realm_law = grand_censor_law
+                                    root = title:e_minister_censor
+                                }
+                            }
+                        }
+                    }
+                    add = {
+                        value = 1000
+                        desc = appointment_title_value.diarch
+                    }
+                }
+                if = {
+                    limit = {
+                        OR = {
+                            this = title:e_minister_chancellor
+                            this = title:e_minister_censor
+                            this = title:e_minister_grand_marshal
+                        }
+                    }
+                    add = {
+                        value = 3500
+                        desc = appointment_title_value.minister
+                    }
+                }
+                else_if = {
+                    limit = {
+                        OR = {
+                            this = title:e_minister_of_personnel
+                            this = title:e_minister_of_revenue
+                        }
+                    }
+                    add = {
+                        value = 3000
+                        desc = appointment_title_value.minister
+                    }
+                }
+                else_if = {
+                    limit = {
+                        OR = {
+                            this = title:e_minister_of_rites
+                            this = title:e_minister_of_war
+                        }
+                    }
+                    add = {
+                        value = 2500
+                        desc = appointment_title_value.minister
+                    }
+                }
+                else_if = {
+                    limit = {
+                        OR = {
+                            this = title:e_minister_of_justice
+                            this = title:e_minister_of_works
+                        }
+                    }
+                    add = {
+                        value = 2000
+                        desc = appointment_title_value.minister
+                    }
+                }
+            }
+    }
+}

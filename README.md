@@ -27,3 +27,5 @@ CK3 天朝行政体系重做 mod。普通文官路生成动态无地提刑官职
 权限覆盖与更新检查：[原版更新检查](docs/judicial_upstream_check.md)。
 
 互动文本与作用域：[动态本地化](docs/judicial_localization.md)。
+
+提刑同级调任的职位价值：[提刑重要性算法与验证](docs/judicial_prominence.md)。已实现独立公式，静态检查通过与游戏内验证分别记录在该文档中。
