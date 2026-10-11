@@ -21,7 +21,7 @@
 - `common/scripted_triggers/tca_judicial_arrest_triggers.txt`：官员身份、辖区与发送/回复时资格复查。
 - `common/scripted_effects/tca_judicial_arrest_native_effects.txt`、`common/scripted_modifiers/tca_judicial_prison_modifiers.txt`：从本机原版拘捕流程改写的结果、拒捕与 AI 分数。
 - `common/scripted_effects/tca_judicial_prison_effects.txt`、`common/on_action/tca_judicial_prison_on_actions.txt`、`events/tca_judicial_prison_events.txt`：登记、交接、延迟引渡。
-- 仅覆盖原版 `imprison_neutral_is_valid_showing_failures_only_triggers_trigger`，保留原版检查并限制地方／司法官员使用普通与摄政拘捕入口。其他 mod 覆盖同名 trigger 时存在加载顺序冲突。更新检查步骤见 `judicial_upstream_check.md`。
+- 仅覆盖原版 `imprison_neutral_is_valid_showing_failures_only_triggers_trigger`，保留原版检查并限制地方／司法官员使用普通与摄政拘捕入口。其他 mod 覆盖同名 trigger 时存在加载顺序冲突。通用原版漂移检查步骤见 `judicial_upstream_check.md`。
 
 原版参考（本机 1.20.0.4）：`game/common/character_interactions/00_prison_interactions.txt` 的 `imprison_interaction`，`game/common/scripted_triggers/00_scripted_triggers.txt` 的 basic/advanced 囚禁资格，`game/common/scripted_effects/00_prison_effects.txt` 的暴政、合法收押与拒捕战争，以及 `game/common/on_action/prison_on_actions.txt` / `war_on_actions.txt` 的角色作用域。
 

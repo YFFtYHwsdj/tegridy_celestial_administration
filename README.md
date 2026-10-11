@@ -26,7 +26,7 @@ CK3 天朝行政体系重做 mod。普通文官路生成动态无地提刑官职
 
 司法拘捕当前实现与验收：[司法拘捕及囚犯交接](docs/judicial_arrest.md)。AI 审批与后续拘捕均采用原生概率判定；合法理由+80。有效审批否决由请求者损失100威望、50影响力并产生关系后果；请求采用3个月全局、同目标1年冷却，明细沿用原生界面。
 
-权限覆盖与更新检查：[原版更新检查](docs/judicial_upstream_check.md)。
+权限覆盖与原版漂移检查：[原版覆盖更新检查](docs/judicial_upstream_check.md)。运行 `python3 tools/scan_upstream_overrides.py` 可独立扫描原版与模组，检查覆盖登记是否遗漏；运行 `python3 tools/check_upstream_overrides.py` 可检查已审阅基线是否随原版更新发生变化。
 
 互动文本与作用域：[动态本地化](docs/judicial_localization.md)。
 
