@@ -1,5 +1,5 @@
 ﻿version="0.1.0"
-name="Tegridy的天朝行政重做"
+name="一国三公 / Imperium in Imperio"
 tags={
     "Gameplay"
 }
