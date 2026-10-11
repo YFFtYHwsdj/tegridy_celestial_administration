@@ -1,0 +1,37 @@
+﻿# Called on the test requester after synchronous case dispatch has completed.
+tca_test_notify_results_effect = {
+    save_scope_as = tca_test_reporter
+    set_variable = { name = tca_test_suite_not_passed value = var:tca_test_suite_expected }
+    change_variable = { name = tca_test_suite_not_passed subtract = var:tca_test_suite_passed }
+    if = {
+        limit = {
+            var:tca_test_suite_expected > 0
+            var:tca_test_suite_not_passed = 0
+            var:tca_test_suite_failed = 0
+            var:tca_test_suite_skipped = 0
+        }
+        debug_log = "TCA_TEST SUITE_ALL_PASSED"
+        send_interface_message = {
+            type = tca_tests_passed_message
+            title = tca_tests_all_passed_title
+            desc = tca_tests_passed_desc
+        }
+    }
+    else = {
+        debug_log = "TCA_TEST SUITE_NOT_ALL_PASSED"
+        send_interface_message = {
+            type = tca_tests_failed_message
+            title = tca_tests_not_all_passed_title
+            desc = tca_tests_failed_desc
+        }
+    }
+}
+
+tca_test_notify_waiting_effect = {
+    save_scope_as = tca_test_reporter
+    send_interface_message = {
+        type = tca_tests_passed_message
+        title = tca_tests_waiting_title
+        desc = tca_tests_waiting_desc
+    }
+}

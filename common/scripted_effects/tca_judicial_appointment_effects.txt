@@ -109,7 +109,11 @@ tca_fill_initial_judicial_holder_effect = {
                 tca_sync_judicial_holder_liege_effect = yes
                 holder ?= { tca_ensure_native_judicial_realm_succession_effect = yes }
                 holder ?= { tca_ensure_official_contract_effect = yes }
-                set_delete_on_destroy = no
+                # Fixed offices already declare delete_on_destroy = no in landed_titles.
+                if = {
+                    limit = { NOT = { has_variable = tca_judicial_static_title } }
+                    set_delete_on_destroy = no
+                }
                 set_destroy_on_succession = no
                 tca_restore_judicial_title_identity_effect = yes
             }
@@ -206,6 +210,10 @@ tca_refresh_judicial_position_effect = {
         holder ?= { tca_ensure_official_contract_effect = yes }
         tca_restore_judicial_title_identity_effect = yes
         tca_reconcile_judicial_prisoners_effect = yes
+    }
+    else_if = {
+        limit = { has_variable = tca_judicial_title exists = var:song_judicial_circuit }
+        var:song_judicial_circuit = { tca_destroy_judicial_title_effect = yes }
     }
 }
 

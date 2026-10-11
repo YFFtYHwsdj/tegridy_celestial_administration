@@ -97,22 +97,28 @@ tca_unregister_judicial_prisoner_effect = {
 
 # Prisoner scope, scope:tca_custodian is the next keeper.
 # Use only the engine effect: never reapply arrest opinions, tyranny or reason checks.
-# Engine behavior for an already imprisoned target remains a required in-game check.
+# The engine rejects imprison on an existing prisoner. Release and re-imprison
+# synchronously; the transfer flag protects our registry during release callbacks.
+# Native release/imprison on_actions still run and need gameplay acceptance.
 tca_transfer_judicial_prisoner_effect = {
     if = {
         limit = {
             is_alive = yes
             is_imprisoned = yes
             exists = scope:tca_custodian
+            scope:tca_custodian = { is_alive = yes is_ruler = yes }
+            NOT = { this = scope:tca_custodian }
             NOT = { is_imprisoned_by = scope:tca_custodian }
         }
         save_scope_as = tca_transferred_prisoner
         add_character_flag = tca_judicial_transfer_in_progress
         if = {
             limit = { is_in_prison_type = house_arrest }
+            release_from_prison = yes
             scope:tca_custodian = { imprison = { target = scope:tca_transferred_prisoner type = house_arrest } }
         }
         else = {
+            release_from_prison = yes
             scope:tca_custodian = { imprison = { target = scope:tca_transferred_prisoner type = dungeon } }
         }
         remove_character_flag = tca_judicial_transfer_in_progress
@@ -148,7 +154,17 @@ tca_retire_judicial_prisoners_effect = {
         every_in_list = {
             variable = tca_judicial_prisoners
             tca_transfer_judicial_prisoner_effect = yes
-            tca_unregister_judicial_prisoner_effect = yes
+            # Keep a failed handoff registered rather than silently losing custody data.
+            if = {
+                limit = {
+                    OR = {
+                        is_alive = no
+                        is_imprisoned = no
+                        AND = { exists = scope:tca_custodian is_imprisoned_by = scope:tca_custodian }
+                    }
+                }
+                tca_unregister_judicial_prisoner_effect = yes
+            }
         }
     }
 }
@@ -189,4 +205,41 @@ tca_resolve_pending_judicial_capture_effect = {
             remove_variable = tca_pending_judicial_governor
         }
     }
+}
+
+# Shared reply dispatch: the interactions and regression tests use identical gates.
+tca_handle_judicial_approval_accept_effect = {
+    tca_restore_judicial_arrest_context_effect = yes
+    if = {
+        limit = { tca_judicial_arrest_still_valid_trigger = yes }
+        tca_judicial_arrest_approved_effect = yes
+    }
+    else = { tca_judicial_arrest_invalidated_effect = yes }
+}
+
+tca_handle_judicial_approval_decline_effect = {
+    tca_restore_judicial_arrest_context_effect = yes
+    if = {
+        limit = { tca_judicial_arrest_still_valid_trigger = yes }
+        tca_judicial_arrest_veto_effect = yes
+    }
+    else = { tca_judicial_arrest_invalidated_effect = yes }
+}
+
+tca_handle_judicial_arrest_accept_effect = {
+    tca_restore_judicial_arrest_context_effect = yes
+    if = {
+        limit = { tca_judicial_arrest_still_valid_trigger = yes }
+        tca_judicial_arrest_success_native_effect = yes
+    }
+    else = { tca_judicial_arrest_invalidated_effect = yes }
+}
+
+tca_handle_judicial_arrest_decline_effect = {
+    tca_restore_judicial_arrest_context_effect = yes
+    if = {
+        limit = { tca_judicial_arrest_still_valid_trigger = yes }
+        tca_judicial_arrest_decline_native_effect = yes
+    }
+    else = { tca_judicial_arrest_invalidated_effect = yes }
 }

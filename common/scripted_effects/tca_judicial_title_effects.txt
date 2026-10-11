@@ -28,7 +28,11 @@ tca_ensure_judicial_title_effect = {
             set_no_automatic_claims = yes
             set_can_be_named_after_dynasty = no
             set_can_use_nomadic_naming = no
-            set_delete_on_destroy = no
+            # Fixed offices already declare delete_on_destroy = no in landed_titles.
+            if = {
+                limit = { NOT = { has_variable = tca_judicial_static_title } }
+                set_delete_on_destroy = no
+            }
             set_destroy_on_succession = no
             set_variable = { name = tca_judicial_title value = yes }
             set_variable = { name = song_judicial_circuit value = scope:tca_circuit }
@@ -75,7 +79,11 @@ tca_configure_judicial_title_location_effect = {
 # and both circuit pointers. Also called by external on_title_destroyed events.
 tca_retire_judicial_title_effect = {
     tca_retire_judicial_prisoners_effect = yes
-    set_delete_on_destroy = no
+    # Fixed offices already declare delete_on_destroy = no in landed_titles.
+    if = {
+        limit = { NOT = { has_variable = tca_judicial_static_title } }
+        set_delete_on_destroy = no
+    }
     set_destroy_on_succession = no
 }
 
@@ -116,6 +124,8 @@ tca_restore_judicial_title_effect = {
 
 # Character scope: run after title transfers and government changes have settled.
 tca_refresh_character_circuits_effect = {
+    tca_ensure_court_system_law_effect = yes
+    tca_refresh_official_name_flags_effect = yes
     save_scope_as = tca_lifecycle_actor
     every_held_title = {
         limit = { tier = tier_kingdom }
@@ -132,6 +142,11 @@ tca_refresh_character_circuits_effect = {
 
 # Empty/global scope: bounded yearly repair, not a daily world scan.
 tca_refresh_all_judicial_titles_effect = {
+    every_independent_ruler = {
+        tca_ensure_court_system_law_effect = yes
+        tca_refresh_official_name_flags_effect = yes
+        every_vassal_or_below = { tca_refresh_official_name_flags_effect = yes }
+    }
     tca_initialize_static_judicial_bindings_effect = yes
     # Preserve inactive circuits in the registry so their offices remain reachable.
     # Pick one surviving ruler as the lifecycle context; this grants no position.
@@ -185,7 +200,11 @@ tca_restore_judicial_title_identity_effect = {
         set_definitive_form = yes
         set_title_name_dynamic = tca_judicial_title_name
         set_coa = scope:tca_circuit
-        set_delete_on_destroy = no
+        # Fixed offices already declare delete_on_destroy = no in landed_titles.
+        if = {
+            limit = { NOT = { has_variable = tca_judicial_static_title } }
+            set_delete_on_destroy = no
+        }
         set_destroy_on_succession = no
         # Old saves may retain the office-specific override. The holder's native
         # realm law is ensured by the appointment/maintenance caller before this.
@@ -194,5 +213,26 @@ tca_restore_judicial_title_identity_effect = {
             limit = { has_title_law = tca_judicial_appointment_succession_law }
             remove_title_law = tca_judicial_appointment_succession_law
         }
+    }
+}
+
+# Character scope: coalesce gain/government/liege callbacks until the next day.
+# Timed marker also recovers if a queued event cannot run; keep it during repair
+# so appointments performed by that repair do not schedule themselves again.
+tca_request_judicial_maintenance_effect = {
+    if = {
+        limit = { is_alive = yes NOT = { has_variable = tca_judicial_maintenance_pending } }
+        set_variable = { name = tca_judicial_maintenance_pending value = yes days = 3 }
+        trigger_event = { id = tca_judicial_titles.2 days = 1 }
+    }
+}
+
+tca_run_judicial_maintenance_effect = {
+    if = {
+        limit = { is_alive = yes }
+        set_variable = { name = tca_judicial_maintenance_pending value = yes days = 3 }
+        tca_refresh_character_circuits_effect = yes
+        tca_refresh_held_judicial_positions_effect = yes
+        remove_variable = tca_judicial_maintenance_pending
     }
 }

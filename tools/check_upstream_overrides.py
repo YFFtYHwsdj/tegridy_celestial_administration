@@ -102,9 +102,11 @@ def load_registry(mod_dir):
         raise ValueError("unsupported upstream override registry schema")
     if not isinstance(data.get("overrides"), list) or not isinstance(data.get("known_extensions"), list):
         raise ValueError("registry must contain overrides and known_extensions lists")
-    for section in ("overrides", "known_extensions"):
-        required = ("key", "mod", "vanilla", "baseline") if section == "overrides" else ("key", "mod", "vanilla")
-        for index, entry in enumerate(data[section]):
+    if not isinstance(data.get("localization_overrides", []), list):
+        raise ValueError("localization_overrides must be a list")
+    for section in ("overrides", "known_extensions", "localization_overrides"):
+        required = ("key", "mod", "vanilla", "baseline") if section in ("overrides", "localization_overrides") else ("key", "mod", "vanilla")
+        for index, entry in enumerate(data.get(section, [])):
             label = f"{section}[{index}]"
             if not isinstance(entry, dict):
                 raise ValueError(f"{label} must be an object")
@@ -190,10 +192,39 @@ def _compare_entry(entry, label, expected, source_path, definition_key):
     return 0
 
 
+def localization_values(path):
+    """Read quoted localization entries, preserving literal escapes for drift checks."""
+    result = {}
+    for line in path.read_text(encoding="utf-8-sig").splitlines():
+        match = re.match(r'^\s*([A-Za-z0-9_]+):(?:\d+)?\s*"((?:\\.|[^"\\])*)"\s*(?:#.*)?$', line)
+        if match:
+            if match[1] in result:
+                raise ValueError(f"duplicate localization key {match[1]} in {path}")
+            result[match[1]] = match[2]
+    return result
+
+
+def check_localization_overrides(registry, game_dir, mod_dir):
+    changed = 0
+    for entry in registry.get("localization_overrides", []):
+        baseline = json.loads((mod_dir / entry["baseline"]).read_text(encoding="utf-8"))
+        key = entry["key"]
+        if key not in baseline:
+            raise ValueError(f"localization baseline missing {key}")
+        native = localization_values(game_dir / entry["vanilla"])
+        if native.get(key) != baseline[key]:
+            print(f"NEEDS REVIEW: installed-game localization {key} differs from its reviewed baseline.")
+            changed = 1
+        replacement = localization_values(mod_dir / entry["mod"])
+        if key not in replacement:
+            raise ValueError(f"mod localization override missing {key}")
+    return changed
+
+
 def check(game_dir, mod_dir):
     registry = load_registry(mod_dir)
     known = {}
-    changed = 0
+    changed = check_localization_overrides(registry, game_dir, mod_dir)
     for entry in registry["overrides"]:
         identity = _entry_identity(entry)
         if identity in known:
@@ -238,6 +269,7 @@ def check(game_dir, mod_dir):
     if not changed:
         print(f"OK: {len(registry['overrides'])} vanilla overrides match reviewed baselines; "
               f"{len(registry['known_extensions'])} additive on_action definitions are classified; "
+              f"{len(registry.get('localization_overrides', []))} localization overrides checked; "
               "no unregistered same-name definitions found.")
     return int(bool(changed))
 

@@ -1,0 +1,81 @@
+﻿# wait_days is a framework field compiling to a real delayed character event.
+# Dedicated 1066 test realm; unpause until the final result notification.
+
+tca_test_judicial_delayed_maintenance = {
+ name = "tca_test_judicial_delayed_maintenance"
+ assert = { game_start_date = 1066.9.15 title:h_china = { exists = holder holder = { is_alive = yes is_imprisoned = no is_independent_ruler = yes government_has_flag = government_is_celestial tca_external_official_names_trigger = no any_vassal_or_below = { count >= 2 is_alive = yes is_imprisoned = no government_has_flag = government_is_celestial highest_held_title_tier = tier_kingdom NOT = { tgp_is_any_minister = yes } NOT = { vassal_contract_has_flag = celestial_province_military } NOT = { vassal_contract_has_flag = celestial_province_protectorate } any_held_title = { tier = tier_kingdom is_landless_type_title = no is_noble_family_title = no OR = { exists = title_capital_county exists = holder.capital_county } } } } } }
+ effect = {
+  title:h_china.holder = { tca_test_create_judicial_law_target_effect = yes }
+  scope:tca_test_law_target = {
+   add_character_flag = tca_song_local_names
+   add_character_flag = tca_song_central_names
+   tca_request_judicial_maintenance_effect = yes
+   tca_request_judicial_maintenance_effect = yes
+  }
+ }
+ expect = { scope:tca_test_law_target = { has_variable = tca_judicial_maintenance_pending has_character_flag = tca_song_local_names } }
+ wait_days = 2
+ expect = { scope:tca_test_law_target = {
+  is_alive = yes
+  NOT = { has_variable = tca_judicial_maintenance_pending }
+  NOT = { has_character_flag = tca_song_local_names }
+  NOT = { has_character_flag = tca_song_central_names }
+ } }
+}
+
+tca_test_judicial_delayed_law_disabled = {
+ name = "tca_test_judicial_delayed_law_disabled"
+ assert = { game_start_date = 1066.9.15 title:h_china = { exists = holder holder = { is_alive = yes is_imprisoned = no is_independent_ruler = yes government_has_flag = government_is_celestial tca_external_official_names_trigger = no any_vassal_or_below = { count >= 2 is_alive = yes is_imprisoned = no government_has_flag = government_is_celestial highest_held_title_tier = tier_kingdom NOT = { tgp_is_any_minister = yes } NOT = { vassal_contract_has_flag = celestial_province_military } NOT = { vassal_contract_has_flag = celestial_province_protectorate } any_held_title = { tier = tier_kingdom is_landless_type_title = no is_noble_family_title = no OR = { exists = title_capital_county exists = holder.capital_county } } } } } }
+ effect = { title:h_china.holder = { tca_test_prepare_judicial_law_realm_effect = yes } }
+ effect = { scope:tca_test_law_sovereign = {
+  if = { limit = { NOT = { has_realm_law = tca_judicial_institutions_enabled_law } } add_realm_law_skip_effects = tca_judicial_institutions_enabled_law }
+  tca_refresh_court_system_realm_effect = yes
+  remove_variable = tca_court_system_cooldown
+  add_realm_law = tca_judicial_institutions_disabled_law
+ } }
+ expect = { scope:tca_test_law_sovereign = { has_realm_law = tca_judicial_institutions_disabled_law has_variable = tca_court_system_cooldown } }
+ wait_days = 2
+ expect = { scope:tca_test_law_sovereign = {
+  has_realm_law = tca_judicial_institutions_disabled_law
+  has_variable = tca_court_system_cooldown
+  any_in_list = { variable = tca_test_law_circuits count >= 2 }
+  NOT = { any_in_list = { variable = tca_test_law_circuits NOT = {
+   var:song_judicial_title = { this = prev.var:tca_test_law_original_position NOT = { exists = holder } }
+  } } }
+ } }
+}
+
+tca_test_judicial_delayed_law_enabled = {
+ name = "tca_test_judicial_delayed_law_enabled"
+ assert = { game_start_date = 1066.9.15 title:h_china = { exists = holder holder = { is_alive = yes is_imprisoned = no is_independent_ruler = yes government_has_flag = government_is_celestial tca_external_official_names_trigger = no any_vassal_or_below = { count >= 2 is_alive = yes is_imprisoned = no government_has_flag = government_is_celestial highest_held_title_tier = tier_kingdom NOT = { tgp_is_any_minister = yes } NOT = { vassal_contract_has_flag = celestial_province_military } NOT = { vassal_contract_has_flag = celestial_province_protectorate } any_held_title = { tier = tier_kingdom is_landless_type_title = no is_noble_family_title = no OR = { exists = title_capital_county exists = holder.capital_county } } } } } }
+ effect = { title:h_china.holder = { tca_test_prepare_judicial_law_realm_effect = yes } }
+ effect = { scope:tca_test_law_sovereign = {
+  add_realm_law_skip_effects = tca_judicial_institutions_disabled_law
+  tca_refresh_court_system_realm_effect = yes
+  remove_variable = tca_court_system_cooldown
+  add_realm_law = tca_judicial_institutions_enabled_law
+ } }
+ expect = { scope:tca_test_law_sovereign = { has_realm_law = tca_judicial_institutions_enabled_law has_variable = tca_court_system_cooldown } }
+ wait_days = 2
+ expect = { scope:tca_test_law_sovereign = {
+  has_realm_law = tca_judicial_institutions_enabled_law
+  has_variable = tca_court_system_cooldown
+  any_in_list = { variable = tca_test_law_circuits count >= 2 }
+  NOT = { any_in_list = { variable = tca_test_law_circuits NOT = {
+   var:song_judicial_title = { this = prev.var:tca_test_law_original_position exists = holder tca_is_valid_judicial_holder_trigger = yes }
+  } } }
+ } }
+}
+
+tca_test_judicial_delayed_commissioner_death = {
+ name = "tca_test_judicial_delayed_commissioner_death"
+ assert = { game_start_date = 1066.9.15 title:h_china = { exists = holder holder = { is_alive = yes is_imprisoned = no is_independent_ruler = yes government_has_flag = government_is_celestial tca_external_official_names_trigger = no any_vassal_or_below = { count >= 2 is_alive = yes is_imprisoned = no government_has_flag = government_is_celestial highest_held_title_tier = tier_kingdom NOT = { tgp_is_any_minister = yes } NOT = { vassal_contract_has_flag = celestial_province_military } NOT = { vassal_contract_has_flag = celestial_province_protectorate } any_held_title = { tier = tier_kingdom is_landless_type_title = no is_noble_family_title = no OR = { exists = title_capital_county exists = holder.capital_county } } } } } }
+ effect = { title:h_china.holder = { tca_test_prepare_judicial_law_realm_effect = yes } }
+ expect = { scope:tca_test_law_position = { tca_is_valid_judicial_holder_trigger = yes } scope:tca_test_law_sovereign = { any_in_list = { variable = tca_test_law_circuits count >= 2 } } }
+ effect = { scope:tca_test_law_circuit.holder = { tca_test_create_judicial_law_target_effect = yes } scope:tca_test_law_position = { save_scope_as = tca_position } scope:tca_test_law_commissioner = { imprison = { target = scope:tca_test_law_target type = dungeon } } scope:tca_test_law_target = { tca_register_judicial_prisoner_effect = yes } }
+ expect = { scope:tca_test_law_target = { is_imprisoned_by = scope:tca_test_law_commissioner var:tca_judicial_prison_title = scope:tca_test_law_position } scope:tca_test_law_position = { is_target_in_variable_list = { name = tca_judicial_prisoners target = scope:tca_test_law_target } } }
+ effect = { scope:tca_test_law_commissioner = { death = { death_reason = death_fight } } }
+ expect = { scope:tca_test_law_commissioner = { is_alive = no } scope:tca_test_law_target = { is_imprisoned_by = scope:tca_test_law_circuit.holder is_in_prison_type = dungeon var:tca_judicial_prison_title = scope:tca_test_law_position } scope:tca_test_law_position = { var:song_judicial_circuit = scope:tca_test_law_circuit is_target_in_variable_list = { name = tca_judicial_prisoners target = scope:tca_test_law_target } } }
+ wait_days = 2
+ expect = { scope:tca_test_law_position = { tca_is_valid_judicial_holder_trigger = yes } scope:tca_test_law_sovereign = { any_in_list = { variable = tca_test_law_circuits count >= 2 } } scope:tca_test_law_target = { is_imprisoned_by = scope:tca_test_law_position.holder is_in_prison_type = dungeon var:tca_judicial_prison_title = scope:tca_test_law_position } scope:tca_test_law_position = { holder != scope:tca_test_law_commissioner } }
+}

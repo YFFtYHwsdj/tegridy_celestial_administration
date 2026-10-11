@@ -1,0 +1,69 @@
+﻿# Character scope. Initial legacy migration wins over engine defaults in new groups.
+# After the per-sovereign marker is set, later player choices are preserved.
+tca_ensure_court_system_law_effect = {
+    top_liege = {
+        if = {
+            limit = { government_has_flag = government_is_celestial NOT = { has_variable = tca_court_system_migrated_v2 } }
+            if = {
+                limit = { has_realm_law_flag = tca_court_system_song }
+                if = { limit = { NOT = { has_realm_law = tca_local_names_song_law } } add_realm_law_skip_effects = tca_local_names_song_law }
+                if = { limit = { NOT = { has_realm_law = tca_central_names_song_law } } add_realm_law_skip_effects = tca_central_names_song_law }
+                if = { limit = { NOT = { has_realm_law = tca_judicial_institutions_enabled_law } } add_realm_law_skip_effects = tca_judicial_institutions_enabled_law }
+            }
+            else_if = {
+                limit = { has_realm_law_flag = tca_court_system_tang }
+                if = { limit = { NOT = { has_realm_law = tca_local_names_default_law } } add_realm_law_skip_effects = tca_local_names_default_law }
+                if = { limit = { NOT = { has_realm_law = tca_central_names_default_law } } add_realm_law_skip_effects = tca_central_names_default_law }
+                if = { limit = { NOT = { has_realm_law = tca_judicial_institutions_disabled_law } } add_realm_law_skip_effects = tca_judicial_institutions_disabled_law }
+            }
+            if = { limit = { has_realm_law = tca_court_system_song_law } remove_realm_law = tca_court_system_song_law }
+            if = { limit = { has_realm_law = tca_court_system_tang_law } remove_realm_law = tca_court_system_tang_law }
+            set_variable = { name = tca_court_system_migrated_v2 value = yes }
+        }
+        if = {
+            limit = { government_has_flag = government_is_celestial NOR = { has_realm_law_flag = tca_local_names_default has_realm_law_flag = tca_local_names_song } }
+            if = { limit = { tca_should_start_with_song_system_trigger = yes } add_realm_law_skip_effects = tca_local_names_song_law }
+            else = { add_realm_law_skip_effects = tca_local_names_default_law }
+        }
+        if = {
+            limit = { government_has_flag = government_is_celestial NOR = { has_realm_law_flag = tca_central_names_default has_realm_law_flag = tca_central_names_song } }
+            if = { limit = { tca_should_start_with_song_system_trigger = yes } add_realm_law_skip_effects = tca_central_names_song_law }
+            else = { add_realm_law_skip_effects = tca_central_names_default_law }
+        }
+        if = {
+            limit = { government_has_flag = government_is_celestial NOR = { has_realm_law_flag = tca_judicial_institutions_disabled has_realm_law_flag = tca_judicial_institutions_enabled } }
+            if = { limit = { tca_should_start_with_song_system_trigger = yes } add_realm_law_skip_effects = tca_judicial_institutions_enabled_law }
+            else = { add_realm_law_skip_effects = tca_judicial_institutions_disabled_law }
+        }
+    }
+}
+# Local flavourization entries are activated by a native character flag, so they
+# are absent rather than a fallback overriding other mods' names.
+tca_refresh_official_name_flags_effect = {
+    if = {
+        limit = {
+            government_has_flag = government_is_celestial
+            is_independent_ruler = no
+            is_landed = yes
+            NOT = { vassal_contract_has_flag = celestial_province_protectorate }
+            tca_uses_song_local_names_trigger = yes
+        }
+        add_character_flag = tca_song_local_names
+    }
+    else = { remove_character_flag = tca_song_local_names }
+    if = {
+        limit = { government_has_flag = government_is_celestial tca_uses_song_central_names_trigger = yes }
+        add_character_flag = tca_song_central_names
+    }
+    else = { remove_character_flag = tca_song_central_names }
+}
+tca_refresh_court_system_realm_effect = {
+    tca_ensure_court_system_law_effect = yes
+    tca_refresh_official_name_flags_effect = yes
+    tca_refresh_character_circuits_effect = yes
+    every_vassal_or_below = {
+        tca_refresh_official_name_flags_effect = yes
+        tca_refresh_character_circuits_effect = yes
+        tca_refresh_held_judicial_positions_effect = yes
+    }
+}
