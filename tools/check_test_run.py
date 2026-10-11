@@ -9,6 +9,36 @@ from check_upstream_overrides import definitions
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def expected_cases(root=ROOT):
+    """Read maintained native events; never generate or run game scripts."""
+    entries = {}
+    checks = {}
+    for path in sorted((root / 'events').glob('tca_*test*_events.txt')):
+        for event, body in definitions(path.read_text(encoding='utf-8-sig')).items():
+            for index, token in enumerate(body[:-2]):
+                if token != 'debug_log' or body[index + 1] != '=':
+                    continue
+                message = body[index + 2].strip('"')
+                begin = re.fullmatch(r'TCA_TEST BEGIN (\S+) (tca_test_\S+)', message)
+                check = re.fullmatch(r'TCA_TEST CHECK_PASS (tca_test_\S+) (\d+)', message)
+                if begin:
+                    entry, name = begin.groups()
+                    if entry != event or name in entries:
+                        raise ValueError(f'{path.name}: duplicate or mismatched BEGIN {name}')
+                    entries[name] = event
+                if check:
+                    name, step = check.groups()
+                    if int(step) in checks.setdefault(name, set()):
+                        raise ValueError(f'{name}: duplicate assertion {step}')
+                    checks[name].add(int(step))
+    if not entries or entries.keys() != checks.keys():
+        raise ValueError('Test entries and assertion names must be nonempty and match')
+    for name, steps in checks.items():
+        if steps != set(range(1, len(steps) + 1)):
+            raise ValueError(f'{name}: assertion numbers must be consecutive')
+    return {name: len(checks[name]) for name in entries}
+
+
 def inspect_run(debug, errors, expected):
     lines = debug.splitlines()
     starts = [i for i, line in enumerate(lines) if 'TCA_TEST SUITE_DISPATCH' in line]
@@ -58,12 +88,20 @@ def inspect_run(debug, errors, expected):
             findings[detail.group(1) if detail else 'Script system error'] += 1
         elif 'Compiling source for tca_' in entry:
             findings['Judicial modifier compilation failure'] += 1
+        elif 'Unexpected token:' in entry and 'tca_' in entry:
+            findings['TCA script parsing failure'] += 1
         elif 'has been queued twice' in entry:
             event = re.search(r'Event (tca_[\w.]+)', entry)
             if event:
                 findings[f'{event.group(1)} queued twice'] += 1
         elif 'Key is missing localization:' in entry:
             findings['Judicial localization missing'] += 1
+        elif 'Data error in loc string' in entry:
+            findings['TCA localization evaluation failure'] += 1
+        elif any(message in entry for message in (
+                'Failed to find type', 'Could not find promote',
+                'Failed converting statement', 'Could not find data system function')):
+            findings['TCA localization data binding failure'] += 1
     issues.extend(f'Engine error ({count}): {label}' for label, count in findings.items())
     summary = Counter({kind: sum(count for (k, _), count in results.items() if k == kind)
                        for kind in ['BEGIN', 'PASS', 'FAIL', 'PRECONDITION_FAIL']})
@@ -75,11 +113,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--logs', type=Path, default=ROOT.parent.parent / 'logs')
     args = parser.parse_args()
-    from build_test_events import parts
-    expected = {}
-    for source in (ROOT / 'tests').glob('tca_*_tests.txt'):
-        for name, body in definitions(source.read_text(encoding='utf-8-sig')).items():
-            expected[name] = sum(key == 'expect' for key, _ in parts(body))
+    expected = expected_cases()
     issues, counts = inspect_run((args.logs / 'debug.log').read_text(errors='replace'),
                                 (args.logs / 'error.log').read_text(errors='replace'), expected)
     print(f'Expected {len(expected)} cases; observed {dict(counts)}')

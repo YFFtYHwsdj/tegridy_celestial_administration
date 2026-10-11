@@ -44,7 +44,7 @@
 - `history/titles/tca_judicial_titles.txt`：每个机构在 1066.9.15 的 `effect` 中以 `CIRCUIT = title:k_*` 声明对应关系；人物留空，不覆盖原版头衔历史。
 - `common/scripted_effects/tca_judicial_static_title_effects.txt`：通用绑定器在官职作用域接受 `CIRCUIT` 参数，设置路上的 `tca_static_judicial_title` 备用引用，并在没有有效现职绑定时建立双向引用和登记。既有动态绑定不被覆盖。标记 `tca_judicial_static_title` 只表示固定对象来源。
 - `common/scripted_effects/tca_judicial_title_effects.txt`：有效双向绑定优先；无绑定时清除临时官职作用域，先查固定对象，再动态创建。固定对象通过路上的备用引用直接读取，不再按路 ID 执行 `if / else_if` 查找；两者随后共用任命和身份维护。
-- `localization/{simp_chinese,english}/tca_judicial_static_titles_l_*.yml`：无人且尚未初始化时也有静态机构名及形容词；运行中继续使用随路名更新的动态名称。
+- `localization/{simp_chinese,english}/tca_judicial_static_titles_l_*.yml`：无人且尚未初始化时也有静态机构名及形容词；运行中使用稳定的机构本地化键，通过GetTitleByKey读取所属路当前名称；旧动态机构属于这15路时也使用同一键。
 
 旧存档已有有效动态绑定时保留对象、现任官员及囚犯记录，不自动迁移到固定对象。旧存档不会重新执行头衔历史；全局维护先执行一次有界补接清单，每个固定机构一行，调用与历史相同的通用绑定器。它也兜底处理无人头衔未执行历史效果的情况。无有效绑定时才接入固定对象；新定义能否在旧存档加载时被完整纳入仍待验证。其他路仍动态创建。补接清单仅在 1066 开局执行，并由 `tca_static_judicial_bindings_v1` 标记限制为每存档一次。修改或新增历史映射时须同步该清单。
 

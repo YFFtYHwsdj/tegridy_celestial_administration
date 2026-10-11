@@ -44,82 +44,30 @@ CK3 天朝行政体系重做 mod。中央、地方官制分别提供因便／宋
 
 ## 测试框架
 
-游戏内测试用 CK3 的 P 脚本表达前置条件、操作及预期结果，直接调用模组正式 trigger/effect。测试源位于 `tests/tca_*_tests.txt`，生成器将它们编译为隐藏事件并自动汇总到一个总入口，未来新增测试组沿用同一入口。Python 只负责生成及检查脚本，不重复模拟拘捕、评分或辖区等业务规则。
+测试直接维护为游戏原生的隐藏事件，不再使用Python生成器或中间测试源。Python工具只检查日志、登记及原版覆盖，不生成测试，不模拟游戏业务。
 
-框架有两类检查：游戏内 P 脚本检查法律、权限、标记、迁移等实际引擎状态；`tools/test_*.py` 检查生成器及原版覆盖检查等开发工具。Python 工具测试不会计入游戏内通知。
-
-目前登记3组59项、235个断言：13项官制、42项即时[司法法律回归](docs/judicial_law_tests.md)及4项延迟司法回归。新增法律限制、审批人入狱／换任、目标迁庭，以及自然次日维护、启闭和提刑死亡交接；20:04修正后59项及235断言全部通过，包含四项自然延迟回归；启动仍有已记录的命名作用域及机构名本地化错误。即时项后会显示等待通知，请取消暂停并推进至少八日，直到最终结果。运行后用 `python3 tools/check_test_run.py` 核对全部结果及相关引擎错误。框架说明见[统一测试文档](docs/mod_tests.md)，实际UI扣款及保存重载仍需另外验收。
+- `events/tca_court_test_events.txt`：13项官制测试。
+- `events/tca_judicial_law_test_events.txt`：42项司法法律测试。
+- `events/tca_judicial_loading_test_events.txt`：3项加载／命名测试。
+- `events/tca_judicial_timing_test_events.txt`：4项真实延迟测试，每项等待两日。
+- `events/tca_tests_events.txt`：总入口和串行延迟调度。
 
 ### 游戏内运行
 
-1. 在 CK3 启动选项加入 `-debug_mode`，启用本模组。使用专用测试新局或测试前存档，初始化完成后暂停；测试会修改世界状态，结束后不要保存为正常游玩进度。
-2. 当前官制组使用 1066 中国场景，不加载东方王朝、礼法与治道等外部官名管理模组。其他测试组可以定义自己的场景要求。
-3. 点击调试决议分类中的“调试：模组一键测试”，或在控制台输入一整行：
+重启专用1066中国debug测试局，通过“调试：模组一键测试”或`event tca_tests.1`运行。当前62项、242个断言；取消暂停推进至少八日，直到最终通知。测试会修改法律、角色和机构状态，不在正常游玩存档上运行。
 
-   ```text
-   event tca_tests.1
-   ```
+单项入口沿用现有事件编号，例如`event tca_judicial_loading_test.1`。测试期间不重复启动、不切换请求角色。等待没有结束或前置不满足不能算通过。
 
-4. 上方通知显示是否全部通过、通过及未通过数量。未通过包括断言失败、前置条件不满足的未执行，以及缺少完成结果的用例；不把未执行当作通过。
-5. 在用户目录 `Crusader Kings III/logs/debug.log` 搜索本次运行的 `TCA_TEST`，核对每项 BEGIN、CHECK_PASS/CHECK_FAIL、PASS/FAIL/PRECONDITION_FAIL，并检查同次调用的 `error.log`。通知显示全部通过仍不能证明没有引擎脚本错误。
-
-需要单项复测时，用生成文件中的事件编号，例如 `event tca_court_test.10`。单项只写日志；总入口才汇总并发通知。旧 `event tca_court_test.100` 保留为总入口别名。本机 `scripted_tests` 命令曾发生执行器锁等待，不用它运行这套测试。
+完成后运行`python3 tools/check_test_run.py`，核对每项及每个编号断言的结果，并人工审阅同次error.log。
 
 ### 编写或添加测试
 
-在 `tests/` 新建 `tca_<模块>_tests.txt`，或向对应文件追加用例。各名称必须使用全项目唯一的 `tca_test_` 前缀，每个文件最多 99 项。结构是先 `name`，再一个前置 `assert`，随后一组或多组 `effect` 与 `expect`，至少包含一个 `expect`。
+直接编辑对应测试事件，准备独立场景、调用正式trigger/effect、检查实际结果。保留BEGIN、CHECK_PASS／CHECK_FAIL和PASS／FAIL／PRECONDITION_FAIL日志，以及现有统计与防重逻辑。延迟测试使用原生`trigger_event = { id = ... days = 2 }`和续接事件，不新增wait_days字段。
 
-下面的示例检查实际行为：独立最高领主不应保留普通地方官名标记。它先注入残留标记，再调用正式维护效果检查清除结果；示例用于说明写法，不会因出现在本文中自动加入测试：
+新增用例在`events/tca_tests_events.txt`登记入口，并同步计划数量；延迟组串行入口也要维护。运行`python3 -m unittest discover -s tools -p 'test_*.py'`检查用例登记、数量及日志读取；覆盖对象改动另运行`python3 tools/check_upstream_overrides.py`。没有生成步骤。
 
-```pdx
-tca_test_example_sovereign_name_cleanup = {
-    name = "tca_test_example_sovereign_name_cleanup"
-    assert = {
-        title:h_china = {
-            exists = holder
-            holder = {
-                is_alive = yes
-                is_independent_ruler = yes
-                government_has_flag = government_is_celestial
-            }
-        }
-    }
-    effect = {
-        title:h_china.holder = {
-            save_scope_as = tca_example_subject
-            add_character_flag = tca_song_local_names
-            tca_refresh_official_name_flags_effect = yes
-        }
-    }
-    expect = {
-        scope:tca_example_subject = {
-            NOT = { has_character_flag = tca_song_local_names }
-        }
-    }
-}
-```
+### 验证范围
 
-每项自行准备独立状态，直接调用正式实现，断言玩家需求或业务结果，不能依赖其他用例先执行。通过显式 title 等作用域定位对象；当前编译器不支持 `character_target`、`target` 等附加字段。不要改写 `tca_test_suite_*` 统计变量及 `tca_test_suite_running`、`tca_test_case_failed` 标记。新增用例尽量追加到文件末尾，保留已有单项编号。
+20:30原版本62项／242断言全部通过，相关加载和命名错误消失。本次去生成器重构只改变测试代码的维护方式，事件及调度的脚本token完整保持不变；重构后仍需重启核对加载与总入口。原生`scripted_tests`最小用例在本机再次卡住，暂不使用该执行器。
 
-修改测试源后，在模组目录运行：
-
-```text
-python3 tools/build_test_events.py
-python3 tools/build_test_events.py --check
-```
-
-生成器自动发现所有 `tests/tca_*_tests.txt`，生成各组事件及总调度列表，数量由用例计算。保存生成文件，勿直接修改带生成标记的事件；重启游戏加载修改后再运行。各组命名规则及限制见[统一测试文档](docs/mod_tests.md)，已有用例见[官制测试](docs/court_system_engine_tests.md)及[司法法律测试](docs/judicial_law_tests.md)。
-
-开发工具的 Python 测试在模组目录运行：
-
-```text
-python3 -m unittest discover -s tools -p 'test_*.py'
-```
-
-### 发现问题与修复验证
-
-新增机制或改变可自动验证的行为时，补相应回归用例，优先覆盖有意义的正反条件和边界。发现缺陷后记录场景、触发步骤、实际与预期结果以及日志，先构造最小复现，尽量写出修复前能失败的正确预期，再修改实现。修复后确认该项通过，并运行相关模块及受影响的共享流程测试，保留用例防止回归。
-
-不要通过删掉断言、放宽预期或把真实缺陷变成跳过来获得通过结果。如果问题表现为引擎错误，但现有状态断言已经通过，仍要检查错误日志并补相应复现步骤或检查；不能仅凭通知宣布修复完成。
-
-无法由当前即时框架验证的界面、异步事件、概率行为和存档问题，在模块文档记录可复现的游戏内验收步骤及结果。不能运行时明确标为待复现/待复测；能运行时记录修复前后实际结果。汇报区分静态检查、工具测试、游戏内断言及完整行为验收，具体开发约定见 [AGENTS.md](AGENTS.md#测试开发约定)。
+详细规则和复现记录见[统一测试文档](docs/mod_tests.md)，具体场景见[官制测试](docs/court_system_engine_tests.md)及[司法法律测试](docs/judicial_law_tests.md)。界面显示、异步互动、AI概率、保存重载等按模块分别验收，断言通过不等于完整玩法已验证。

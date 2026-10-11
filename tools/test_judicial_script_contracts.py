@@ -8,6 +8,54 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class JudicialLoadingTests(unittest.TestCase):
+    def test_native_naming_override_changes_only_title_capital_link(self):
+        native = (ROOT / 'tools/baselines/tgp_chinese_naming_tier_trigger.txt').read_text()
+        mod = definitions((ROOT / 'common/scripted_triggers/zz_tca_chinese_naming_triggers.txt').read_text(encoding='utf-8-sig'))
+        corrected = native.replace('scope:title ?= {\n\t\t\tcapital_county.title_province',
+                                   'scope:title ?= {\n\t\t\ttitle_capital_county.title_province')
+        self.assertNotEqual(corrected, native)
+        self.assertEqual(mod['tgp_chinese_naming_tier_trigger'],
+                         definitions(corrected)['tgp_chinese_naming_tier_trigger'])
+
+    def test_native_unique_naming_helper_changes_only_title_capital_link(self):
+        native = (ROOT / 'tools/baselines/tgp_has_unique_chinese_naming.txt').read_text()
+        mod = definitions((ROOT / 'common/scripted_triggers/zz_tca_chinese_naming_triggers.txt').read_text(encoding='utf-8-sig'))
+        corrected = native.replace('scope:title.capital_county.title_province',
+                                   'scope:title.title_capital_county.title_province')
+        self.assertNotEqual(corrected, native)
+        self.assertEqual(mod['tgp_has_unique_chinese_naming'],
+                         definitions(corrected)['tgp_has_unique_chinese_naming'])
+
+    def test_native_event_cases_are_registered_in_dispatcher(self):
+        from check_test_run import expected_cases
+        expected = expected_cases(ROOT)
+        suite = (ROOT / 'events/tca_tests_events.txt').read_text(encoding='utf-8-sig')
+        total = re.search(r'name = tca_test_suite_expected value = (\d+)', suite)
+        self.assertEqual(int(total.group(1)), len(expected))
+        entries = set()
+        for path in (ROOT / 'events').glob('tca_*test*_events.txt'):
+            entries.update(re.findall(r'TCA_TEST BEGIN (\S+) tca_test_', path.read_text(encoding='utf-8-sig')))
+        for entry in entries:
+            self.assertEqual(len(re.findall(r'trigger_event\s*=\s*'+re.escape(entry)+r'(?![\d.])', suite)), 1, entry)
+        self.assertFalse((ROOT / 'tools/build_test_events.py').exists())
+        self.assertFalse((ROOT / 'tools/test_sources').exists())
+        self.assertFalse(list((ROOT / 'tests').glob('tca_*_tests.txt')))
+
+    def test_known_circuit_name_keys_resolve_without_transient_scopes(self):
+        from check_upstream_overrides import localization_values
+        titles = definitions((ROOT / 'common/landed_titles/tca_judicial_titles.txt').read_text(encoding='utf-8-sig'))
+        naming = (ROOT / 'common/scripted_effects/tca_judicial_title_name_effects.txt').read_text(encoding='utf-8-sig')
+        for language in ['english', 'simp_chinese']:
+            path = ROOT / f'localization/{language}/tca_judicial_static_titles_l_{language}.yml'
+            self.assertTrue(path.read_bytes().startswith(b'\xef\xbb\xbf'))
+            loc = localization_values(path)
+            for title in titles:
+                circuit = title.replace('d_tca_judicial_', 'k_')
+                self.assertIn(f'var:song_judicial_circuit = title:{circuit}', naming)
+                self.assertIn(f'set_title_name = {title}', naming)
+                self.assertIn(f"GetTitleByKey('{circuit}')", loc[title])
+                self.assertNotIn('tca_circuit.', loc[title])
+
     def test_modifier_calls_only_pass_declared_arguments(self):
         modifiers = definitions((ROOT / 'common/scripted_modifiers/tca_judicial_prison_modifiers.txt').read_text(encoding='utf-8-sig'))
         interactions = definitions((ROOT / 'common/character_interactions/tca_judicial_arrest_interactions.txt').read_text(encoding='utf-8-sig'))
