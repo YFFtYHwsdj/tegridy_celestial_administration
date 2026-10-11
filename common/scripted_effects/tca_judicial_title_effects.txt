@@ -10,15 +10,20 @@ tca_ensure_judicial_title_effect = {
         save_scope_as = tca_circuit
         # Forget a missing object. A valid reverse-bound position is never replaced.
         remove_variable = song_judicial_title
-        holder = {
-            create_dynamic_title = {
-                tier = duchy
-                name = tca_judicial_title_name
-                adj = tca_judicial_title_adj
+        clear_saved_scope = tca_position
+        var:tca_static_judicial_title ?= { save_scope_as = tca_position }
+        if = {
+            limit = { NOT = { exists = scope:tca_position } }
+            holder = {
+                create_dynamic_title = {
+                    tier = duchy
+                    name = tca_judicial_title_name
+                    adj = tca_judicial_title_adj
+                }
             }
+            scope:new_title = { save_scope_as = tca_position }
         }
-        scope:new_title = {
-            save_scope_as = tca_position
+        scope:tca_position = {
             tca_configure_judicial_title_location_effect = yes
             set_no_automatic_claims = yes
             set_can_be_named_after_dynasty = no
@@ -40,7 +45,11 @@ tca_ensure_judicial_title_effect = {
     }
     # Refresh previously generated titles and follow subsequent circuit renames.
     if = {
-        limit = { tca_has_judicial_title_trigger = yes }
+        limit = {
+            tca_is_judicial_circuit_trigger = yes
+            NOT = { has_variable = tca_judicial_disabled }
+            tca_has_judicial_title_trigger = yes
+        }
         save_scope_as = tca_circuit
         var:song_judicial_title = { tca_refresh_judicial_position_effect = yes }
     }
@@ -62,43 +71,29 @@ tca_configure_judicial_title_location_effect = {
     }
 }
 
-# Position title scope. Must also work when called by on_title_destroyed.
-tca_unlink_judicial_title_effect = {
+# Position title scope. Destruction retires custody but preserves office identity
+# and both circuit pointers. Also called by external on_title_destroyed events.
+tca_retire_judicial_title_effect = {
     tca_retire_judicial_prisoners_effect = yes
-    save_scope_as = tca_position_to_unlink
-    if = {
-        limit = { exists = var:song_judicial_circuit }
-        var:song_judicial_circuit = {
-            if = {
-                limit = { var:song_judicial_title ?= scope:tca_position_to_unlink }
-                remove_variable = song_judicial_title
-                remove_list_global_variable = { name = tca_judicial_circuits target = this }
-                remove_variable = tca_judicial_registered
-            }
-        }
-    }
-    remove_variable = song_judicial_circuit
+    set_delete_on_destroy = no
+    set_destroy_on_succession = no
 }
 
 # Circuit title scope; scope:tca_lifecycle_actor must be a character.
-# Unlink BEFORE destruction to avoid recursive cleanup through the engine hook.
+# Keep the object and binding, withdrawing only the current appointment.
+# The destruction callback retires custody but does not call destroy_title again.
 tca_destroy_judicial_title_effect = {
     if = {
         limit = { tca_has_judicial_title_trigger = yes }
         var:song_judicial_title = {
             save_scope_as = tca_position_to_destroy
-            tca_unlink_judicial_title_effect = yes
-            # Enable object deletion only immediately before explicit destruction.
-            # Keeping this flag on an active office makes IsDestroyedOnSuccession true.
-            set_delete_on_destroy = yes
+            tca_retire_judicial_title_effect = yes
         }
         if = {
             limit = { exists = scope:tca_position_to_destroy.holder }
             scope:tca_position_to_destroy.holder = { destroy_title = scope:tca_position_to_destroy }
         }
-        else = {
-            scope:tca_lifecycle_actor = { destroy_title = scope:tca_position_to_destroy }
-        }
+        # Already vacant offices need no further destruction transaction.
     }
     else = {
         remove_variable = song_judicial_title
@@ -137,8 +132,9 @@ tca_refresh_character_circuits_effect = {
 
 # Empty/global scope: bounded yearly repair, not a daily world scan.
 tca_refresh_all_judicial_titles_effect = {
-    # destroy_title is called from character scope, even for an empty position.
-    # Pick one surviving ruler as the effect context; this grants them no position.
+    tca_initialize_static_judicial_bindings_effect = yes
+    # Preserve inactive circuits in the registry so their offices remain reachable.
+    # Pick one surviving ruler as the lifecycle context; this grants no position.
     every_independent_ruler = {
         limit = { NOT = { exists = scope:tca_lifecycle_actor } }
         save_scope_as = tca_lifecycle_actor

@@ -1,0 +1,58 @@
+﻿# Judicial title scope. Declare a fixed institution's circuit from title history.
+# Idempotent: a valid existing office (including a legacy dynamic one) wins.
+tca_bind_judicial_circuit_effect = {
+    if = {
+        limit = { game_start_date = 1066.9.15 exists = $CIRCUIT$ }
+        save_scope_as = tca_binding_position
+        set_variable = { name = tca_judicial_static_title value = yes }
+        set_delete_on_destroy = no
+        set_destroy_on_succession = no
+        $CIRCUIT$ = {
+            # A separate fallback pointer does not replace the active old-save binding.
+            set_variable = { name = tca_static_judicial_title value = scope:tca_binding_position }
+            if = {
+                limit = { NOT = { tca_has_judicial_title_trigger = yes } }
+                save_scope_as = tca_circuit
+                set_variable = { name = song_judicial_title value = scope:tca_binding_position }
+                scope:tca_binding_position = {
+                    set_variable = { name = tca_judicial_title value = yes }
+                    set_variable = { name = song_judicial_circuit value = scope:tca_circuit }
+                    set_coa = scope:tca_circuit
+                }
+                if = {
+                    limit = { NOT = { has_variable = tca_judicial_registered } }
+                    add_to_global_variable_list = { name = tca_judicial_circuits target = this }
+                    set_variable = { name = tca_judicial_registered value = yes }
+                }
+            }
+        }
+    }
+}
+
+# Empty/global scope. Older saves do not replay title history.
+# Also repairs initial binding if vacant-title history effects are skipped.
+# The bounded compatibility list invokes the SAME binder as history, once per save.
+tca_initialize_static_judicial_bindings_effect = {
+    if = {
+        limit = {
+            game_start_date = 1066.9.15
+            NOT = { has_global_variable = tca_static_judicial_bindings_v1 }
+        }
+        title:d_tca_judicial_henan = { tca_bind_judicial_circuit_effect = { CIRCUIT = title:k_henan } }
+        title:d_tca_judicial_hedong = { tca_bind_judicial_circuit_effect = { CIRCUIT = title:k_hedong } }
+        title:d_tca_judicial_qingxu = { tca_bind_judicial_circuit_effect = { CIRCUIT = title:k_qingxu } }
+        title:d_tca_judicial_huainan = { tca_bind_judicial_circuit_effect = { CIRCUIT = title:k_huainan } }
+        title:d_tca_judicial_jiangdong = { tca_bind_judicial_circuit_effect = { CIRCUIT = title:k_jiangdong } }
+        title:d_tca_judicial_jiangxi = { tca_bind_judicial_circuit_effect = { CIRCUIT = title:k_jiangxi } }
+        title:d_tca_judicial_liangzhe = { tca_bind_judicial_circuit_effect = { CIRCUIT = title:k_liangzhe } }
+        title:d_tca_judicial_fujian = { tca_bind_judicial_circuit_effect = { CIRCUIT = title:k_fujian } }
+        title:d_tca_judicial_shannan = { tca_bind_judicial_circuit_effect = { CIRCUIT = title:k_shannan } }
+        title:d_tca_judicial_hunan = { tca_bind_judicial_circuit_effect = { CIRCUIT = title:k_hunan } }
+        title:d_tca_judicial_xichuan = { tca_bind_judicial_circuit_effect = { CIRCUIT = title:k_xichuan } }
+        title:d_tca_judicial_dongchuan = { tca_bind_judicial_circuit_effect = { CIRCUIT = title:k_dongchuan } }
+        title:d_tca_judicial_xingyuan = { tca_bind_judicial_circuit_effect = { CIRCUIT = title:k_xingyuan } }
+        title:d_tca_judicial_kuizhou = { tca_bind_judicial_circuit_effect = { CIRCUIT = title:k_kuizhou } }
+        title:d_tca_judicial_lingnan = { tca_bind_judicial_circuit_effect = { CIRCUIT = title:k_lingnan } }
+        set_global_variable = { name = tca_static_judicial_bindings_v1 value = yes }
+    }
+}
