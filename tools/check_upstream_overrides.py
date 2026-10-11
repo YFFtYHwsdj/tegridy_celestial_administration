@@ -84,7 +84,7 @@ def definitions(text, allow_duplicates=False, ignored_keys=()):
 
 
 def body(text, name):
-    """Compatibility helper used by existing script-focused unit tests."""
+    """Extract block contents for parser unit tests."""
     parsed = definitions(text)
     if name not in parsed:
         raise ValueError(f"expected top-level {name}, found none")

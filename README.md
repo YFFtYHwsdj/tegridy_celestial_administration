@@ -28,6 +28,8 @@ CK3 天朝行政体系重做 mod。普通文官路生成动态无地提刑官职
 
 权限覆盖与原版漂移检查：[原版覆盖更新检查](docs/judicial_upstream_check.md)。运行 `python3 tools/scan_upstream_overrides.py` 可独立扫描原版与模组，检查覆盖登记是否遗漏；运行 `python3 tools/check_upstream_overrides.py` 可检查已审阅基线是否随原版更新发生变化。
 
+开发工具仅保留覆盖检查、查漏扫描及其测试（另含本地化 BOM 检查）；已移除 Python 对拘捕策略、评分与辖区的重复模拟，业务行为按模块文档进行游戏内验收。
+
 互动文本与作用域：[动态本地化](docs/judicial_localization.md)。
 
 提刑同级调任的职位价值：[提刑重要性算法与验证](docs/judicial_prominence.md)。已实现独立公式，静态检查通过与游戏内验证分别记录在该文档中。
