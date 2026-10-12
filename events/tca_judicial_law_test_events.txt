@@ -1985,6 +1985,21 @@ tca_judicial_law_test.26 = {
                 add_character_flag = tca_test_case_failed
                 debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_law_approval_thresholds 1"
             }
+            clear_saved_scope = tca_test_threshold_original_heir
+            title:h_china.current_heir ?= { save_scope_as = tca_test_threshold_original_heir }
+            scope:tca_test_law_circuit.holder = {
+                create_character = {
+                    age = 60
+                    gender_female_chance = 0
+                    random_traits = no
+                    dynasty = none
+                    culture = this.culture
+                    faith = this.faith
+                    rite = this.rite
+                    employer = this
+                    save_scope_as = tca_test_threshold_fixture_father
+                }
+            }
             scope:tca_test_law_circuit.holder = { save_scope_as = actor save_scope_as = puppet_or_actor tca_test_create_judicial_law_target_effect = yes } scope:tca_test_law_target = { save_scope_as = recipient tca_test_normalize_judicial_score_target_effect = yes remove_trait = confucian_education add_trait = confucian_education add_trait_xp = { trait = confucian_education value = 80 } } tca_setup_judicial_arrest_roles_effect = yes
             if = {
                 limit = { scope:recipient = { tca_judicial_office_score = 0 } }
@@ -2100,6 +2115,43 @@ tca_judicial_law_test.26 = {
                 add_character_flag = tca_test_case_failed
                 debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_law_approval_thresholds 15"
             }
+            # Restore the native father relationship after the imperial-family check.
+            scope:tca_test_law_target = { set_father = scope:tca_test_threshold_fixture_father }
+            # A score fixture must not remain an imperial child or change the heir.
+            if = {
+                limit = {
+                    scope:tca_test_law_target = { father = scope:tca_test_threshold_fixture_father }
+                    scope:tca_test_law_sovereign = {
+                        NOT = { any_child = { this = scope:tca_test_law_target } }
+                    }
+                }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_law_approval_thresholds 16"
+            }
+            else = {
+                add_character_flag = tca_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_law_approval_thresholds 16"
+            }
+            if = {
+                limit = {
+                    OR = {
+                        AND = {
+                            exists = scope:tca_test_threshold_original_heir
+                            title:h_china = { current_heir = scope:tca_test_threshold_original_heir }
+                        }
+                        AND = {
+                            NOT = { exists = scope:tca_test_threshold_original_heir }
+                            title:h_china = { NOT = { exists = current_heir } }
+                        }
+                    }
+                }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_law_approval_thresholds 17"
+            }
+            else = {
+                add_character_flag = tca_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_law_approval_thresholds 17"
+            }
+            clear_saved_scope = tca_test_threshold_original_heir
+            clear_saved_scope = tca_test_threshold_fixture_father
             if = {
                 limit = { has_character_flag = tca_test_case_failed }
                 debug_log = "TCA_TEST FAIL tca_test_judicial_law_approval_thresholds"
