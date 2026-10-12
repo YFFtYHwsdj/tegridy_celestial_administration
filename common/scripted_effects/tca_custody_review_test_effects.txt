@@ -1,0 +1,54 @@
+﻿# Disposable native test fixtures, not gameplay callers.
+tca_test_review_fixture_effect = {
+    clear_saved_scope = tca_review_prestige_loss_at_start
+    clear_saved_scope = tca_review_influence_loss_at_start
+    title:h_china.holder = { tca_test_prepare_judicial_law_realm_effect = yes }
+    scope:tca_test_law_commissioner = {
+        save_scope_as = tca_review_actor
+        save_scope_as = tca_review_office_holder
+        primary_title = { save_scope_as = tca_review_office }
+        primary_title.var:song_judicial_circuit = { save_scope_as = tca_review_circuit }
+        top_liege = { save_scope_as = tca_review_court }
+        remove_character_flag = tca_review_actor_pending
+        remove_character_flag = tca_review_send_cooldown
+        remove_variable = tca_review_prisoner
+        change_influence = 1000
+        add_prestige = 1000
+    }
+    scope:tca_test_law_circuit.holder = {
+        save_scope_as = tca_review_keeper
+        tca_test_create_judicial_law_target_effect = yes
+        add_prestige = 1000
+        change_influence = 1000
+        imprison = { target = scope:tca_test_law_target type = house_arrest }
+    }
+    scope:tca_review_actor = {
+        if = { limit = { has_hook = scope:tca_review_keeper } remove_hook = { target = scope:tca_review_keeper } }
+    }
+    scope:tca_test_law_target = { save_scope_as = tca_review_prisoner }
+    clear_saved_scope = tca_review_hook
+}
+
+# No inherited verdict opinions may make a resolution assertion pass.
+tca_test_review_clear_reply_opinions_effect = {
+    scope:tca_review_actor = { remove_opinion = { target = scope:tca_review_keeper modifier = tca_review_defeated_opinion } }
+    scope:tca_review_keeper = {
+        remove_opinion = { target = scope:tca_review_actor modifier = tca_review_defeated_opinion }
+    }
+}
+
+# Fresh fixed attributes avoid cached same-event skill mutations.
+tca_test_review_score_pair_effect = {
+    create_character = {
+        age = 30 gender_female_chance = 0 random_traits = no dynasty = none
+        employer = root culture = root.culture faith = root.faith rite = root.rite
+        learning = $ACTOR_LEARNING$ diplomacy = $ACTOR_DIPLOMACY$
+        save_scope_as = tca_review_actor
+    }
+    create_character = {
+        age = 30 gender_female_chance = 0 random_traits = no dynasty = none
+        employer = root culture = root.culture faith = root.faith rite = root.rite
+        learning = $KEEPER_LEARNING$ diplomacy = $KEEPER_DIPLOMACY$
+        save_scope_as = tca_review_keeper
+    }
+}

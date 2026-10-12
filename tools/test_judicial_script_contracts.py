@@ -8,6 +8,17 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class JudicialLoadingTests(unittest.TestCase):
+    def test_review_linked_tooltip_does_not_require_event_role_aliases(self):
+        # #tooltip localization has no inherited event actor/recipient context.
+        for language in ('english', 'simp_chinese'):
+            text = (ROOT / f'localization/{language}/tca_custody_review_l_{language}.yml').read_text(encoding='utf-8-sig')
+            linked_keys = set(re.findall(r'#tooltip:(tca_review_\w+)', text))
+            self.assertTrue(linked_keys)
+            entries = dict(re.findall(r'^\s*(tca_review_\w+):\s*"(.*)"$', text, re.MULTILINE))
+            for key in linked_keys:
+                self.assertIn(key, entries)
+                self.assertNotRegex(entries[key], r'(?<![\w.])(?:actor|recipient)\.', key)
+
     def test_native_naming_override_changes_only_title_capital_link(self):
         native = (ROOT / 'tools/baselines/tgp_chinese_naming_tier_trigger.txt').read_text()
         mod = definitions((ROOT / 'common/scripted_triggers/zz_tca_chinese_naming_triggers.txt').read_text(encoding='utf-8-sig'))
@@ -32,6 +43,9 @@ class JudicialLoadingTests(unittest.TestCase):
         suite = (ROOT / 'events/tca_tests_events.txt').read_text(encoding='utf-8-sig')
         total = re.search(r'name = tca_test_suite_expected value = (\d+)', suite)
         self.assertEqual(int(total.group(1)), len(expected))
+        logged_total = re.search(r'TCA_TEST SUITE_DISPATCH (\d+) cases', suite)
+        self.assertIsNotNone(logged_total)
+        self.assertEqual(int(logged_total.group(1)), len(expected))
         entries = set()
         for path in (ROOT / 'events').glob('tca_*test*_events.txt'):
             entries.update(re.findall(r'TCA_TEST BEGIN (\S+) tca_test_', path.read_text(encoding='utf-8-sig')))

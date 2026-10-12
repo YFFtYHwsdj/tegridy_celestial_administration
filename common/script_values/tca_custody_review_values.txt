@@ -1,0 +1,117 @@
+﻿# Prisoner-scope prices: tune each value independently of identity scoring.
+tca_review_tier_1_start_cost = 15
+tca_review_tier_1_influence_loss = 15
+tca_review_tier_1_prestige_loss = 30
+tca_review_tier_2_start_cost = 25
+tca_review_tier_2_influence_loss = 25
+tca_review_tier_2_prestige_loss = 60
+tca_review_tier_3_start_cost = 40
+tca_review_tier_3_influence_loss = 50
+tca_review_tier_3_prestige_loss = 125
+tca_review_tier_4_start_cost = 65
+tca_review_tier_4_influence_loss = 100
+tca_review_tier_4_prestige_loss = 250
+tca_review_tier_5_start_cost = 100
+tca_review_tier_5_influence_loss = 200
+tca_review_tier_5_prestige_loss = 500
+tca_review_start_cost = {
+    value = tca_review_tier_1_start_cost
+    if = { limit = { tca_judicial_identity_tier = 5 } value = tca_review_tier_5_start_cost }
+    else_if = { limit = { tca_judicial_identity_tier = 4 } value = tca_review_tier_4_start_cost }
+    else_if = { limit = { tca_judicial_identity_tier = 3 } value = tca_review_tier_3_start_cost }
+    else_if = { limit = { tca_judicial_identity_tier = 2 } value = tca_review_tier_2_start_cost }
+}
+tca_review_influence_loss = {
+    value = tca_review_tier_1_influence_loss
+    if = { limit = { tca_judicial_identity_tier = 5 } value = tca_review_tier_5_influence_loss }
+    else_if = { limit = { tca_judicial_identity_tier = 4 } value = tca_review_tier_4_influence_loss }
+    else_if = { limit = { tca_judicial_identity_tier = 3 } value = tca_review_tier_3_influence_loss }
+    else_if = { limit = { tca_judicial_identity_tier = 2 } value = tca_review_tier_2_influence_loss }
+}
+tca_review_prestige_loss = {
+    value = tca_review_tier_1_prestige_loss
+    if = { limit = { tca_judicial_identity_tier = 5 } value = tca_review_tier_5_prestige_loss }
+    else_if = { limit = { tca_judicial_identity_tier = 4 } value = tca_review_tier_4_prestige_loss }
+    else_if = { limit = { tca_judicial_identity_tier = 3 } value = tca_review_tier_3_prestige_loss }
+    else_if = { limit = { tca_judicial_identity_tier = 2 } value = tca_review_tier_2_prestige_loss }
+}
+# Native confirmation roles; no prisoner selected means no price preview yet.
+tca_review_interaction_cost = {
+    value = 0
+    if = { limit = { exists = scope:secondary_recipient } value = scope:secondary_recipient.tca_review_start_cost }
+}
+# Settlement uses the send-time snapshot even if transferring changes status.
+tca_review_settlement_prestige_loss = {
+    value = scope:tca_review_prisoner.tca_review_prestige_loss
+    if = { limit = { exists = scope:tca_review_prestige_loss_at_start } value = scope:tca_review_prestige_loss_at_start }
+}
+tca_review_settlement_influence_loss = {
+    value = scope:tca_review_prisoner.tca_review_influence_loss
+    if = { limit = { exists = scope:tca_review_influence_loss_at_start } value = scope:tca_review_influence_loss_at_start }
+}
+tca_review_confucian_bonus = {
+    value = 0
+    if = { limit = { has_trait = confucian_education }
+        add = 2
+        if = { limit = { has_trait_xp = { trait = confucian_education value >= 80 } } add = 8 }
+        else_if = { limit = { has_trait_xp = { trait = confucian_education value >= 60 } } add = 6 }
+        else_if = { limit = { has_trait_xp = { trait = confucian_education value >= 40 } } add = 4 }
+        else_if = { limit = { has_trait_xp = { trait = confucian_education value >= 20 } } add = 2 }
+    }
+}
+tca_review_personality_bonus = {
+    value = 0
+    if = { limit = { has_trait = just } add = 3 }
+    if = { limit = { has_trait = arbitrary } subtract = 3 }
+}
+tca_review_learning_bonus = { value = learning }
+tca_review_diplomacy_bonus = { value = diplomacy multiply = 0.5 }
+tca_review_non_learning_score = {
+    value = tca_review_diplomacy_bonus
+    add = tca_review_confucian_bonus
+    add = tca_review_personality_bonus
+}
+# Labels belong to the actual scoring terms; GetScriptValueDesc builds the tooltip.
+tca_review_score = {
+    value = 0
+    add = { desc = tca_review_learning_contribution value = tca_review_learning_bonus }
+    add = { desc = tca_review_diplomacy_contribution value = tca_review_diplomacy_bonus }
+    add = { desc = tca_review_confucian_contribution value = tca_review_confucian_bonus }
+    add = { desc = tca_review_personality_contribution value = tca_review_personality_bonus }
+}
+tca_review_actor_weight = {
+    value = scope:tca_review_actor.tca_review_score
+    subtract = scope:tca_review_keeper.tca_review_score
+    multiply = 3
+    add = 50
+    min = 1
+}
+tca_review_keeper_weight = {
+    value = scope:tca_review_keeper.tca_review_score
+    subtract = scope:tca_review_actor.tca_review_score
+    multiply = 3
+    add = 50
+    min = 1
+}
+tca_review_actor_probability = {
+    value = tca_review_actor_weight
+    divide = { value = tca_review_actor_weight add = tca_review_keeper_weight }
+    multiply = 100
+}
+tca_review_keeper_probability = { value = 100 subtract = tca_review_actor_probability }
+tca_review_ai_interest = {
+    value = -20
+    if = { limit = { scope:tca_review_actor = { tca_review_close_trigger = { OTHER = scope:tca_review_prisoner } } } add = 60 }
+    else_if = { limit = { scope:tca_review_actor = { tca_review_dear_trigger = { OTHER = scope:tca_review_prisoner } } } add = 40 }
+    if = { limit = { scope:tca_review_actor = { has_relation_nemesis = scope:tca_review_keeper } } add = 25 }
+    else_if = { limit = { scope:tca_review_actor = { has_relation_rival = scope:tca_review_keeper } } add = 15 }
+    if = { limit = { tca_review_actor_probability >= 75 } add = 20 }
+    else_if = { limit = { tca_review_actor_probability >= 60 } add = 10 }
+    else_if = {
+        limit = { NOT = { AND = { scope:tca_review_actor = { has_usable_hook = scope:tca_review_keeper tca_review_dear_trigger = { OTHER = scope:tca_review_prisoner } } } } }
+        if = { limit = { tca_review_actor_probability < 25 } subtract = 30 }
+        else_if = { limit = { tca_review_actor_probability < 40 } subtract = 15 }
+    }
+    add = { value = scope:tca_review_actor.ai_boldness min = -100 max = 100 multiply = 0.1 }
+    if = { limit = { scope:tca_review_actor = { has_trait = stubborn } } add = 5 }
+}

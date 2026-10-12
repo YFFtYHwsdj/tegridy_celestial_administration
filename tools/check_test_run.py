@@ -90,6 +90,10 @@ def inspect_run(debug, errors, expected):
             findings['Judicial modifier compilation failure'] += 1
         elif 'Unexpected token:' in entry and 'tca_' in entry:
             findings['TCA script parsing failure'] += 1
+        elif 'should be in utf8-bom encoding' in entry:
+            findings['TCA script encoding failure'] += 1
+        elif 'Exclusive send options should at least be two' in entry:
+            findings['TCA interaction send-option configuration failure'] += 1
         elif 'has been queued twice' in entry:
             event = re.search(r'Event (tca_[\w.]+)', entry)
             if event:

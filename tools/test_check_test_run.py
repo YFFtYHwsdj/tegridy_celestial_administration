@@ -5,6 +5,18 @@ from check_test_run import inspect_run, expected_cases
 
 
 class RunEvidenceTests(unittest.TestCase):
+    def test_script_bom_error_invalidates_pass(self):
+        issues, _ = inspect_run(self.run_log(),
+                               "[10:00:00][E]: File 'common/script_values/tca_custody_review_values.txt' should be in utf8-bom encoding (will try to use it anyways)",
+                               {'tca_test_example'})
+        self.assertTrue(any('encoding failure' in issue for issue in issues))
+
+    def test_invalid_exclusive_send_option_invalidates_pass(self):
+        issues, _ = inspect_run(self.run_log(),
+                               "[10:00:00][E]: Exclusive send options should at least be two, in interaction 'tca_custody_review_interaction'",
+                               {'tca_test_example'})
+        self.assertTrue(any('send-option configuration failure' in issue for issue in issues))
+
     def event_fixture(self, root, checks):
         path = root / 'events/tca_fixture_test_events.txt'
         path.parent.mkdir()

@@ -1,0 +1,155 @@
+﻿# Shared roles: tca_review_actor, keeper, prisoner. No custody-origin filter.
+# Office correspondence does not require participants to be idle or at home.
+tca_review_actor_identity_trigger = {
+    is_alive = yes
+    is_adult = yes
+    is_imprisoned = no
+    tca_is_judicial_commissioner_trigger = yes
+}
+tca_review_actor_available_trigger = {
+    tca_review_actor_identity_trigger = yes
+}
+# Explicit inputs: menu checks must not depend on redirect-created event targets.
+tca_review_keeper_identity_trigger = {
+    trigger_if = {
+        limit = { $ACTOR$ = { tca_review_actor_identity_trigger = yes } }
+        is_alive = yes
+        is_imprisoned = no
+        is_ruler = yes
+        this != $ACTOR$
+        custom_tooltip = {
+            text = tca_review_keeper_in_circuit
+            OR = {
+                this = $ACTOR$.primary_title.var:song_judicial_circuit.holder
+                is_vassal_or_below_of = $ACTOR$.primary_title.var:song_judicial_circuit.holder
+            }
+        }
+    }
+    trigger_else = { always = no }
+}
+
+tca_review_keeper_trigger = {
+    tca_review_keeper_identity_trigger = { ACTOR = $ACTOR$ }
+    NOT = { is_at_war_with = $ACTOR$ }
+}
+
+tca_review_prisoner_trigger = {
+    is_alive = yes
+    is_imprisoned_by = $KEEPER$
+    this != $ACTOR$
+    this != $KEEPER$
+    NOT = { has_variable = tca_pending_judicial_title }
+    NOT = { has_character_flag = is_being_tortured }
+}
+tca_review_actor_can_start_trigger = {
+    tca_review_actor_available_trigger = yes
+    NOT = { has_character_flag = tca_review_actor_pending }
+    NOT = { has_character_flag = tca_review_send_cooldown }
+}
+tca_review_prisoner_can_start_trigger = {
+    tca_review_prisoner_trigger = { ACTOR = $ACTOR$ KEEPER = $KEEPER$ }
+    NOT = { has_character_flag = tca_review_pending }
+    NOT = { has_character_flag = tca_review_prisoner_cooldown }
+    trigger_if = { limit = { NOT = { scope:tca_review_cost_paid ?= yes } } $ACTOR$ = { influence >= prev.tca_review_start_cost } }
+}
+tca_review_eligible_start_trigger = {
+    $ACTOR$ = { tca_review_actor_can_start_trigger = yes }
+    $KEEPER$ = { tca_review_keeper_trigger = { ACTOR = $ACTOR$ } }
+    $PRISONER$ = { tca_review_prisoner_can_start_trigger = { ACTOR = $ACTOR$ KEEPER = $KEEPER$ } }
+}
+tca_review_can_start_trigger = {
+    tca_review_eligible_start_trigger = { ACTOR = scope:tca_review_actor KEEPER = scope:tca_review_keeper PRISONER = scope:tca_review_prisoner }
+    trigger_if = {
+        limit = { scope:tca_review_hook ?= yes }
+        scope:tca_review_actor = { has_usable_hook = scope:tca_review_keeper }
+    }
+}
+# Native interaction roles exist independently on every GUI evaluation.
+tca_review_interaction_shown_trigger = {
+    scope:actor = { tca_review_actor_identity_trigger = yes }
+    scope:recipient = {
+        tca_review_keeper_identity_trigger = { ACTOR = scope:actor }
+        any_prisoner = { tca_review_prisoner_trigger = { ACTOR = scope:actor KEEPER = scope:recipient } }
+    }
+}
+tca_review_interaction_send_trigger = {
+    trigger_if = {
+        limit = { exists = scope:secondary_recipient }
+        tca_review_eligible_start_trigger = { ACTOR = scope:actor KEEPER = scope:recipient PRISONER = scope:secondary_recipient }
+        trigger_if = { limit = { scope:hook ?= yes } scope:actor = { has_usable_hook = scope:recipient } }
+    }
+    trigger_else = { always = no }
+}
+tca_review_context_valid_trigger = {
+    trigger_if = {
+        limit = {
+            exists = scope:tca_review_actor
+            exists = scope:tca_review_keeper
+            exists = scope:tca_review_prisoner
+            exists = scope:tca_review_office
+            exists = scope:tca_review_circuit
+            exists = scope:tca_review_court
+            scope:tca_review_actor = { is_alive = yes }
+            scope:tca_review_keeper = { is_alive = yes }
+            scope:tca_review_prisoner = { is_alive = yes }
+        }
+        scope:tca_review_actor = {
+            tca_review_actor_available_trigger = yes
+            primary_title = scope:tca_review_office
+            primary_title.var:song_judicial_circuit = scope:tca_review_circuit
+            top_liege = scope:tca_review_court
+            has_character_flag = tca_review_actor_pending
+            var:tca_review_prisoner = scope:tca_review_prisoner
+            var:tca_review_serial = scope:tca_review_serial
+        }
+        scope:tca_review_keeper = { tca_review_keeper_trigger = { ACTOR = scope:tca_review_actor } top_liege = scope:tca_review_court }
+        scope:tca_review_prisoner = {
+            tca_review_prisoner_trigger = { ACTOR = scope:tca_review_actor KEEPER = scope:tca_review_keeper }
+            has_character_flag = tca_review_pending
+            var:tca_review_requester = scope:tca_review_actor
+            var:tca_review_pending_serial = scope:tca_review_serial
+        }
+        trigger_if = {
+            limit = { scope:tca_review_hook ?= yes }
+            scope:tca_review_actor = { has_usable_hook = scope:tca_review_keeper }
+        }
+    }
+    trigger_else = { always = no }
+}
+
+tca_review_close_trigger = {
+    OR = {
+        is_spouse_of = $OTHER$
+        is_parent_of = $OTHER$
+        $OTHER$ = { is_parent_of = prev }
+        has_relation_best_friend = $OTHER$
+        has_relation_soulmate = $OTHER$
+    }
+}
+tca_review_dear_trigger = {
+    OR = {
+        tca_review_close_trigger = { OTHER = $OTHER$ }
+        is_close_or_extended_family_of = $OTHER$
+        has_relation_friend = $OTHER$
+        has_relation_lover = $OTHER$
+        has_secret_relation_lover = $OTHER$
+    }
+}
+
+# Native fixture precondition: matches the existing realm-preparation contract.
+tca_test_review_world_trigger = {
+    debug_only = yes
+    game_start_date = 1066.9.15
+    title:h_china = {
+        exists = holder
+        holder = {
+            is_alive = yes is_imprisoned = no
+            government_has_flag = government_is_celestial
+            tca_external_official_names_trigger = no
+            any_vassal_or_below = {
+                count >= 2
+                any_held_title = { tca_is_judicial_circuit_trigger = yes }
+            }
+        }
+    }
+}

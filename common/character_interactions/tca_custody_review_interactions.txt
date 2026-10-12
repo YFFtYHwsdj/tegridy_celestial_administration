@@ -1,0 +1,51 @@
+﻿tca_custody_review_interaction = {
+    category = interaction_category_prison
+    icon = imprison
+    common_interaction = yes
+    use_diplomatic_range = no
+    desc = tca_custody_review_interaction_desc
+    send_name = tca_review_send_name
+    cost = { influence = tca_review_interaction_cost }
+    auto_accept = yes
+    cooldown = { months = 3 }
+    redirect = { tca_review_interaction_pick_prisoner_effect = yes }
+    is_shown = { tca_review_interaction_shown_trigger = yes }
+    populate_recipient_list = {
+        scope:recipient = {
+            every_prisoner = {
+                limit = { tca_review_prisoner_trigger = { ACTOR = scope:actor KEEPER = scope:recipient } NOT = { has_character_flag = tca_review_pending } NOT = { has_character_flag = tca_review_prisoner_cooldown } }
+                add_to_list = characters
+            }
+        }
+    }
+    is_valid_showing_failures_only = {
+        scope:actor = { tca_review_actor_can_start_trigger = yes }
+        scope:recipient = { tca_review_keeper_trigger = { ACTOR = scope:actor } }
+        trigger_if = {
+            limit = { exists = scope:secondary_recipient }
+            scope:secondary_recipient = { tca_review_prisoner_trigger = { ACTOR = scope:actor KEEPER = scope:recipient } NOT = { has_character_flag = tca_review_pending } NOT = { has_character_flag = tca_review_prisoner_cooldown } }
+        }
+        trigger_if = { limit = { scope:hook ?= yes } scope:actor = { has_usable_hook = scope:recipient } }
+    }
+    can_send = {
+        tca_review_interaction_send_trigger = yes
+        trigger_if = {
+            limit = { scope:hook ?= yes }
+            custom_description = { text = tca_review_hook_preview always = yes }
+        }
+        trigger_else = {
+            custom_description = { text = tca_review_debate_details always = yes }
+        }
+    }
+    send_options_exclusive = no
+    send_option = {
+        is_valid = { scope:actor = { has_usable_hook = scope:recipient } }
+        flag = hook
+        localization = tca_review_use_hook
+    }
+    # on_accept is also evaluated by the confirmation-window preview.
+    # Only on_send may create a real request or schedule an event.
+    on_send = { tca_review_interaction_send_effect = yes }
+    on_accept = { tca_review_interaction_preview_effect = yes }
+    ai_will_do = { base = 0 }
+}
