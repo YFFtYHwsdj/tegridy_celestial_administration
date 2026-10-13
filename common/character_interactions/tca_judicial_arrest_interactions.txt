@@ -17,6 +17,9 @@
     ai_intermediary_maybe = yes
     ai_intermediary_accept = {
         base = 20
+        # Native queue regression control. Only disposable debug actors carry these flags.
+        modifier = { add = -1000 scope:actor = { debug_only = yes has_character_flag = tca_test_arrest_force_veto } }
+        modifier = { add = 1000 scope:actor = { debug_only = yes has_character_flag = tca_test_arrest_force_approval } }
         modifier = { add = 80 desc = tca_judicial_approval_reason scope:actor = { has_imprisonment_reason = scope:recipient } }
         opinion_modifier = { who = scope:intermediary opinion_target = scope:actor multiplier = 0.25 desc = AI_OPINION_REASON }
         opinion_modifier = { who = scope:intermediary opinion_target = scope:recipient multiplier = -0.25 desc = tca_judicial_approval_target_opinion }
@@ -88,47 +91,30 @@
     cost = { prestige = liege_diarchy_surcharge_interaction_imprison_interaction_value }
     on_send = {
         tca_restore_judicial_arrest_context_effect = yes
+        tca_test_record_arrest_send_effect = yes
+        tca_trace_judicial_arrest_effect = { STAGE = REQUEST_SEND }
         scope:puppet_or_actor = { add_character_flag = { flag = flag_hostile_actions_disabled_delay days = 10 } }
     }
     on_accept = { tca_handle_judicial_arrest_accept_effect = yes }
     on_decline = { tca_handle_judicial_arrest_decline_effect = yes }
-    auto_accept = {trigger_if = {
-			limit = {
-				scope:recipient = {
-					is_landed = no
-					# Landless prelates: a cardinalate or clerical region cannot sustain the refusal war
-					OR = {
-						exists = clerical_elector_title
-						any_held_title = {
-							OR = {
-								is_noble_family_title = yes
-								has_clerical_region = yes
-							}
-						}
-					}
-				}
-			}
-			custom_description = {
-				text = noble_family_head_cannot_refuse_your_power
-				scope:recipient = {
-					is_landed = no
-					OR = {
-						exists = clerical_elector_title
-						any_held_title = {
-							OR = {
-								is_noble_family_title = yes
-								has_clerical_region = yes
-							}
-						}
-					}
-				}
-			}
-		}
-		trigger_else = {
-			always = no
-		}
-	}
-    ai_accept = { base = 0 tca_judicial_target_acceptance = yes }
+    on_auto_accept = { tca_trace_judicial_arrest_effect = { STAGE = REQUEST_AUTO_ACCEPT } }
+    # Whole-interaction auto_accept also approves the intermediary in CK3.
+    auto_accept = no
+    ai_accept = {
+        base = 0
+        tca_judicial_target_acceptance = yes
+        # MTTH modifiers execute in order: reset only exempt AI targets, then add 100.
+        # This affects recipient acceptance after approval, never intermediary acceptance.
+        modifier = {
+            factor = 0
+            scope:recipient = { tca_judicial_arrest_ai_cannot_refuse_trigger = yes }
+        }
+        modifier = {
+            add = 100
+            desc = tca_judicial_arrest_cannot_refuse_reason
+            scope:recipient = { tca_judicial_arrest_ai_cannot_refuse_trigger = yes }
+        }
+    }
     ai_will_do = { base = -100 tca_judicial_arrest_ai_will_do = yes }
     ai_frequency_by_tier = { barony = 0 county = 36 duchy = 10 kingdom = 10 empire = 10 hegemony = 10 }
     ai_targets = { ai_recipients = vassals chance = 0.5 }

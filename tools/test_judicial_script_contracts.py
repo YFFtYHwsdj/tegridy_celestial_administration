@@ -55,6 +55,37 @@ class JudicialLoadingTests(unittest.TestCase):
         self.assertFalse((ROOT / 'tools/test_sources').exists())
         self.assertFalse(list((ROOT / 'tests').glob('tca_*_tests.txt')))
 
+    def test_serial_dispatch_reaches_all_delayed_cases_before_summary(self):
+        # Count registration alone cannot catch a premature summary in the wait chain.
+        suite = definitions((ROOT / 'events/tca_tests_events.txt').read_text(encoding='utf-8-sig'))
+        stages = {}
+        delayed_entries = set()
+        for event, body in suite.items():
+            text = ' '.join(body)
+            stage = re.search(r'name = tca_test_suite_delayed_next value = (\d+)', text)
+            if stage:
+                self.assertNotIn(int(stage[1]), stages)
+                stages[int(stage[1])] = event
+                target = re.search(r'trigger_event = (tca_\w+_test\.\d+)', text)
+                self.assertIsNotNone(target, event)
+                delayed_entries.add(target[1])
+        self.assertEqual(set(stages), set(range(len(stages))))
+        effects = definitions((ROOT / 'common/scripted_effects/tca_test_delayed_dispatch_effects.txt').read_text(encoding='utf-8-sig'))
+        edges = dict((int(n), event) for n, event in re.findall(
+            r'limit = \{ var:tca_test_suite_delayed_next = (\d+) \} trigger_event = (tca_tests\.\d+)',
+            ' '.join(effects['tca_test_continue_delayed_effect'])))
+        self.assertEqual(set(edges), set(stages))
+        for index in range(len(stages) - 1):
+            self.assertEqual(edges[index], stages[index + 1], index)
+        self.assertEqual(edges[len(stages) - 1], 'tca_tests.2')
+        declared = set()
+        for path in (ROOT / 'events').glob('tca_*test*_events.txt'):
+            for event, body in definitions(path.read_text(encoding='utf-8-sig')).items():
+                text = ' '.join(body)
+                if 'TCA_TEST BEGIN' in text and 'add_character_flag = tca_test_delayed_case_active' in text:
+                    declared.add(event)
+        self.assertEqual(delayed_entries, declared)
+
     def test_known_circuit_name_keys_resolve_without_transient_scopes(self):
         from check_upstream_overrides import localization_values
         titles = definitions((ROOT / 'common/landed_titles/tca_judicial_titles.txt').read_text(encoding='utf-8-sig'))
@@ -69,6 +100,16 @@ class JudicialLoadingTests(unittest.TestCase):
                 self.assertIn(f'set_title_name = {title}', naming)
                 self.assertIn(f"GetTitleByKey('{circuit}')", loc[title])
                 self.assertNotIn('tca_circuit.', loc[title])
+
+    def test_request_arrest_cannot_auto_approve_intermediary(self):
+        interactions = definitions((ROOT / 'common/character_interactions/tca_judicial_arrest_interactions.txt').read_text(encoding='utf-8-sig'))
+        request = ' '.join(interactions['tca_request_imprison_interaction'])
+        self.assertIn('auto_accept = no', request)
+        self.assertNotRegex(request, r'(?<!\w)auto_accept = \{')
+        # The direct interaction keeps the native auto-accept rule.
+        self.assertIn('auto_accept = {', ' '.join(interactions['tca_judicial_imprison_interaction']))
+        # Apply ordinary scoring first; reset and set the recipient endpoint last.
+        self.assertRegex(request, r'ai_accept = \{ base = 0 tca_judicial_target_acceptance = yes modifier = \{ factor = 0 scope:recipient = \{ tca_judicial_arrest_ai_cannot_refuse_trigger = yes \} \} modifier = \{ add = 100 desc = tca_judicial_arrest_cannot_refuse_reason scope:recipient = \{ tca_judicial_arrest_ai_cannot_refuse_trigger = yes \} \} \}')
 
     def test_modifier_calls_only_pass_declared_arguments(self):
         modifiers = definitions((ROOT / 'common/scripted_modifiers/tca_judicial_prison_modifiers.txt').read_text(encoding='utf-8-sig'))

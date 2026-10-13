@@ -1,0 +1,31 @@
+﻿# Debug-only observations. Do not change interaction participants or world state.
+tca_trace_judicial_arrest_effect = {
+    if = {
+        limit = { debug_only = yes }
+        debug_log = "TCA_ARREST_TRACE $STAGE$"
+        scope:recipient ?= {
+            save_scope_value_as = { name = tca_arrest_diag_standing value = tca_judicial_authority_score }
+            save_scope_value_as = { name = tca_arrest_diag_tier value = tca_judicial_identity_tier }
+            if = { limit = { tca_is_judicial_commissioner_trigger = yes } debug_log = "TCA_ARREST_TRACE TARGET_CURRENT_COMMISSIONER" }
+            if = { limit = { is_landed = no } debug_log = "TCA_ARREST_TRACE TARGET_UNLANDED" }
+            if = { limit = { any_held_title = { is_noble_family_title = yes } } debug_log = "TCA_ARREST_TRACE TARGET_HAS_FAMILY_TITLE" }
+            if = { limit = { exists = clerical_elector_title } debug_log = "TCA_ARREST_TRACE TARGET_CLERICAL_ELECTOR" }
+            if = { limit = { any_held_title = { has_clerical_region = yes } } debug_log = "TCA_ARREST_TRACE TARGET_HAS_CLERICAL_REGION" }
+            if = { limit = { is_imprisoned = yes } debug_log = "TCA_ARREST_TRACE TARGET_ALREADY_IMPRISONED" }
+        }
+        if = { limit = { exists = scope:intermediary } debug_log = "TCA_ARREST_TRACE APPROVER_PRESENT" }
+        else = { debug_log = "TCA_ARREST_TRACE APPROVER_MISSING" }
+        scope:intermediary ?= {
+            if = { limit = { is_ai = yes } debug_log = "TCA_ARREST_TRACE APPROVER_AI" }
+            else = { debug_log = "TCA_ARREST_TRACE APPROVER_PLAYER" }
+            save_scope_value_as = { name = tca_arrest_diag_approver_honor value = ai_honor }
+        }
+        scope:actor ?= {
+            if = { limit = { has_imprisonment_reason = scope:recipient } debug_log = "TCA_ARREST_TRACE LAWFUL_REASON" }
+            else = { debug_log = "TCA_ARREST_TRACE NO_LAWFUL_REASON" }
+        }
+        if = { limit = { tca_judicial_arrest_context_valid_trigger = yes } debug_log = "TCA_ARREST_TRACE CONTEXT_VALID" }
+        else = { debug_log = "TCA_ARREST_TRACE CONTEXT_INVALID" }
+        debug_log_scopes = yes
+    }
+}

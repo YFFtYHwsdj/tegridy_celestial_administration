@@ -3161,3 +3161,118 @@ tca_judicial_law_test.42 = {
         }
     }
 }
+
+# Exact request redirect path: governor -> sitting commissioner -> central approver.
+# This does not simulate the engine's interaction queue or claim a real AI reply.
+tca_judicial_law_test.43 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        if = { limit = { has_character_flag = tca_test_delayed_case_active } debug_log = "TCA_TEST CASE_BUSY" }
+        else = {
+            debug_log = "TCA_TEST BEGIN tca_judicial_law_test.43 tca_test_judicial_governor_arrest_commissioner_route"
+            remove_character_flag = tca_test_case_failed
+            if = {
+                limit = {
+                    debug_only = yes game_start_date = 1066.9.15
+                    title:h_china = {
+                        exists = holder
+                        holder = {
+                            is_alive = yes is_imprisoned = no is_independent_ruler = yes
+                            government_has_flag = government_is_celestial tca_external_official_names_trigger = no
+                            any_vassal_or_below = {
+                                count >= 2 is_alive = yes is_imprisoned = no
+                                government_has_flag = government_is_celestial highest_held_title_tier = tier_kingdom
+                                NOT = { tgp_is_any_minister = yes }
+                                NOT = { vassal_contract_has_flag = celestial_province_military }
+                                NOT = { vassal_contract_has_flag = celestial_province_protectorate }
+                                any_held_title = { tier = tier_kingdom is_landless_type_title = no is_noble_family_title = no OR = { exists = title_capital_county exists = holder.capital_county } }
+                            }
+                        }
+                    }
+                }
+                title:h_china.holder = { tca_test_prepare_judicial_law_realm_effect = yes }
+                scope:tca_test_law_circuit.holder = { save_scope_as = actor save_scope_as = puppet_or_actor }
+                scope:tca_test_law_commissioner = { save_scope_as = recipient }
+                # Call both formal redirect effects; never pre-populate intermediary.
+                tca_setup_judicial_arrest_roles_effect = yes
+                tca_setup_judicial_approval_effect = yes
+                tca_trace_judicial_arrest_effect = { STAGE = TEST_COMMISSIONER_REDIRECT }
+                if = { limit = { scope:actor = { tca_is_judicial_governor_trigger = yes } scope:recipient = { tca_is_judicial_commissioner_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_governor_arrest_commissioner_route 1" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_governor_arrest_commissioner_route 1" }
+                if = { limit = { scope:recipient = { tca_judicial_office_score = 80 tca_judicial_authority_score >= 80 tca_judicial_identity_tier >= 4 } } debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_governor_arrest_commissioner_route 2" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_governor_arrest_commissioner_route 2" }
+                if = { limit = { exists = scope:tca_circuit scope:tca_circuit = scope:tca_test_law_circuit } debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_governor_arrest_commissioner_route 3" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_governor_arrest_commissioner_route 3" }
+                if = { limit = { exists = scope:intermediary scope:intermediary = { this != scope:actor this != scope:recipient tca_is_current_central_approver_trigger = { COURT = scope:tca_test_law_sovereign } } } debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_governor_arrest_commissioner_route 4" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_governor_arrest_commissioner_route 4" }
+                if = { limit = { tca_judicial_arrest_context_valid_trigger = yes tca_judicial_requires_central_trigger = yes tca_judicial_direct_authorized_trigger = no } debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_governor_arrest_commissioner_route 5" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_governor_arrest_commissioner_route 5" }
+                if = { limit = { tca_judicial_arrest_still_valid_trigger = yes } debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_governor_arrest_commissioner_route 6" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_governor_arrest_commissioner_route 6" }
+                scope:recipient = { save_scope_as = intermediary }
+                if = { limit = { tca_judicial_arrest_context_valid_trigger = no } debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_governor_arrest_commissioner_route 7" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_governor_arrest_commissioner_route 7" }
+                clear_saved_scope = intermediary
+                if = { limit = { tca_judicial_arrest_context_valid_trigger = no tca_judicial_arrest_still_valid_trigger = no } debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_governor_arrest_commissioner_route 8" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_governor_arrest_commissioner_route 8" }
+                if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_judicial_governor_arrest_commissioner_route" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+                else = { debug_log = "TCA_TEST PASS tca_test_judicial_governor_arrest_commissioner_route" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            }
+            else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_judicial_governor_arrest_commissioner_route" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } }
+            remove_character_flag = tca_test_case_failed
+        }
+    }
+}
+
+# Required local approval must not silently become direct custody if the role is lost.
+tca_judicial_law_test.44 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        if = { limit = { has_character_flag = tca_test_delayed_case_active } debug_log = "TCA_TEST CASE_BUSY" }
+        else = {
+            debug_log = "TCA_TEST BEGIN tca_judicial_law_test.44 tca_test_judicial_missing_approver_blocks_custody"
+            remove_character_flag = tca_test_case_failed
+            if = {
+                limit = {
+                    debug_only = yes game_start_date = 1066.9.15
+                    title:h_china = {
+                        exists = holder
+                        holder = {
+                            is_alive = yes is_imprisoned = no is_independent_ruler = yes
+                            government_has_flag = government_is_celestial tca_external_official_names_trigger = no
+                            any_vassal_or_below = {
+                                count >= 2 is_alive = yes is_imprisoned = no
+                                government_has_flag = government_is_celestial highest_held_title_tier = tier_kingdom
+                                NOT = { tgp_is_any_minister = yes }
+                                NOT = { vassal_contract_has_flag = celestial_province_military }
+                                NOT = { vassal_contract_has_flag = celestial_province_protectorate }
+                                any_held_title = { tier = tier_kingdom is_landless_type_title = no is_noble_family_title = no OR = { exists = title_capital_county exists = holder.capital_county } }
+                            }
+                        }
+                    }
+                }
+                title:h_china.holder = { tca_test_prepare_judicial_approval_reply_effect = yes }
+                if = { limit = { scope:recipient = { tca_judicial_authority_score = 30 tca_judicial_identity_tier = 2 } scope:intermediary = scope:tca_test_law_commissioner tca_judicial_arrest_still_valid_trigger = yes } debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_missing_approver_blocks_custody 1" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_missing_approver_blocks_custody 1" }
+                clear_saved_scope = intermediary
+                if = { limit = { tca_judicial_arrest_context_valid_trigger = no tca_judicial_arrest_still_valid_trigger = no } debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_missing_approver_blocks_custody 2" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_missing_approver_blocks_custody 2" }
+                if = { limit = { tca_judicial_direct_authorized_trigger = no } debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_missing_approver_blocks_custody 3" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_missing_approver_blocks_custody 3" }
+                tca_handle_judicial_arrest_accept_effect = yes
+                if = { limit = { scope:recipient = { is_imprisoned = no } scope:actor = { prestige = scope:tca_test_reply_prestige influence = scope:tca_test_reply_influence NOT = { has_character_flag = flag_hostile_actions_disabled_delay } } } debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_missing_approver_blocks_custody 4" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_missing_approver_blocks_custody 4" }
+                tca_setup_judicial_arrest_roles_effect = yes
+                tca_setup_judicial_approval_effect = yes
+                if = { limit = { scope:intermediary = scope:tca_test_law_commissioner tca_judicial_arrest_still_valid_trigger = yes } debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_missing_approver_blocks_custody 5" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_missing_approver_blocks_custody 5" }
+                if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_judicial_missing_approver_blocks_custody" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+                else = { debug_log = "TCA_TEST PASS tca_test_judicial_missing_approver_blocks_custody" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            }
+            else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_judicial_missing_approver_blocks_custody" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } }
+            remove_character_flag = tca_test_case_failed
+        }
+    }
+}

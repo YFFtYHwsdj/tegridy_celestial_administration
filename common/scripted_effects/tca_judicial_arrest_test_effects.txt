@@ -1,0 +1,192 @@
+﻿# Test-only observations. Never change the framework's reserved counters/flags.
+tca_test_record_arrest_send_effect = {
+    scope:actor ?= { if = { limit = { debug_only = yes has_character_flag = tca_test_arrest_native_active } change_variable = { name = tca_test_arrest_sent add = 1 } } }
+}
+tca_test_record_arrest_approval_effect = {
+    scope:actor ?= { if = { limit = { debug_only = yes has_character_flag = tca_test_arrest_native_active } change_variable = { name = tca_test_arrest_approved add = 1 } } }
+}
+tca_test_record_arrest_veto_effect = {
+    scope:actor ?= { if = { limit = { debug_only = yes has_character_flag = tca_test_arrest_native_active } change_variable = { name = tca_test_arrest_vetoed add = 1 } } }
+}
+tca_test_record_arrest_target_accept_effect = {
+    scope:actor ?= { if = { limit = { debug_only = yes has_character_flag = tca_test_arrest_native_active } change_variable = { name = tca_test_arrest_target_accepted add = 1 } } }
+}
+
+# Independent disposable governor for every case: no inherited request cooldown.
+# ROOT remains the suite reporter; no player switching and no direct imprisonment.
+tca_test_prepare_native_arrest_effect = {
+    title:h_china.holder = { tca_test_prepare_judicial_law_realm_effect = yes }
+    # Never replace an earlier case's disposable governor. Repeated appointment
+    # can trigger nested native title destruction while that governor has vassals.
+    clear_saved_scope = tca_test_law_circuit
+    clear_saved_scope = tca_test_law_position
+    clear_saved_scope = tca_test_law_commissioner
+    scope:tca_test_law_sovereign = {
+        every_in_list = {
+            variable = tca_test_law_circuits
+            limit = {
+                NOT = { has_variable = tca_test_arrest_fixture_used }
+                tca_is_judicial_circuit_trigger = yes
+            }
+            # Replace the inherited alias unconditionally for each eligible entry.
+            # The last eligible entry wins; never gate selection on alias existence.
+            save_scope_as = tca_test_law_circuit
+        }
+    }
+    # Mark only the selected circuit, after the iteration has completed.
+    scope:tca_test_law_circuit = { set_variable = { name = tca_test_arrest_fixture_used value = yes } }
+    scope:tca_test_law_circuit.var:song_judicial_title ?= { save_scope_as = tca_test_law_position }
+    scope:tca_test_law_position.holder ?= { save_scope_as = tca_test_law_commissioner }
+    scope:tca_test_law_position ?= { tca_retire_judicial_prisoners_effect = yes }
+    clear_saved_scope = tca_test_arrest_office
+    scope:tca_test_law_sovereign = {
+        create_character = {
+            age = 40 gender_female_chance = 0 random_traits = no dynasty = none
+            culture = this.culture faith = this.faith rite = this.rite employer = this
+            intrigue = 100 learning = 10 diplomacy = 10
+            save_scope_as = tca_test_arrest_actor
+        }
+    }
+    tca_test_log_native_arrest_fixture_effect = { STAGE = BEFORE_APPOINTMENT }
+    scope:tca_test_arrest_actor = {
+        create_title_and_vassal_change = { type = appointment add_claim_on_loss = no save_scope_as = tca_test_arrest_governor_change }
+        scope:tca_test_law_circuit = { change_title_holder = { holder = scope:tca_test_arrest_actor change = scope:tca_test_arrest_governor_change } }
+        resolve_title_and_vassal_change = scope:tca_test_arrest_governor_change
+        tca_test_log_native_arrest_fixture_effect = { STAGE = AFTER_APPOINTMENT }
+        change_government = celestial_government
+        create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_test_arrest_liege_change }
+        change_liege = { liege = scope:tca_test_law_sovereign change = scope:tca_test_arrest_liege_change }
+        resolve_title_and_vassal_change = scope:tca_test_arrest_liege_change
+        add_prestige = 2000
+        change_influence = 2000
+        add_perk = prison_feudal_complex_perk
+        remove_character_flag = flag_hostile_actions_disabled_delay
+        add_character_flag = tca_test_arrest_native_active
+        add_character_flag = $CONTROL$
+        set_variable = { name = tca_test_arrest_sent value = 0 }
+        set_variable = { name = tca_test_arrest_approved value = 0 }
+        set_variable = { name = tca_test_arrest_vetoed value = 0 }
+        set_variable = { name = tca_test_arrest_target_accepted value = 0 }
+        create_character = {
+            age = 35 gender_female_chance = 0 random_traits = no dynasty = none
+            culture = this.culture faith = this.faith rite = this.rite employer = this
+            intrigue = 1 learning = 10 diplomacy = 10
+            save_scope_as = tca_test_arrest_target
+        }
+    }
+    scope:tca_test_law_circuit = { save_scope_as = tca_circuit }
+    scope:tca_test_law_position = { tca_sync_judicial_holder_liege_effect = yes }
+    scope:tca_test_arrest_target = {
+        add_character_flag = tca_test_arrest_native_target
+        if = {
+            limit = { always = $FAMILY$ }
+            create_dynasty = { spread_to_descendants = yes }
+            # Native family title primitive, without the career event queued by the wrapper.
+            give_noble_family_title = { name = noble_family_name tier = county article = DEFAULT_TITLE_NAME_ARTICLE government = celestial_government save_scope_as = tca_test_arrest_family }
+        }
+        if = {
+            limit = { always = $COMMISSIONER$ }
+            create_title_and_vassal_change = { type = appointment add_claim_on_loss = no save_scope_as = tca_test_arrest_office_change }
+            scope:tca_test_law_position = { change_title_holder = { holder = scope:tca_test_arrest_target change = scope:tca_test_arrest_office_change } }
+            resolve_title_and_vassal_change = scope:tca_test_arrest_office_change
+            change_government = celestial_government
+            scope:tca_test_law_circuit = { save_scope_as = tca_circuit }
+            scope:tca_test_law_position = { tca_sync_judicial_holder_liege_effect = yes }
+        }
+        else_if = {
+            limit = { always = $OFFICE$ }
+            scope:tca_test_arrest_actor = { create_dynamic_title = { tier = duchy name = tca_test_arrest_office_name } }
+            scope:new_title = {
+                save_scope_as = tca_test_arrest_office
+                tca_configure_judicial_title_location_effect = yes
+            }
+            create_title_and_vassal_change = { type = appointment add_claim_on_loss = no save_scope_as = tca_test_arrest_office_change }
+            scope:tca_test_arrest_office = { change_title_holder = { holder = scope:tca_test_arrest_target change = scope:tca_test_arrest_office_change } }
+            resolve_title_and_vassal_change = scope:tca_test_arrest_office_change
+            change_government = celestial_government
+        }
+        # Maintain exact sending-time no-family control, even if native rank-up created one.
+        if = { limit = { NOT = { always = $FAMILY$ } } every_held_title = { limit = { is_noble_family_title = yes } save_scope_as = tca_test_arrest_family_to_remove holder = { destroy_title = scope:tca_test_arrest_family_to_remove } } }
+        create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_test_arrest_target_liege_change }
+        change_liege = { liege = scope:tca_test_arrest_actor change = scope:tca_test_arrest_target_liege_change }
+        resolve_title_and_vassal_change = scope:tca_test_arrest_target_liege_change
+        tca_test_normalize_judicial_score_target_effect = yes
+        remove_trait = confucian_education
+        add_trait = confucian_education
+        add_trait_xp = { trait = confucian_education value = 100 }
+    }
+    scope:tca_test_arrest_actor = {
+        # Native legal reason permits the AI governor to send. Approval is separately controlled.
+        add_opinion = { target = scope:tca_test_arrest_target modifier = schemed_against_me }
+        save_scope_as = actor save_scope_as = puppet_or_actor
+    }
+    scope:tca_test_arrest_target = { save_scope_as = recipient }
+    clear_saved_scope = intermediary
+    tca_setup_judicial_arrest_roles_effect = yes
+    tca_setup_judicial_approval_effect = yes
+    scope:intermediary ?= { save_scope_as = tca_test_arrest_approver }
+}
+
+tca_test_send_native_arrest_effect = {
+    # Default execute_threshold is the disabled enum (3); do not use execute_threshold=accept.
+    # send_threshold uses the command/queue path also used by the player's Send button.
+    run_interaction = {
+        interaction = tca_request_imprison_interaction
+        actor = scope:tca_test_arrest_actor
+        recipient = scope:tca_test_arrest_target
+        send_threshold = decline
+    }
+}
+
+tca_test_cleanup_native_arrest_effect = {
+    scope:tca_test_arrest_target ?= { remove_character_flag = tca_test_arrest_native_target }
+    scope:tca_test_arrest_actor ?= {
+        remove_character_flag = tca_test_arrest_native_active
+        remove_character_flag = tca_test_arrest_force_veto
+        remove_character_flag = tca_test_arrest_force_approval
+    }
+}
+
+# Record the actual end state; keep custody assertions unchanged on natural release/transfer.
+tca_test_log_native_arrest_final_effect = {
+    if = {
+        limit = { debug_only = yes }
+        debug_log = "TCA_ARREST_FINAL STATE"
+        clear_saved_scope = tca_test_arrest_final_keeper
+        clear_saved_scope = tca_test_arrest_final_public_title
+        scope:tca_test_arrest_actor ?= {
+            save_scope_value_as = { name = tca_test_arrest_final_sent value = var:tca_test_arrest_sent }
+            save_scope_value_as = { name = tca_test_arrest_final_approved value = var:tca_test_arrest_approved }
+            save_scope_value_as = { name = tca_test_arrest_final_vetoed value = var:tca_test_arrest_vetoed }
+            save_scope_value_as = { name = tca_test_arrest_final_target_accepted value = var:tca_test_arrest_target_accepted }
+            if = { limit = { is_alive = no } debug_log = "TCA_ARREST_FINAL REQUESTER_DEAD" }
+        }
+        scope:tca_test_arrest_target ?= {
+            if = { limit = { is_alive = no } debug_log = "TCA_ARREST_FINAL TARGET_DEAD" }
+            if = { limit = { is_imprisoned = yes } debug_log = "TCA_ARREST_FINAL TARGET_IMPRISONED" imprisoner = { save_scope_as = tca_test_arrest_final_keeper } }
+            else = { debug_log = "TCA_ARREST_FINAL TARGET_FREE" }
+            if = { limit = { any_held_title = { is_noble_family_title = yes } } debug_log = "TCA_ARREST_FINAL TARGET_HAS_FAMILY_TITLE" }
+            var:tca_judicial_prison_title ?= { save_scope_as = tca_test_arrest_final_public_title }
+        }
+        debug_log_scopes = yes
+    }
+}
+
+# Observe fixture transactions without repairing the world or changing assertions.
+tca_test_log_native_arrest_fixture_effect = {
+    if = {
+        limit = { debug_only = yes }
+        debug_log = "TCA_ARREST_FIXTURE_$STAGE$"
+        clear_saved_scope = tca_test_arrest_fixture_circuit_holder
+        clear_saved_scope = tca_test_arrest_fixture_circuit_liege
+        scope:tca_test_law_circuit ?= {
+            holder ?= { save_scope_as = tca_test_arrest_fixture_circuit_holder }
+            de_facto_liege ?= { save_scope_as = tca_test_arrest_fixture_circuit_liege }
+        }
+        scope:tca_test_arrest_actor ?= {
+            if = { limit = { has_title = scope:tca_test_law_circuit } debug_log = "TCA_ARREST_FIXTURE REQUESTER_HAS_CIRCUIT" }
+            else = { debug_log = "TCA_ARREST_FIXTURE REQUESTER_MISSING_CIRCUIT" }
+        }
+        debug_log_scopes = yes
+    }
+}
