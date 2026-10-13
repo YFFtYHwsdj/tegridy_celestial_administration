@@ -1,0 +1,39 @@
+﻿# Native regression for the observer host resolver. Never recursively run a suite.
+namespace = tca_test_entry_test
+
+tca_test_entry_test.1 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        if = { limit = { has_character_flag = tca_test_delayed_case_active } debug_log = "TCA_TEST CASE_BUSY" }
+        else = {
+            debug_log = "TCA_TEST BEGIN tca_test_entry_test.1 tca_test_observer_host_resolution"
+            remove_character_flag = tca_test_case_failed
+            if = {
+                limit = { tca_test_observer_world_ready_trigger = yes }
+                create_character = {
+                    age = 30 gender_female_chance = 0 random_traits = no dynasty = none
+                    employer = root culture = root.culture faith = root.faith rite = root.rite
+                    save_scope_as = tca_test_entry_caller
+                }
+                if = { limit = { title:h_china.holder = { tca_test_observer_host_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_observer_host_resolution 1" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_observer_host_resolution 1" }
+                if = { limit = { scope:tca_test_entry_caller = { tca_test_observer_host_trigger = no } } debug_log = "TCA_TEST CHECK_PASS tca_test_observer_host_resolution 2" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_observer_host_resolution 2" }
+                scope:tca_test_entry_caller = {
+                    # A stale saved host and an unrelated AI caller must not matter.
+                    save_scope_as = tca_test_observer_host
+                    tca_test_resolve_observer_host_effect = yes
+                }
+                if = { limit = { exists = scope:tca_test_observer_host scope:tca_test_observer_host = { this = title:h_china.holder tca_test_observer_host_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_observer_host_resolution 3" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_observer_host_resolution 3" }
+                if = { limit = { scope:tca_test_entry_caller = { is_alive = yes is_ai = yes tca_test_observer_host_trigger = no NOT = { has_character_flag = tca_test_suite_running } NOT = { has_character_flag = tca_test_delayed_case_active } } } debug_log = "TCA_TEST CHECK_PASS tca_test_observer_host_resolution 4" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_observer_host_resolution 4" }
+                if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_observer_host_resolution" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+                else = { debug_log = "TCA_TEST PASS tca_test_observer_host_resolution" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            }
+            else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_observer_host_resolution" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } }
+            remove_character_flag = tca_test_case_failed
+        }
+    }
+}

@@ -1,0 +1,47 @@
+﻿# A plain snapshot writer, usable on any variable-supporting scope for native tests.
+tca_test_publish_status_effect = {
+    set_variable = { name = tca_test_status_expected value = $EXPECTED$ }
+    set_variable = { name = tca_test_status_passed value = $PASSED$ }
+    set_variable = { name = tca_test_status_failed value = $FAILED$ }
+    set_variable = { name = tca_test_status_skipped value = $SKIPPED$ }
+    set_variable = { name = tca_test_status_completed value = var:tca_test_status_passed }
+    change_variable = { name = tca_test_status_completed add = var:tca_test_status_failed }
+    change_variable = { name = tca_test_status_completed add = var:tca_test_status_skipped }
+    set_variable = { name = tca_test_status_phase value = $PHASE$ }
+    set_variable = { name = tca_test_status_reason value = $REASON$ }
+    set_variable = { name = tca_test_status_visible value = 1 }
+}
+
+# Called on the actual reporter. Frozen title data remains readable after death.
+# Phase: 1 running, 2 complete/all passed, 3 complete/not all passed, 4 aborted.
+# Reason: 0 none, 1 death, 2 environment/sovereign changed.
+tca_test_update_status_effect = {
+    if = {
+        limit = { is_alive = yes has_variable = tca_test_suite_expected }
+        save_scope_value_as = { name = tca_status_expected value = var:tca_test_suite_expected }
+        save_scope_value_as = { name = tca_status_passed value = var:tca_test_suite_passed }
+        save_scope_value_as = { name = tca_status_failed value = var:tca_test_suite_failed }
+        save_scope_value_as = { name = tca_status_skipped value = var:tca_test_suite_skipped }
+        title:h_china = {
+            tca_test_publish_status_effect = {
+                EXPECTED = scope:tca_status_expected PASSED = scope:tca_status_passed
+                FAILED = scope:tca_status_failed SKIPPED = scope:tca_status_skipped
+                PHASE = $PHASE$ REASON = $REASON$
+            }
+        }
+    }
+    else = {
+        title:h_china = {
+            set_variable = { name = tca_test_status_phase value = $PHASE$ }
+            set_variable = { name = tca_test_status_reason value = $REASON$ }
+            set_variable = { name = tca_test_status_visible value = 1 }
+        }
+    }
+}
+
+tca_test_close_status_effect = {
+    if = {
+        limit = { has_variable = tca_test_status_phase NOT = { var:tca_test_status_phase = 1 } }
+        set_variable = { name = tca_test_status_visible value = 0 }
+    }
+}

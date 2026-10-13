@@ -59,6 +59,17 @@ def inspect_run(debug, errors, expected):
             name = second if kind == 'BEGIN' else first
             results[kind, name] += 1
     issues = []
+    if any('TCA_TEST SUITE_ABORTED' in line for line in lines[starts[-1]:]):
+        issues.append('Suite aborted: test environment invalid')
+    # A newer observer attempt must not silently inherit an older suite's pass.
+    observer_attempts = [line for line in lines[starts[-1] + 1:]
+                         if 'TCA_TEST OBSERVER_ENTRY_REJECTED' in line
+                         or 'TCA_TEST OBSERVER_ENTRY_DISPATCH' in line]
+    if observer_attempts:
+        if 'OBSERVER_ENTRY_REJECTED' in observer_attempts[-1]:
+            issues.append('Latest observer entry rejected: ' + observer_attempts[-1].split('OBSERVER_ENTRY_REJECTED', 1)[1].strip())
+        else:
+            issues.append('No suite dispatch after latest observer entry')
     for name in sorted(expected):
         if results['BEGIN', name] != 1 or results['PASS', name] != 1:
             issues.append(f'{name}: begin={results["BEGIN", name]}, pass={results["PASS", name]}')
@@ -90,6 +101,8 @@ def inspect_run(debug, errors, expected):
             findings['Judicial modifier compilation failure'] += 1
         elif 'Unexpected token:' in entry and 'tca_' in entry:
             findings['TCA script parsing failure'] += 1
+        elif 'can not be used in event target links' in entry:
+            findings['TCA invalid event target scope link'] += 1
         elif 'should be in utf8-bom encoding' in entry:
             findings['TCA script encoding failure'] += 1
         elif 'Exclusive send options should at least be two' in entry:

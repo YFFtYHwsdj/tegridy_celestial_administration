@@ -1,0 +1,96 @@
+﻿namespace = tca_test_lifecycle_test
+
+tca_test_lifecycle_test.1 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        if = { limit = { has_character_flag = tca_test_delayed_case_active } debug_log = "TCA_TEST CASE_BUSY" }
+        else = {
+            debug_log = "TCA_TEST BEGIN tca_test_lifecycle_test.1 tca_test_protection_restore"
+            remove_character_flag = tca_test_case_failed
+            if = {
+                limit = { debug_only = yes is_alive = yes }
+                create_character = { age = 30 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_test_protection_new }
+                create_character = { age = 30 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_test_protection_existing }
+                scope:tca_test_protection_new = { add_trait = incapable tca_test_protect_character_effect = yes }
+                if = { limit = { scope:tca_test_protection_new = { has_trait = tca_test_death_protection has_trait = incapable has_variable = tca_test_protection_added } } debug_log = "TCA_TEST CHECK_PASS tca_test_protection_restore 1" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_protection_restore 1" }
+                scope:tca_test_protection_new = { tca_test_protect_character_effect = yes }
+                if = { limit = { scope:tca_test_protection_new = { has_trait = tca_test_death_protection has_variable = tca_test_protection_added } } debug_log = "TCA_TEST CHECK_PASS tca_test_protection_restore 2" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_protection_restore 2" }
+                scope:tca_test_protection_new = { tca_test_restore_character_effect = yes }
+                if = { limit = { scope:tca_test_protection_new = { has_trait = incapable NOT = { has_trait = tca_test_death_protection } NOT = { has_variable = tca_test_protection_added } } } debug_log = "TCA_TEST CHECK_PASS tca_test_protection_restore 3" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_protection_restore 3" }
+                scope:tca_test_protection_new = { tca_test_restore_character_effect = yes }
+                if = { limit = { scope:tca_test_protection_new = { has_trait = incapable NOT = { has_trait = tca_test_death_protection } } } debug_log = "TCA_TEST CHECK_PASS tca_test_protection_restore 4" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_protection_restore 4" }
+                scope:tca_test_protection_existing = { add_trait = immortal add_trait = tca_test_death_protection tca_test_protect_character_effect = yes }
+                if = { limit = { scope:tca_test_protection_existing = { has_trait = immortal has_trait = tca_test_death_protection NOT = { has_variable = tca_test_protection_added } } } debug_log = "TCA_TEST CHECK_PASS tca_test_protection_restore 5" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_protection_restore 5" }
+                scope:tca_test_protection_existing = { tca_test_restore_character_effect = yes }
+                if = { limit = { scope:tca_test_protection_existing = { has_trait = immortal has_trait = tca_test_death_protection } } debug_log = "TCA_TEST CHECK_PASS tca_test_protection_restore 6" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_protection_restore 6" }
+                # These two traits were explicitly prepared only on this disposable fixture.
+                scope:tca_test_protection_existing = { remove_trait = immortal remove_trait = tca_test_death_protection }
+                if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_protection_restore" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+                else = { debug_log = "TCA_TEST PASS tca_test_protection_restore" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            }
+            else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_protection_restore" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } }
+            remove_character_flag = tca_test_case_failed
+        }
+    }
+}
+
+tca_test_lifecycle_test.2 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        if = { limit = { has_character_flag = tca_test_delayed_case_active } debug_log = "TCA_TEST CASE_BUSY" }
+        else = {
+            debug_log = "TCA_TEST BEGIN tca_test_lifecycle_test.2 tca_test_protected_death_hook"
+            remove_character_flag = tca_test_case_failed
+            if = {
+                limit = { debug_only = yes is_alive = yes }
+                create_character = { age = 30 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_test_death_fixture_reporter }
+                create_character = { age = 30 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_test_death_fixture_target }
+                scope:tca_test_death_fixture_target = {
+                    tca_test_protect_character_effect = yes
+                    set_variable = { name = tca_test_death_reporter value = scope:tca_test_death_fixture_reporter }
+                    # Real death path: do not directly call the on_death callback.
+                    death = { death_reason = death_fight }
+                }
+                add_character_flag = tca_test_delayed_case_active
+                debug_log = "TCA_TEST WAIT tca_test_protected_death_hook 1 day"
+                trigger_event = { id = tca_test_lifecycle_test.1102 days = 1 }
+            }
+            else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_protected_death_hook" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_continue_delayed_effect = yes }
+        }
+    }
+}
+
+tca_test_lifecycle_test.1102 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+
+        if = { limit = { scope:tca_test_death_fixture_target = { is_alive = no } } debug_log = "TCA_TEST CHECK_PASS tca_test_protected_death_hook 1" }
+        else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_protected_death_hook 1" }
+        if = { limit = { scope:tca_test_death_fixture_reporter = { var:tca_test_lifecycle_death_detected = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_protected_death_hook 2" }
+        else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_protected_death_hook 2" }
+        if = { limit = { scope:tca_test_death_fixture_reporter = { var:tca_test_lifecycle_cleanup_observed = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_protected_death_hook 3" }
+        else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_protected_death_hook 3" }
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } NOT = { title:h_china = { has_variable = tca_test_suite_aborted } } } debug_log = "TCA_TEST CHECK_PASS tca_test_protected_death_hook 4" }
+        else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_protected_death_hook 4" }
+        scope:tca_test_death_fixture_reporter = { remove_variable = tca_test_lifecycle_death_detected remove_variable = tca_test_lifecycle_cleanup_observed }
+        if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_protected_death_hook" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+        else = { debug_log = "TCA_TEST PASS tca_test_protected_death_hook" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        remove_character_flag = tca_test_case_failed
+        remove_character_flag = tca_test_delayed_case_active
+        tca_test_continue_delayed_effect = yes
+
+        }
+    }
+}

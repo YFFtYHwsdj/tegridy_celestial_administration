@@ -5,6 +5,16 @@ from check_test_run import inspect_run, expected_cases
 
 
 class RunEvidenceTests(unittest.TestCase):
+    def test_invalid_value_event_target_link_invalidates_pass(self):
+        error = "[13:58:52][E][jomini_eventtarget.cpp:325]: Scope type 'value' can not be used in event target links, link compare_value infile: events/tca_custody_review_test_events.txt line: 97"
+        issues, _ = inspect_run(self.run_log(), error, {'tca_test_example'})
+        self.assertTrue(any('event target' in issue.lower() for issue in issues))
+
+    def test_aborted_environment_cannot_pass_even_with_complete_assertions(self):
+        log = self.run_log() + '\nTCA_TEST SUITE_ABORTED monitored character died'
+        issues, _ = inspect_run(log, '', {'tca_test_example'})
+        self.assertTrue(any('aborted' in issue.lower() for issue in issues))
+
     def test_script_bom_error_invalidates_pass(self):
         issues, _ = inspect_run(self.run_log(),
                                "[10:00:00][E]: File 'common/script_values/tca_custody_review_values.txt' should be in utf8-bom encoding (will try to use it anyways)",
@@ -83,6 +93,22 @@ class RunEvidenceTests(unittest.TestCase):
         issues, counts = inspect_run(self.run_log() + '\n' + self.run_log(), '', {'tca_test_example'})
         self.assertEqual(issues, [])
         self.assertEqual(counts['BEGIN'], 1)
+
+    def test_rejected_observer_entry_cannot_reuse_old_pass(self):
+        log = self.run_log() + '\nTCA_TEST OBSERVER_ENTRY_REJECTED valid 1066 China host required'
+        issues, _ = inspect_run(log, '', {'tca_test_example'})
+        self.assertTrue(any('observer entry' in issue.lower() for issue in issues))
+
+    def test_observer_entry_requires_a_new_suite_dispatch(self):
+        log = self.run_log() + '\nTCA_TEST OBSERVER_ENTRY_DISPATCH'
+        issues, _ = inspect_run(log, '', {'tca_test_example'})
+        self.assertTrue(any('observer entry' in issue.lower() for issue in issues))
+
+    def test_busy_observer_retry_does_not_invalidate_completed_suite(self):
+        log = self.run_log().replace('TCA_TEST SUITE_ALL_PASSED',
+                                    'TCA_TEST OBSERVER_ENTRY_BUSY\nTCA_TEST SUITE_ALL_PASSED')
+        issues, _ = inspect_run(log, '', {'tca_test_example'})
+        self.assertEqual(issues, [])
 
     def test_precondition_failure_is_not_pass(self):
         log = self.run_log().replace('TCA_TEST PASS tca_test_example', 'TCA_TEST PRECONDITION_FAIL tca_test_example')

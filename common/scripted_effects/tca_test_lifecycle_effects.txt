@@ -1,0 +1,96 @@
+﻿tca_test_protect_character_effect = {
+    if = {
+        limit = { NOT = { has_trait = tca_test_death_protection } }
+        set_variable = { name = tca_test_protection_added value = yes }
+        add_trait = tca_test_death_protection
+    }
+}
+
+tca_test_restore_character_effect = {
+    if = {
+        # Dead characters no longer support variable operations in this engine.
+        limit = { is_alive = yes }
+        if = {
+            limit = { has_variable = tca_test_protection_added }
+            remove_trait = tca_test_death_protection
+            remove_variable = tca_test_protection_added
+        }
+        remove_variable = tca_test_death_reporter
+    }
+}
+
+tca_test_begin_lifecycle_effect = {
+    save_scope_as = tca_test_lifecycle_reporter
+    tca_test_protect_character_effect = yes
+    set_variable = { name = tca_test_death_reporter value = this }
+    if = {
+        limit = { title:h_china = { exists = holder holder = { is_alive = yes } } }
+        set_variable = { name = tca_test_lifecycle_sovereign value = title:h_china.holder }
+        title:h_china.holder = {
+            tca_test_protect_character_effect = yes
+            set_variable = { name = tca_test_death_reporter value = scope:tca_test_lifecycle_reporter }
+        }
+    }
+}
+
+tca_test_cleanup_lifecycle_effect = {
+    var:tca_test_lifecycle_sovereign ?= { tca_test_restore_character_effect = yes }
+    tca_test_restore_character_effect = yes
+    remove_variable = tca_test_lifecycle_sovereign
+}
+
+tca_test_abort_environment_effect = {
+    if = {
+        limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+        if = {
+            limit = { is_alive = no }
+            tca_test_update_status_effect = { PHASE = 4 REASON = 1 }
+        }
+        else_if = {
+            limit = { has_variable = tca_test_lifecycle_death_detected }
+            tca_test_update_status_effect = { PHASE = 4 REASON = 1 }
+        }
+        else = { tca_test_update_status_effect = { PHASE = 4 REASON = 2 } }
+        debug_log = "TCA_TEST SUITE_ABORTED test environment invalid"
+        add_character_flag = tca_test_suite_aborted
+        title:h_china = { set_variable = { name = tca_test_suite_aborted value = yes } }
+        remove_character_flag = tca_test_suite_running
+        remove_character_flag = tca_test_delayed_case_active
+        remove_variable = tca_test_suite_delayed_next
+        tca_test_cleanup_lifecycle_effect = yes
+    }
+}
+
+tca_test_validate_environment_effect = {
+    if = {
+        limit = { tca_test_environment_intact_trigger = no }
+        tca_test_abort_environment_effect = yes
+    }
+}
+
+# Called in the dying character's scope, before the native death completes.
+tca_test_record_monitored_death_effect = {
+    save_scope_as = tca_test_dying_character
+    var:tca_test_death_reporter ?= {
+        save_scope_as = tca_test_death_audit_reporter
+        set_variable = { name = tca_test_lifecycle_death_detected value = yes }
+        if = {
+            limit = { has_character_flag = tca_test_suite_running }
+            debug_log = "TCA_TEST MONITORED_CHARACTER_DIED"
+            tca_test_abort_environment_effect = yes
+        }
+    }
+    scope:tca_test_dying_character = {
+        tca_test_restore_character_effect = yes
+        if = {
+            limit = {
+                NOT = { has_trait = tca_test_death_protection }
+                NOT = { has_variable = tca_test_protection_added }
+                NOT = { has_variable = tca_test_death_reporter }
+            }
+            scope:tca_test_death_audit_reporter = {
+                set_variable = { name = tca_test_lifecycle_cleanup_observed value = yes }
+            }
+        }
+    }
+}

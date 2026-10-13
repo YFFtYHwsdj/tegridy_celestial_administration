@@ -6,19 +6,28 @@ tca_tests.1 = {
     hidden = yes
     immediate = {
         if = {
+            limit = { OR = { has_character_flag = tca_test_suite_aborted title:h_china = { has_variable = tca_test_suite_aborted } } }
+            debug_log = "TCA_TEST SUITE_ENTRY_REJECTED aborted environment; start a fresh test game"
+        }
+        else_if = {
             limit = { OR = { has_character_flag = tca_test_suite_running has_character_flag = tca_test_delayed_case_active } }
             debug_log = "TCA_TEST SUITE_BUSY"
         }
         else = {
         save_scope_as = tca_test_reporter
-        set_variable = { name = tca_test_suite_expected value = 104 }
+        set_variable = { name = tca_test_suite_expected value = 108 }
         set_variable = { name = tca_test_suite_passed value = 0 }
         set_variable = { name = tca_test_suite_failed value = 0 }
         set_variable = { name = tca_test_suite_skipped value = 0 }
         if = {
             limit = { debug_only = yes }
             add_character_flag = tca_test_suite_running
-            debug_log = "TCA_TEST SUITE_DISPATCH 104 cases"
+            tca_test_begin_lifecycle_effect = yes
+            tca_test_update_status_effect = { PHASE = 1 REASON = 0 }
+            debug_log = "TCA_TEST SUITE_DISPATCH 108 cases"
+            trigger_event = tca_test_entry_test.1
+            trigger_event = tca_test_status_test.1
+            trigger_event = tca_test_lifecycle_test.1
             trigger_event = tca_court_test.1
             trigger_event = tca_court_test.2
             trigger_event = tca_court_test.3
@@ -108,7 +117,7 @@ tca_tests.1 = {
             trigger_event = tca_tests.1000
         }
         else = {
-            set_variable = { name = tca_test_suite_skipped value = 104 }
+            set_variable = { name = tca_test_suite_skipped value = 108 }
             debug_log = "TCA_TEST SUITE_PRECONDITION_FAIL debug mode required"
             tca_test_notify_results_effect = yes
         }
@@ -120,9 +129,14 @@ tca_tests.2 = {
     type = character_event
     hidden = yes
     immediate = {
-        remove_character_flag = tca_test_suite_running
-        remove_variable = tca_test_suite_delayed_next
-        tca_test_notify_results_effect = yes
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            tca_test_cleanup_lifecycle_effect = yes
+            remove_character_flag = tca_test_suite_running
+            remove_variable = tca_test_suite_delayed_next
+            tca_test_notify_results_effect = yes
+        }
     }
 }
 
@@ -130,8 +144,14 @@ tca_tests.1000 = {
     type = character_event
     hidden = yes
     immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+
         set_variable = { name = tca_test_suite_delayed_next value = 0 }
         trigger_event = tca_judicial_timing_test.1
+
+        }
     }
 }
 
@@ -139,8 +159,14 @@ tca_tests.1001 = {
     type = character_event
     hidden = yes
     immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+
         set_variable = { name = tca_test_suite_delayed_next value = 1 }
         trigger_event = tca_judicial_timing_test.2
+
+        }
     }
 }
 
@@ -148,8 +174,14 @@ tca_tests.1002 = {
     type = character_event
     hidden = yes
     immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+
         set_variable = { name = tca_test_suite_delayed_next value = 2 }
         trigger_event = tca_judicial_timing_test.3
+
+        }
     }
 }
 
@@ -157,8 +189,14 @@ tca_tests.1003 = {
     type = character_event
     hidden = yes
     immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+
         set_variable = { name = tca_test_suite_delayed_next value = 3 }
         trigger_event = tca_judicial_timing_test.4
+
+        }
     }
 }
 
@@ -166,16 +204,28 @@ tca_tests.1004 = {
     type = character_event
     hidden = yes
     immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+
         set_variable = { name = tca_test_suite_delayed_next value = 4 }
         trigger_event = tca_custody_review_test.1
+
+        }
     }
 }
 tca_tests.1005 = {
     type = character_event
     hidden = yes
     immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+
         set_variable = { name = tca_test_suite_delayed_next value = 5 }
         trigger_event = tca_custody_review_test.9
+
+        }
     }
 }
 
@@ -183,16 +233,28 @@ tca_tests.1006 = {
     type = character_event
     hidden = yes
     immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+
         set_variable = { name = tca_test_suite_delayed_next value = 6 }
         trigger_event = tca_custody_review_test.14
+
+        }
     }
 }
 tca_tests.1007 = {
     type = character_event
     hidden = yes
     immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+
         set_variable = { name = tca_test_suite_delayed_next value = 7 }
         trigger_event = tca_custody_review_test.15
+
+        }
     }
 }
 
@@ -200,18 +262,92 @@ tca_tests.1008 = {
     type = character_event
     hidden = yes
     immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+
         set_variable = { name = tca_test_suite_delayed_next value = 8 }
         trigger_event = tca_custody_review_test.22
+
+        }
     }
 }
 
-tca_tests.1009 = { type = character_event hidden = yes immediate = { set_variable = { name = tca_test_suite_delayed_next value = 9 } trigger_event = tca_judicial_arrest_test.1 } }
-tca_tests.1010 = { type = character_event hidden = yes immediate = { set_variable = { name = tca_test_suite_delayed_next value = 10 } trigger_event = tca_judicial_arrest_test.2 } }
-tca_tests.1011 = { type = character_event hidden = yes immediate = { set_variable = { name = tca_test_suite_delayed_next value = 11 } trigger_event = tca_judicial_arrest_test.3 } }
-tca_tests.1012 = { type = character_event hidden = yes immediate = { set_variable = { name = tca_test_suite_delayed_next value = 12 } trigger_event = tca_judicial_arrest_test.4 } }
-tca_tests.1013 = { type = character_event hidden = yes immediate = { set_variable = { name = tca_test_suite_delayed_next value = 13 } trigger_event = tca_judicial_arrest_test.5 } }
-tca_tests.1014 = { type = character_event hidden = yes immediate = { set_variable = { name = tca_test_suite_delayed_next value = 14 } trigger_event = tca_judicial_arrest_test.6 } }
-tca_tests.1015 = { type = character_event hidden = yes immediate = { set_variable = { name = tca_test_suite_delayed_next value = 15 } trigger_event = tca_judicial_arrest_test.7 } }
-tca_tests.1016 = { type = character_event hidden = yes immediate = { set_variable = { name = tca_test_suite_delayed_next value = 16 } trigger_event = tca_judicial_arrest_test.8 } }
-tca_tests.1017 = { type = character_event hidden = yes immediate = { set_variable = { name = tca_test_suite_delayed_next value = 17 } trigger_event = tca_judicial_arrest_test.9 } }
-tca_tests.1018 = { type = character_event hidden = yes immediate = { set_variable = { name = tca_test_suite_delayed_next value = 18 } trigger_event = tca_judicial_arrest_test.10 } }
+tca_tests.1009 = { type = character_event hidden = yes immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+ set_variable = { name = tca_test_suite_delayed_next value = 9 } trigger_event = tca_judicial_arrest_test.1
+        }
+    } }
+tca_tests.1010 = { type = character_event hidden = yes immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+ set_variable = { name = tca_test_suite_delayed_next value = 10 } trigger_event = tca_judicial_arrest_test.2
+        }
+    } }
+tca_tests.1011 = { type = character_event hidden = yes immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+ set_variable = { name = tca_test_suite_delayed_next value = 11 } trigger_event = tca_judicial_arrest_test.3
+        }
+    } }
+tca_tests.1012 = { type = character_event hidden = yes immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+ set_variable = { name = tca_test_suite_delayed_next value = 12 } trigger_event = tca_judicial_arrest_test.4
+        }
+    } }
+tca_tests.1013 = { type = character_event hidden = yes immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+ set_variable = { name = tca_test_suite_delayed_next value = 13 } trigger_event = tca_judicial_arrest_test.5
+        }
+    } }
+tca_tests.1014 = { type = character_event hidden = yes immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+ set_variable = { name = tca_test_suite_delayed_next value = 14 } trigger_event = tca_judicial_arrest_test.6
+        }
+    } }
+tca_tests.1015 = { type = character_event hidden = yes immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+ set_variable = { name = tca_test_suite_delayed_next value = 15 } trigger_event = tca_judicial_arrest_test.7
+        }
+    } }
+tca_tests.1016 = { type = character_event hidden = yes immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+ set_variable = { name = tca_test_suite_delayed_next value = 16 } trigger_event = tca_judicial_arrest_test.8
+        }
+    } }
+tca_tests.1017 = { type = character_event hidden = yes immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+ set_variable = { name = tca_test_suite_delayed_next value = 17 } trigger_event = tca_judicial_arrest_test.9
+        }
+    } }
+tca_tests.1018 = { type = character_event hidden = yes immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+ set_variable = { name = tca_test_suite_delayed_next value = 18 } trigger_event = tca_judicial_arrest_test.10
+        }
+    } }
+
+tca_tests.1019 = { type = character_event hidden = yes immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+ set_variable = { name = tca_test_suite_delayed_next value = 19 } trigger_event = tca_test_lifecycle_test.2
+        }
+    } }
