@@ -29,6 +29,27 @@ class UpstreamCheckTests(unittest.TestCase):
             result = check(self.game, self.mod)
         return result, output.getvalue()
 
+    def test_auxiliary_extension_checks_native_drift_without_refreshing_baseline(self):
+        vanilla = 'common/on_action/game_start.txt'
+        adapter = 'tools/cli_adapter/common/on_action/start.txt'
+        baseline = 'tools/baselines/start.txt'
+        self.write(self.mod / 'common/empty.txt', '')
+        self.write(self.game / vanilla, 'on_game_start_after_lobby = { effect = { native = yes } }')
+        self.write(self.mod / baseline, 'on_game_start_after_lobby = { effect = { native = yes } }')
+        self.write(self.mod / adapter, 'on_game_start_after_lobby = { on_actions = { tca_cli_start } }')
+        self.write(self.mod / 'tools/upstream_overrides.json', json.dumps({
+            'schema_version': 1, 'overrides': [], 'known_extensions': [],
+            'auxiliary_extensions': [{'key': 'on_game_start_after_lobby', 'vanilla': vanilla,
+                                      'mod': adapter, 'baseline': baseline}]}))
+        self.assertEqual(self.run_check()[0], 0)
+        before = (self.mod / baseline).read_bytes()
+        self.write(self.game / vanilla, 'on_game_start_after_lobby = { effect = { native = no } }')
+        self.assertEqual(self.run_check()[0], 1)
+        self.assertEqual((self.mod / baseline).read_bytes(), before)
+        self.write(self.mod / adapter, 'tca_cli_start = {}')
+        with self.assertRaisesRegex(ValueError, 'auxiliary extension missing'):
+            self.run_check()
+
     def test_unregistered_scalar_override_is_reported(self):
         self.write(self.game / "common/script_values/native.txt", "threshold = 30")
         self.write(self.mod / "common/script_values/mod.txt", "threshold = 80")

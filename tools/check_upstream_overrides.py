@@ -104,8 +104,10 @@ def load_registry(mod_dir):
         raise ValueError("registry must contain overrides and known_extensions lists")
     if not isinstance(data.get("localization_overrides", []), list):
         raise ValueError("localization_overrides must be a list")
-    for section in ("overrides", "known_extensions", "localization_overrides"):
-        required = ("key", "mod", "vanilla", "baseline") if section in ("overrides", "localization_overrides") else ("key", "mod", "vanilla")
+    if not isinstance(data.get("auxiliary_extensions", []), list):
+        raise ValueError("auxiliary_extensions must be a list")
+    for section in ("overrides", "known_extensions", "localization_overrides", "auxiliary_extensions"):
+        required = ("key", "mod", "vanilla", "baseline") if section in ("overrides", "localization_overrides", "auxiliary_extensions") else ("key", "mod", "vanilla")
         for index, entry in enumerate(data.get(section, [])):
             label = f"{section}[{index}]"
             if not isinstance(entry, dict):
@@ -225,6 +227,16 @@ def check(game_dir, mod_dir):
     registry = load_registry(mod_dir)
     known = {}
     changed = check_localization_overrides(registry, game_dir, mod_dir)
+    # Separate opt-in adapter mods live under tools/, outside the normal mod roots.
+    # Check their registered native callbacks and reviewed baselines explicitly.
+    for entry in registry.get("auxiliary_extensions", []):
+        baseline = entry_definitions(entry, mod_dir / entry["baseline"]).get(entry["key"])
+        if baseline is None:
+            raise ValueError(f"auxiliary baseline missing {entry['key']}")
+        changed |= _compare_entry(entry, f"installed-game:{entry['key']}", baseline,
+                                  game_dir / entry["vanilla"], entry["key"])
+        if entry["key"] not in read_definitions(mod_dir / entry["mod"], allow_duplicates=True):
+            raise ValueError(f"auxiliary extension missing {entry['key']}")
     for entry in registry["overrides"]:
         identity = _entry_identity(entry)
         if identity in known:
@@ -270,6 +282,7 @@ def check(game_dir, mod_dir):
         print(f"OK: {len(registry['overrides'])} vanilla overrides match reviewed baselines; "
               f"{len(registry['known_extensions'])} additive on_action definitions are classified; "
               f"{len(registry.get('localization_overrides', []))} localization overrides checked; "
+              f"{len(registry.get('auxiliary_extensions', []))} auxiliary extensions checked; "
               "no unregistered same-name definitions found.")
     return int(bool(changed))
 

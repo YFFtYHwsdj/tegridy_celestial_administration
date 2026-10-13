@@ -16,6 +16,8 @@ python3 tools/check_upstream_overrides.py
 
 没有登记的同类型同名定义会报告出来，要求分类并登记，防止新增覆盖漏出清单。`known_extensions` 用来标记同名但只追加回调的 on_action；检查其原版和模组定义仍存在，但不把它们当作整段原版覆盖进行基线比较。
 
+`auxiliary_extensions`登记`tools/`下独立、按需加载的辅助模组同名追加对象，要求记录原版、适配文件及已审阅基线。通用上游检查核对其原版基线和追加对象存在性；它们不属于普通模组的`common/`／`events/`加载范围，不计入下述普通查漏扫描的失效登记。当前仅登记CLI测试适配的开局回调，见[CLI测试说明](cli_game_tests.md)。
+
 ## 独立覆盖查漏
 
 单独检查登记是否完整：

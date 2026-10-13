@@ -46,7 +46,9 @@ CK3 天朝行政体系重做 mod。中央、地方官制分别提供因便／宋
 
 ## 测试框架
 
-测试直接维护为游戏原生的隐藏事件，不再使用Python生成器或中间测试源。Python工具只检查日志、登记及原版覆盖，不生成测试，不模拟游戏业务。
+支持 CLI 自动新开专用观察者测试局：`python3 tools/run_game_tests.py`。当前为 macOS 带窗口运行，无需 computer use；自动启用 debug/develop、推进日期、执行全组并核对独立日志。适配模组仅由工具加载，正常开局不自动运行。参数、退出码与限制见[CLI 测试说明](docs/cli_game_tests.md)。
+
+测试直接维护为游戏原生的隐藏事件，不再使用Python生成器或中间测试源。Python工具负责启动编排、日志核对、登记及原版覆盖检查，不生成测试，不模拟游戏业务。
 
 - `events/tca_court_test_events.txt`：13项官制测试。
 - `events/tca_judicial_law_test_events.txt`：44项司法法律测试。
