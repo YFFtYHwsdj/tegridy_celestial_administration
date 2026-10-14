@@ -89,14 +89,17 @@ tca_custody_review_test.3 = {
                     save_scope_value_as = { name = tca_test_direct_keeper_influence value = influence }
                 }
                 tca_test_review_clear_reply_opinions_effect = yes
+                save_scope_value_as = { name = tca_test_numeric_defeat_influence value = { value = scope:tca_test_review_influence subtract = scope:tca_review_prisoner.tca_review_influence_loss } }
                 tca_review_start_effect = yes
                 if = { limit = { scope:tca_review_actor = { NOT = { has_character_flag = tca_review_actor_pending } NOT = { has_variable = tca_review_prisoner } }
                     scope:tca_review_prisoner = { NOT = { has_character_flag = tca_review_pending } NOT = { has_variable = tca_review_requester } }
-                    OR = {
-                        AND = { scope:tca_review_prisoner = { is_imprisoned_by = scope:tca_review_actor } scope:tca_review_actor.influence = scope:tca_test_review_influence }
-                        AND = { scope:tca_review_prisoner = { is_imprisoned_by = scope:tca_review_keeper } scope:tca_review_actor.influence = { value = scope:tca_test_review_influence subtract = scope:tca_review_prisoner.tca_review_influence_loss } }
-                    } } debug_log = "TCA_TEST CHECK_PASS tca_test_review_direct_resolution 1" }
+                     } debug_log = "TCA_TEST CHECK_PASS tca_test_review_direct_resolution 1" }
                 else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_review_direct_resolution 1" }
+                if = { limit = { OR = {
+                    AND = { scope:tca_review_prisoner = { is_imprisoned_by = scope:tca_review_actor } scope:tca_review_actor.influence = scope:tca_test_review_influence }
+                    AND = { scope:tca_review_prisoner = { is_imprisoned_by = scope:tca_review_keeper } scope:tca_review_actor.influence = scope:tca_test_numeric_defeat_influence }
+                } } debug_log = "TCA_TEST CHECK_PASS tca_test_review_direct_resolution 5" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_review_direct_resolution 5" }
                 if = { limit = { scope:tca_review_prisoner = { is_in_prison_type = house_arrest }
                     OR = {
                         AND = {
@@ -507,7 +510,10 @@ tca_custody_review_test.1101 = {
                 scope:tca_review_prisoner = { remove_trait = just add_trait = arbitrary }
                 if = { limit = { scope:tca_review_prisoner.tca_review_personality_bonus = -3 } debug_log = "TCA_TEST CHECK_PASS tca_test_review_score 7" }
                 else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_review_score 7" }
-                scope:tca_review_prisoner = { save_scope_value_as = { name = tca_test_review_before_merit value = tca_review_score } change_merit = 1000 add_character_flag = tgp_passed_palace_examination }
+                scope:tca_review_prisoner = { save_scope_value_as = { name = tca_test_review_before_merit value = tca_review_score } change_merit = 1000 add_character_flag = passed_palace_exam }
+                # Verify the existing fixture actually grants the native exam identity.
+                if = { limit = { scope:tca_review_prisoner = { tgp_passed_palace_examination = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_review_score 9" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_review_score 9" }
                 if = { limit = { scope:tca_review_prisoner.tca_review_score = scope:tca_test_review_before_merit } debug_log = "TCA_TEST CHECK_PASS tca_test_review_score 8" }
                 else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_review_score 8" }
                 if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_review_score" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
@@ -605,15 +611,18 @@ tca_custody_review_test.14 = {
                     clear_saved_scope = hook
                     # Emulate native interaction cost before invoking its on_send callback.
                     scope:actor = { change_influence = { value = scope:secondary_recipient.tca_review_start_cost multiply = -1 } save_scope_value_as = { name = tca_test_native_paid_influence value = influence } }
+                    save_scope_value_as = { name = tca_test_numeric_defeat_influence value = { value = scope:tca_test_native_paid_influence subtract = scope:tca_review_prisoner.tca_review_influence_loss } }
                     tca_review_interaction_send_effect = yes
                     if = { limit = { scope:tca_review_actor = { has_character_flag = tca_review_send_cooldown var:tca_review_serial = 1 NOT = { has_character_flag = tca_review_actor_pending } }
                         scope:tca_review_prisoner = { NOT = { has_character_flag = tca_review_pending } }
-                        OR = {
-                            AND = { scope:tca_review_prisoner = { is_imprisoned_by = scope:tca_review_actor } scope:tca_review_actor.influence = scope:tca_test_native_paid_influence }
-                            AND = { scope:tca_review_prisoner = { is_imprisoned_by = scope:tca_review_keeper } scope:tca_review_actor.influence = { value = scope:tca_test_native_paid_influence subtract = scope:tca_review_prisoner.tca_review_influence_loss } }
-                        }
+
                         scope:tca_review_actor = { NOT = { has_variable = tca_review_prisoner } } scope:tca_review_prisoner = { has_character_flag = tca_review_prisoner_cooldown } } debug_log = "TCA_TEST CHECK_PASS tca_test_review_send_resolution 1" }
                     else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_review_send_resolution 1" }
+                    if = { limit = { OR = {
+                        AND = { scope:tca_review_prisoner = { is_imprisoned_by = scope:tca_review_actor } scope:tca_review_actor.influence = scope:tca_test_native_paid_influence }
+                        AND = { scope:tca_review_prisoner = { is_imprisoned_by = scope:tca_review_keeper } scope:tca_review_actor.influence = scope:tca_test_numeric_defeat_influence }
+                    } } debug_log = "TCA_TEST CHECK_PASS tca_test_review_send_resolution 5" }
+                    else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_review_send_resolution 5" }
                     add_character_flag = tca_test_delayed_case_active
                     debug_log = "TCA_TEST WAIT tca_test_review_send_resolution 3 days"
                     trigger_event = { id = tca_custody_review_test.1401 days = 3 }
@@ -1194,16 +1203,28 @@ tca_custody_review_test.23 = {
                 if = { limit = { tca_review_actor_weight = 98 tca_review_keeper_weight = 2 tca_review_actor_probability = 98 } debug_log = "TCA_TEST CHECK_PASS tca_test_review_random_boundaries 2" }
                 else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_review_random_boundaries 2" }
                 tca_test_review_score_pair_effect = { ACTOR_LEARNING = 26 ACTOR_DIPLOMACY = 11 KEEPER_LEARNING = 10 KEEPER_DIPLOMACY = 10 }
-                if = { limit = { tca_review_actor_weight = 99.5 tca_review_keeper_weight = 1 tca_review_actor_probability = { value = 99.5 divide = 100.5 multiply = 100 } } debug_log = "TCA_TEST CHECK_PASS tca_test_review_random_boundaries 3" }
+                save_scope_value_as = { name = tca_test_numeric_expected value = { value = 99.5 divide = 100.5 multiply = 100 } }
+                if = { limit = { tca_review_actor_weight = 99.5 tca_review_keeper_weight = 1 tca_review_actor_probability = scope:tca_test_numeric_expected } debug_log = "TCA_TEST CHECK_PASS tca_test_review_random_boundaries 3" }
                 else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_review_random_boundaries 3" }
+                save_scope_value_as = { name = tca_test_numeric_wrong value = { value = scope:tca_test_numeric_expected add = 1 } }
+                if = { limit = { NOT = { tca_review_actor_probability = scope:tca_test_numeric_wrong } } debug_log = "TCA_TEST CHECK_PASS tca_test_review_random_boundaries 6" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_review_random_boundaries 6" }
                 tca_test_review_score_pair_effect = { ACTOR_LEARNING = 27 ACTOR_DIPLOMACY = 10 KEEPER_LEARNING = 10 KEEPER_DIPLOMACY = 10 }
-                if = { limit = { tca_review_actor_weight = 101 tca_review_keeper_weight = 1 tca_review_actor_probability = { value = 101 divide = 102 multiply = 100 } } debug_log = "TCA_TEST CHECK_PASS tca_test_review_random_boundaries 4" }
+                save_scope_value_as = { name = tca_test_numeric_expected value = { value = 101 divide = 102 multiply = 100 } }
+                if = { limit = { tca_review_actor_weight = 101 tca_review_keeper_weight = 1 tca_review_actor_probability = scope:tca_test_numeric_expected } debug_log = "TCA_TEST CHECK_PASS tca_test_review_random_boundaries 4" }
                 else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_review_random_boundaries 4" }
+                save_scope_value_as = { name = tca_test_numeric_wrong value = { value = scope:tca_test_numeric_expected add = 1 } }
+                if = { limit = { NOT = { tca_review_actor_probability = scope:tca_test_numeric_wrong } } debug_log = "TCA_TEST CHECK_PASS tca_test_review_random_boundaries 7" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_review_random_boundaries 7" }
                 scope:tca_review_actor = { save_scope_as = tca_test_swap_actor }
                 scope:tca_review_keeper = { save_scope_as = tca_review_actor }
                 scope:tca_test_swap_actor = { save_scope_as = tca_review_keeper }
-                if = { limit = { tca_review_actor_weight = 1 tca_review_keeper_weight = 101 tca_review_actor_probability = { value = 1 divide = 102 multiply = 100 } } debug_log = "TCA_TEST CHECK_PASS tca_test_review_random_boundaries 5" }
+                save_scope_value_as = { name = tca_test_numeric_expected value = { value = 1 divide = 102 multiply = 100 } }
+                if = { limit = { tca_review_actor_weight = 1 tca_review_keeper_weight = 101 tca_review_actor_probability = scope:tca_test_numeric_expected } debug_log = "TCA_TEST CHECK_PASS tca_test_review_random_boundaries 5" }
                 else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_review_random_boundaries 5" }
+                save_scope_value_as = { name = tca_test_numeric_wrong value = { value = scope:tca_test_numeric_expected add = 1 } }
+                if = { limit = { NOT = { tca_review_actor_probability = scope:tca_test_numeric_wrong } } debug_log = "TCA_TEST CHECK_PASS tca_test_review_random_boundaries 8" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_review_random_boundaries 8" }
                 if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_review_random_boundaries" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
                 else = { debug_log = "TCA_TEST PASS tca_test_review_random_boundaries" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
             }
@@ -1253,16 +1274,28 @@ tca_custody_review_test.25 = {
                 if = { limit = { tca_review_actor_weight = 65 tca_review_keeper_weight = 35 } debug_log = "TCA_TEST CHECK_PASS tca_test_review_random_extra_score 1" }
                 else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_review_random_extra_score 1" }
                 scope:tca_review_actor = { add_trait = confucian_education }
-                if = { limit = { scope:tca_review_actor = { tca_review_confucian_bonus = 2 tca_review_non_learning_score = 12 } tca_review_actor_weight = { value = scope:tca_review_actor.learning subtract = scope:tca_review_keeper.learning multiply = 3 add = 71 } } debug_log = "TCA_TEST CHECK_PASS tca_test_review_random_extra_score 2" }
+                save_scope_value_as = { name = tca_test_numeric_expected value = { value = scope:tca_review_actor.learning subtract = scope:tca_review_keeper.learning multiply = 3 add = 71 } }
+                if = { limit = { scope:tca_review_actor = { tca_review_confucian_bonus = 2 tca_review_non_learning_score = 12 } tca_review_actor_weight = scope:tca_test_numeric_expected } debug_log = "TCA_TEST CHECK_PASS tca_test_review_random_extra_score 2" }
                 else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_review_random_extra_score 2" }
+                save_scope_value_as = { name = tca_test_numeric_wrong value = { value = scope:tca_test_numeric_expected add = 1 } }
+                if = { limit = { NOT = { tca_review_actor_weight = scope:tca_test_numeric_wrong } } debug_log = "TCA_TEST CHECK_PASS tca_test_review_random_extra_score 5" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_review_random_extra_score 5" }
                 scope:tca_review_actor = { add_trait = just }
-                if = { limit = { scope:tca_review_actor = { tca_review_personality_bonus = 3 tca_review_non_learning_score = 15 } tca_review_actor_weight = { value = scope:tca_review_actor.learning subtract = scope:tca_review_keeper.learning multiply = 3 add = 80 } } debug_log = "TCA_TEST CHECK_PASS tca_test_review_random_extra_score 3" }
+                save_scope_value_as = { name = tca_test_numeric_expected value = { value = scope:tca_review_actor.learning subtract = scope:tca_review_keeper.learning multiply = 3 add = 80 } }
+                if = { limit = { scope:tca_review_actor = { tca_review_personality_bonus = 3 tca_review_non_learning_score = 15 } tca_review_actor_weight = scope:tca_test_numeric_expected } debug_log = "TCA_TEST CHECK_PASS tca_test_review_random_extra_score 3" }
                 else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_review_random_extra_score 3" }
+                save_scope_value_as = { name = tca_test_numeric_wrong value = { value = scope:tca_test_numeric_expected add = 1 } }
+                if = { limit = { NOT = { tca_review_actor_weight = scope:tca_test_numeric_wrong } } debug_log = "TCA_TEST CHECK_PASS tca_test_review_random_extra_score 6" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_review_random_extra_score 6" }
                 scope:tca_review_actor = { save_scope_as = tca_test_swap_actor }
                 scope:tca_review_keeper = { save_scope_as = tca_review_actor }
                 scope:tca_test_swap_actor = { save_scope_as = tca_review_keeper }
-                if = { limit = { tca_review_actor_weight = { value = scope:tca_review_actor.learning subtract = scope:tca_review_keeper.learning multiply = 3 add = 20 } } debug_log = "TCA_TEST CHECK_PASS tca_test_review_random_extra_score 4" }
+                save_scope_value_as = { name = tca_test_numeric_expected value = { value = scope:tca_review_actor.learning subtract = scope:tca_review_keeper.learning multiply = 3 add = 20 } }
+                if = { limit = { tca_review_actor_weight = scope:tca_test_numeric_expected } debug_log = "TCA_TEST CHECK_PASS tca_test_review_random_extra_score 4" }
                 else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_review_random_extra_score 4" }
+                save_scope_value_as = { name = tca_test_numeric_wrong value = { value = scope:tca_test_numeric_expected add = 1 } }
+                if = { limit = { NOT = { tca_review_actor_weight = scope:tca_test_numeric_wrong } } debug_log = "TCA_TEST CHECK_PASS tca_test_review_random_extra_score 7" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_review_random_extra_score 7" }
                 if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_review_random_extra_score" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
                 else = { debug_log = "TCA_TEST PASS tca_test_review_random_extra_score" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
             }
@@ -1340,6 +1373,16 @@ tca_custody_review_test.27 = {
             if = {
                 limit = { tca_test_review_world_trigger = yes }
                 tca_test_review_fixture_effect = yes
+                # A disposable 16-year-old supports Confucian education and both tested fathers.
+                # The usual 35-year-old prisoner may be older than a generated official.
+                create_character = {
+                    age = 16 gender_female_chance = 0 random_traits = no dynasty = none
+                    employer = root culture = root.culture faith = root.faith rite = root.rite
+                    save_scope_as = tca_review_prisoner
+                }
+                scope:tca_review_prisoner = { tca_test_normalize_judicial_score_target_effect = yes }
+                if = { limit = { scope:tca_review_prisoner = { age = 16 is_lowborn = yes } scope:tca_review_actor.age > scope:tca_review_prisoner.age } debug_log = "TCA_TEST CHECK_PASS tca_test_review_identity_tariffs 7" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_review_identity_tariffs 7" }
                 scope:tca_review_prisoner = { tca_test_normalize_judicial_score_target_effect = yes remove_trait = confucian_education }
                 if = { limit = { scope:tca_review_prisoner = { tca_judicial_authority_score = 0 tca_judicial_identity_tier = 1 tca_review_start_cost = 15 tca_review_influence_loss = 15 tca_review_prestige_loss = 30 } } debug_log = "TCA_TEST CHECK_PASS tca_test_review_identity_tariffs 1" }
                 else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_review_identity_tariffs 1" }

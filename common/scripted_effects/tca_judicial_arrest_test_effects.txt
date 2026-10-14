@@ -12,6 +12,30 @@ tca_test_record_arrest_target_accept_effect = {
     scope:actor ?= { if = { limit = { debug_only = yes has_character_flag = tca_test_arrest_native_active } change_variable = { name = tca_test_arrest_target_accepted add = 1 } } }
 }
 
+# Called after the real imprisonment effect; never substitutes for it.
+tca_test_record_arrest_custody_effect = {
+    scope:actor ?= {
+        if = {
+            limit = { debug_only = yes has_character_flag = tca_test_arrest_native_active }
+            if = { limit = { scope:recipient = { is_imprisoned_by = scope:actor NOT = { has_variable = tca_judicial_prison_title } } }
+                add_to_variable_list = { name = tca_test_arrest_captured_cases target = scope:recipient.var:tca_test_arrest_case }
+            }
+            scope:recipient = {
+                set_variable = { name = tca_test_arrest_requester value = scope:actor }
+                set_variable = { name = tca_test_arrest_captured_date value = current_date }
+            }
+            save_scope_value_as = { name = tca_arrest_diag_custody_date value = current_date }
+            debug_log = "TCA_ARREST_CUSTODY IMMEDIATE_RESULT"
+            debug_log_scopes = yes
+        }
+    }
+}
+
+# Character scope. Native appointment can already grant this perk.
+tca_test_ensure_arrest_perk_effect = {
+    if = { limit = { NOT = { has_perk = prison_feudal_complex_perk } } add_perk = prison_feudal_complex_perk }
+}
+
 # Independent disposable governor for every case: no inherited request cooldown.
 # ROOT remains the suite reporter; no player switching and no direct imprisonment.
 tca_test_prepare_native_arrest_effect = {
@@ -49,6 +73,11 @@ tca_test_prepare_native_arrest_effect = {
     }
     tca_test_log_native_arrest_fixture_effect = { STAGE = BEFORE_APPOINTMENT }
     scope:tca_test_arrest_actor = {
+        tca_test_protect_character_effect = yes
+        # Prepare the native family before rank-up, outside the appointment transaction.
+        # This avoids a nested CreateNobleFamilyTitle while the old governor loses office.
+        create_dynasty = { spread_to_descendants = yes }
+        give_noble_family_title = { name = noble_family_name tier = county article = DEFAULT_TITLE_NAME_ARTICLE government = celestial_government save_scope_as = tca_test_arrest_actor_family }
         create_title_and_vassal_change = { type = appointment add_claim_on_loss = no save_scope_as = tca_test_arrest_governor_change }
         scope:tca_test_law_circuit = { change_title_holder = { holder = scope:tca_test_arrest_actor change = scope:tca_test_arrest_governor_change } }
         resolve_title_and_vassal_change = scope:tca_test_arrest_governor_change
@@ -59,7 +88,7 @@ tca_test_prepare_native_arrest_effect = {
         resolve_title_and_vassal_change = scope:tca_test_arrest_liege_change
         add_prestige = 2000
         change_influence = 2000
-        add_perk = prison_feudal_complex_perk
+        tca_test_ensure_arrest_perk_effect = yes
         remove_character_flag = flag_hostile_actions_disabled_delay
         add_character_flag = tca_test_arrest_native_active
         add_character_flag = $CONTROL$
@@ -77,6 +106,8 @@ tca_test_prepare_native_arrest_effect = {
     scope:tca_test_law_circuit = { save_scope_as = tca_circuit }
     scope:tca_test_law_position = { tca_sync_judicial_holder_liege_effect = yes }
     scope:tca_test_arrest_target = {
+        tca_test_protect_character_effect = yes
+        set_variable = { name = tca_test_arrest_case value = flag:$CASE$ }
         add_character_flag = tca_test_arrest_native_target
         if = {
             limit = { always = $FAMILY$ }
@@ -139,15 +170,18 @@ tca_test_send_native_arrest_effect = {
 }
 
 tca_test_cleanup_native_arrest_effect = {
-    scope:tca_test_arrest_target ?= { remove_character_flag = tca_test_arrest_native_target }
+    scope:tca_test_arrest_target ?= { if = { limit = { is_alive = yes } remove_character_flag = tca_test_arrest_native_target remove_variable = tca_test_arrest_requester tca_test_restore_character_effect = yes } }
     scope:tca_test_arrest_actor ?= {
+        if = { limit = { is_alive = yes }
+        tca_test_restore_character_effect = yes
         remove_character_flag = tca_test_arrest_native_active
         remove_character_flag = tca_test_arrest_force_veto
         remove_character_flag = tca_test_arrest_force_approval
+        }
     }
 }
 
-# Record the actual end state; keep custody assertions unchanged on natural release/transfer.
+# Observe the day-20 state; callback evidence does not establish the cause of release/death.
 tca_test_log_native_arrest_final_effect = {
     if = {
         limit = { debug_only = yes }

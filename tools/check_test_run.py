@@ -103,6 +103,16 @@ def inspect_run(debug, errors, expected):
             findings['TCA script parsing failure'] += 1
         elif 'can not be used in event target links' in entry:
             findings['TCA invalid event target scope link'] += 1
+        elif 'Value of wrong type' in entry:
+            findings['TCA invalid script value type'] += 1
+        elif any(message in entry for message in (
+                'is used but is never set', 'is set but is never used',
+                'is orphaned', 'is scripted as an orphan, but has callers')):
+            # Include the identifier so diagnostics remain actionable. Events
+            # intentionally kept for compatibility declare orphan = yes and
+            # therefore do not produce an orphan diagnostic in the first place.
+            detail = entry.split(']: ', 1)[-1].strip()
+            findings[detail] += 1
         elif 'should be in utf8-bom encoding' in entry:
             findings['TCA script encoding failure'] += 1
         elif 'Exclusive send options should at least be two' in entry:

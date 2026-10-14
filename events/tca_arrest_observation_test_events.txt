@@ -1,0 +1,83 @@
+﻿namespace = tca_arrest_observation_test
+
+# Validate callback evidence with real native imprisonment, release and death.
+tca_arrest_observation_test.1 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        if = { limit = { has_character_flag = tca_test_delayed_case_active } debug_log = "TCA_TEST CASE_BUSY" }
+        else = {
+            debug_log = "TCA_TEST BEGIN tca_arrest_observation_test.1 tca_test_arrest_observation_evidence"
+            remove_character_flag = tca_test_case_failed
+            if = {
+                limit = { debug_only = yes is_alive = yes }
+                create_character = { age = 40 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_test_observation_requester }
+                create_character = { age = 20 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_test_observation_released }
+                scope:tca_test_observation_requester = {
+                    # Native imprisonment requires a ruler; use a disposable family title.
+                    create_dynasty = { spread_to_descendants = yes }
+                    give_noble_family_title = { name = noble_family_name tier = county article = DEFAULT_TITLE_NAME_ARTICLE government = celestial_government save_scope_as = tca_test_observation_family }
+                    save_scope_as = actor save_scope_as = tca_test_arrest_actor
+                    add_character_flag = tca_test_arrest_native_active
+                }
+                scope:tca_test_observation_released = { save_scope_as = recipient save_scope_as = tca_test_arrest_target set_variable = { name = tca_test_arrest_case value = flag:tca_test_observation_release } add_character_flag = tca_test_arrest_native_target }
+                if = { limit = { NOT = { tca_test_native_arrest_followup_consistent_trigger = { CASE = tca_test_observation_release } } } debug_log = "TCA_TEST CHECK_PASS tca_test_arrest_observation_evidence 1" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_arrest_observation_evidence 1" }
+                scope:actor = { imprison = { target = scope:recipient type = house_arrest } }
+                tca_test_record_arrest_custody_effect = yes
+                if = { limit = { tca_test_native_arrest_followup_consistent_trigger = { CASE = tca_test_observation_release }  } debug_log = "TCA_TEST CHECK_PASS tca_test_arrest_observation_evidence 2" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_arrest_observation_evidence 2" }
+                scope:recipient = { release_from_prison = yes }
+                create_character = { age = 20 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_test_observation_dead }
+                scope:tca_test_observation_dead = { save_scope_as = recipient set_variable = { name = tca_test_arrest_case value = flag:tca_test_observation_death } add_character_flag = tca_test_arrest_native_target }
+                scope:actor = { imprison = { target = scope:recipient type = house_arrest } }
+                tca_test_record_arrest_custody_effect = yes
+                scope:recipient = { death = { death_reason = death_fight } }
+                add_character_flag = tca_test_delayed_case_active
+                debug_log = "TCA_TEST WAIT tca_test_arrest_observation_evidence 1 day"
+                trigger_event = { id = tca_arrest_observation_test.1001 days = 1 }
+            }
+            else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_arrest_observation_evidence" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_continue_delayed_effect = yes }
+        }
+    }
+}
+tca_arrest_observation_test.1001 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            scope:tca_test_observation_requester = { save_scope_as = tca_test_arrest_actor }
+            scope:tca_test_observation_released = { save_scope_as = tca_test_arrest_target }
+            if = { limit = { scope:tca_test_arrest_actor = { is_target_in_variable_list = { name = tca_test_arrest_released_cases target = flag:tca_test_observation_release } } } debug_log = "TCA_TEST CHECK_PASS tca_test_arrest_observation_evidence 3" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_arrest_observation_evidence 3" }
+            if = { limit = { tca_test_native_arrest_followup_consistent_trigger = { CASE = tca_test_observation_release }  } debug_log = "TCA_TEST CHECK_PASS tca_test_arrest_observation_evidence 4" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_arrest_observation_evidence 4" }
+            scope:tca_test_observation_dead = { save_scope_as = tca_test_arrest_target }
+            if = { limit = { scope:tca_test_arrest_target = { is_alive = no } scope:tca_test_arrest_actor = { is_target_in_variable_list = { name = tca_test_arrest_dead_cases target = flag:tca_test_observation_death } } } debug_log = "TCA_TEST CHECK_PASS tca_test_arrest_observation_evidence 5" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_arrest_observation_evidence 5" }
+            if = { limit = { tca_test_native_arrest_followup_consistent_trigger = { CASE = tca_test_observation_death }  } debug_log = "TCA_TEST CHECK_PASS tca_test_arrest_observation_evidence 6" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_arrest_observation_evidence 6" }
+            # Deliberately suppress auditing only for this disposable release.
+            # Actual custody is established first; missing evidence must stay a failure.
+            scope:tca_test_observation_requester = { save_scope_as = actor }
+            create_character = { age = 20 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_test_observation_unknown }
+            scope:tca_test_observation_unknown = { save_scope_as = recipient save_scope_as = tca_test_arrest_target set_variable = { name = tca_test_arrest_case value = flag:tca_test_observation_unknown } }
+            scope:actor = { imprison = { target = scope:recipient type = house_arrest } }
+            tca_test_record_arrest_custody_effect = yes
+            scope:recipient = { release_from_prison = yes }
+            if = { limit = { NOT = { tca_test_native_arrest_followup_consistent_trigger = { CASE = tca_test_observation_unknown } } } debug_log = "TCA_TEST CHECK_PASS tca_test_arrest_observation_evidence 7" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_arrest_observation_evidence 7" }
+            scope:recipient = { death = { death_reason = death_fight } }
+            if = { limit = { NOT = { tca_test_native_arrest_followup_consistent_trigger = { CASE = tca_test_observation_unknown } } } debug_log = "TCA_TEST CHECK_PASS tca_test_arrest_observation_evidence 8" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_arrest_observation_evidence 8" }
+            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_arrest_observation_evidence" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_arrest_observation_evidence" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            tca_test_cleanup_native_arrest_effect = yes
+            remove_character_flag = tca_test_case_failed
+            remove_character_flag = tca_test_delayed_case_active
+            tca_test_continue_delayed_effect = yes
+        }
+    }
+}

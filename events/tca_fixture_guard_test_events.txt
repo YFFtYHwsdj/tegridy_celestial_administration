@@ -1,0 +1,55 @@
+﻿# Native coverage for the shared arrest fixture and current office classification.
+namespace = tca_fixture_guard_test
+
+tca_fixture_guard_test.1 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        if = { limit = { has_character_flag = tca_test_delayed_case_active } debug_log = "TCA_TEST CASE_BUSY" }
+        else = {
+            debug_log = "TCA_TEST BEGIN tca_fixture_guard_test.1 tca_test_fixture_guards"
+            remove_character_flag = tca_test_case_failed
+            if = {
+                limit = { tca_test_review_world_trigger = yes }
+                title:h_china.holder = { tca_test_prepare_judicial_law_realm_effect = yes }
+                create_character = {
+                    age = 16 gender_female_chance = 0 random_traits = no dynasty = none
+                    employer = root culture = root.culture faith = root.faith rite = root.rite
+                    save_scope_as = tca_test_fixture_perk_actor
+                }
+                scope:tca_test_fixture_perk_actor = {
+                    if = { limit = { NOT = { has_perk = prison_feudal_complex_perk } } add_character_flag = tca_test_fixture_started_without_perk }
+                    tca_test_ensure_arrest_perk_effect = yes
+                }
+                if = { limit = { scope:tca_test_fixture_perk_actor = { has_character_flag = tca_test_fixture_started_without_perk has_perk = prison_feudal_complex_perk } } debug_log = "TCA_TEST CHECK_PASS tca_test_fixture_guards 1" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_fixture_guards 1" }
+                # Deliberately call the real fixture helper on an existing perk.
+                # An add_perk error invalidates this run even if the perk remains.
+                scope:tca_test_fixture_perk_actor = { tca_test_ensure_arrest_perk_effect = yes }
+                if = { limit = { scope:tca_test_fixture_perk_actor = { has_perk = prison_feudal_complex_perk } } debug_log = "TCA_TEST CHECK_PASS tca_test_fixture_guards 2" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_fixture_guards 2" }
+                if = { limit = {
+                    scope:tca_test_law_commissioner = { tca_is_landless_official_trigger = yes tca_is_civil_official_trigger = yes tca_is_military_official_trigger = no }
+                    scope:tca_test_law_sovereign = { tca_is_landless_official_trigger = no tca_is_civil_official_trigger = no tca_is_military_official_trigger = no }
+                    scope:tca_test_fixture_perk_actor = { tca_is_landless_official_trigger = no tca_is_civil_official_trigger = no tca_is_military_official_trigger = no }
+                } debug_log = "TCA_TEST CHECK_PASS tca_test_fixture_guards 3" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_fixture_guards 3" }
+                # A newly created unrelated pool character must not gain royal kinship.
+                create_character = {
+                    age = 16 gender_female_chance = 0 random_traits = no dynasty = none
+                    location = root.location culture = root.culture faith = root.faith rite = root.rite
+                    save_scope_as = tca_test_fixture_pool_actor
+                }
+                scope:tca_test_fixture_pool_actor = { top_liege ?= { save_scope_as = tca_test_fixture_pool_top_liege } }
+                debug_log = "TCA_FIXTURE_POOL_REALM"
+                debug_log_scopes = yes
+                if = { limit = { scope:tca_test_fixture_pool_actor = { tca_is_emperor_first_degree_kin_trigger = no } } debug_log = "TCA_TEST CHECK_PASS tca_test_fixture_guards 4" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_fixture_guards 4" }
+                if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_fixture_guards" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+                else = { debug_log = "TCA_TEST PASS tca_test_fixture_guards" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            }
+            else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_fixture_guards" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } }
+            remove_character_flag = tca_test_case_failed
+        }
+    }
+}

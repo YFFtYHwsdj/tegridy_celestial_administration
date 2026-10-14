@@ -12,6 +12,11 @@ from check_upstream_overrides import definitions
 
 
 class GameRunnerTests(unittest.TestCase):
+    def test_adapter_does_not_override_native_prison_interactions(self):
+        adapter = ROOT / 'tools/cli_adapter'
+        self.assertFalse(list((adapter / 'common/character_interactions').glob('*.txt')))
+        self.assertNotIn('tca_cli_arrest_isolated', (adapter / 'events/tca_cli_events.txt').read_text(encoding='utf-8-sig'))
+
     def test_each_run_has_fresh_logs_and_adapter_snapshot(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

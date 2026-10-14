@@ -67,3 +67,20 @@ tca_test_native_arrest_veto_opinions_trigger = {
         has_opinion_modifier = { target = scope:tca_test_arrest_approver modifier = tca_judicial_arrest_veto_protected_opinion }
     }
 }
+
+# Caller supplies the immutable case ID; never dereference a dead prisoner's variables.
+tca_test_native_arrest_followup_consistent_trigger = {
+    scope:tca_test_arrest_actor = { is_target_in_variable_list = { name = tca_test_arrest_captured_cases target = flag:$CASE$ } }
+    trigger_if = {
+        limit = { scope:tca_test_arrest_target = { is_alive = yes } }
+        scope:tca_test_arrest_target = { var:tca_test_arrest_case = flag:$CASE$ }
+        OR = {
+            tca_test_native_arrest_approved_custody_trigger = yes
+            AND = {
+                scope:tca_test_arrest_target = { is_imprisoned = no }
+                scope:tca_test_arrest_actor = { is_target_in_variable_list = { name = tca_test_arrest_released_cases target = flag:$CASE$ } }
+            }
+        }
+    }
+    trigger_else = { scope:tca_test_arrest_actor = { is_target_in_variable_list = { name = tca_test_arrest_dead_cases target = flag:$CASE$ } } }
+}

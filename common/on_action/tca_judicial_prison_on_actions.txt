@@ -1,6 +1,6 @@
 ﻿on_imprison = { on_actions = { tca_judicial_capture } }
 on_release_from_prison = { on_actions = { tca_judicial_prison_release tca_test_arrest_native_release } }
-on_death = { on_actions = { tca_judicial_prison_death tca_test_monitored_death } }
+on_death = { on_actions = { tca_judicial_prison_death tca_test_monitored_death tca_test_arrest_native_death } }
 
 tca_test_monitored_death = {
     trigger = { has_variable = tca_test_death_reporter }
@@ -68,7 +68,26 @@ tca_judicial_prison_death = {
 tca_test_arrest_native_release = {
     trigger = { debug_only = yes has_character_flag = tca_test_arrest_native_target }
     effect = {
+        var:tca_test_arrest_requester ?= {
+            if = { limit = { scope:imprisoner ?= this exists = scope:imprisoner }
+                add_to_variable_list = { name = tca_test_arrest_released_cases target = root.var:tca_test_arrest_case }
+            }
+        }
+        set_variable = { name = tca_test_arrest_released_date value = current_date }
+        if = { limit = { has_character_flag = escaped_from_prison_flag } debug_log = "TCA_ARREST_RELEASE ESCAPE_FLAG" }
+        scope:imprisoner = {
+            if = { limit = { has_hook = root } debug_log = "TCA_ARREST_RELEASE CAPTOR_HAS_HOOK" }
+        }
+        var:tca_test_arrest_requester ?= { save_scope_as = tca_arrest_diag_expected_captor }
+        save_scope_value_as = { name = tca_arrest_diag_release_date value = var:tca_test_arrest_released_date }
+        save_scope_value_as = { name = tca_arrest_diag_capture_date value = var:tca_test_arrest_captured_date }
         debug_log = "TCA_ARREST_RELEASE NATIVE_CALLBACK"
         debug_log_scopes = yes
     }
+}
+
+# on_death provides the native death_reason while the character is still valid.
+tca_test_arrest_native_death = {
+    trigger = { debug_only = yes has_character_flag = tca_test_arrest_native_target }
+    effect = { var:tca_test_arrest_requester ?= { add_to_variable_list = { name = tca_test_arrest_dead_cases target = root.var:tca_test_arrest_case } } debug_log = "TCA_ARREST_DEATH NATIVE_CALLBACK" debug_log_scopes = yes }
 }

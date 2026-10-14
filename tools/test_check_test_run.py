@@ -5,6 +5,49 @@ from check_test_run import inspect_run, expected_cases
 
 
 class RunEvidenceTests(unittest.TestCase):
+    def test_orphan_with_callers_invalidates_pass(self):
+        error = "[21:57:29][E][jomini_eventmanager.cpp:368]: Event tca_cli.1 is scripted as an orphan, but has callers"
+        issues, _ = inspect_run(self.run_log(), error, {'tca_test_example'})
+        self.assertTrue(any('tca_cli.1' in issue for issue in issues))
+
+    def test_wrong_mod_value_type_invalidates_pass(self):
+        error = "[15:44:33][E][jomini_scriptvalue.cpp:1499]: Value of wrong type in 'file: common/scripted_effects/tca_judicial_arrest_test_effects.txt line: 30'. Got value of type 'none'"
+        issues, _ = inspect_run(self.run_log(), error, {'tca_test_example'})
+        self.assertTrue(any('value type' in issue.lower() for issue in issues))
+
+    def test_unset_mod_variable_invalidates_pass(self):
+        error = "[15:07:35][E][jomini_effect.cpp:1162]: Variable 'tca_official_military' is used but is never set. Setting it in an unused scripted trigger or effect does not count"
+        issues, _ = inspect_run(self.run_log(), error, {'tca_test_example'})
+        self.assertTrue(any('tca_official_military' in issue for issue in issues))
+
+    def test_unused_mod_variable_invalidates_pass(self):
+        error = "[15:07:35][E][jomini_effect.cpp:1146]: Variable 'tca_generated_initial_judicial_holder' is set but is never used."
+        issues, _ = inspect_run(self.run_log(), error, {'tca_test_example'})
+        self.assertTrue(any('tca_generated_initial_judicial_holder' in issue for issue in issues))
+
+    def test_unset_mod_event_target_invalidates_pass(self):
+        error = "[15:07:35][E][jomini_effect.cpp:1162]: Event target 'tca_test_law_subgovernor' is used but is never set."
+        issues, _ = inspect_run(self.run_log(), error, {'tca_test_example'})
+        self.assertTrue(any('tca_test_law_subgovernor' in issue for issue in issues))
+
+    def test_unmarked_orphan_mod_event_invalidates_pass(self):
+        error = "[15:07:40][E][jomini_eventmanager.cpp:368]: Event tca_court_test.100 is orphaned"
+        issues, _ = inspect_run(self.run_log(), error, {'tca_test_example'})
+        self.assertTrue(any('tca_court_test.100' in issue for issue in issues))
+
+    def test_duplicate_perk_in_test_fixture_invalidates_pass(self):
+        error = ("[15:08:23][E][jomini_script_system.cpp:304]: Script system error!\n"
+                 "  Error: add_perk effect [ Test governor already has the perk prison_feudal_complex_perk ]\n"
+                 "  Script location: file: common/scripted_effects/tca_judicial_arrest_test_effects.txt line: 62\n")
+        issues, _ = inspect_run(self.run_log(), error, {'tca_test_example'})
+        self.assertTrue(any('prison_feudal_complex_perk' in issue for issue in issues))
+
+    def test_unrelated_native_diagnostics_are_not_attributed_to_mod(self):
+        error = ("[15:07:35][E]: Variable 'native_unused' is set but is never used.\n"
+                 "[15:07:40][E]: Event native_debug.1 is orphaned\n")
+        issues, _ = inspect_run(self.run_log(), error, {'tca_test_example'})
+        self.assertEqual(issues, [])
+
     def test_invalid_value_event_target_link_invalidates_pass(self):
         error = "[13:58:52][E][jomini_eventtarget.cpp:325]: Scope type 'value' can not be used in event target links, link compare_value infile: events/tca_custody_review_test_events.txt line: 97"
         issues, _ = inspect_run(self.run_log(), error, {'tca_test_example'})
