@@ -5,13 +5,47 @@ import subprocess
 import tempfile
 import unittest
 from unittest.mock import Mock
+from types import SimpleNamespace
 
-from run_game_tests import (ROOT, descriptor, isolated_settings, outcome, prepare_run,
-                            progress, stop_owned_process, terminal_condition)
+from run_game_tests import (ROOT, game_command, descriptor, isolated_settings, outcome, prepare_run,
+                            progress, selected_stage, stop_owned_process, terminal_condition)
 from check_upstream_overrides import definitions
 
 
 class GameRunnerTests(unittest.TestCase):
+    def test_native_seed_is_optional_and_preserves_isolated_command(self):
+        args = SimpleNamespace(game_dir=Path('/tmp/game with spaces'), seed=None)
+        default = game_command(args, Path('/tmp/run with spaces'))
+        self.assertFalse(any(arg.startswith('-random_seed=') for arg in default))
+        self.assertIn('-userdir=/tmp/run with spaces/', default)
+        self.assertIn('-bookmark=bm_1066_china', default)
+        args.seed = 2878361204
+        self.assertEqual(game_command(args, Path('/tmp/run with spaces')), default + ['-random_seed=2878361204'])
+
+    def test_native_seed_bounds_are_checked_before_launch(self):
+        for seed in (-1, 4294967296):
+            with self.assertRaises(ValueError):
+                game_command(SimpleNamespace(game_dir=Path('/tmp/game'), seed=seed), Path('/tmp/run'))
+        for seed in (0, 4294967295):
+            self.assertIn(f'-random_seed={seed}', game_command(SimpleNamespace(game_dir=Path('/tmp/game'), seed=seed), Path('/tmp/run')))
+
+    def test_focused_run_selects_registered_event_and_only_changes_adapter_copy(self):
+        source = ROOT / 'tools/cli_adapter/events/tca_cli_events.txt'
+        original = source.read_bytes()
+        with tempfile.TemporaryDirectory() as temp:
+            run = prepare_run(ROOT, Path(temp), Path(temp) / 'absent', 'tca_judicial_imperial_test.1')
+            selection = json.loads((run / 'selection.json').read_text())
+            self.assertEqual(selection, {'case': 'tca_judicial_imperial_test.1', 'stage': '1022'})
+            copied = (run / 'mod/tca_cli_adapter/events/tca_cli_events.txt').read_text(encoding='utf-8-sig')
+            self.assertIn('tca_run_focused_observer_test_effect = { STAGE = 1022 }', copied)
+            self.assertNotIn('tca_run_observer_tests_effect = yes', copied)
+        self.assertEqual(source.read_bytes(), original)
+
+    def test_focused_run_rejects_unknown_and_continuation_events(self):
+        for entry in ('not_an_event', 'tca_judicial_imperial_test.1005'):
+            with self.assertRaises(ValueError):
+                selected_stage(ROOT, entry)
+
     def test_adapter_does_not_override_native_prison_interactions(self):
         adapter = ROOT / 'tools/cli_adapter'
         self.assertFalse(list((adapter / 'common/character_interactions').glob('*.txt')))
@@ -53,8 +87,9 @@ class GameRunnerTests(unittest.TestCase):
         self.assertEqual(outcome('summary', True, 0), 0)
         self.assertEqual(outcome('summary', True, 1), 1)
         self.assertEqual(outcome('summary', False, 0), 2)
-        for condition in ('timeout', 'process_exit', 'interrupted', 'not_observer'):
+        for condition in ('timeout', 'process_exit', 'interrupted', 'not_observer', 'entry_rejected'):
             self.assertEqual(outcome(condition, True, 0), 2)
+        self.assertEqual(terminal_condition('TCA_TEST OBSERVER_ENTRY_REJECTED focused world invalid', None), 'entry_rejected')
         self.assertIsNone(terminal_condition('TCA_TEST PASS example', None))
         self.assertEqual(terminal_condition('TCA_TEST SUITE_ABORTED death', None), 'summary')
         self.assertEqual(terminal_condition('', 0), 'process_exit')

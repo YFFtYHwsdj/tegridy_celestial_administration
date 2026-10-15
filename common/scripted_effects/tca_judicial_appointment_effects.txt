@@ -26,7 +26,8 @@ tca_fill_initial_judicial_holder_effect = {
                 debug_log = "TCA: judicial holder failed eligibility; appointing replacement"
             }
         }
-        holder = { save_scope_as = tca_appointment_liege }
+        tca_resolve_judicial_office_liege_effect = yes
+        scope:tca_expected_judicial_liege = { save_scope_as = tca_appointment_liege }
         var:song_judicial_title = { save_scope_as = tca_appointment_title }
         clear_saved_scope = tca_appointment_candidate
         every_in_list = {
@@ -161,7 +162,7 @@ tca_sync_judicial_holder_liege_effect = {
                 NOT = { has_variable = tca_judicial_disabled }
             }
         }
-        var:song_judicial_circuit.holder = { save_scope_as = tca_expected_judicial_liege }
+        var:song_judicial_circuit = { tca_resolve_judicial_office_liege_effect = yes }
         holder = {
             if = {
                 limit = {
@@ -185,6 +186,41 @@ tca_sync_judicial_holder_liege_effect = {
                 resolve_title_and_vassal_change = scope:tca_judicial_liege_change
             }
         }
+    }
+}
+
+# Circuit title scope. Imperial circuits belong to the current justice minister
+# in this emperor's council, with the emperor as a vacant-ministry fallback.
+tca_resolve_judicial_office_liege_effect = {
+    holder = { save_scope_as = tca_expected_judicial_liege }
+    if = {
+        limit = { holder = { is_independent_ruler = yes } }
+        holder = {
+            random_councillor = {
+                limit = {
+                    has_council_position = minister_justice
+                    is_alive = yes
+                    is_imprisoned = no
+                    government_has_flag = government_is_celestial
+                    highest_held_title_tier > tier_duchy
+                }
+                save_scope_as = tca_expected_judicial_liege
+            }
+        }
+    }
+}
+
+# Character scope, emperor. Prison callbacks already have a settled ministry
+# state; reattach existing officers now, without creating titles or appointing
+# candidates inside the prison transaction. Full maintenance remains deferred.
+tca_refresh_imperial_judicial_lieges_effect = {
+    every_held_title = {
+        limit = {
+            tca_is_judicial_circuit_trigger = yes
+            NOT = { has_variable = tca_judicial_disabled }
+            tca_has_judicial_title_trigger = yes
+        }
+        var:song_judicial_title = { tca_sync_judicial_holder_liege_effect = yes }
     }
 }
 

@@ -15,6 +15,8 @@ def expected_cases(root=ROOT):
     checks = {}
     for path in sorted((root / 'events').glob('tca_*test*_events.txt')):
         for event, body in definitions(path.read_text(encoding='utf-8-sig')).items():
+            if '.' in event and not 0 <= int(event.rsplit('.', 1)[1]) < 10000:
+                raise ValueError(f'{path.name}: event ID must be below 10000: {event}')
             for index, token in enumerate(body[:-2]):
                 if token != 'debug_log' or body[index + 1] != '=':
                     continue
@@ -91,6 +93,9 @@ def inspect_run(debug, errors, expected):
     # Startup failures matter even when no errors occur during the suite itself.
     findings = Counter()
     for entry in re.split(r'(?=\[\d{2}:\d{2}:\d{2}\])', errors):
+        if 'is not a valid event ID, has to be < 10000' in entry:
+            findings['Invalid numeric event ID'] += 1
+            continue
         related = 'tca_' in entry or '提点刑狱司' in entry
         if not related:
             continue
@@ -99,7 +104,7 @@ def inspect_run(debug, errors, expected):
             findings[detail.group(1) if detail else 'Script system error'] += 1
         elif 'Compiling source for tca_' in entry:
             findings['Judicial modifier compilation failure'] += 1
-        elif 'Unexpected token:' in entry and 'tca_' in entry:
+        elif any(message in entry for message in ('Unexpected token:', 'Unknown trigger:', 'Unknown effect:')):
             findings['TCA script parsing failure'] += 1
         elif 'can not be used in event target links' in entry:
             findings['TCA invalid event target scope link'] += 1
@@ -136,11 +141,24 @@ def inspect_run(debug, errors, expected):
     return issues, summary
 
 
+def selected_case_expectations(entry, root=ROOT):
+    all_cases = expected_cases(root)
+    for path in sorted((root / 'events').glob('tca_*test*_events.txt')):
+        for event, body in definitions(path.read_text(encoding='utf-8-sig')).items():
+            if event == entry:
+                match = re.search(r'TCA_TEST BEGIN ' + re.escape(entry) + r' (tca_test_\S+)', ' '.join(body))
+                if match:
+                    name = match[1].rstrip('"')
+                    return {name: all_cases[name]}
+    raise ValueError(f'Unknown native test entry: {entry}')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--logs', type=Path, default=ROOT.parent.parent / 'logs')
+    parser.add_argument('--case', help='verify only this maintained native case')
     args = parser.parse_args()
-    expected = expected_cases()
+    expected = selected_case_expectations(args.case) if args.case else expected_cases()
     issues, counts = inspect_run((args.logs / 'debug.log').read_text(errors='replace'),
                                 (args.logs / 'error.log').read_text(errors='replace'), expected)
     print(f'Expected {len(expected)} cases; observed {dict(counts)}')
@@ -148,7 +166,8 @@ def main():
         print(issue)
     if len(issues) > 30:
         print(f'... {len(issues) - 30} further issues')
-    print('NOT VERIFIED' if issues else 'OK: all current cases passed; no detected mod-related engine errors')
+    scope = 'selected case' if args.case else 'all current cases'
+    print('NOT VERIFIED' if issues else f'OK: {scope} passed; no detected mod-related engine errors')
     return int(bool(issues))
 
 

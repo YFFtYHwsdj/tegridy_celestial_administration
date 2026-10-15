@@ -1,10 +1,35 @@
 import unittest
 import tempfile
 from pathlib import Path
-from check_test_run import inspect_run, expected_cases
+from check_test_run import inspect_run, expected_cases, selected_case_expectations
 
 
 class RunEvidenceTests(unittest.TestCase):
+    def test_focused_selection_counts_actual_continuation_assertions(self):
+        self.assertEqual(selected_case_expectations('tca_judicial_imperial_test.1'), {'tca_test_imperial_circuit_lifecycle': 14})
+        with self.assertRaises(ValueError):
+            selected_case_expectations('tca_judicial_imperial_test.1005')
+
+    def test_focused_evidence_rejects_extra_cases_and_launch_errors(self):
+        extra = self.run_log() + '\nTCA_TEST BEGIN tca_extra_test.1 tca_test_extra\nTCA_TEST CHECK_PASS tca_test_extra 1\nTCA_TEST PASS tca_test_extra'
+        issues, _ = inspect_run(extra, '', {'tca_test_example': 1})
+        self.assertTrue(any('tca_test_extra' in issue for issue in issues))
+        issues, _ = inspect_run(self.run_log(), "[00:00:00][E]: Event tca_broken.1 is orphaned", {'tca_test_example': 1})
+        self.assertTrue(any('tca_broken' in issue for issue in issues))
+
+    def test_invalid_numeric_event_id_invalidates_engine_evidence(self):
+        issues, _ = inspect_run(self.run_log(), "[00:00:00][E]: '10045' is not a valid event ID, has to be < 10000", {'tca_test_example': 1})
+        self.assertTrue(any('Invalid numeric event ID' in issue for issue in issues))
+
+    def test_event_reader_rejects_engine_numeric_id_overflow(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.event_fixture(root, 'debug_log = "TCA_TEST CHECK_PASS tca_test_fixture 2"')
+            path = root / 'events/tca_fixture_test_events.txt'
+            path.write_text(path.read_text().replace('tca_fixture_test.2 =', 'tca_fixture_test.10000 ='))
+            with self.assertRaisesRegex(ValueError, 'below 10000'):
+                expected_cases(root)
+
     def test_orphan_with_callers_invalidates_pass(self):
         error = "[21:57:29][E][jomini_eventmanager.cpp:368]: Event tca_cli.1 is scripted as an orphan, but has callers"
         issues, _ = inspect_run(self.run_log(), error, {'tca_test_example'})
@@ -125,6 +150,14 @@ class RunEvidenceTests(unittest.TestCase):
         issues, _ = inspect_run(self.run_log(),
                                 '[10:00:00][E]: Error: "Unexpected token: wait_days" '
                                 'in file: "tests/tca_judicial_timing_tests.txt"',
+                                {'tca_test_example'})
+        self.assertTrue(any('parsing failure' in issue for issue in issues))
+
+    def test_unknown_trigger_in_native_event_invalidates_pass(self):
+        issues, _ = inspect_run(self.run_log(),
+                                '[22:35:56][E][pdx_persistent_reader.cpp:216]: '
+                                'Error: "Unknown trigger: any_de_jure_vassal_title, near line: 281" '
+                                'in file: "events/tca_judicial_de_jure_test_events.txt" near line: 281',
                                 {'tca_test_example'})
         self.assertTrue(any('parsing failure' in issue for issue in issues))
 

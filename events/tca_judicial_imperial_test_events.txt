@@ -1,0 +1,375 @@
+﻿namespace = tca_judicial_imperial_test
+
+# Real imperial circuit, direct imperial landless governor, local approval,
+# native council replacement, unavailable minister, and return to a governor.
+tca_judicial_imperial_test.1 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { has_character_flag = tca_test_delayed_case_active } debug_log = "TCA_TEST CASE_BUSY" }
+        else = {
+            debug_log = "TCA_TEST BEGIN tca_judicial_imperial_test.1 tca_test_imperial_circuit_lifecycle"
+            remove_character_flag = tca_test_case_failed
+            if = { limit = { tca_test_native_arrest_realm_ready_trigger = yes }
+                tca_test_prepare_native_arrest_effect = { FAMILY = yes COMMISSIONER = no OFFICE = yes CONTROL = tca_test_arrest_force_approval CASE = tca_test_imperial_fixture }
+                scope:tca_test_arrest_actor = { save_scope_as = tca_test_em_former }
+                scope:tca_test_arrest_target = { save_scope_as = tca_test_em_state }
+                # A genuine dedicated kingdom title prevents unrelated native AI
+                # appointments to historical provinces from invalidating this case.
+                create_dynamic_title = { tier = kingdom name = tca_test_judicial_circuit_name }
+                scope:new_title = { save_scope_as = tca_test_em_circuit set_capital_county = root.capital_county }
+                create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_test_em_take }
+                scope:tca_test_em_circuit = { change_title_holder = { holder = root change = scope:tca_test_em_take } }
+                resolve_title_and_vassal_change = scope:tca_test_em_take
+                scope:tca_test_em_state.primary_title = { set_de_jure_liege_title = scope:tca_test_em_circuit }
+                # Prepare the direct imperial subject; the office is created
+                # only by the real title/council hooks during the three-day wait.
+                scope:tca_test_em_state = {
+                    create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_test_em_move_state }
+                    change_liege = { liege = root change = scope:tca_test_em_move_state }
+                    resolve_title_and_vassal_change = scope:tca_test_em_move_state
+                    add_intrigue_skill = 99
+                    remove_character_flag = tca_test_arrest_native_target
+                }
+                create_character = { age = 40 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_test_em_minister_1 }
+                scope:tca_test_em_minister_1 = {
+                    create_dynasty = { spread_to_descendants = yes }
+                    give_noble_family_title = { name = noble_family_name tier = county article = DEFAULT_TITLE_NAME_ARTICLE government = celestial_government save_scope_as = tca_test_em_family_1 }
+                    change_government = celestial_government
+                    create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_test_em_minister_liege_1 }
+                    change_liege = { liege = root change = scope:tca_test_em_minister_liege_1 }
+                    resolve_title_and_vassal_change = scope:tca_test_em_minister_liege_1
+                    tca_test_protect_character_effect = yes
+                }
+                assign_councillor_type = { type = minister_justice remove_existing_councillor = yes target = scope:tca_test_em_minister_1 }
+                if = { limit = { scope:tca_test_em_state = { var:tca_test_arrest_case = flag:tca_test_imperial_fixture } scope:tca_test_em_circuit = { holder = root tca_is_judicial_circuit_trigger = yes } }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_imperial_circuit_lifecycle 1" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_imperial_circuit_lifecycle 1" }
+                # Wait for native title/council hooks, without calling the maintenance worker.
+                add_character_flag = tca_test_delayed_case_active
+                trigger_event = { id = tca_judicial_imperial_test.1001 days = 3 }
+            }
+            else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_imperial_circuit_lifecycle" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_continue_delayed_effect = yes }
+        }
+    }
+}
+tca_judicial_imperial_test.1001 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            scope:tca_test_em_circuit.var:song_judicial_title ?= {
+                save_scope_as = tca_test_em_office
+                holder ?= { save_scope_as = tca_test_em_commissioner }
+            }
+            if = { limit = {
+                scope:tca_test_em_minister_1 = { has_council_position = minister_justice is_councillor_of = root highest_held_title_tier > tier_duchy }
+                scope:tca_test_em_office = { de_jure_liege = scope:tca_test_em_circuit holder = scope:tca_test_em_commissioner }
+                scope:tca_test_em_commissioner = { liege = scope:tca_test_em_minister_1 tca_is_judicial_commissioner_trigger = yes }
+            } debug_log = "TCA_TEST CHECK_PASS tca_test_imperial_circuit_lifecycle 2" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_imperial_circuit_lifecycle 2" }
+            if = { limit = {
+                scope:tca_test_em_state = { liege = root tca_is_judicial_governor_trigger = yes tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:tca_test_em_circuit } }
+                NOT = { tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:tca_test_em_circuit } }
+                NOT = { tca_review_keeper_identity_trigger = { ACTOR = scope:tca_test_em_commissioner } }
+            } debug_log = "TCA_TEST CHECK_PASS tca_test_imperial_circuit_lifecycle 3" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_imperial_circuit_lifecycle 3" }
+            scope:tca_test_em_state = {
+                create_character = { age = 30 gender_female_chance = 0 random_traits = no dynasty = none employer = this culture = this.culture faith = this.faith rite = this.rite intrigue = 1 save_scope_as = tca_test_em_prisoner }
+                save_scope_as = tca_test_arrest_actor save_scope_as = actor save_scope_as = puppet_or_actor
+                add_character_flag = tca_test_arrest_native_active
+                add_character_flag = tca_test_arrest_force_approval
+                set_variable = { name = tca_test_arrest_sent value = 0 }
+                set_variable = { name = tca_test_arrest_approved value = 0 }
+                set_variable = { name = tca_test_arrest_vetoed value = 0 }
+                set_variable = { name = tca_test_arrest_target_accepted value = 0 }
+                remove_character_flag = flag_hostile_actions_disabled_delay
+            }
+            scope:tca_test_em_prisoner = {
+                tca_test_protect_character_effect = yes
+                tca_test_normalize_judicial_score_target_effect = yes
+                add_trait = confucian_education
+                add_trait_xp = { trait = confucian_education value = 100 }
+                add_character_flag = tca_test_arrest_native_target
+                set_variable = { name = tca_test_arrest_case value = flag:tca_test_imperial_local_approval }
+                save_scope_as = recipient save_scope_as = tca_test_arrest_target
+            }
+            scope:actor = { add_opinion = { target = scope:recipient modifier = schemed_against_me } }
+            clear_saved_scope = intermediary
+            tca_setup_judicial_arrest_roles_effect = yes
+            tca_setup_judicial_approval_effect = yes
+            if = { limit = {
+                scope:recipient = { tca_judicial_identity_tier = 2 }
+                scope:intermediary = scope:tca_test_em_commissioner
+                scope:tca_circuit = scope:tca_test_em_circuit
+                tca_judicial_arrest_still_valid_trigger = yes
+            } debug_log = "TCA_TEST CHECK_PASS tca_test_imperial_circuit_lifecycle 4" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_imperial_circuit_lifecycle 4" }
+            scope:intermediary ?= { save_scope_as = tca_test_arrest_approver }
+            if = { limit = { tca_test_native_arrest_send_valid_trigger = yes }
+                tca_test_send_native_arrest_effect = yes
+            }
+            if = { limit = { tca_test_native_arrest_waiting_trigger = yes }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_imperial_circuit_lifecycle 5" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_imperial_circuit_lifecycle 5" }
+            trigger_event = { id = tca_judicial_imperial_test.1002 days = 20 }
+        }
+    }
+}
+tca_judicial_imperial_test.1002 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { tca_test_native_arrest_approval_result_trigger = yes tca_test_native_arrest_followup_consistent_trigger = { CASE = tca_test_imperial_local_approval } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_imperial_circuit_lifecycle 6" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_imperial_circuit_lifecycle 6" }
+            # Normal AI may appoint a governor during the 20-day request wait.
+            # Re-establish the imperial-ownership precondition for the separate
+            # council-replacement phase; do not repair after its assertions.
+            scope:tca_test_em_circuit.holder = { save_scope_as = tca_test_em_holder_after_request }
+            if = { limit = { scope:tca_test_em_circuit = { NOT = { holder = root } } }
+                debug_log = "TCA_EM REPREPARE_IMPERIAL_OWNERSHIP_AFTER_REQUEST"
+                scope:tca_test_em_commissioner = {
+                    create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_test_em_reprepare_liege }
+                    change_liege = { liege = root change = scope:tca_test_em_reprepare_liege }
+                    resolve_title_and_vassal_change = scope:tca_test_em_reprepare_liege
+                }
+                create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_test_em_reprepare_title }
+                scope:tca_test_em_circuit = { change_title_holder = { holder = root change = scope:tca_test_em_reprepare_title } }
+                resolve_title_and_vassal_change = scope:tca_test_em_reprepare_title
+            }
+            create_character = { age = 40 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_test_em_minister_2 }
+            scope:tca_test_em_minister_2 = {
+                create_dynasty = { spread_to_descendants = yes }
+                give_noble_family_title = { name = noble_family_name tier = county article = DEFAULT_TITLE_NAME_ARTICLE government = celestial_government save_scope_as = tca_test_em_family_2 }
+                change_government = celestial_government
+                create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_test_em_minister_liege_2 }
+                change_liege = { liege = root change = scope:tca_test_em_minister_liege_2 }
+                resolve_title_and_vassal_change = scope:tca_test_em_minister_liege_2
+                tca_test_protect_character_effect = yes
+            }
+            assign_councillor_type = { type = minister_justice remove_existing_councillor = yes target = scope:tca_test_em_minister_2 }
+            trigger_event = { id = tca_judicial_imperial_test.1003 days = 3 }
+        }
+    }
+}
+tca_judicial_imperial_test.1003 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            scope:tca_test_em_office.holder.liege ?= { save_scope_as = tca_test_em_actual_liege }
+            scope:tca_test_em_circuit.holder ?= { save_scope_as = tca_test_em_current_holder }
+            scope:tca_test_em_minister_2.primary_title ?= { save_scope_as = tca_test_em_minister_title }
+            debug_log = "TCA_EM MINISTRY_REPLACEMENT_STATE"
+            debug_log_scopes = yes
+            if = { limit = {
+                scope:tca_test_em_minister_2 = { has_council_position = minister_justice is_councillor_of = root }
+                scope:tca_test_em_commissioner = { liege = scope:tca_test_em_minister_2 primary_title = scope:tca_test_em_office tca_is_judicial_commissioner_trigger = yes }
+                scope:tca_test_em_office = { de_jure_liege = scope:tca_test_em_circuit }
+            } debug_log = "TCA_TEST CHECK_PASS tca_test_imperial_circuit_lifecycle 7" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_imperial_circuit_lifecycle 7" }
+            # Actual native imprisonment makes the current minister unavailable.
+            imprison = { target = scope:tca_test_em_minister_2 type = house_arrest }
+            trigger_event = { id = tca_judicial_imperial_test.1004 days = 1 }
+        }
+    }
+}
+tca_judicial_imperial_test.1004 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            scope:tca_test_em_circuit.holder ?= { save_scope_as = tca_test_em_holder_when_unavailable }
+            scope:tca_test_em_office.holder.liege ?= { save_scope_as = tca_test_em_liege_when_unavailable }
+            scope:tca_test_em_circuit = { tca_resolve_judicial_office_liege_effect = yes }
+            debug_log = "TCA_EM MINISTRY_UNAVAILABLE_STATE"
+            debug_log_scopes = yes
+            if = { limit = {
+                scope:tca_test_em_minister_2 = { is_imprisoned = yes }
+                scope:tca_test_em_commissioner = { liege = root tca_is_judicial_commissioner_trigger = yes }
+                scope:tca_test_em_office = { de_jure_liege = scope:tca_test_em_circuit holder = scope:tca_test_em_commissioner }
+            } debug_log = "TCA_TEST CHECK_PASS tca_test_imperial_circuit_lifecycle 8" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_imperial_circuit_lifecycle 8" }
+            scope:tca_test_em_minister_2 = { release_from_prison = yes }
+            trigger_event = { id = tca_judicial_imperial_test.1008 days = 1 }
+        }
+    }
+}
+tca_judicial_imperial_test.1008 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = {
+                scope:tca_test_em_minister_2 = { is_imprisoned = no }
+                tca_has_available_justice_trigger = no
+                scope:tca_test_em_commissioner = { liege = root }
+            } debug_log = "TCA_TEST CHECK_PASS tca_test_imperial_circuit_lifecycle 14" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_imperial_circuit_lifecycle 14" }
+            scope:tca_test_em_minister_2 = {
+                if = { limit = { has_council_position = minister_justice } debug_log = "TCA_EM RELEASED_MINISTER_POSITION_YES" }
+                if = { limit = { is_councillor_of = root } debug_log = "TCA_EM RELEASED_MINISTER_COUNCILLOR_YES" }
+                if = { limit = { government_has_flag = government_is_celestial } debug_log = "TCA_EM RELEASED_MINISTER_CELESTIAL_YES" }
+            }
+            assign_councillor_type = { type = minister_justice remove_existing_councillor = yes target = scope:tca_test_em_minister_2 }
+            trigger_event = { id = tca_judicial_imperial_test.1005 days = 3 }
+        }
+    }
+}
+tca_judicial_imperial_test.1005 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            scope:tca_test_em_circuit.holder = { save_scope_as = tca_test_em_recovery_holder }
+            scope:tca_test_em_commissioner.liege = { save_scope_as = tca_test_em_recovery_liege }
+            scope:tca_test_em_circuit = { tca_resolve_judicial_office_liege_effect = yes }
+            debug_log = "TCA_EM RECOVERY_STATE"
+            debug_log_scopes = yes
+            if = { limit = { scope:tca_test_em_commissioner = { liege = scope:tca_test_em_minister_2 tca_is_judicial_commissioner_trigger = yes } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_imperial_circuit_lifecycle 9" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_imperial_circuit_lifecycle 9" }
+            create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_test_em_return }
+            scope:tca_test_em_circuit = { change_title_holder = { holder = scope:tca_test_em_former change = scope:tca_test_em_return } }
+            resolve_title_and_vassal_change = scope:tca_test_em_return
+            # Native grants can transfer de jure subjects. Prepare the direct
+            # imperial subject for this distinct phase before waiting for hooks.
+            scope:tca_test_em_state = {
+                create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_test_em_keep_direct }
+                change_liege = { liege = root change = scope:tca_test_em_keep_direct }
+                resolve_title_and_vassal_change = scope:tca_test_em_keep_direct
+            }
+            trigger_event = { id = tca_judicial_imperial_test.1006 days = 3 }
+        }
+    }
+}
+tca_judicial_imperial_test.1006 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            scope:tca_test_em_circuit.holder = { save_scope_as = tca_test_em_return_holder }
+            scope:tca_test_em_commissioner.liege = { save_scope_as = tca_test_em_return_liege }
+            debug_log = "TCA_EM RETURN_STATE"
+            debug_log_scopes = yes
+            if = { limit = {
+                scope:tca_test_em_circuit = { holder = scope:tca_test_em_former var:song_judicial_title = scope:tca_test_em_office }
+                scope:tca_test_em_commissioner = { liege = scope:tca_test_em_former tca_is_judicial_commissioner_trigger = yes }
+                scope:tca_test_em_office = { de_jure_liege = scope:tca_test_em_circuit }
+                scope:tca_test_em_state = { liege = root tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:tca_test_em_circuit } }
+            } debug_log = "TCA_TEST CHECK_PASS tca_test_imperial_circuit_lifecycle 10" }
+            else = {
+                add_character_flag = tca_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_imperial_circuit_lifecycle 10"
+                scope:tca_test_em_state.liege ?= { save_scope_as = tca_test_em_state_actual_liege }
+                scope:tca_test_em_office.de_jure_liege ?= { save_scope_as = tca_test_em_office_actual_parent }
+                if = { limit = { scope:tca_test_em_circuit = { holder = scope:tca_test_em_former var:song_judicial_title = scope:tca_test_em_office } } debug_log = "TCA_EM RETURN_HOLDER yes" }
+                else = { debug_log = "TCA_EM RETURN_HOLDER no" }
+                if = { limit = { scope:tca_test_em_commissioner = { liege = scope:tca_test_em_former tca_is_judicial_commissioner_trigger = yes } } debug_log = "TCA_EM RETURN_JUDGE yes" }
+                else = { debug_log = "TCA_EM RETURN_JUDGE no" }
+                if = { limit = { scope:tca_test_em_office = { de_jure_liege = scope:tca_test_em_circuit } } debug_log = "TCA_EM RETURN_PARENT yes" }
+                else = { debug_log = "TCA_EM RETURN_PARENT no" }
+                if = { limit = { scope:tca_test_em_state = { liege = root tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:tca_test_em_circuit } } } debug_log = "TCA_EM RETURN_SUBJECT yes" }
+                else = { debug_log = "TCA_EM RETURN_SUBJECT no" }
+                debug_log_scopes = yes
+            }
+            # Independent fresh target: the earlier requester accumulated
+            # standing and native relationships during its real arrest.
+            create_character = { age = 35 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_test_em_direct_target }
+            create_dynamic_title = { tier = duchy name = tca_test_arrest_office_name }
+            scope:new_title = {
+                save_scope_as = tca_test_em_direct_title
+                scope:tca_test_em_circuit = { save_scope_as = tca_circuit }
+                tca_configure_judicial_title_location_effect = yes
+                set_de_jure_liege_title = scope:tca_test_em_circuit
+            }
+            scope:tca_test_em_direct_target = {
+                create_dynasty = { spread_to_descendants = yes }
+                give_noble_family_title = { name = noble_family_name tier = county article = DEFAULT_TITLE_NAME_ARTICLE government = celestial_government save_scope_as = tca_test_em_direct_family }
+                create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_test_em_direct_grant }
+                scope:tca_test_em_direct_title = { change_title_holder = { holder = scope:tca_test_em_direct_target change = scope:tca_test_em_direct_grant } }
+                resolve_title_and_vassal_change = scope:tca_test_em_direct_grant
+                change_government = celestial_government
+                create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_test_em_direct_fealty }
+                change_liege = { liege = root change = scope:tca_test_em_direct_fealty }
+                resolve_title_and_vassal_change = scope:tca_test_em_direct_fealty
+                tca_test_normalize_judicial_score_target_effect = yes
+                tca_test_protect_character_effect = yes
+            }
+            trigger_event = { id = tca_judicial_imperial_test.1009 days = 1 }
+        }
+    }
+}
+tca_judicial_imperial_test.1009 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            # Commissioner acts against a governor directly under the emperor,
+            # although the circuit itself now has a different local holder.
+            scope:tca_test_em_commissioner = {
+                save_scope_as = actor save_scope_as = puppet_or_actor
+                add_opinion = { target = scope:tca_test_em_direct_target modifier = schemed_against_me }
+            }
+            scope:tca_test_em_direct_target = { save_scope_as = recipient }
+            clear_saved_scope = intermediary
+            clear_saved_scope = hook
+            tca_setup_judicial_arrest_roles_effect = yes
+            scope:recipient.liege = { save_scope_as = tca_test_em_direct_liege }
+            save_scope_value_as = { name = tca_test_em_direct_tier value = scope:recipient.tca_judicial_identity_tier }
+            if = { limit = { tca_judicial_actor_has_jurisdiction_trigger = yes } debug_log = "TCA_EM DIRECT_JURISDICTION_YES" }
+            if = { limit = { tca_judicial_arrest_context_valid_trigger = yes } debug_log = "TCA_EM DIRECT_CONTEXT_YES" }
+            debug_log = "TCA_EM DIRECT_STATE"
+            debug_log_scopes = yes
+            scope:tca_test_em_commissioner = {
+                set_variable = { name = tca_test_direct_arrest_probe value = yes }
+                set_variable = { name = tca_test_direct_arrest_valid value = no }
+                remove_character_flag = flag_hostile_actions_disabled_delay
+            }
+            run_interaction = { interaction = tca_judicial_imprison_interaction actor = scope:tca_test_em_commissioner recipient = scope:tca_test_em_direct_target send_threshold = decline }
+            if = { limit = {
+                scope:tca_test_em_direct_target = { is_landed = no tca_judicial_identity_tier < 4 }
+                scope:tca_test_em_commissioner = { var:tca_test_direct_arrest_valid = yes var:tca_test_direct_arrest_backer = root }
+            } debug_log = "TCA_TEST CHECK_PASS tca_test_imperial_circuit_lifecycle 11" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_imperial_circuit_lifecycle 11" }
+            scope:tca_test_em_commissioner = { remove_variable = tca_test_direct_arrest_probe remove_variable = tca_test_direct_arrest_valid remove_variable = tca_test_direct_arrest_backer }
+            if = { limit = {
+                scope:tca_test_em_direct_target = { is_imprisoned_by = scope:tca_test_em_commissioner var:tca_judicial_prison_title = scope:tca_test_em_office }
+                scope:tca_test_em_office = { is_target_in_variable_list = { name = tca_judicial_prisoners target = scope:tca_test_em_direct_target } }
+            } debug_log = "TCA_TEST CHECK_PASS tca_test_imperial_circuit_lifecycle 12" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_imperial_circuit_lifecycle 12" }
+            scope:tca_test_em_direct_target = { if = { limit = { is_imprisoned = yes } release_from_prison = yes } }
+            trigger_event = { id = tca_judicial_imperial_test.1007 days = 1 }
+        }
+    }
+}
+tca_judicial_imperial_test.1007 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = {
+                scope:tca_test_em_direct_target = { is_imprisoned = no NOT = { has_variable = tca_judicial_prison_title } }
+                scope:tca_test_em_office = { NOT = { is_target_in_variable_list = { name = tca_judicial_prisoners target = scope:tca_test_em_direct_target } } }
+            } debug_log = "TCA_TEST CHECK_PASS tca_test_imperial_circuit_lifecycle 13" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_imperial_circuit_lifecycle 13" }
+            tca_test_cleanup_native_arrest_effect = yes
+            scope:tca_test_em_direct_target = { tca_test_restore_character_effect = yes }
+            scope:tca_test_em_former = { tca_test_restore_character_effect = yes }
+            scope:tca_test_em_minister_1 = { tca_test_restore_character_effect = yes }
+            scope:tca_test_em_minister_2 = { tca_test_restore_character_effect = yes }
+            if = { limit = { has_character_flag = tca_test_case_failed }
+                debug_log = "TCA_TEST FAIL tca_test_imperial_circuit_lifecycle"
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+            }
+            else = {
+                debug_log = "TCA_TEST PASS tca_test_imperial_circuit_lifecycle"
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } }
+            }
+            remove_character_flag = tca_test_case_failed
+            remove_character_flag = tca_test_delayed_case_active
+            tca_test_continue_delayed_effect = yes
+        }
+    }
+}

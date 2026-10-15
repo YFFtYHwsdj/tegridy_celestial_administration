@@ -17,10 +17,7 @@ tca_test_prepare_judicial_law_realm_effect = {
     if = { limit = { has_realm_law = tca_court_system_tang_law } remove_realm_law = tca_court_system_tang_law }
     set_variable = { name = tca_court_system_migrated_v2 value = yes }
     remove_variable = tca_court_system_cooldown
-    every_in_list = {
-        variable = tca_test_law_circuits
-        scope:tca_test_law_sovereign = { remove_list_variable = { name = tca_test_law_circuits target = prev } }
-    }
+    clear_variable_list = tca_test_law_circuits
     if = { limit = { NOT = { has_realm_law = tca_local_names_default_law } } add_realm_law_skip_effects = tca_local_names_default_law }
     if = { limit = { NOT = { has_realm_law = tca_central_names_default_law } } add_realm_law_skip_effects = tca_central_names_default_law }
     if = { limit = { NOT = { has_realm_law = tca_judicial_institutions_enabled_law } } add_realm_law_skip_effects = tca_judicial_institutions_enabled_law }
@@ -28,11 +25,18 @@ tca_test_prepare_judicial_law_realm_effect = {
         every_held_title = {
             limit = { tca_is_judicial_circuit_trigger = yes }
             remove_variable = tca_judicial_disabled
+        }
+    }
+    tca_refresh_court_system_realm_effect = yes
+    # Appointment/title callbacks can change the political graph during repair.
+    # Take the assertion snapshot AFTER repair, not from its earlier input set.
+    every_vassal_or_below = {
+        every_held_title = {
+            limit = { tca_is_judicial_circuit_trigger = yes }
             save_scope_as = tca_test_law_collect_circuit
             scope:tca_test_law_sovereign = { add_to_variable_list = { name = tca_test_law_circuits target = scope:tca_test_law_collect_circuit } }
         }
     }
-    tca_refresh_court_system_realm_effect = yes
     every_in_list = {
         variable = tca_test_law_circuits
         set_variable = { name = tca_test_law_original_governor value = holder }

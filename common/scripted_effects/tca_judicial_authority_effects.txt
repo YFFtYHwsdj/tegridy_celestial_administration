@@ -25,27 +25,18 @@ tca_resolve_central_judicial_authority_effect = {
     else = { save_scope_as = tca_approver }
 }
 
-# Character scope. Walk actual lieges until reaching the matching circuit.
+# Character scope. Resolve the target's single circuit from the bounded registry.
 # The recipient has already passed the actor's narrower jurisdiction check.
 tca_find_arrest_circuit_effect = {
-    if = {
+    every_in_global_list = {
+        variable = tca_judicial_circuits
         limit = {
-            any_held_title = {
-                tca_is_judicial_circuit_trigger = yes
-                NOT = { has_variable = tca_judicial_disabled }
-                scope:recipient = { tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = prev } }
-            }
+            tca_is_judicial_circuit_trigger = yes
+            NOT = { has_variable = tca_judicial_disabled }
+            scope:recipient = { tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = prev } }
         }
-        random_held_title = {
-            limit = {
-                tca_is_judicial_circuit_trigger = yes
-                NOT = { has_variable = tca_judicial_disabled }
-                scope:recipient = { tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = prev } }
-            }
-            save_scope_as = tca_circuit
-        }
+        save_scope_as = tca_circuit
     }
-    else_if = { limit = { exists = liege } liege = { tca_find_arrest_circuit_effect = yes } }
 }
 
 # Internal context is reconstructed; do not put backing officials in UI participant slots.
@@ -62,7 +53,9 @@ tca_setup_judicial_arrest_roles_effect = {
                 limit = { tca_is_judicial_commissioner_trigger = yes }
                 primary_title.var:song_judicial_circuit = { save_scope_as = tca_circuit }
                 scope:tca_circuit.holder = { save_scope_as = tca_governor }
-                if = { limit = { scope:recipient = scope:tca_circuit.holder } top_liege = { save_scope_as = tca_governor } }
+                # A native refusal war must target the rebel's actual liege.
+                if = { limit = { scope:recipient = { is_ruler = yes exists = liege } } scope:recipient.liege = { save_scope_as = tca_governor } }
+                else_if = { limit = { NOT = { scope:tca_governor = { tca_basic_allowed_to_arrest_character_trigger = { CHARACTER = scope:recipient } } } } top_liege = { save_scope_as = tca_governor } }
             }
             else = { tca_find_arrest_circuit_effect = yes }
         }
@@ -73,8 +66,9 @@ tca_setup_judicial_approval_effect = {
     clear_saved_scope = tca_approver
     if = {
         limit = { exists = scope:tca_circuit }
+        scope:tca_circuit = { save_temporary_scope_as = tca_checked_circuit }
         if = {
-            limit = { OR = { scope:recipient = { tca_judicial_identity_tier >= 4 } scope:tca_circuit = { tca_has_available_tixing_trigger = no } } }
+            limit = { tca_judicial_requires_central_trigger = yes }
             scope:actor.top_liege = { tca_resolve_central_judicial_authority_effect = yes }
         }
         else = { scope:tca_circuit.var:song_judicial_title.holder = { save_scope_as = tca_approver } }

@@ -813,7 +813,7 @@ tca_judicial_law_test.14 = {
                 add_character_flag = tca_test_case_failed
                 debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_law_local_approval_roundtrip 1"
             }
-            scope:tca_test_law_sovereign = { random_vassal_or_below = { limit = { is_alive = yes is_imprisoned = no highest_held_title_tier = tier_county any_held_title = { tca_is_local_administrative_title_trigger = yes } tca_has_judicial_circuit_context_trigger = yes tca_judicial_identity_tier >= 2 tca_judicial_identity_tier < 4 } save_scope_as = recipient } } scope:recipient = { every_liege_or_above = { limit = { highest_held_title_tier = tier_kingdom tca_is_judicial_governor_trigger = yes } save_scope_as = actor save_scope_as = puppet_or_actor } } tca_setup_judicial_arrest_roles_effect = yes tca_setup_judicial_approval_effect = yes
+            scope:tca_test_law_sovereign = { random_vassal_or_below = { limit = { is_alive = yes is_imprisoned = no highest_held_title_tier = tier_county any_held_title = { tca_is_local_administrative_title_trigger = yes } tca_has_judicial_circuit_context_trigger = yes any_liege_or_above = { is_alive = yes is_imprisoned = no highest_held_title_tier = tier_kingdom tca_is_judicial_governor_trigger = yes } tca_judicial_identity_tier >= 2 tca_judicial_identity_tier < 4 } save_scope_as = recipient } } scope:recipient = { every_liege_or_above = { limit = { highest_held_title_tier = tier_kingdom tca_is_judicial_governor_trigger = yes } save_scope_as = actor save_scope_as = puppet_or_actor } } tca_setup_judicial_arrest_roles_effect = yes tca_setup_judicial_approval_effect = yes
             if = {
                 limit = { exists = scope:tca_circuit exists = scope:intermediary scope:intermediary = scope:tca_circuit.var:song_judicial_title.holder tca_judicial_arrest_context_valid_trigger = yes scope:tca_circuit = { save_temporary_scope_as = tca_checked_circuit } tca_judicial_direct_authorized_trigger = no tca_judicial_requires_central_trigger = no }
                 debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_law_local_approval_roundtrip 2"
@@ -2674,6 +2674,97 @@ tca_judicial_law_test.35 = {
                 add_character_flag = tca_test_case_failed
                 debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_maintenance_coalesced 2"
             }
+            # Fresh native character with no employer; wait for pool/realm state to settle.
+            clear_saved_scope = tca_test_law_target
+            create_character = { age = 30 gender_female_chance = 0 random_traits = no dynasty = none location = title:c_middlesex.title_province culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_test_law_target }
+            if = { limit = { scope:tca_test_law_target = { pool_character_is_pruneable_trigger = yes } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_maintenance_coalesced 6" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_maintenance_coalesced 6" }
+            # The delayed fixture must survive native pool cleanup, without moving it to court.
+            scope:tca_test_law_target = {
+                # Native pool pruning explicitly excludes historical characters.
+                # This is a disposable generated fixture, not a historical person.
+                add_trait = historical_character
+                tca_test_protect_character_effect = yes
+            }
+            if = { limit = { scope:tca_test_law_target = { pool_character_is_pruneable_trigger = no } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_maintenance_coalesced 5" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_maintenance_coalesced 5" }
+
+            add_character_flag = tca_test_delayed_case_active
+            trigger_event = { id = tca_judicial_law_test.1035 days = 1 }
+        }
+        else = {
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_judicial_maintenance_coalesced"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+            tca_test_continue_delayed_effect = yes
+        }
+        }
+    }
+}
+
+tca_judicial_law_test.1035 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = {
+                limit = { scope:tca_test_law_target = { is_alive = yes is_ruler = no top_liege = this NOT = { exists = liege_or_court_owner } NOT = { exists = host } } }
+                scope:tca_test_law_target = {
+                    set_variable = { name = tca_test_maintenance_completions value = 0 }
+                    add_character_flag = tca_test_pool_maintenance_probe
+                    tca_request_judicial_maintenance_effect = yes
+                }
+                if = { limit = { scope:tca_test_law_target = { has_variable = tca_judicial_maintenance_pending } }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_maintenance_coalesced 3" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_maintenance_coalesced 3" }
+            }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_maintenance_coalesced 3" }
+            # Give the original queued maintenance event time to run; do not call its worker.
+            trigger_event = { id = tca_judicial_law_test.2035 days = 2 }
+        }
+    }
+}
+
+tca_judicial_law_test.2035 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = {
+                limit = { scope:tca_test_law_target = { is_alive = yes is_ruler = no top_liege = this NOT = { exists = liege_or_court_owner } NOT = { exists = host } NOT = { has_variable = tca_judicial_maintenance_pending } NOT = { has_variable = tca_court_system_migrated_v2 } } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_maintenance_coalesced 4"
+            }
+            else = {
+                add_character_flag = tca_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_maintenance_coalesced 4"
+                scope:tca_test_law_target = {
+                    debug_log = "TCA_POOL FINAL_STATE"
+                    debug_log_scopes = yes
+                    if = { limit = { is_alive = yes } debug_log = "TCA_POOL ALIVE yes" }
+                    else = { debug_log = "TCA_POOL ALIVE no" }
+                    if = { limit = { is_ruler = no } debug_log = "TCA_POOL NON_RULER yes" }
+                    else = { debug_log = "TCA_POOL NON_RULER no" }
+                    if = { limit = { top_liege = this } debug_log = "TCA_POOL SELF_REALM yes" }
+                    else = { debug_log = "TCA_POOL SELF_REALM no" }
+                    if = { limit = { NOT = { exists = liege_or_court_owner } } debug_log = "TCA_POOL NO_COURT yes" }
+                    else = { debug_log = "TCA_POOL NO_COURT no" }
+                    if = { limit = { NOT = { exists = host } } debug_log = "TCA_POOL NO_HOST yes" }
+                    else = { debug_log = "TCA_POOL NO_HOST no" }
+                    if = { limit = { NOT = { has_variable = tca_judicial_maintenance_pending } } debug_log = "TCA_POOL PENDING_CLEARED yes" }
+                    else = { debug_log = "TCA_POOL PENDING_CLEARED no" }
+                    if = { limit = { NOT = { has_variable = tca_court_system_migrated_v2 } } debug_log = "TCA_POOL NO_MIGRATION yes" }
+                    else = { debug_log = "TCA_POOL NO_MIGRATION no" }
+                }
+            }
+            if = { limit = { scope:tca_test_law_target = { var:tca_test_maintenance_completions = 1 } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_maintenance_coalesced 7" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_maintenance_coalesced 7" }
+            scope:tca_test_law_target = {
+                remove_character_flag = tca_test_pool_maintenance_probe
+                remove_trait = historical_character
+                tca_test_restore_character_effect = yes
+            }
             if = {
                 limit = { has_character_flag = tca_test_case_failed }
                 debug_log = "TCA_TEST FAIL tca_test_judicial_maintenance_coalesced"
@@ -2683,14 +2774,9 @@ tca_judicial_law_test.35 = {
                 debug_log = "TCA_TEST PASS tca_test_judicial_maintenance_coalesced"
                 if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } }
             }
-        }
-        else = {
-            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_judicial_maintenance_coalesced"
-            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
-        }
-        remove_character_flag = tca_test_case_failed
-
-
+            remove_character_flag = tca_test_case_failed
+            remove_character_flag = tca_test_delayed_case_active
+            tca_test_continue_delayed_effect = yes
         }
     }
 }

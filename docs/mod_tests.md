@@ -4,7 +4,7 @@
 
 测试直接维护为CK3原生隐藏事件，不使用Python生成器，也不保留另一套P脚本中间源。`events/`下的测试文件就是正式测试代码，`common/scripted_effects/tca_judicial_law_test_effects.txt`是共享场景准备，Python仅用于读取日志和静态检查。
 
-当前110项／485断言，89项即时、21项串行延迟。原生拘捕组直接发送真实审批请求，检查即时收押和第20日的匹配观察证据；观察证据用例使用真实释放／死亡回调，并包含跨囚犯旧证据反例。测试范围及结果见[原生拘捕文档](judicial_arrest_native_tests.md)。
+当前115项／574断言，88项即时、27项串行延迟。路级法理与真实庄园回归见[司法辖区记录](judicial_de_jure_probe.md)。原生拘捕组直接发送真实审批请求，检查即时收押和第20日的匹配观察证据；世族批准/否决场景核对实际领主与庄园路不同，迁移场景核对旧审批失效。观察证据用例使用真实释放／死亡回调，并包含跨囚犯旧证据反例。测试范围及结果见[原生拘捕文档](judicial_arrest_native_tests.md)。
 
 ## CLI 自动执行
 
@@ -18,9 +18,9 @@ macOS 可运行`python3 tools/run_game_tests.py`，自动建立独立1066观察�
 effect tca_run_observer_tests_effect = yes
 ```
 
-无需查找角色ID或临时切换玩家。`tca_run_observer_tests_effect`检查debug、1066开局及有效天朝皇帝，再由`tca_test_resolve_observer_host_effect`固定选择`title:h_china.holder`承载`tca_tests.1`。测试统计、运行标记及二十一项串行延迟继续保存在该角色上；不使用控制台的默认角色。原有玩家决议、`event tca_tests.1`及各组单项入口保持不变。
+无需查找角色ID或临时切换玩家。`tca_run_observer_tests_effect`检查debug、1066开局及有效天朝皇帝，再由`tca_test_resolve_observer_host_effect`固定选择`title:h_china.holder`承载`tca_tests.1`。测试统计、运行标记及二十七项串行延迟继续保存在该角色上；不使用控制台的默认角色。原有玩家决议、`event tca_tests.1`及各组单项入口保持不变。
 
-入口发现任一存活角色已有全组或延迟用例运行标记时，只记录`TCA_TEST OBSERVER_ENTRY_BUSY`，不重置统计。前置不满足记录`TCA_TEST OBSERVER_ENTRY_REJECTED`；成功调用记录`TCA_TEST OBSERVER_ENTRY_DISPATCH`，随后必须出现新的`SUITE_DISPATCH 110 cases`。该入口允许玩家模式使用，但也固定选择天朝皇帝，不将玩家当前角色自动作为测试请求者。
+入口发现任一存活角色已有全组或延迟用例运行标记时，只记录`TCA_TEST OBSERVER_ENTRY_BUSY`，不重置统计。前置不满足记录`TCA_TEST OBSERVER_ENTRY_REJECTED`；成功调用记录`TCA_TEST OBSERVER_ENTRY_DISPATCH`，随后必须出现新的`SUITE_DISPATCH 113 cases`。该入口允许玩家模式使用，但也固定选择天朝皇帝，不将玩家当前角色自动作为测试请求者。
 
 观察者继续正常推进游戏日期，直到日志出现`SUITE_ALL_PASSED`或`SUITE_NOT_ALL_PASSED`，再运行`python3 tools/check_test_run.py`并审阅同次`error.log`。通知面向承载角色，不依赖观察者能看到通知。不得在运行中切换玩家、并发执行另一组测试或使用正常游玩存档。承载者或皇帝死亡、皇位更换时主动中止，详见下节；事件丢失、日期不推进或游戏退出造成缺少终局结果时仍是未完成，不自动换人接续或伪造通过。
 
@@ -38,7 +38,7 @@ effect tca_run_observer_tests_effect = yes
 
 原生回归源`events/tca_test_lifecycle_test_events.txt`：`.1`六断言检查添加、重复保护、恢复、重复恢复、保留原有保护和原版immortal／incapable；`.2`通过正式`death = { death_reason = death_fight }`杀死一个受保护的临时角色，隔日四断言检查死亡、真实on_death记录、保护清理和不误中止真实测试请求者。死亡用例的关联请求者也是独立临时角色，不人为设置真实框架运行／统计标记，不直接调用死亡回调。新增一项即时、一项串行延迟，额外等待一日。
 
-验收：重启1.20.0.4专用1066中国debug局，玩家或观察者入口运行全组，核对当前110项／485断言和同次error.log；测试期间承载者与原皇帝应有临时保护，完成后只撤掉测试添加的保护。在另一专用局等待阶段通过控制台脚本杀死受监测皇帝，应出现死亡／中止记录，存活承载者的保护被撤掉，原队列不再记录续接断言，日志工具返回NOT VERIFIED；再次启动被拒绝。非死亡皇位更换须在下一续接时中止。强制退出或引擎卡死时无法保证执行清理，测试存档不可转为正常游玩存档；原生自然死亡免疫及保存重载仍需另验。
+验收：重启当前1.20.1专用1066中国debug局，玩家或观察者入口运行全组，核对当前115项／574断言和同次error.log；测试期间承载者与原皇帝应有临时保护，完成后只撤掉测试添加的保护。在另一专用局等待阶段通过控制台脚本杀死受监测皇帝，应出现死亡／中止记录，存活承载者的保护被撤掉，原队列不再记录续接断言，日志工具返回NOT VERIFIED；再次启动被拒绝。非死亡皇位更换须在下一续接时中止。强制退出或引擎卡死时无法保证执行清理，测试存档不可转为正常游玩存档；原生自然死亡免疫及保存重载仍需另验。
 
 ## 测试状态窗口（2026-10-13）
 
@@ -50,7 +50,7 @@ effect tca_run_observer_tests_effect = yes
 
 原版依据：`gui/scripted_widgets/_scripted_widgets.info`明确支持以文件／widget名称自动创建独立窗口；原版hud.gui及debug_menus.gui使用IsInGame，window_government_administration.gui使用Title.MakeScope.Var；debug_menus.gui使用ExecuteConsoleCommand。窗口样式组合参考本机Daddy Pika's Cheat Menu（Workshop 2986538297）的DI_main.gui及独立widget登记，属本机参考，不证明其全部内容与当前版本兼容。只新增本模组独立对象，没有同名原版覆盖。
 
-原生回归`tca_test_status_test.1`在独立临时角色上直接调用正式快照和关闭效果，7个断言检查计数汇总、运行显示、运行中拒绝关闭、完成状态、关闭保留结果、死亡中止原因、新轮重新打开及清零。不修改真实框架统计或实际头衔显示数据。当前全组110项／485断言，串行延迟21项。
+原生回归`tca_test_status_test.1`在独立临时角色上直接调用正式快照和关闭效果，7个断言检查计数汇总、运行显示、运行中拒绝关闭、完成状态、关闭保留结果、死亡中止原因、新轮重新打开及清零。不修改真实框架统计或实际头衔显示数据。当前全组115项／574断言，串行延迟27项。
 
 状态窗口原生断言已包含在本页最新全组验收中，实际界面仍须人工检查。重启专用1066中国debug局，在观察者入口运行全组：窗口应自动显示并持续更新；结束后应明确显示完成结果且不自行消失；关闭后再次实际启动应重新显示。另在专用局触发真实受监测死亡，窗口应保留中止原因与计数。还需验证简体中文／英文布局、拖动及关闭按钮。此窗口不处理非debug、前置不符或BUSY拒绝启动时的新状态，继续保留上一轮结果；以OBSERVER_ENTRY日志判断该次请求是否实际启动。
 
@@ -60,13 +60,41 @@ effect tca_run_observer_tests_effect = yes
 
 直接编辑`events/tca_*_test_events.txt`。每项自备前置和状态，调用正式trigger/effect，通过if／limit检查结果；日志保留唯一tca_test_名称、连续CHECK编号及BEGIN／PASS／FAIL／PRECONDITION_FAIL。前置不满足计未执行，任何失败保留到用例结束。不要改写统计值来制造通过。
 
-真实等待写成原生trigger_event的days参数，由后续角色事件检查。续接事件保留上下文，二十一项串行运行，不以直接调用正式worker替代自然触发。请求角色死亡、事件丢失或退出游戏时，无最终结果就是未完成。
+真实等待写成原生trigger_event的days参数，由后续角色事件检查。续接事件保留上下文，二十七项串行运行，不以直接调用正式worker替代自然触发。请求角色死亡、事件丢失或退出游戏时，无最终结果就是未完成。
 
 新增用例在总入口`events/tca_tests_events.txt`登记并同步计划数量；延迟调度在该文件和`tca_test_delayed_dispatch_effects.txt`维护。日志工具从正式事件读取预期用例和编号，工具回归检查登记、连续编号和总数量。没有生成步骤。
 
 检查命令：`python3 -m unittest discover -s tools -p 'test_*.py'`；游戏运行后用`python3 tools/check_test_run.py`，并审阅同次error.log。源码及静态通过不能当作引擎结果。
 
-## 当前验收（2026-10-14 09:49）
+## 当前验收状态（2026-10-15核对）
+
+当前修复后两个独立CLI局 run-5tr6bhkv（固定种子2878361204）及 run-l5defgvd（随机新局）均为115 BEGIN／115 PASS／574 CHECK_PASS，零失败或未执行；观察者、summary及日志核对通过，verification_exit=0、runner_exit=0，完整error.log无tca_记录。100项工具测试和原版覆盖检查通过。庄园现在25断言，人物池维护7断言；快照失效反例、防原生清理正反条件及真实维护恰好执行一次的证明均通过。详见[夹具修复及历史边界](judicial_de_jure_probe.md#测试夹具修复2026-10-15当前实现)。
+
+### 前次失败（夹具修复前）
+
+run-qw0oucit 为113／115项通过，563 CHECK_PASS／4 CHECK_FAIL，NOT VERIFIED；庄园第7／14／15及人物池维护第4失败，伴随庄园空作用域错误。保留该次结果，不以当前通过改写旧证据；原人物池综合断言不能从旧日志唯一归因，后续逐条件诊断继续保留。
+
+### 前次通过（改法时序修复后）
+
+前次完整CLI局 `run-8jaow2r1`：115 BEGIN／115 PASS／567 CHECK_PASS，零失败或未执行，观察者及日志核对通过，完整error.log无tca_记录。98项工具测试和原版覆盖检查通过。司法法律改用改法后回调，关闭5断言、启用4断言，分别检查当日及自然日期推进后的原生法理状态；复现、首次全组庄园缺员失败及未确认边界见[法律回调记录](judicial_law_tests.md#法律回调时序当前实现2026-10-15)。
+
+### 前次：法理停用修订验收
+
+独立1066中国观察者CLI局 `run-qz4um49d`：115 BEGIN／115 PASS／562 CHECK_PASS，零失败或未执行，观察者已确认，verification_exit及runner_exit为0，完整error.log无tca_记录。新增法理停用/维护/恢复/原生销毁/皇帝状态6断言，法理用例现在31断言；全部同模块回归也执行通过。98项Python工具测试和原版覆盖检查通过。日志工具新增未知trigger解析错误的回归，先复现漏报再修正，不能凭旧版工具对 `run-rugh3i0y` 的OK判断通过。内部退役父引用及保存重载、界面目视边界见[当前司法验收](judicial_de_jure_probe.md)。
+
+### 前次验收（2026-10-14 16:28，法理停用修订前）
+
+2026-10-14 16:28，CK3 1.20.0.4独立1066中国观察者CLI局，目录 `run-m5qxhw6m`：115 BEGIN／115 PASS／556 CHECK_PASS，零失败或未执行。观察者、汇总及日志核对均确认，verification_exit与runner_exit均为0，完整error.log无tca_记录。当前88项即时、27项串行延迟。97项Python工具测试、8项覆盖/17项追加/1项辅助扩展检查通过。新增庄园21/5断言，原法理世族断言、跨路真实批准/否决及司法维护用例同步完善；人物池维护实际等待原始排队事件执行。场景、失败到通过和夹具修正依据见[司法辖区记录](judicial_de_jure_probe.md)。保存重载、玩家界面及长期AI另行验收。
+
+### 前次验收（2026-10-14 14:55，庄园修订前）
+
+2026-10-14 14:55，CK3 1.20.0.4独立1066中国观察者CLI局，目录 `run-c2ssmad4`：113 BEGIN／113 PASS／528 CHECK_PASS，零失败或未执行。观察者、汇总及日志核对均确认，verification_exit与runner_exit均为0，完整error.log无tca_记录。97项Python工具测试、8项覆盖/17项追加/1项辅助扩展检查通过。新增法理25断言、皇帝持路14断言、拒捕战争4断言；自动创建通过原始头衔取得回调验证，战争与拘押直接走原生流程。场景及失败到通过记录见[路级法理司法记录](judicial_de_jure_probe.md)。保存重载、玩家界面及长期AI另行验收。
+
+### 历史原型验收（2026-10-14 10:29）
+
+CK3 1.20.0.4独立1066中国观察者CLI局，目录`run-mjhn7hv7`：111 BEGIN／111 PASS／495 CHECK_PASS，零失败、零未执行；观察者已确认，SUITE_ALL_PASSED，terminal.json的verification_exit及runner_exit均为0。完整error.log无tca_记录，仍有原版背景错误。新增无地官署法理原型十断言通过，实际de facto与法理归属对照见[原型记录](judicial_de_jure_probe.md)。90项Python工具测试与原版覆盖检查通过。保存重载、真实死亡继承和完整玩法尚未由本次验证覆盖。
+
+### 前次验收（2026-10-14 09:49）
 
 独立1066中国观察者CLI局，仅加载主模组和启动适配模组，目录`run-m6q95reg`：110 BEGIN／110 PASS／485 CHECK_PASS，零失败或未执行，SUITE_ALL_PASSED。terminal.json确认观察者切换、summary终止、日志核对及工具退出码0；游戏进程在汇总后由工具强制终止（-9）。完整error.log无tca_记录，仍有原版背景错误，不能称全游戏无错误。
 

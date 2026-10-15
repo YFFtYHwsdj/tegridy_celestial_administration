@@ -265,6 +265,12 @@ def check(game_dir, mod_dir):
         if identity in known:
             raise ValueError(f"definition classified more than once: {identity}")
         known[identity] = "extension"
+        if "baseline" in entry:
+            baseline = entry_definitions(entry, mod_dir / entry["baseline"]).get(entry["key"])
+            if baseline is None:
+                raise ValueError(f"extension baseline missing {entry['key']}")
+            changed |= _compare_entry(entry, f"installed-game:{entry['key']}", baseline,
+                                      game_dir / entry["vanilla"], entry["key"])
         for label, path in (("installed-game", game_dir / entry["vanilla"]),
                             ("mod-extension", mod_dir / entry["mod"])):
             if entry["key"] not in read_definitions(path, allow_duplicates=True):

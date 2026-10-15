@@ -51,6 +51,7 @@ tca_test_prepare_native_arrest_effect = {
             limit = {
                 NOT = { has_variable = tca_test_arrest_fixture_used }
                 tca_is_judicial_circuit_trigger = yes
+                holder.primary_title = this
             }
             # Replace the inherited alias unconditionally for each eligible entry.
             # The last eligible entry wins; never gate selection on alias existence.
@@ -59,6 +60,7 @@ tca_test_prepare_native_arrest_effect = {
     }
     # Mark only the selected circuit, after the iteration has completed.
     scope:tca_test_law_circuit = { set_variable = { name = tca_test_arrest_fixture_used value = yes } }
+    scope:tca_test_law_circuit = { save_scope_as = tca_test_arrest_estate_circuit }
     scope:tca_test_law_circuit.var:song_judicial_title ?= { save_scope_as = tca_test_law_position }
     scope:tca_test_law_position.holder ?= { save_scope_as = tca_test_law_commissioner }
     scope:tca_test_law_position ?= { tca_retire_judicial_prisoners_effect = yes }
@@ -78,11 +80,15 @@ tca_test_prepare_native_arrest_effect = {
         # This avoids a nested CreateNobleFamilyTitle while the old governor loses office.
         create_dynasty = { spread_to_descendants = yes }
         give_noble_family_title = { name = noble_family_name tier = county article = DEFAULT_TITLE_NAME_ARTICLE government = celestial_government save_scope_as = tca_test_arrest_actor_family }
-        create_title_and_vassal_change = { type = appointment add_claim_on_loss = no save_scope_as = tca_test_arrest_governor_change }
+        # Prepare a specific test ruler with a native grant. A career appointment
+        # can select another native successor instead of the requested fixture.
+        change_merit = kingdom_starting_merit_value
+        create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_test_arrest_governor_change }
         scope:tca_test_law_circuit = { change_title_holder = { holder = scope:tca_test_arrest_actor change = scope:tca_test_arrest_governor_change } }
         resolve_title_and_vassal_change = scope:tca_test_arrest_governor_change
         tca_test_log_native_arrest_fixture_effect = { STAGE = AFTER_APPOINTMENT }
         change_government = celestial_government
+        assign_completed_exams_based_on_title_tier_effect = yes
         create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_test_arrest_liege_change }
         change_liege = { liege = scope:tca_test_law_sovereign change = scope:tca_test_arrest_liege_change }
         resolve_title_and_vassal_change = scope:tca_test_arrest_liege_change
@@ -114,6 +120,7 @@ tca_test_prepare_native_arrest_effect = {
             create_dynasty = { spread_to_descendants = yes }
             # Native family title primitive, without the career event queued by the wrapper.
             give_noble_family_title = { name = noble_family_name tier = county article = DEFAULT_TITLE_NAME_ARTICLE government = celestial_government save_scope_as = tca_test_arrest_family }
+            domicile ?= { move_domicile = scope:tca_test_law_circuit.title_capital_county.title_province }
         }
         if = {
             limit = { always = $COMMISSIONER$ }
@@ -130,6 +137,7 @@ tca_test_prepare_native_arrest_effect = {
             scope:new_title = {
                 save_scope_as = tca_test_arrest_office
                 tca_configure_judicial_title_location_effect = yes
+                set_de_jure_liege_title = scope:tca_test_law_circuit
             }
             create_title_and_vassal_change = { type = appointment add_claim_on_loss = no save_scope_as = tca_test_arrest_office_change }
             scope:tca_test_arrest_office = { change_title_holder = { holder = scope:tca_test_arrest_target change = scope:tca_test_arrest_office_change } }
@@ -167,6 +175,22 @@ tca_test_send_native_arrest_effect = {
         recipient = scope:tca_test_arrest_target
         send_threshold = decline
     }
+}
+
+# Real estate outside the requesting governor's circuit; actual vassalage stays fixed.
+tca_test_move_arrest_estate_to_other_circuit_effect = {
+    scope:tca_test_law_sovereign = {
+        every_in_list = {
+            variable = tca_test_law_circuits
+            limit = { this != scope:tca_test_law_circuit tca_is_judicial_circuit_trigger = yes tca_has_available_tixing_trigger = yes }
+            save_scope_as = tca_test_arrest_estate_circuit
+        }
+    }
+    scope:tca_test_arrest_target.domicile = { move_domicile = scope:tca_test_arrest_estate_circuit.title_capital_county.title_province }
+    clear_saved_scope = intermediary
+    tca_setup_judicial_arrest_roles_effect = yes
+    tca_setup_judicial_approval_effect = yes
+    scope:intermediary ?= { save_scope_as = tca_test_arrest_approver }
 }
 
 tca_test_cleanup_native_arrest_effect = {
@@ -221,6 +245,19 @@ tca_test_log_native_arrest_fixture_effect = {
             if = { limit = { has_title = scope:tca_test_law_circuit } debug_log = "TCA_ARREST_FIXTURE REQUESTER_HAS_CIRCUIT" }
             else = { debug_log = "TCA_ARREST_FIXTURE REQUESTER_MISSING_CIRCUIT" }
         }
+        debug_log_scopes = yes
+    }
+}
+
+# Observe real direct-interaction participants, not inherited event participants.
+tca_test_record_direct_arrest_context_effect = {
+    if = {
+        limit = { debug_only = yes scope:actor = { has_variable = tca_test_direct_arrest_probe } }
+        if = { limit = { tca_judicial_arrest_still_valid_trigger = yes }
+            scope:actor = { set_variable = { name = tca_test_direct_arrest_valid value = yes } }
+        }
+        scope:actor = { set_variable = { name = tca_test_direct_arrest_backer value = scope:tca_governor } }
+        debug_log = "TCA_EM DIRECT_NATIVE_CONTEXT"
         debug_log_scopes = yes
     }
 }

@@ -1,9 +1,17 @@
-﻿# Title scope. Family/camp/other landless titles never confer administrative jurisdiction.
+﻿# Title scope. Civil offices include landless offices formally under a circuit.
 tca_is_local_administrative_title_trigger = {
     tier >= tier_county
     tier <= tier_kingdom
-    is_landless_type_title = no
     is_noble_family_title = no
+    NOT = { has_variable = tca_judicial_title }
+    OR = {
+        is_landless_type_title = no
+        AND = {
+            is_landless_type_title = yes
+            exists = de_jure_liege
+            de_jure_liege = { tca_is_judicial_circuit_trigger = yes }
+        }
+    }
     exists = holder
     holder = {
         government_has_flag = government_is_celestial
@@ -177,10 +185,13 @@ tca_has_available_tixing_trigger = {
 }
 # Actor scope. Limit to an ordinary circuit or its subordinate civilian offices.
 tca_has_judicial_circuit_context_trigger = {
-    OR = {
-        any_held_title = { tca_is_judicial_circuit_trigger = yes NOT = { has_variable = tca_judicial_disabled } }
-        any_liege_or_above = {
-            any_held_title = { tca_is_judicial_circuit_trigger = yes NOT = { has_variable = tca_judicial_disabled } }
+    save_temporary_scope_as = tca_context_actor
+    any_in_global_list = {
+        variable = tca_judicial_circuits
+        tca_is_judicial_circuit_trigger = yes
+        NOT = { has_variable = tca_judicial_disabled }
+        scope:tca_context_actor = {
+            tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = prev }
         }
     }
 }
@@ -200,7 +211,7 @@ tca_judicial_actor_has_jurisdiction_trigger = {
     trigger_if = {
         limit = { scope:actor = { tca_is_judicial_commissioner_trigger = yes } }
         scope:recipient = {
-            tca_is_target_in_administrative_title_trigger = { TITLE = scope:actor.primary_title.var:song_judicial_circuit }
+            tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:actor.primary_title.var:song_judicial_circuit }
         }
     }
     trigger_else = {
@@ -220,11 +231,13 @@ tca_judicial_actor_has_jurisdiction_trigger = {
 # Interaction scope, valid only after restoring/resolving tca_circuit.
 tca_judicial_requires_central_trigger = {
     OR = {
+        scope:recipient = { any_held_title = { tca_is_judicial_circuit_trigger = yes } }
         scope:recipient = { tca_judicial_identity_tier >= 4 }
         scope:tca_checked_circuit = { tca_has_available_tixing_trigger = no }
     }
 }
 tca_judicial_direct_authorized_trigger = {
+    scope:recipient = { NOT = { any_held_title = { tca_is_judicial_circuit_trigger = yes } } }
     scope:recipient = {
         OR = {
             tca_judicial_identity_tier = 1

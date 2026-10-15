@@ -22,7 +22,7 @@ tca_test_native_arrest_fixture_valid_trigger = {
     scope:tca_test_arrest_actor = { is_ai = yes tca_is_judicial_governor_trigger = yes intrigue >= 90 has_perk = prison_feudal_complex_perk }
     scope:tca_test_arrest_target = {
         is_alive = yes is_imprisoned = no is_landed = no liege = scope:tca_test_arrest_actor
-        trigger_if = { limit = { always = $FAMILY$ } any_held_title = { is_noble_family_title = yes } }
+        trigger_if = { limit = { always = $FAMILY$ } any_held_title = { is_noble_family_title = yes } domicile = { is_domicile_type = east_asian_estate domicile_location.county = scope:tca_test_arrest_estate_circuit.title_capital_county } }
         trigger_else = { NOT = { any_held_title = { is_noble_family_title = yes } } }
         trigger_if = { limit = { always = $COMMISSIONER$ } tca_is_judicial_commissioner_trigger = yes tca_judicial_identity_tier >= 4 }
         trigger_else = { tca_is_judicial_commissioner_trigger = no }
@@ -83,4 +83,18 @@ tca_test_native_arrest_followup_consistent_trigger = {
         }
     }
     trigger_else = { scope:tca_test_arrest_actor = { is_target_in_variable_list = { name = tca_test_arrest_dead_cases target = flag:$CASE$ } } }
+}
+
+# Native graph assertion: an unfilled office is absent from every managed real circuit.
+# A retired transient parent reference is not itself a circuit.
+tca_test_judicial_office_detached_trigger = {
+    save_temporary_scope_as = tca_test_detached_position
+    NOT = { exists = holder }
+    NOT = {
+        any_in_global_list = {
+            variable = tca_judicial_circuits
+            exists = this
+            scope:tca_test_detached_position = { target_is_de_jure_liege_or_above = prev }
+        }
+    }
 }

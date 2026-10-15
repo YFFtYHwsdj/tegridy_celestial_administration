@@ -11,6 +11,39 @@ tca_test_resolve_observer_host_effect = {
     }
 }
 
+# CLI-selected delayed stage. Business cases remain in their maintained events.
+tca_run_focused_observer_test_effect = {
+    if = {
+        limit = {
+            debug_only = yes
+            tca_test_observer_world_ready_trigger = yes
+            NOT = { any_living_character = { OR = { has_character_flag = tca_test_suite_running has_character_flag = tca_test_delayed_case_active } } }
+            NOT = { title:h_china = { has_variable = tca_test_suite_aborted } }
+        }
+        tca_test_resolve_observer_host_effect = yes
+        scope:tca_test_observer_host = {
+            save_scope_as = tca_test_reporter
+            set_variable = { name = tca_test_focused_run value = yes }
+            set_variable = { name = tca_test_suite_expected value = 1 }
+            set_variable = { name = tca_test_suite_passed value = 0 }
+            set_variable = { name = tca_test_suite_failed value = 0 }
+            set_variable = { name = tca_test_suite_skipped value = 0 }
+            add_character_flag = tca_test_suite_running
+            tca_test_begin_lifecycle_effect = yes
+            tca_test_update_status_effect = { PHASE = 1 REASON = 0 }
+            debug_log = "TCA_TEST OBSERVER_ENTRY_DISPATCH"
+            debug_log = "TCA_TEST SUITE_DISPATCH 1 cases"
+            trigger_event = tca_tests.$STAGE$
+        }
+    }
+    else = {
+        if = { limit = { NOT = { debug_only = yes } } debug_log = "TCA_TEST OBSERVER_ENTRY_REJECTED focused debug required" }
+        if = { limit = { NOT = { tca_test_observer_world_ready_trigger = yes } } debug_log = "TCA_TEST OBSERVER_ENTRY_REJECTED focused world invalid" }
+        if = { limit = { any_living_character = { OR = { has_character_flag = tca_test_suite_running has_character_flag = tca_test_delayed_case_active } } } debug_log = "TCA_TEST OBSERVER_ENTRY_REJECTED focused busy" }
+        if = { limit = { title:h_china = { has_variable = tca_test_suite_aborted } } debug_log = "TCA_TEST OBSERVER_ENTRY_REJECTED focused aborted" }
+    }
+}
+
 tca_run_observer_tests_effect = {
     if = {
         limit = { NOT = { debug_only = yes } }

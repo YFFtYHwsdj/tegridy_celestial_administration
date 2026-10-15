@@ -46,12 +46,31 @@ def isolated_settings(source):
     return f'"game" = {game}\n"Graphics" = {graphics}\n'
 
 
-def prepare_run(repo, run_root, settings):
+def selected_stage(repo, entry):
+    from check_test_run import selected_case_expectations
+    selected_case_expectations(entry, repo)
+    stages = definitions((repo / 'events/tca_tests_events.txt').read_text(encoding='utf-8-sig'))
+    for stage, body in stages.items():
+        text = ' '.join(body)
+        if 'name = tca_test_suite_delayed_next' in text and re.search(r'trigger_event = ' + re.escape(entry) + r'(?![\d.])', text):
+            return stage.split('.')[1]
+    raise ValueError('Focused CLI currently supports registered delayed cases only')
+
+
+def prepare_run(repo, run_root, settings, selected_case=None):
     run_root.mkdir(parents=True, exist_ok=True)
     run = Path(tempfile.mkdtemp(prefix='run-', dir=run_root))
     (run / 'mod').mkdir()
     adapter = run / 'mod/tca_cli_adapter'
     shutil.copytree(repo / 'tools/cli_adapter', adapter)
+    if selected_case:
+        stage = selected_stage(repo, selected_case)
+        events = adapter / 'events/tca_cli_events.txt'
+        text = events.read_text(encoding='utf-8-sig').replace(
+            'tca_run_observer_tests_effect = yes',
+            f'tca_run_focused_observer_test_effect = {{ STAGE = {stage} }}')
+        events.write_text(text, encoding='utf-8-sig')
+        write_json(run / 'selection.json', {'case': selected_case, 'stage': stage})
     (run / 'mod/tca_main.mod').write_text(descriptor('TCA Main', repo), encoding='utf-8')
     (run / 'mod/tca_cli_adapter.mod').write_text(descriptor('TCA CLI Adapter', adapter), encoding='utf-8')
     write_json(run / 'dlc_load.json', {'disabled_dlcs': [], 'enabled_mods': [
@@ -72,6 +91,8 @@ def progress(log, elapsed, running):
 def terminal_condition(log, process_code):
     if any(marker in log for marker in SUMMARY_MARKERS):
         return 'summary'
+    if 'TCA_TEST OBSERVER_ENTRY_REJECTED' in log:
+        return 'entry_rejected'
     if 'TCA_CLI NOT_OBSERVER' in log:
         return 'not_observer'
     if process_code is not None:
@@ -93,11 +114,21 @@ def stop_owned_process(process):
             process.wait()
 
 
-def run_game(args, run):
+def game_command(args, run):
     executable = args.game_dir / 'binaries/ck3.app/Contents/MacOS/ck3'
     command = [str(executable), '-debug_mode', '-develop', '-skip',
                '-bookmark=bm_1066_china', '-play=h_china', '-suppress_error_log',
                f'-userdir={run}/']
+    seed = getattr(args, 'seed', None)
+    if seed is not None:
+        if not 0 <= seed <= 0xFFFFFFFF:
+            raise ValueError('--seed must be between 0 and 4294967295')
+        command.append(f'-random_seed={seed}')
+    return command
+
+
+def run_game(args, run):
+    command = game_command(args, run)
     env = os.environ.copy()
     env['SteamAppId'] = '1158310'
     start = time.monotonic()
@@ -131,8 +162,10 @@ def run_game(args, run):
     log = debug.read_text(errors='replace') if debug.exists() else ''
     state = progress(log, time.monotonic() - start, False)
     write_json(run / 'progress.json', state)
-    checker = subprocess.run([sys.executable, str(ROOT / 'tools/check_test_run.py'),
-                              '--logs', str(run / 'logs')], capture_output=True, text=True)
+    checker_command = [sys.executable, str(ROOT / 'tools/check_test_run.py'), '--logs', str(run / 'logs')]
+    if getattr(args, 'case', None):
+        checker_command += ['--case', args.case]
+    checker = subprocess.run(checker_command, capture_output=True, text=True)
     (run / 'result.txt').write_text(checker.stdout + checker.stderr, encoding='utf-8')
     code = outcome(condition, state['observer_confirmed'], checker.returncode)
     write_json(run / 'terminal.json', {**state, 'condition': condition,
@@ -152,14 +185,18 @@ def main(argv=None):
                         help='read-only graphics/game preferences source; absent file uses defaults')
     parser.add_argument('--timeout', type=float, default=240, help='total startup/test timeout in seconds')
     parser.add_argument('--prepare-only', action='store_true', help='prepare isolated files without launching')
+    parser.add_argument('--seed', type=int, help='native new-game random seed for reproducible regressions')
+    parser.add_argument('--case', help='run one registered delayed native case; default runs the full suite')
     args = parser.parse_args(argv)
     args.game_dir = args.game_dir.expanduser().resolve()
+    if args.seed is not None and not 0 <= args.seed <= 0xFFFFFFFF:
+        parser.error('--seed must be between 0 and 4294967295')
     if args.timeout <= 0:
         parser.error('--timeout must be positive')
     try:
         if not args.prepare_only and not (args.game_dir / 'binaries/ck3.app/Contents/MacOS/ck3').is_file():
             raise ValueError('macOS CK3 executable missing; set --game-dir to the installation root')
-        run = prepare_run(ROOT, args.run_root.expanduser().resolve(), args.settings.expanduser())
+        run = prepare_run(ROOT, args.run_root.expanduser().resolve(), args.settings.expanduser(), args.case)
         print(f'Fresh run directory: {run}', flush=True)
         if args.prepare_only:
             return 0

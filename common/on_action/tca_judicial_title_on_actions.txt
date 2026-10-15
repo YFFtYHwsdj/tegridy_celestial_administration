@@ -11,7 +11,10 @@ tca_judicial_setup = {
 
 tca_judicial_title_gain = {
     trigger = { government_has_flag = government_is_celestial }
-    effect = { tca_request_judicial_maintenance_effect = yes }
+    effect = {
+        tca_request_judicial_maintenance_effect = yes
+        if = { limit = { OR = { has_council_position = minister_justice scope:title = title:e_minister_of_justice } } top_liege = { tca_request_judicial_maintenance_effect = yes } }
+    }
 }
 
 tca_judicial_government_change = {
@@ -72,3 +75,12 @@ tca_judicial_position_government_change = {
 
 # A commissioner's new county/office or changed liege must also be checked.
 on_vassal_change = { on_actions = { tca_judicial_position_government_change } }
+
+# Native council callbacks: emperor-owned commissions must follow the current
+# ministry, even when firing leaves a vacancy without a new title-gain callback.
+on_fired_from_council = { on_actions = { tca_judicial_council_fired } }
+on_councillor_left = { on_actions = { tca_judicial_council_left } }
+on_councillors_swapped = { on_actions = { tca_judicial_council_swapped } }
+tca_judicial_council_fired = { effect = { tca_request_judicial_maintenance_effect = yes } }
+tca_judicial_council_left = { effect = { scope:old_employer ?= { tca_request_judicial_maintenance_effect = yes } } }
+tca_judicial_council_swapped = { effect = { scope:councillor_liege ?= { tca_request_judicial_maintenance_effect = yes } } }

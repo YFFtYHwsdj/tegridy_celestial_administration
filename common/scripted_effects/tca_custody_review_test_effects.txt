@@ -52,3 +52,37 @@ tca_test_review_score_pair_effect = {
         save_scope_as = tca_review_keeper
     }
 }
+
+# Character scope: take a current, usable pair rather than an earlier law snapshot.
+# These geography tests need two distinct primary circuit governors and judges.
+tca_test_select_current_judicial_pair_effect = {
+    save_scope_as = tca_test_pair_sovereign
+    clear_saved_scope = tca_test_estate_a
+    clear_saved_scope = tca_test_estate_b
+    every_in_global_list = {
+        variable = tca_judicial_circuits
+        limit = {
+            tca_is_judicial_circuit_trigger = yes
+            NOT = { has_variable = tca_judicial_disabled }
+            tca_has_available_tixing_trigger = yes
+            holder.top_liege = scope:tca_test_pair_sovereign
+            holder.primary_title = this
+            holder = { is_imprisoned = no NOT = { tgp_is_any_minister = yes } }
+        }
+        save_scope_as = tca_test_estate_a
+    }
+    every_in_global_list = {
+        variable = tca_judicial_circuits
+        limit = {
+            tca_is_judicial_circuit_trigger = yes
+            NOT = { has_variable = tca_judicial_disabled }
+            tca_has_available_tixing_trigger = yes
+            holder.top_liege = scope:tca_test_pair_sovereign
+            holder.primary_title = this
+            holder = { is_imprisoned = no NOT = { tgp_is_any_minister = yes } }
+            this != scope:tca_test_estate_a
+            holder != scope:tca_test_estate_a.holder
+        }
+        save_scope_as = tca_test_estate_b
+    }
+}

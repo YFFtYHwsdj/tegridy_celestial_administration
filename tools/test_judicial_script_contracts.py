@@ -46,6 +46,9 @@ class JudicialLoadingTests(unittest.TestCase):
         logged_total = re.search(r'TCA_TEST SUITE_DISPATCH (\d+) cases', suite)
         self.assertIsNotNone(logged_total)
         self.assertEqual(int(logged_total.group(1)), len(expected))
+        rejected_total = re.search(r'name = tca_test_suite_skipped value = ([1-9]\d*)', suite)
+        self.assertIsNotNone(rejected_total)
+        self.assertEqual(int(rejected_total.group(1)), len(expected))
         entries = set()
         for path in (ROOT / 'events').glob('tca_*test*_events.txt'):
             entries.update(re.findall(r'TCA_TEST BEGIN (\S+) tca_test_', path.read_text(encoding='utf-8-sig')))
@@ -150,7 +153,7 @@ class JudicialLoadingTests(unittest.TestCase):
         hooks = (ROOT / 'common/on_action/tca_judicial_title_on_actions.txt').read_text(encoding='utf-8-sig')
         self.assertNotIn('trigger_event', hooks)
         self.assertNotIn('events = { tca_judicial_titles.1 }', hooks)
-        self.assertEqual(hooks.count('tca_request_judicial_maintenance_effect = yes'), 4)
+        self.assertEqual(hooks.count('tca_request_judicial_maintenance_effect = yes'), 8)
         effects = definitions((ROOT / 'common/scripted_effects/tca_judicial_title_effects.txt').read_text(encoding='utf-8-sig'))
         request = effects['tca_request_judicial_maintenance_effect']
         self.assertIn('has_variable', request)

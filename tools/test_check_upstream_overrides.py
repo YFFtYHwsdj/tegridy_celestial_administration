@@ -29,6 +29,25 @@ class UpstreamCheckTests(unittest.TestCase):
             result = check(self.game, self.mod)
         return result, output.getvalue()
 
+    def test_additive_extension_checks_reviewed_native_baseline(self):
+        vanilla = 'common/on_action/council.txt'
+        mod = 'common/on_action/tca_council.txt'
+        baseline = 'tools/baselines/council.txt'
+        self.write(self.game / vanilla, 'on_fired_from_council = { native = yes }')
+        self.write(self.mod / baseline, 'on_fired_from_council = { native = yes }')
+        self.write(self.mod / mod, 'on_fired_from_council = { on_actions = { tca_callback } }')
+        self.write(self.mod / 'tools/upstream_overrides.json', json.dumps({
+            'schema_version': 1, 'overrides': [], 'known_extensions': [{
+                'key': 'on_fired_from_council', 'vanilla': vanilla,
+                'mod': mod, 'baseline': baseline}]}))
+        self.assertEqual(self.run_check()[0], 0)
+        before = (self.mod / baseline).read_bytes()
+        self.write(self.game / vanilla, 'on_fired_from_council = { native = no }')
+        result, output = self.run_check()
+        self.assertEqual(result, 1)
+        self.assertIn('NEEDS REVIEW', output)
+        self.assertEqual((self.mod / baseline).read_bytes(), before)
+
     def test_auxiliary_extension_checks_native_drift_without_refreshing_baseline(self):
         vanilla = 'common/on_action/game_start.txt'
         adapter = 'tools/cli_adapter/common/on_action/start.txt'

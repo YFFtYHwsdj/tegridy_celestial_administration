@@ -1,0 +1,361 @@
+﻿# Real native estates; no surrogate location variables or business-rule simulation.
+namespace = tca_judicial_estate_test
+
+# Native approval queue keeps the old participant; estate relocation invalidates it.
+tca_judicial_estate_test.2 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { has_character_flag = tca_test_delayed_case_active } debug_log = "TCA_TEST CASE_BUSY" }
+        else = {
+            debug_log = "TCA_TEST BEGIN tca_judicial_estate_test.2 tca_test_judicial_estate_pending_arrest"
+            remove_character_flag = tca_test_case_failed
+            if = { limit = { tca_test_native_arrest_realm_ready_trigger = yes }
+                tca_test_prepare_native_arrest_effect = { FAMILY = yes COMMISSIONER = no OFFICE = no CONTROL = tca_test_arrest_force_approval CASE = tca_test_arrest_case_estate_migration }
+                scope:tca_test_arrest_approver = { save_scope_as = tca_test_estate_old_approver }
+                if = { limit = { tca_test_native_arrest_fixture_valid_trigger = { FAMILY = yes COMMISSIONER = no OFFICE = no } scope:tca_test_arrest_target = { var:tca_test_arrest_case = flag:tca_test_arrest_case_estate_migration } tca_test_native_arrest_send_valid_trigger = yes }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_estate_pending_arrest 1"
+                    tca_test_send_native_arrest_effect = yes
+                }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_estate_pending_arrest 1" }
+                if = { limit = { tca_test_native_arrest_waiting_trigger = yes }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_estate_pending_arrest 2" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_estate_pending_arrest 2" }
+                tca_test_move_arrest_estate_to_other_circuit_effect = yes
+                scope:tca_test_estate_old_approver = { save_scope_as = intermediary }
+                if = { limit = { scope:tca_test_arrest_estate_circuit != scope:tca_test_law_circuit scope:tca_test_arrest_target = { liege = scope:tca_test_arrest_actor domicile.domicile_location.county = scope:tca_test_arrest_estate_circuit.title_capital_county } tca_judicial_arrest_context_valid_trigger = no }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_estate_pending_arrest 3" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_estate_pending_arrest 3" }
+                add_character_flag = tca_test_delayed_case_active
+                trigger_event = { id = tca_judicial_estate_test.1002 days = 20 }
+            }
+            else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_judicial_estate_pending_arrest" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_continue_delayed_effect = yes }
+        }
+    }
+}
+tca_judicial_estate_test.1002 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_test_arrest_target = { is_alive = yes is_imprisoned = no liege = scope:tca_test_arrest_actor tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:tca_test_arrest_estate_circuit } } scope:tca_test_arrest_actor = { var:tca_test_arrest_sent = 1 var:tca_test_arrest_target_accepted = 0 } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_estate_pending_arrest 4" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_estate_pending_arrest 4" }
+            if = { limit = { scope:tca_test_arrest_actor = { NOT = { has_opinion_modifier = { target = scope:tca_test_estate_old_approver modifier = tca_judicial_arrest_veto_disappointed_opinion } } } scope:tca_test_arrest_target = { NOT = { has_opinion_modifier = { target = scope:tca_test_arrest_actor modifier = tca_judicial_arrest_veto_requested_opinion } } } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_estate_pending_arrest 5" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_estate_pending_arrest 5" }
+            tca_test_cleanup_native_arrest_effect = yes
+            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_judicial_estate_pending_arrest" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_judicial_estate_pending_arrest" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            remove_character_flag = tca_test_case_failed
+            remove_character_flag = tca_test_delayed_case_active
+            tca_test_continue_delayed_effect = yes
+        }
+    }
+}
+
+tca_judicial_estate_test.1 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        if = { limit = { has_character_flag = tca_test_delayed_case_active } debug_log = "TCA_TEST CASE_BUSY" }
+        else = {
+            debug_log = "TCA_TEST BEGIN tca_judicial_estate_test.1 tca_test_judicial_estate_jurisdiction"
+            remove_character_flag = tca_test_case_failed
+            if = { limit = { tca_test_review_world_trigger = yes title:h_china.holder = { any_councillor = { has_council_position = minister_justice } } }
+                # Seed stale out-of-realm entries: fixture rebuilding must remove
+                # all old values, including adjacent entries in the same list.
+                title:h_china.holder = {
+                    add_to_variable_list = { name = tca_test_law_circuits target = title:k_england }
+                    add_to_variable_list = { name = tca_test_law_circuits target = title:k_scotland }
+                    add_to_variable_list = { name = tca_test_law_circuits target = title:k_wales }
+                }
+                # An inherited saved alias must also be overwritten, not merely
+                # cleared and then selected through a cached existence check.
+                title:k_england = { save_scope_as = tca_test_law_other_circuit }
+                tca_test_review_fixture_effect = yes
+                if = { limit = {
+                    scope:tca_test_law_circuit = { tca_is_judicial_circuit_trigger = yes }
+                    scope:tca_test_law_other_circuit = { tca_is_judicial_circuit_trigger = yes }
+                    scope:tca_test_law_circuit != scope:tca_test_law_other_circuit
+                    scope:tca_test_law_other_circuit != title:k_england
+                } debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_estate_jurisdiction 23" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_estate_jurisdiction 23" }
+
+                if = { limit = { title:h_china.holder = {
+                    any_in_list = { variable = tca_test_law_circuits count >= 2 }
+                    NOT = { any_in_list = { variable = tca_test_law_circuits NOT = { tca_is_judicial_circuit_trigger = yes } } }
+                } } debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_estate_jurisdiction 22" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_estate_jurisdiction 22" }
+
+                scope:tca_test_law_other_circuit = { save_scope_as = tca_test_estate_excluded tca_abolish_judicial_title_effect = yes }
+                tca_test_select_current_judicial_pair_effect = yes
+                if = { limit = {
+                    scope:tca_test_estate_a != scope:tca_test_estate_excluded
+                    scope:tca_test_estate_b != scope:tca_test_estate_excluded
+                    scope:tca_test_estate_a = { tca_is_judicial_circuit_trigger = yes tca_has_available_tixing_trigger = yes }
+                    scope:tca_test_estate_b = { tca_is_judicial_circuit_trigger = yes tca_has_available_tixing_trigger = yes }
+                } debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_estate_jurisdiction 24" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_estate_jurisdiction 24" }
+                scope:tca_test_estate_excluded = { tca_restore_judicial_title_effect = yes }
+                scope:tca_test_estate_a.holder = { save_scope_as = tca_test_estate_governor_a }
+                scope:tca_test_estate_b.holder = { save_scope_as = tca_test_estate_governor_b }
+                scope:tca_test_estate_a.var:song_judicial_title.holder = { save_scope_as = tca_test_estate_judge_a }
+                scope:tca_test_estate_b = {
+                    if = { limit = { NOT = { exists = var:song_judicial_title.holder } }
+                        debug_log = "TCA_ESTATE EMPTY_SECOND_OFFICE"
+                        if = { limit = { is_landless_type_title = no } debug_log = "TCA_ESTATE LANDED_TYPE yes" }
+                        else = { debug_log = "TCA_ESTATE LANDED_TYPE no" }
+                        if = { limit = { OR = { exists = title_capital_county exists = holder.capital_county } } debug_log = "TCA_ESTATE CAPITAL yes" }
+                        else = { debug_log = "TCA_ESTATE CAPITAL no" }
+                        if = { limit = { holder = { is_alive = yes } } debug_log = "TCA_ESTATE HOLDER_ALIVE yes" }
+                        else = { debug_log = "TCA_ESTATE HOLDER_ALIVE no" }
+                        if = { limit = { holder = { tca_has_judicial_institutions_trigger = yes } } debug_log = "TCA_ESTATE INSTITUTIONS yes" }
+                        else = { debug_log = "TCA_ESTATE INSTITUTIONS no" }
+                        if = { limit = { holder = { government_has_flag = government_is_celestial } } debug_log = "TCA_ESTATE CELESTIAL yes" }
+                        else = { debug_log = "TCA_ESTATE CELESTIAL no" }
+                        if = { limit = { holder = { is_independent_ruler = no highest_held_title_tier = tier_kingdom } } debug_log = "TCA_ESTATE VASSAL_KING yes" }
+                        else = { debug_log = "TCA_ESTATE VASSAL_KING no" }
+                        if = { limit = { holder = { is_independent_ruler = yes highest_held_title_tier >= tier_empire } } debug_log = "TCA_ESTATE INDEPENDENT_EMPEROR yes" }
+                        else = { debug_log = "TCA_ESTATE INDEPENDENT_EMPEROR no" }
+                        if = { limit = { holder = { NOT = { vassal_contract_has_flag = celestial_province_military } } } debug_log = "TCA_ESTATE CIVILIAN yes" }
+                        else = { debug_log = "TCA_ESTATE CIVILIAN no" }
+                        if = { limit = { holder = { NOT = { vassal_contract_has_flag = celestial_province_protectorate } } } debug_log = "TCA_ESTATE NOT_PROTECTORATE yes" }
+                        else = { debug_log = "TCA_ESTATE NOT_PROTECTORATE no" }
+                        debug_log_scopes = yes
+                        if = { limit = { tca_is_judicial_circuit_trigger = yes } debug_log = "TCA_ESTATE B_ELIGIBLE yes" }
+                        else = { debug_log = "TCA_ESTATE B_ELIGIBLE no" }
+                        if = { limit = { has_variable = tca_judicial_disabled } debug_log = "TCA_ESTATE B_DISABLED yes" }
+                        else = { debug_log = "TCA_ESTATE B_DISABLED no" }
+                        if = { limit = { tca_has_judicial_title_trigger = yes } debug_log = "TCA_ESTATE B_BINDING yes" }
+                        else = { debug_log = "TCA_ESTATE B_BINDING no" }
+                    }
+                }
+                scope:tca_test_estate_b.var:song_judicial_title.holder = { save_scope_as = tca_test_estate_judge_b }
+                title:h_china.holder = {
+                    random_councillor = { limit = { has_council_position = minister_justice } save_scope_as = tca_test_estate_minister }
+                }
+                create_character = { age = 35 gender_female_chance = 0 random_traits = no dynasty = none employer = scope:tca_test_estate_governor_a culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_test_estate_family }
+                scope:tca_test_estate_family = {
+                    create_dynasty = { spread_to_descendants = yes }
+                    give_noble_family_title = { name = noble_family_name tier = county article = DEFAULT_TITLE_NAME_ARTICLE government = celestial_government save_scope_as = tca_test_estate_family_title }
+                    tca_test_protect_character_effect = yes
+                    domicile ?= { move_domicile = scope:tca_test_estate_b.title_capital_county.title_province }
+                    create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_test_estate_fealty }
+                    change_liege = { liege = scope:tca_test_estate_governor_a change = scope:tca_test_estate_fealty }
+                    resolve_title_and_vassal_change = scope:tca_test_estate_fealty
+                    create_character = { age = 25 gender_female_chance = 0 random_traits = no dynasty = none employer = this culture = this.culture faith = this.faith rite = this.rite save_scope_as = tca_test_estate_courtier }
+                }
+                if = { limit = {
+                    scope:tca_test_estate_a != scope:tca_test_estate_b
+                    scope:tca_test_estate_governor_a != scope:tca_test_estate_governor_b
+                    exists = scope:tca_test_estate_minister
+                    scope:tca_test_estate_family = { primary_title = scope:tca_test_estate_family_title liege = scope:tca_test_estate_governor_a domicile = { is_domicile_type = east_asian_estate domicile_location.county = scope:tca_test_estate_b.title_capital_county } }
+                } debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_estate_jurisdiction 1" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_estate_jurisdiction 1" }
+                add_character_flag = tca_test_delayed_case_active
+                trigger_event = { id = tca_judicial_estate_test.1001 days = 1 }
+            }
+            else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_judicial_estate_jurisdiction" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_continue_delayed_effect = yes }
+        }
+    }
+}
+
+tca_judicial_estate_test.1001 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+                # Resolve live political roles on the continuation day. Earlier
+                # snapshot holders can have lost office during native callbacks.
+                title:h_china.holder = { tca_test_select_current_judicial_pair_effect = yes }
+                scope:tca_test_estate_a.holder ?= { save_scope_as = tca_test_estate_governor_a }
+                scope:tca_test_estate_b.holder ?= { save_scope_as = tca_test_estate_governor_b }
+                scope:tca_test_estate_a.var:song_judicial_title.holder ?= { save_scope_as = tca_test_estate_judge_a }
+                scope:tca_test_estate_b.var:song_judicial_title.holder ?= { save_scope_as = tca_test_estate_judge_b }
+                scope:tca_test_estate_family = {
+                    create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_test_estate_live_fealty }
+                    change_liege = { liege = scope:tca_test_estate_governor_a change = scope:tca_test_estate_live_fealty }
+                    resolve_title_and_vassal_change = scope:tca_test_estate_live_fealty
+                    domicile ?= { move_domicile = scope:tca_test_estate_b.title_capital_county.title_province }
+                }
+                if = { limit = {
+                    scope:tca_test_estate_a != scope:tca_test_estate_b
+                    scope:tca_test_estate_governor_a != scope:tca_test_estate_governor_b
+                    scope:tca_test_estate_a = { tca_is_judicial_circuit_trigger = yes tca_has_available_tixing_trigger = yes }
+                    scope:tca_test_estate_b = { tca_is_judicial_circuit_trigger = yes tca_has_available_tixing_trigger = yes }
+                    scope:tca_test_estate_family = { liege = scope:tca_test_estate_governor_a domicile.domicile_location.county = scope:tca_test_estate_b.title_capital_county }
+                } debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_estate_jurisdiction 25" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_estate_jurisdiction 25" }
+                if = { limit = { scope:tca_test_estate_family = { tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:tca_test_estate_b } NOT = { tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:tca_test_estate_a } } } }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_estate_jurisdiction 2" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_estate_jurisdiction 2" }
+                if = { limit = { scope:tca_test_estate_courtier = { liege_or_court_owner = scope:tca_test_estate_family tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:tca_test_estate_b } NOT = { tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:tca_test_estate_a } } } }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_estate_jurisdiction 3" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_estate_jurisdiction 3" }
+                # An actual superior in B changes no geographical membership.
+                scope:tca_test_estate_family = {
+                    create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_test_estate_fealty_b }
+                    change_liege = { liege = scope:tca_test_estate_governor_b change = scope:tca_test_estate_fealty_b }
+                    resolve_title_and_vassal_change = scope:tca_test_estate_fealty_b
+                }
+                if = { limit = { scope:tca_test_estate_family = { liege = scope:tca_test_estate_governor_b tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:tca_test_estate_b } NOT = { tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:tca_test_estate_a } } } scope:tca_test_estate_courtier = { tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:tca_test_estate_b } } }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_estate_jurisdiction 4" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_estate_jurisdiction 4" }
+                scope:tca_test_estate_family = {
+                    create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_test_estate_fealty_minister }
+                    change_liege = { liege = scope:tca_test_estate_minister change = scope:tca_test_estate_fealty_minister }
+                    resolve_title_and_vassal_change = scope:tca_test_estate_fealty_minister
+                }
+                if = { limit = { scope:tca_test_estate_family = { liege = scope:tca_test_estate_minister tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:tca_test_estate_b } NOT = { tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:tca_test_estate_a } } } scope:tca_test_estate_courtier = { tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:tca_test_estate_b } } }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_estate_jurisdiction 5" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_estate_jurisdiction 5" }
+                scope:tca_test_estate_family = {
+                    create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_test_estate_fealty_emperor }
+                    change_liege = { liege = title:h_china.holder change = scope:tca_test_estate_fealty_emperor }
+                    resolve_title_and_vassal_change = scope:tca_test_estate_fealty_emperor
+                }
+                if = { limit = { scope:tca_test_estate_family = { liege = title:h_china.holder tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:tca_test_estate_b } NOT = { tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:tca_test_estate_a } } } scope:tca_test_estate_courtier = { tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:tca_test_estate_b } } }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_estate_jurisdiction 6" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_estate_jurisdiction 6" }
+                if = { limit = { scope:tca_test_estate_family = { tca_review_keeper_identity_trigger = { ACTOR = scope:tca_test_estate_judge_b } NOT = { tca_review_keeper_identity_trigger = { ACTOR = scope:tca_test_estate_judge_a } } } }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_estate_jurisdiction 7" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_estate_jurisdiction 7" }
+                # Real native relocation immediately changes both person and household.
+                scope:tca_test_estate_family.domicile = { move_domicile = scope:tca_test_estate_a.title_capital_county.title_province }
+                if = { limit = { scope:tca_test_estate_family = { liege = title:h_china.holder domicile.domicile_location.county = scope:tca_test_estate_a.title_capital_county tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:tca_test_estate_a } NOT = { tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:tca_test_estate_b } } } scope:tca_test_estate_courtier = { tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:tca_test_estate_a } NOT = { tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:tca_test_estate_b } } } }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_estate_jurisdiction 8" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_estate_jurisdiction 8" }
+                if = { limit = { scope:tca_test_estate_family = { tca_review_keeper_identity_trigger = { ACTOR = scope:tca_test_estate_judge_a } NOT = { tca_review_keeper_identity_trigger = { ACTOR = scope:tca_test_estate_judge_b } } } }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_estate_jurisdiction 9" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_estate_jurisdiction 9" }
+                # A real prisoner and formal pending review; moving invalidates the old verdict.
+                scope:tca_test_estate_family = {
+                    create_character = { age = 25 gender_female_chance = 0 random_traits = no dynasty = none employer = this culture = this.culture faith = this.faith rite = this.rite save_scope_as = tca_test_estate_prisoner }
+                    imprison = { target = scope:tca_test_estate_prisoner type = house_arrest }
+                    save_scope_as = tca_review_keeper
+                }
+                scope:tca_test_estate_prisoner = { save_scope_as = tca_review_prisoner }
+                scope:tca_test_estate_judge_a = { save_scope_as = tca_review_actor remove_character_flag = tca_review_actor_pending remove_character_flag = tca_review_send_cooldown change_influence = 1000 }
+                clear_saved_scope = tca_review_hook
+                if = { limit = { tca_review_can_start_trigger = yes }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_estate_jurisdiction 10"
+                    tca_review_prepare_effect = yes
+                }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_estate_jurisdiction 10" }
+                if = { limit = { tca_review_context_valid_trigger = yes }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_estate_jurisdiction 11" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_estate_jurisdiction 11" }
+                scope:tca_test_estate_family.domicile = { move_domicile = scope:tca_test_estate_b.title_capital_county.title_province }
+                if = { limit = { tca_review_context_valid_trigger = no }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_estate_jurisdiction 12" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_estate_jurisdiction 12" }
+                tca_review_actor_wins_effect = yes
+                if = { limit = { scope:tca_test_estate_prisoner = { is_imprisoned_by = scope:tca_test_estate_family NOT = { has_character_flag = tca_review_pending } NOT = { has_variable = tca_judicial_prison_title } } scope:tca_test_estate_judge_a = { NOT = { has_character_flag = tca_review_actor_pending } } }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_estate_jurisdiction 13" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_estate_jurisdiction 13" }
+                # New B requester uses the real start and native hook transfer path.
+                scope:tca_test_estate_prisoner = { remove_character_flag = tca_review_prisoner_cooldown }
+                scope:tca_test_estate_judge_b = { save_scope_as = tca_review_actor change_influence = 1000 remove_character_flag = tca_review_actor_pending remove_character_flag = tca_review_send_cooldown add_hook = { target = scope:tca_test_estate_family type = loyalty_hook } }
+                save_scope_value_as = { name = tca_review_hook value = yes }
+                if = { limit = { tca_review_can_start_trigger = yes }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_estate_jurisdiction 14"
+                    tca_review_start_effect = yes
+                }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_estate_jurisdiction 14" }
+                if = { limit = { scope:tca_test_estate_prisoner = { is_imprisoned_by = scope:tca_test_estate_judge_b var:tca_judicial_prison_title = scope:tca_test_estate_b.var:song_judicial_title NOT = { has_character_flag = tca_review_pending } } scope:tca_test_estate_judge_b = { NOT = { has_character_flag = tca_review_actor_pending } NOT = { has_usable_hook = scope:tca_test_estate_family } } }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_estate_jurisdiction 15" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_estate_jurisdiction 15" }
+                # A foreign de-jure county supplies no circuit or superior-office fallback.
+                scope:tca_test_estate_family.domicile = { move_domicile = title:c_middlesex.title_province }
+                if = { limit = { scope:tca_test_estate_family = { domicile.domicile_location.county = title:c_middlesex NOT = { tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:tca_test_estate_a } } NOT = { tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:tca_test_estate_b } } NOT = { tca_review_keeper_identity_trigger = { ACTOR = scope:tca_test_estate_judge_a } } NOT = { tca_review_keeper_identity_trigger = { ACTOR = scope:tca_test_estate_judge_b } } } }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_estate_jurisdiction 16" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_estate_jurisdiction 16" }
+                scope:tca_test_estate_family.domicile = { move_domicile = scope:tca_test_estate_b.title_capital_county.title_province }
+                # Administrative primary A overrides contradictory estate B.
+                scope:tca_test_estate_governor_a = { create_dynamic_title = { tier = duchy name = tca_test_de_jure_office_name } }
+                scope:new_title = {
+                    save_scope_as = tca_test_estate_office
+                    scope:tca_test_estate_a = { save_scope_as = tca_circuit }
+                    tca_configure_judicial_title_location_effect = yes
+                    set_de_jure_liege_title = scope:tca_test_estate_a
+                }
+                scope:tca_test_estate_family = {
+                    create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_test_estate_office_grant }
+                    scope:tca_test_estate_office = { change_title_holder = { holder = scope:tca_test_estate_family change = scope:tca_test_estate_office_grant } }
+                    resolve_title_and_vassal_change = scope:tca_test_estate_office_grant
+                    change_government = celestial_government
+                    create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_test_estate_office_fealty }
+                    change_liege = { liege = title:h_china.holder change = scope:tca_test_estate_office_fealty }
+                    resolve_title_and_vassal_change = scope:tca_test_estate_office_fealty
+                    set_primary_title_to = scope:tca_test_estate_office
+                }
+                scope:tca_test_estate_office = { set_de_jure_liege_title = scope:tca_test_estate_a }
+                if = { limit = { scope:tca_test_estate_family = { primary_title = scope:tca_test_estate_office domicile.domicile_location.county = scope:tca_test_estate_b.title_capital_county tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:tca_test_estate_a } NOT = { tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:tca_test_estate_b } } } scope:tca_test_estate_courtier = { tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:tca_test_estate_a } NOT = { tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:tca_test_estate_b } } } }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_estate_jurisdiction 17" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_estate_jurisdiction 17" }
+                scope:tca_test_estate_family = { destroy_title = scope:tca_test_estate_office }
+                if = { limit = { scope:tca_test_estate_family = { primary_title = scope:tca_test_estate_family_title tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:tca_test_estate_b } NOT = { tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:tca_test_estate_a } } } scope:tca_test_estate_courtier = { tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:tca_test_estate_b } } }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_estate_jurisdiction 18" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_estate_jurisdiction 18" }
+                # Estate county is actually held by A while its de-jure circuit stays B.
+                scope:tca_test_estate_b.title_capital_county = {
+                    save_scope_as = tca_test_estate_county
+                    holder = { save_scope_as = tca_test_estate_county_holder }
+                    de_jure_liege = { save_scope_as = tca_test_estate_county_duchy }
+                }
+                scope:tca_test_estate_governor_a = {
+                    create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_test_estate_county_grant }
+                    scope:tca_test_estate_county = { change_title_holder = { holder = scope:tca_test_estate_governor_a change = scope:tca_test_estate_county_grant } }
+                    resolve_title_and_vassal_change = scope:tca_test_estate_county_grant
+                }
+                scope:tca_test_estate_county = { set_de_jure_liege_title = scope:tca_test_estate_county_duchy }
+                if = { limit = { scope:tca_test_estate_county = { holder = scope:tca_test_estate_governor_a target_is_de_jure_liege_or_above = scope:tca_test_estate_b } scope:tca_test_estate_family = { domicile.domicile_location.county = scope:tca_test_estate_county tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:tca_test_estate_b } NOT = { tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:tca_test_estate_a } } } scope:tca_test_estate_courtier = { tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:tca_test_estate_b } } }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_estate_jurisdiction 19" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_estate_jurisdiction 19" }
+                scope:tca_test_estate_county_holder = {
+                    create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_test_estate_county_restore }
+                    scope:tca_test_estate_county = { change_title_holder = { holder = scope:tca_test_estate_county_holder change = scope:tca_test_estate_county_restore } }
+                    resolve_title_and_vassal_change = scope:tca_test_estate_county_restore
+                }
+                scope:tca_test_estate_county = { set_de_jure_liege_title = scope:tca_test_estate_county_duchy }
+                # An estate does not grant authority over a member of another independent realm.
+                scope:tca_test_estate_family = {
+                    create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_test_estate_foreign_fealty }
+                    change_liege = { liege = title:k_england.holder change = scope:tca_test_estate_foreign_fealty }
+                    resolve_title_and_vassal_change = scope:tca_test_estate_foreign_fealty
+                }
+                if = { limit = { scope:tca_test_estate_family = { top_liege != title:h_china.holder domicile.domicile_location.county = scope:tca_test_estate_county NOT = { tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:tca_test_estate_b } } NOT = { tca_review_keeper_identity_trigger = { ACTOR = scope:tca_test_estate_judge_b } } } scope:tca_test_estate_courtier = { NOT = { tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:tca_test_estate_b } } } }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_estate_jurisdiction 20" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_estate_jurisdiction 20" }
+                scope:tca_test_estate_family = {
+                    create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_test_estate_home_fealty }
+                    change_liege = { liege = title:h_china.holder change = scope:tca_test_estate_home_fealty }
+                    resolve_title_and_vassal_change = scope:tca_test_estate_home_fealty
+                }
+                # Abolished institutions cannot arrest or review geographical members.
+                scope:tca_test_estate_governor_b = { save_scope_as = tca_lifecycle_actor }
+                scope:tca_test_estate_b = { tca_abolish_judicial_title_effect = yes }
+                scope:tca_test_estate_judge_b = { save_scope_as = actor save_scope_as = puppet_or_actor }
+                scope:tca_test_estate_family = { save_scope_as = recipient }
+                clear_saved_scope = intermediary
+                if = { limit = { scope:tca_test_estate_family = { tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:tca_test_estate_b } NOT = { tca_review_keeper_identity_trigger = { ACTOR = scope:tca_test_estate_judge_b } } } tca_judicial_actor_has_jurisdiction_trigger = no }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_estate_jurisdiction 21" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_estate_jurisdiction 21" }
+                scope:tca_test_estate_b = { tca_restore_judicial_title_effect = yes }
+                scope:tca_test_estate_prisoner = { if = { limit = { is_imprisoned = yes } release_from_prison = yes } }
+                scope:tca_test_estate_family = { tca_test_restore_character_effect = yes }
+                if = { limit = { has_character_flag = tca_test_case_failed }
+                    debug_log = "TCA_TEST FAIL tca_test_judicial_estate_jurisdiction"
+                    if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+                }
+                else = {
+                    debug_log = "TCA_TEST PASS tca_test_judicial_estate_jurisdiction"
+                    if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } }
+                }
+            remove_character_flag = tca_test_case_failed
+            remove_character_flag = tca_test_delayed_case_active
+            tca_test_continue_delayed_effect = yes
+        }
+    }
+}

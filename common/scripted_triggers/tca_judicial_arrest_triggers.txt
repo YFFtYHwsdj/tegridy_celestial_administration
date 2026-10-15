@@ -38,7 +38,47 @@ tca_uses_judicial_arrest_trigger = {
 
 # Shared circuit membership; protected offices are classified by score, not excluded.
 tca_is_judicial_target_in_circuit_trigger = {
-    tca_is_target_in_administrative_title_trigger = { TITLE = $CIRCUIT$ }
+    $CIRCUIT$ = { save_temporary_scope_as = tca_membership_circuit }
+    trigger_if = { limit = { tca_is_hosted_court_guest_trigger = yes } host.top_liege = scope:tca_membership_circuit.holder.top_liege }
+    trigger_else = { top_liege = scope:tca_membership_circuit.holder.top_liege }
+    this != scope:tca_membership_circuit.holder.top_liege
+    trigger_if = {
+        limit = { tca_is_hosted_court_guest_trigger = yes }
+        host = { tca_has_office_in_judicial_circuit_trigger = { CIRCUIT = scope:tca_membership_circuit } }
+    }
+    trigger_else_if = {
+        limit = { is_ruler = yes }
+        tca_has_office_in_judicial_circuit_trigger = { CIRCUIT = scope:tca_membership_circuit }
+    }
+    trigger_else = {
+        liege_or_court_owner ?= { tca_has_office_in_judicial_circuit_trigger = { CIRCUIT = scope:tca_membership_circuit } }
+    }
+}
+
+# Character scope: one primary office assigns the person and their shared court.
+# A circuit holder is included only when this circuit is their primary title.
+tca_has_office_in_judicial_circuit_trigger = {
+    trigger_if = {
+        limit = { primary_title ?= { is_noble_family_title = yes } }
+        # Family-primary holders and their court follow the real estate county.
+        # Missing estate/location has no superior-office fallback.
+        domicile ?= {
+            OR = { is_domicile_type = estate is_domicile_type = east_asian_estate is_domicile_type = japanese_manor }
+            domicile_location.county ?= { target_is_de_jure_liege_or_above = $CIRCUIT$ }
+        }
+    }
+    trigger_else = {
+        primary_title ?= {
+            OR = {
+                this = $CIRCUIT$
+                AND = {
+                    tier < tier_kingdom
+                    is_noble_family_title = no
+                    target_is_de_jure_liege_or_above = $CIRCUIT$
+                }
+            }
+        }
+    }
 }
 
 # Use engine-saved participants; arbitrary redirect scopes are not assumed durable.
@@ -51,23 +91,12 @@ tca_judicial_arrest_context_valid_trigger = {
         scope:actor.primary_title.var:song_judicial_circuit = { save_temporary_scope_as = tca_checked_circuit }
     }
     trigger_else = {
-        scope:actor = {
-            OR = {
-                any_held_title = {
-                    tca_is_judicial_circuit_trigger = yes
-                    NOT = { has_variable = tca_judicial_disabled }
-                    scope:recipient = { tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = prev } }
-                    save_temporary_scope_as = tca_checked_circuit
-                }
-                any_liege_or_above = {
-                    any_held_title = {
-                        tca_is_judicial_circuit_trigger = yes
-                        NOT = { has_variable = tca_judicial_disabled }
-                        scope:recipient = { tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = prev } }
-                        save_temporary_scope_as = tca_checked_circuit
-                    }
-                }
-            }
+        any_in_global_list = {
+            variable = tca_judicial_circuits
+            tca_is_judicial_circuit_trigger = yes
+            NOT = { has_variable = tca_judicial_disabled }
+            scope:recipient = { tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = prev } }
+            save_temporary_scope_as = tca_checked_circuit
         }
     }
     exists = scope:tca_checked_circuit
@@ -105,7 +134,7 @@ tca_judicial_arrest_still_valid_trigger = {
                 }
             }
             trigger_else = {
-                scope:tca_checked_circuit.holder = {
+                scope:actor.top_liege = {
                     is_alive = yes is_imprisoned = no
                     tca_basic_allowed_to_arrest_character_trigger = { CHARACTER = scope:recipient }
                     NOT = { is_at_war_with = scope:recipient }

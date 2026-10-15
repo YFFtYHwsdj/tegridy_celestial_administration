@@ -1,0 +1,128 @@
+﻿namespace = tca_judicial_refusal_test
+
+# Independent fixture: real landed direct imperial subject and native refusal war.
+tca_judicial_refusal_test.1 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_judicial_refusal_test.1 tca_test_imperial_refusal_war"
+        remove_character_flag = tca_test_case_failed
+        if = { limit = { tca_test_native_arrest_realm_ready_trigger = yes }
+            tca_test_prepare_native_arrest_effect = { FAMILY = yes COMMISSIONER = no OFFICE = yes CONTROL = tca_test_arrest_force_approval CASE = tca_test_imperial_refusal }
+            scope:tca_test_law_position = { save_scope_as = tca_test_rf_office holder = { save_scope_as = tca_test_rf_commissioner tca_test_protect_character_effect = yes } }
+            scope:tca_test_arrest_target = { save_scope_as = tca_test_rf_target remove_character_flag = tca_test_arrest_native_target }
+            scope:tca_test_law_circuit.title_capital_county = { save_scope_as = tca_test_rf_county holder = { save_scope_as = tca_test_rf_county_owner } }
+            create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_test_rf_grant }
+            scope:tca_test_rf_county = { change_title_holder_include_vassals = { holder = scope:tca_test_rf_target change = scope:tca_test_rf_grant } }
+            resolve_title_and_vassal_change = scope:tca_test_rf_grant
+            scope:tca_test_rf_target = {
+                create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_test_rf_fealty }
+                change_liege = { liege = root change = scope:tca_test_rf_fealty }
+                resolve_title_and_vassal_change = scope:tca_test_rf_fealty
+                tca_test_normalize_judicial_score_target_effect = yes
+                remove_trait = confucian_education
+                add_character_flag = tca_test_arrest_force_target_decline
+            }
+            scope:tca_test_rf_commissioner = {
+                add_opinion = { target = scope:tca_test_rf_target modifier = schemed_against_me }
+                remove_character_flag = flag_hostile_actions_disabled_delay
+                set_variable = { name = tca_test_direct_arrest_probe value = yes }
+                set_variable = { name = tca_test_direct_arrest_valid value = no }
+            }
+            add_character_flag = tca_test_delayed_case_active
+            trigger_event = { id = tca_judicial_refusal_test.1000 days = 1 }
+        }
+        else = {
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_imperial_refusal_war"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+            tca_test_continue_delayed_effect = yes
+        }
+    }
+}
+tca_judicial_refusal_test.1000 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            scope:tca_test_rf_commissioner = { add_prestige = 2000 save_scope_as = actor save_scope_as = puppet_or_actor }
+            scope:tca_test_rf_target = { save_scope_as = recipient }
+            save_scope_value_as = { name = tca_rf_tier value = scope:recipient.tca_judicial_identity_tier }
+            if = { limit = { scope:actor = { tca_is_judicial_commissioner_trigger = yes } } debug_log = "TCA_RF COMMISSIONER_VALID" }
+            if = { limit = { tca_judicial_actor_has_jurisdiction_trigger = yes } debug_log = "TCA_RF JURISDICTION_VALID" }
+            if = { limit = { scope:actor = { has_imprisonment_reason = scope:recipient } } debug_log = "TCA_RF LEGAL_REASON" }
+            if = { limit = { scope:actor = { advanced_allowed_to_imprison_character_trigger = { CHARACTER = scope:recipient } } } debug_log = "TCA_RF ADVANCED_VALID" }
+            if = { limit = { tca_basic_allowed_to_arrest_character_trigger = { CHARACTER = scope:recipient } } debug_log = "TCA_RF BASIC_VALID" }
+            debug_log = "TCA_RF SEND_STATE"
+            debug_log_scopes = yes
+            run_interaction = { interaction = tca_judicial_imprison_interaction actor = scope:tca_test_rf_commissioner recipient = scope:tca_test_rf_target send_threshold = decline }
+            if = { limit = {
+                scope:tca_test_rf_target = { is_landed = yes liege = root tca_judicial_identity_tier < 4 var:tca_test_arrest_case = flag:tca_test_imperial_refusal }
+                scope:tca_test_rf_commissioner = { var:tca_test_direct_arrest_valid = yes var:tca_test_direct_arrest_backer = root }
+            } debug_log = "TCA_TEST CHECK_PASS tca_test_imperial_refusal_war 1" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_imperial_refusal_war 1" }
+            trigger_event = { id = tca_judicial_refusal_test.1001 days = 12 }
+        }
+    }
+}
+
+tca_judicial_refusal_test.1001 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            scope:tca_test_rf_target = { every_character_war = {
+                limit = { using_cb = refused_liege_demand_war casus_belli = { primary_attacker = scope:tca_test_rf_target primary_defender = root } }
+                save_scope_as = tca_test_rf_war
+            } }
+            if = { limit = {
+                exists = scope:tca_test_rf_war
+                scope:tca_test_rf_target = { var:tca_pending_judicial_title = scope:tca_test_rf_office var:tca_pending_judicial_governor = root }
+            } debug_log = "TCA_TEST CHECK_PASS tca_test_imperial_refusal_war 2" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_imperial_refusal_war 2" }
+            # End the actual war through its native defender victory, not imprison.
+            scope:tca_test_rf_war ?= { end_war = defender }
+            trigger_event = { id = tca_judicial_refusal_test.1002 days = 2 }
+        }
+    }
+}
+tca_judicial_refusal_test.1002 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = {
+                scope:tca_test_rf_target = { is_imprisoned_by = scope:tca_test_rf_commissioner var:tca_judicial_prison_title = scope:tca_test_rf_office NOT = { has_variable = tca_pending_judicial_title } NOT = { has_variable = tca_pending_judicial_governor } }
+                scope:tca_test_rf_office = { is_target_in_variable_list = { name = tca_judicial_prisoners target = scope:tca_test_rf_target } }
+            } debug_log = "TCA_TEST CHECK_PASS tca_test_imperial_refusal_war 3" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_imperial_refusal_war 3" }
+            scope:tca_test_rf_target = { if = { limit = { is_imprisoned = yes } release_from_prison = yes } }
+            trigger_event = { id = tca_judicial_refusal_test.1003 days = 1 }
+        }
+    }
+}
+tca_judicial_refusal_test.1003 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = {
+                scope:tca_test_rf_target = { is_imprisoned = no NOT = { has_variable = tca_judicial_prison_title } }
+                scope:tca_test_rf_office = { NOT = { is_target_in_variable_list = { name = tca_judicial_prisoners target = scope:tca_test_rf_target } } }
+            } debug_log = "TCA_TEST CHECK_PASS tca_test_imperial_refusal_war 4" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_imperial_refusal_war 4" }
+            create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_test_rf_restore }
+            scope:tca_test_rf_county = { change_title_holder_include_vassals = { holder = scope:tca_test_rf_county_owner change = scope:tca_test_rf_restore } }
+            resolve_title_and_vassal_change = scope:tca_test_rf_restore
+            scope:tca_test_rf_commissioner = { remove_variable = tca_test_direct_arrest_probe remove_variable = tca_test_direct_arrest_valid remove_variable = tca_test_direct_arrest_backer tca_test_restore_character_effect = yes }
+            scope:tca_test_rf_target = { remove_character_flag = tca_test_arrest_force_target_decline }
+            tca_test_cleanup_native_arrest_effect = yes
+            if = { limit = { has_character_flag = tca_test_case_failed }
+                debug_log = "TCA_TEST FAIL tca_test_imperial_refusal_war"
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+            }
+            else = { debug_log = "TCA_TEST PASS tca_test_imperial_refusal_war" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            remove_character_flag = tca_test_case_failed
+            remove_character_flag = tca_test_delayed_case_active
+            tca_test_continue_delayed_effect = yes
+        }
+    }
+}

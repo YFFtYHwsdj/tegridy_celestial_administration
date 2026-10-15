@@ -87,18 +87,50 @@ tca_judicial_timing_test.2 = {
         if = {
             limit = { game_start_date = 1066.9.15 title:h_china = { exists = holder holder = { is_alive = yes is_imprisoned = no is_independent_ruler = yes government_has_flag = government_is_celestial tca_external_official_names_trigger = no any_vassal_or_below = { count >= 2 is_alive = yes is_imprisoned = no government_has_flag = government_is_celestial highest_held_title_tier = tier_kingdom NOT = { tgp_is_any_minister = yes } NOT = { vassal_contract_has_flag = celestial_province_military } NOT = { vassal_contract_has_flag = celestial_province_protectorate } any_held_title = { tier = tier_kingdom is_landless_type_title = no is_noble_family_title = no OR = { exists = title_capital_county exists = holder.capital_county } } } } } }
             title:h_china.holder = { tca_test_prepare_judicial_law_realm_effect = yes }
+            # Positive control: the collected offices are filled and visible in
+            # each circuit's native direct de-jure list before the formal law change.
+            if = { limit = {
+                scope:tca_test_law_sovereign = {
+                    any_in_list = { variable = tca_test_law_circuits count >= 2 }
+                    NOT = { any_in_list = { variable = tca_test_law_circuits NOT = {
+                        var:song_judicial_title = { tca_is_valid_judicial_holder_trigger = yes de_jure_liege = prev }
+                        any_direct_de_jure_vassal_title = { this = prev.var:song_judicial_title }
+                    } } }
+                }
+            } debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_delayed_law_disabled 1" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_delayed_law_disabled 1" }
             scope:tca_test_law_sovereign = { if = { limit = { NOT = { has_realm_law = tca_judicial_institutions_enabled_law } } add_realm_law_skip_effects = tca_judicial_institutions_enabled_law } tca_refresh_court_system_realm_effect = yes remove_variable = tca_court_system_cooldown add_realm_law = tca_judicial_institutions_disabled_law }
+            # No direct maintenance after add_realm_law: test the native law callbacks,
+            # before any queued next-day callback can conceal an immediate defect.
+            if = { limit = {
+                scope:tca_test_law_sovereign = { NOT = { any_in_list = {
+                    variable = tca_test_law_circuits
+                    var:song_judicial_title = { exists = holder }
+                } } }
+            } debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_delayed_law_disabled 3" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_delayed_law_disabled 3" }
+            if = { limit = {
+                scope:tca_test_law_sovereign = { NOT = { any_in_list = {
+                    variable = tca_test_law_circuits
+                    NOT = {
+                        var:song_judicial_title = { tca_test_judicial_office_detached_trigger = yes }
+                        NOT = { any_direct_de_jure_vassal_title = { this = prev.var:song_judicial_title } }
+                    }
+                } } }
+            } debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_delayed_law_disabled 4" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_delayed_law_disabled 4" }
+
             if = {
                 limit = { scope:tca_test_law_sovereign = { has_realm_law = tca_judicial_institutions_disabled_law has_variable = tca_court_system_cooldown } }
-                debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_delayed_law_disabled 1"
+                debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_delayed_law_disabled 2"
             }
             else = {
                 add_character_flag = tca_test_case_failed
-                debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_delayed_law_disabled 1"
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_delayed_law_disabled 2"
             }
             add_character_flag = tca_test_delayed_case_active
-            debug_log = "TCA_TEST WAIT tca_test_judicial_delayed_law_disabled 2 days"
-            trigger_event = { id = tca_judicial_timing_test.1201 days = 2 }
+            debug_log = "TCA_TEST WAIT tca_test_judicial_delayed_law_disabled 1 day"
+            trigger_event = { id = tca_judicial_timing_test.1201 days = 1 }
         }
         else = {
             debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_judicial_delayed_law_disabled"
@@ -122,12 +154,12 @@ tca_judicial_timing_test.1201 = {
         if = {
             limit = { always = yes }
             if = {
-                limit = { scope:tca_test_law_sovereign = { has_realm_law = tca_judicial_institutions_disabled_law has_variable = tca_court_system_cooldown any_in_list = { variable = tca_test_law_circuits count >= 2 } NOT = { any_in_list = { variable = tca_test_law_circuits NOT = { var:song_judicial_title = { this = prev.var:tca_test_law_original_position NOT = { exists = holder } } } } } } }
-                debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_delayed_law_disabled 2"
+                limit = { scope:tca_test_law_sovereign = { has_realm_law = tca_judicial_institutions_disabled_law has_variable = tca_court_system_cooldown any_in_list = { variable = tca_test_law_circuits count >= 2 } NOT = { any_in_list = { variable = tca_test_law_circuits NOT = { var:song_judicial_title = { this = prev.var:tca_test_law_original_position tca_test_judicial_office_detached_trigger = yes } } } } } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_delayed_law_disabled 5"
             }
             else = {
                 add_character_flag = tca_test_case_failed
-                debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_delayed_law_disabled 2"
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_delayed_law_disabled 5"
             }
             if = {
                 limit = { has_character_flag = tca_test_case_failed }
@@ -162,14 +194,35 @@ tca_judicial_timing_test.3 = {
         if = {
             limit = { game_start_date = 1066.9.15 title:h_china = { exists = holder holder = { is_alive = yes is_imprisoned = no is_independent_ruler = yes government_has_flag = government_is_celestial tca_external_official_names_trigger = no any_vassal_or_below = { count >= 2 is_alive = yes is_imprisoned = no government_has_flag = government_is_celestial highest_held_title_tier = tier_kingdom NOT = { tgp_is_any_minister = yes } NOT = { vassal_contract_has_flag = celestial_province_military } NOT = { vassal_contract_has_flag = celestial_province_protectorate } any_held_title = { tier = tier_kingdom is_landless_type_title = no is_noble_family_title = no OR = { exists = title_capital_county exists = holder.capital_county } } } } } }
             title:h_china.holder = { tca_test_prepare_judicial_law_realm_effect = yes }
-            scope:tca_test_law_sovereign = { add_realm_law_skip_effects = tca_judicial_institutions_disabled_law tca_refresh_court_system_realm_effect = yes remove_variable = tca_court_system_cooldown add_realm_law = tca_judicial_institutions_enabled_law }
+            scope:tca_test_law_sovereign = { add_realm_law_skip_effects = tca_judicial_institutions_disabled_law tca_refresh_court_system_realm_effect = yes }
+            # Start detached, then enact through native law callbacks only.
+            if = { limit = {
+                scope:tca_test_law_sovereign = {
+                    any_in_list = { variable = tca_test_law_circuits count >= 2 }
+                    NOT = { any_in_list = { variable = tca_test_law_circuits NOT = {
+                        var:song_judicial_title = { tca_test_judicial_office_detached_trigger = yes }
+                        NOT = { any_direct_de_jure_vassal_title = { this = prev.var:song_judicial_title } }
+                    } } }
+                }
+            } debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_delayed_law_enabled 1" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_delayed_law_enabled 1" }
+            scope:tca_test_law_sovereign = { remove_variable = tca_court_system_cooldown add_realm_law = tca_judicial_institutions_enabled_law }
+            if = { limit = {
+                scope:tca_test_law_sovereign = { NOT = { any_in_list = {
+                    variable = tca_test_law_circuits NOT = {
+                        var:song_judicial_title = { this = prev.var:tca_test_law_original_position tca_is_valid_judicial_holder_trigger = yes de_jure_liege = prev }
+                        any_direct_de_jure_vassal_title = { this = prev.var:song_judicial_title }
+                    }
+                } } }
+            } debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_delayed_law_enabled 3" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_delayed_law_enabled 3" }
             if = {
                 limit = { scope:tca_test_law_sovereign = { has_realm_law = tca_judicial_institutions_enabled_law has_variable = tca_court_system_cooldown } }
-                debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_delayed_law_enabled 1"
+                debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_delayed_law_enabled 2"
             }
             else = {
                 add_character_flag = tca_test_case_failed
-                debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_delayed_law_enabled 1"
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_delayed_law_enabled 2"
             }
             add_character_flag = tca_test_delayed_case_active
             debug_log = "TCA_TEST WAIT tca_test_judicial_delayed_law_enabled 2 days"
@@ -197,12 +250,12 @@ tca_judicial_timing_test.1301 = {
         if = {
             limit = { always = yes }
             if = {
-                limit = { scope:tca_test_law_sovereign = { has_realm_law = tca_judicial_institutions_enabled_law has_variable = tca_court_system_cooldown any_in_list = { variable = tca_test_law_circuits count >= 2 } NOT = { any_in_list = { variable = tca_test_law_circuits NOT = { var:song_judicial_title = { this = prev.var:tca_test_law_original_position exists = holder tca_is_valid_judicial_holder_trigger = yes } } } } } }
-                debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_delayed_law_enabled 2"
+                limit = { scope:tca_test_law_sovereign = { has_realm_law = tca_judicial_institutions_enabled_law has_variable = tca_court_system_cooldown any_in_list = { variable = tca_test_law_circuits count >= 2 } NOT = { any_in_list = { variable = tca_test_law_circuits NOT = { var:song_judicial_title = { this = prev.var:tca_test_law_original_position tca_is_valid_judicial_holder_trigger = yes de_jure_liege = prev } any_direct_de_jure_vassal_title = { this = prev.var:song_judicial_title } } } } } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_delayed_law_enabled 4"
             }
             else = {
                 add_character_flag = tca_test_case_failed
-                debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_delayed_law_enabled 2"
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_delayed_law_enabled 4"
             }
             if = {
                 limit = { has_character_flag = tca_test_case_failed }
