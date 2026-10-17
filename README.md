@@ -16,6 +16,8 @@ CK3 天朝行政体系重做 mod。中央、地方官制分别提供因便／宋
 
 1066 固定机构名单、历史人物补录与验收：[1066 固定提刑机构](docs/judicial_static_titles.md)。
 
+历史考证独立保存在 [research/](research/README.md)，按[考证规范](research/standards.md)记录具体判断、原文出处、核验状态与游戏适配。[1066 开局提刑研究](research/song/1066_tidian_xingyu/README.md)纳入18路及三军路；当前结论统一在研究入口维护，研究人选尚未写入人物或官职历史。旧稿及其较宽的C口径另行归档。
+
 ## 本地加载
 
 在 CK3 启动器中将“一国三公 / Imperium in Imperio”加入播放集并启用。当前声明的游戏版本为本机 1.20.0.4，不表示已完成兼容性或游戏内验证。
