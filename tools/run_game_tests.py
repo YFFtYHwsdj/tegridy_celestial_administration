@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Launch an isolated graphical CK3 observer test game (macOS, no UI automation)."""
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -57,6 +58,43 @@ def selected_stage(repo, entry):
     raise ValueError('Focused CLI currently supports registered delayed cases only')
 
 
+def snapshot_files(run):
+    files = {}
+    for folder, prefix in (('tca_main', ''), ('tca_cli_adapter', '@adapter/')):
+        base = run / 'mod' / folder
+        for path in sorted(base.rglob('*')):
+            if path.is_file():
+                files[prefix + path.relative_to(base).as_posix()] = hashlib.sha256(path.read_bytes()).hexdigest()
+    for name in ('tca_main.mod', 'tca_cli_adapter.mod'):
+        path = run / 'mod' / name
+        files['@' + name] = hashlib.sha256(path.read_bytes()).hexdigest()
+    return files
+
+
+def content_digest(files, version=2):
+    content = files if version == 1 else {key: value for key, value in files.items()
+                                         if key not in {'@tca_main.mod', '@tca_cli_adapter.mod'}}
+    return hashlib.sha256(json.dumps(content, sort_keys=True).encode()).hexdigest()
+
+
+def seal_run(run, source_root=None):
+    files = snapshot_files(run)
+    digest = content_digest(files)
+    write_json(run / 'source_manifest.json', {'format': 2, 'source_root': str(source_root or ROOT),
+                                             'sha256': digest, 'files': files})
+    return digest
+
+
+def verify_snapshot(run):
+    try:
+        manifest = json.loads((run / 'source_manifest.json').read_text())
+        files = snapshot_files(run)
+        digest = content_digest(files, manifest.get('format', 1))
+        return [] if manifest['files'] == files and manifest['sha256'] == digest else ['Runtime snapshot changed after sealing']
+    except (OSError, ValueError, KeyError) as error:
+        return ['Runtime snapshot cannot be verified: ' + str(error)]
+
+
 def prepare_run(repo, run_root, settings, selected_case=None):
     run_root.mkdir(parents=True, exist_ok=True)
     run = Path(tempfile.mkdtemp(prefix='run-', dir=run_root))
@@ -71,11 +109,22 @@ def prepare_run(repo, run_root, settings, selected_case=None):
             f'tca_run_focused_observer_test_effect = {{ STAGE = {stage} }}')
         events.write_text(text, encoding='utf-8-sig')
         write_json(run / 'selection.json', {'case': selected_case, 'stage': stage})
-    (run / 'mod/tca_main.mod').write_text(descriptor('TCA Main', repo), encoding='utf-8')
+    snapshot = run / 'mod/tca_main'
+    snapshot.mkdir()
+    # Copy game content, never Git metadata, editor state, tools or reports.
+    for path in sorted(repo.iterdir()):
+        if path.name.startswith('.') or path.name in {'tools', 'docs'}:
+            continue
+        if path.is_dir():
+            shutil.copytree(path, snapshot / path.name, ignore=shutil.ignore_patterns('.DS_Store', '__pycache__'))
+        elif path.name == 'descriptor.mod':
+            shutil.copy2(path, snapshot / path.name)
+    (run / 'mod/tca_main.mod').write_text(descriptor('TCA Main', snapshot), encoding='utf-8')
     (run / 'mod/tca_cli_adapter.mod').write_text(descriptor('TCA CLI Adapter', adapter), encoding='utf-8')
     write_json(run / 'dlc_load.json', {'disabled_dlcs': [], 'enabled_mods': [
         'mod/tca_main.mod', 'mod/tca_cli_adapter.mod']})
     (run / 'pdx_settings.txt').write_text(isolated_settings(settings), encoding='utf-8')
+    seal_run(run, repo)
     write_json(run_root / 'latest.json', {'run_dir': str(run)})
     return run
 
@@ -128,6 +177,9 @@ def game_command(args, run):
 
 
 def run_game(args, run):
+    issues = verify_snapshot(run)
+    if issues:
+        raise ValueError('; '.join(issues))
     command = game_command(args, run)
     env = os.environ.copy()
     env['SteamAppId'] = '1158310'
@@ -162,15 +214,24 @@ def run_game(args, run):
     log = debug.read_text(errors='replace') if debug.exists() else ''
     state = progress(log, time.monotonic() - start, False)
     write_json(run / 'progress.json', state)
-    checker_command = [sys.executable, str(ROOT / 'tools/check_test_run.py'), '--logs', str(run / 'logs')]
+    checker_command = [sys.executable, str(ROOT / 'tools/check_test_run.py'), '--logs', str(run / 'logs'),
+                       '--source-root', str(run / 'mod/tca_main')]
+    if getattr(args, 'strict_title_heir', False):
+        checker_command += ['--strict-title-heir']
     if getattr(args, 'case', None):
         checker_command += ['--case', args.case]
     checker = subprocess.run(checker_command, capture_output=True, text=True)
     (run / 'result.txt').write_text(checker.stdout + checker.stderr, encoding='utf-8')
+    snapshot_issues = verify_snapshot(run)
     code = outcome(condition, state['observer_confirmed'], checker.returncode)
+    if snapshot_issues:
+        code = 2
+        with (run / 'result.txt').open('a') as result:
+            result.write('NOT VERIFIED\n' + '\n'.join(snapshot_issues) + '\n')
     write_json(run / 'terminal.json', {**state, 'condition': condition,
                'process_exit': process.returncode, 'verification_exit': checker.returncode,
-               'runner_exit': code})
+               'runner_exit': code, 'snapshot_issues': snapshot_issues,
+               'source_sha256': json.loads((run / 'source_manifest.json').read_text())['sha256']})
     print(f"Terminal: {condition}; observer confirmed: {state['observer_confirmed']}", flush=True)
     print(checker.stdout + checker.stderr, end='', flush=True)
     return code
@@ -186,6 +247,7 @@ def main(argv=None):
     parser.add_argument('--timeout', type=float, default=240, help='total startup/test timeout in seconds')
     parser.add_argument('--prepare-only', action='store_true', help='prepare isolated files without launching')
     parser.add_argument('--seed', type=int, help='native new-game random seed for reproducible regressions')
+    parser.add_argument('--strict-title-heir', action='store_true', help='include strict preview-head succession acceptance')
     parser.add_argument('--case', help='run one registered delayed native case; default runs the full suite')
     args = parser.parse_args(argv)
     args.game_dir = args.game_dir.expanduser().resolve()

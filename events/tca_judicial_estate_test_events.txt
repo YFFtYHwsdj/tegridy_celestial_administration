@@ -71,7 +71,9 @@ tca_judicial_estate_test.1 = {
                 }
                 # An inherited saved alias must also be overwritten, not merely
                 # cleared and then selected through a cached existence check.
-                title:k_england = { save_scope_as = tca_test_law_other_circuit }
+                title:k_england = { save_scope_as = tca_test_law_circuit save_scope_as = tca_test_law_other_circuit }
+                # Prime the same existence queries earlier cases can leave cached.
+                if = { limit = { exists = scope:tca_test_law_circuit exists = scope:tca_test_law_other_circuit } debug_log = "TCA_ESTATE FIXTURE_OLD_ALIASES_PRIMED" }
                 tca_test_review_fixture_effect = yes
                 if = { limit = {
                     scope:tca_test_law_circuit = { tca_is_judicial_circuit_trigger = yes }
@@ -79,7 +81,19 @@ tca_judicial_estate_test.1 = {
                     scope:tca_test_law_circuit != scope:tca_test_law_other_circuit
                     scope:tca_test_law_other_circuit != title:k_england
                 } debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_estate_jurisdiction 23" }
-                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_estate_jurisdiction 23" }
+                else = {
+                    add_character_flag = tca_test_case_failed
+                    debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_estate_jurisdiction 23"
+                    if = { limit = { scope:tca_test_law_circuit = { tca_is_judicial_circuit_trigger = yes } } debug_log = "TCA_ESTATE FIXTURE_PRIMARY_VALID yes" }
+                    else = { debug_log = "TCA_ESTATE FIXTURE_PRIMARY_VALID no" }
+                    if = { limit = { scope:tca_test_law_other_circuit = { tca_is_judicial_circuit_trigger = yes } } debug_log = "TCA_ESTATE FIXTURE_SECONDARY_VALID yes" }
+                    else = { debug_log = "TCA_ESTATE FIXTURE_SECONDARY_VALID no" }
+                    if = { limit = { scope:tca_test_law_circuit != scope:tca_test_law_other_circuit } debug_log = "TCA_ESTATE FIXTURE_DISTINCT yes" }
+                    else = { debug_log = "TCA_ESTATE FIXTURE_DISTINCT no" }
+                    if = { limit = { scope:tca_test_law_other_circuit = title:k_england } debug_log = "TCA_ESTATE FIXTURE_STALE_ENGLAND yes" }
+                    else = { debug_log = "TCA_ESTATE FIXTURE_STALE_ENGLAND no" }
+                    debug_log_scopes = yes
+                }
 
                 if = { limit = { title:h_china.holder = {
                     any_in_list = { variable = tca_test_law_circuits count >= 2 }

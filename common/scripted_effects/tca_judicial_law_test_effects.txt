@@ -50,8 +50,22 @@ tca_test_prepare_judicial_law_realm_effect = {
                 set_variable = { name = tca_test_law_original_commissioner value = var:song_judicial_title.holder }
             }
         }
-        if = { limit = { NOT = { exists = scope:tca_test_law_circuit } } save_scope_as = tca_test_law_circuit }
-        else_if = { limit = { NOT = { exists = scope:tca_test_law_other_circuit } } save_scope_as = tca_test_law_other_circuit }
+    }
+    # Assign both aliases from the repaired current snapshot unconditionally.
+    # Do not choose slots by testing whether a cleared inherited alias exists.
+    ordered_in_list = {
+        variable = tca_test_law_circuits
+        limit = { tca_is_judicial_circuit_trigger = yes }
+        order_by = tier
+        position = 0
+        save_scope_as = tca_test_law_circuit
+    }
+    ordered_in_list = {
+        variable = tca_test_law_circuits
+        limit = { tca_is_judicial_circuit_trigger = yes this != scope:tca_test_law_circuit }
+        order_by = tier
+        position = 0
+        save_scope_as = tca_test_law_other_circuit
     }
     scope:tca_test_law_circuit.var:song_judicial_title ?= { save_scope_as = tca_test_law_position }
     scope:tca_test_law_position.holder ?= { save_scope_as = tca_test_law_commissioner }

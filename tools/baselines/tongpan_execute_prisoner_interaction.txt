@@ -1,0 +1,1009 @@
+execute_prisoner_interaction = {
+	interface_priority = 120
+	common_interaction = yes
+	category = interaction_category_prison
+	special_interaction = execute_prisoner_interaction
+	icon = icon_dead
+
+	desc = execute_prisoner_interaction_desc
+
+	ai_targets = {
+		ai_recipients = prisoners
+	}
+
+	ai_frequency_by_tier = {
+		barony = 72
+		county = 12
+		duchy = 12
+		kingdom = 12
+		empire = 12
+		hegemony = 12
+	}
+
+	ai_will_do = {
+		base = 0
+
+		opinion_modifier = {
+			trigger = {
+				scope:puppet_or_actor != scope:recipient
+			}
+			opinion_target = scope:recipient
+			multiplier = -1
+		}
+
+		ai_value_modifier = {
+			ai_compassion = -1
+		}
+		modifier = {
+			add = -20
+			ai_compassion >= low_positive_ai_value
+			scope:recipient = { is_adult = no }
+		}
+		# Try to avoid Kinslaying
+		modifier = {
+			add = -20
+			scope:puppet_or_actor.dynasty = scope:recipient.dynasty
+			NOT = { scope:puppet_or_actor.rite = { rite_has_doctrine = doctrine_kinslaying_any_dynasty_member_crime } }
+		}
+		modifier = {
+			add = -20
+			scope:puppet_or_actor = {
+				is_close_or_extended_family_of = scope:recipient
+				NOT = { rite = { rite_has_doctrine = doctrine_kinslaying_extended_family_crime } }
+			}
+		}
+		modifier = {
+			add = -20
+			scope:puppet_or_actor = {
+				is_close_family_of = scope:recipient
+				NOT = { rite = { rite_has_doctrine = doctrine_kinslaying_close_kin_crime } }
+			}
+		}
+		modifier = {
+			add = 50
+			scope:puppet_or_actor = {
+				has_execute_reason = scope:recipient
+				OR = {
+					has_trait = sadistic
+					has_trait = lunatic
+				}
+			}
+		}
+		modifier = { # Executing your way to new titles is a worthy cause...
+			add = 20
+			scope:puppet_or_actor = {
+				has_execute_reason = scope:recipient
+				ai_greed > 0
+				any_heir_title = { # Execute rulers you can inherit land from
+					holder ?= scope:recipient
+				}
+			}
+		}
+		modifier = { # Vengeful characters enjoy executing their rivals
+			add = 20
+			scope:puppet_or_actor = {
+				has_execute_reason = scope:recipient
+				ai_vengefulness >= medium_positive_ai_value
+				OR = {
+					has_relation_rival = scope:recipient # Execute rivals
+					has_relation_nemesis = scope:recipient # Execute rivals
+					scope:recipient = {
+						is_spouse_of = scope:puppet_or_actor
+						exposed_cheating_on_spouse_trigger = { SPOUSE = scope:puppet_or_actor }
+					}
+				}
+			}
+		}
+		modifier = { # Executing your way to new titles is a worthy cause... and very greedy characters need no execution reason
+			add = 35
+			scope:puppet_or_actor = {
+				ai_greed >= very_high_positive_ai_value
+				any_heir_title = { # Execute rulers you can inherit land from
+					holder ?= scope:recipient
+				}
+			}
+		}
+		modifier = { # Vengeful characters enjoy executing their rivals, and very vengeful characters need no execution reason
+			add = 35
+			scope:puppet_or_actor = {
+				ai_vengefulness >= very_high_positive_ai_value
+				OR = {
+					has_relation_rival = scope:recipient # Execute rivals
+					has_relation_nemesis = scope:recipient # Execute rivals
+					scope:recipient = {
+						is_spouse_of = scope:puppet_or_actor
+						exposed_cheating_on_spouse_trigger = { SPOUSE = scope:puppet_or_actor }
+					}
+				}
+			}
+		}
+		#Scope:target has caused internal strife in the realm
+		character_hates_scope_due_to_strife_modifier = { TARGET = scope:recipient }
+		modifier = {
+			factor = 0
+			scope:puppet_or_actor = {
+				NOR = { # Do not execute unless you have some sort of reason to do it
+					has_execute_reason = scope:recipient
+					has_relation_rival = scope:recipient # Execute rivals
+					has_relation_nemesis = scope:recipient # Execute rivals
+					scope:recipient = {
+						is_spouse_of = scope:puppet_or_actor
+						exposed_cheating_on_spouse_trigger = { SPOUSE = scope:puppet_or_actor }
+					}
+					any_heir_title = { # Execute rulers you can inherit land from
+						holder ?= scope:recipient
+					}
+					has_trait = lunatic # Self explanatory
+				}
+			}
+		}
+
+		# Agenda impact
+		modifier = {
+			scope:recipient = {
+				any_character_struggle = {
+					involvement = involved
+				}
+				is_important_or_vip_struggle_character = yes
+			}
+			add = {
+				value = 0
+				if = {
+					limit = {
+						scope:puppet_or_actor = {
+							any_character_struggle = {
+								phase_has_catalyst = catalyst_execute_important
+							}
+							has_character_flag = agenda_towards_escalation
+						}
+					}
+					add = 200
+				}
+				else_if = {
+					limit = {
+						scope:puppet_or_actor = {
+							any_character_struggle = {
+								phase_has_catalyst = catalyst_execute_important
+							}
+						}
+					}
+					add = -100
+				}
+			}
+		}
+
+		modifier = {
+			scope:recipient = {
+				any_character_struggle = {
+					involvement = involved
+				}
+				has_trait = fp3_struggle_supporter
+			}
+			add = {
+				value = 0
+				if = {
+					limit = {
+						scope:puppet_or_actor = {
+							any_character_struggle = {
+								phase_has_catalyst = catalyst_execute_supporter
+							}
+							has_trait = fp3_struggle_detractor
+						}
+					}
+					add = 200
+				}
+				else_if = {
+					limit = {
+						scope:puppet_or_actor = {
+							any_character_struggle = {
+								phase_has_catalyst = catalyst_execute_supporter
+							}
+						}
+					}
+					add = -100
+				}
+			}
+		}
+
+		#Nomads get the special beheading stuff
+		modifier = {
+			scope:puppet_or_actor = {
+				mpo_keep_prisoners_heads_trigger = yes
+				scope:recipient = {
+					is_ruler = yes
+					highest_held_title_tier >= tier_county
+					is_adult = yes
+				}
+				NOT = {
+					scope:recipient.top_liege ?= {
+						current_military_strength > scope:puppet_or_actor.current_military_strength
+						tier_difference = {
+							target = scope:puppet_or_actor
+							value >= -1
+						}
+					}
+				}
+			}
+			NOT = {
+				scope:puppet_or_actor.rite = { rite_has_parameter = human_sacrifice_active }
+			}
+			add = 10
+		}
+		#Boost further if actor if want to keep head
+		modifier = {
+			#want to keep head
+			scope:puppet_or_actor = {
+				mpo_keep_prisoners_heads_trigger = yes
+			}
+			scope:recipient = {
+				highest_held_title_tier >= tier_kingdom
+				is_adult = yes
+			}
+			NOT = {
+				scope:puppet_or_actor.rite = { rite_has_parameter = human_sacrifice_active }
+			}
+			add = 20
+		}
+		#Boost further if actor wants to be scary
+		modifier = {
+			#want to keep head
+			scope:puppet_or_actor = {
+				mpo_keep_prisoners_heads_trigger = yes
+				scope:recipient = {
+					is_ruler = yes
+					highest_held_title_tier >= tier_county
+					is_adult = yes
+				}
+				OR = {
+					has_trait = conqueror
+					has_trait = greatest_of_khans
+					is_gurkhan = yes
+				}
+			}
+			NOT = {
+				scope:puppet_or_actor.rite = { rite_has_parameter = human_sacrifice_active }
+			}
+			add = 30
+		}
+
+		modifier = {
+			scope:recipient = {
+				any_character_struggle = {
+					involvement = involved
+				}
+				has_trait = fp3_struggle_detractor
+			}
+			add = {
+				value = 0
+				if = {
+					limit = {
+						scope:puppet_or_actor = {
+							any_character_struggle = {
+								phase_has_catalyst = catalyst_execute_detractor
+							}
+							has_trait = fp3_struggle_supporter
+						}
+					}
+					add = 200
+				}
+				else_if = {
+					limit = {
+						scope:puppet_or_actor = {
+							any_character_struggle = {
+								phase_has_catalyst = catalyst_execute_detractor
+							}
+						}
+					}
+					add = -100
+				}
+			}
+		}
+		modifier = {
+			add = 200
+			scope:puppet_or_actor.rite = {
+				rite_has_tenet = tenet_extinction_of_dharma
+			}
+			scope:recipient.rite = {
+				religion = root.faith.religion
+				NOT = {
+					rite_has_tenet = tenet_extinction_of_dharma
+				}
+			}
+		}
+		#don't kill prisoners that are tied with a prison break contract, we don't want it invalidating all the time
+		modifier = {
+			factor = 0
+			scope:recipient = {
+				has_character_flag = being_prisonbroken_by_laamp
+			}
+		}
+		#don't kill prisoners whose deaths would diminish the realm through inheritance
+		modifier = {
+			factor = 0
+			scope:recipient = {
+				is_vassal_or_below_of = scope:puppet_or_actor
+				any_held_title = {
+					is_landless_type_title = no
+					tier >= tier_county
+					current_heir ?= {
+						is_ruler = yes
+						is_landed = yes
+						top_liege != scope:puppet_or_actor.top_liege
+					}
+				}
+			}
+		}
+	}
+
+	is_available = {
+		trigger_if = {
+			limit = { is_ai = yes }
+			is_at_war = no
+		}
+	}
+
+	is_shown = {
+		scope:recipient = {
+			is_imprisoned_by = scope:puppet_or_actor
+		}
+	}
+
+	is_valid_showing_failures_only = {
+		scope:recipient = { NOT = { has_strong_hook = scope:puppet_or_actor } }
+		scope:recipient = {
+			custom_description = {
+				text = "currently_being_tortured"
+				NOT = { has_character_flag = is_being_tortured }
+			}
+		}
+
+		# Blocked by current struggle phase
+		custom_tooltip = {
+			text = struggle_parameter_struggle_cannot_execute_involved_prisoners
+			NOT = {
+				scope:puppet_or_actor = {
+					any_character_struggle = {
+						involvement = involved
+						has_struggle_phase_parameter = struggle_cannot_execute_involved_prisoners
+						is_secondary_character_involvement_involved_trigger = {
+							CHAR = scope:recipient
+						}
+					}
+				}
+			}
+		}
+
+		custom_tooltip = {
+			text = is_currently_being_purged_tt
+			scope:recipient = {
+				NOT = {
+					has_character_flag = is_currently_being_purged
+				}
+			}
+		}
+
+		# For use with co-ruler diarchs.
+		scope:recipient = { is_imprisoned_by = scope:puppet_or_actor }
+	}
+
+	cost = {
+		# Usually, this action is free, but during certain diarchies, we want it to cost.
+		prestige = liege_diarchy_surcharge_interaction_execute_prisoner_interaction_value
+	}
+
+	on_accept = {
+		# If this is a co-ruler we're executing, tell us if we have alternatives.
+		scope:puppet_or_actor = {
+			if = {
+				limit = {
+					OR = {
+						AND = {
+							has_diarchy_active_parameter = diarchy_is_co_rulership
+							diarch ?= scope:recipient
+						}
+						AND = {
+							scope:recipient = { has_diarchy_active_parameter = diarchy_is_co_rulership }
+							is_diarch_of_target = scope:recipient
+						}
+					}
+				}
+				# If the player doesn't have to execute their partner, point that out.
+				if = {
+					limit = { liege_can_maim_co_ruler_without_killing_them_trigger = yes }
+					custom_tooltip = execute_prisoner_interaction.tt.can_maim_diarch
+				}
+				# Otherwise, if they're out diarch, we end it.
+				if = {
+					limit = { scope:puppet_or_actor.diarch = scope:recipient }
+					end_diarchy = yes
+					every_player = {
+						limit = {
+							NOR = {
+								this = scope:puppet_or_actor
+								this = scope:recipient
+							}
+							top_liege = scope:puppet_or_actor.top_liege
+						}
+						trigger_event = diarchy.8022
+					}
+				}
+				# Else, usurp.
+				else = {
+					custom_description_no_bullet = {
+						text = execute_prisoner_interaction_tt_co_emperor_usurpation
+						object = scope:recipient
+					}
+					create_title_and_vassal_change = {
+						type = usurped
+						save_scope_as = change
+					}
+					scope:recipient = {
+						every_held_title = {
+							limit = {
+								OR = {
+									this = scope:recipient.capital_county
+									this = scope:recipient.capital_county.duchy
+									AND = {
+										tier = tier_county
+										this.duchy = scope:recipient.capital_county.duchy
+									}
+									tier >= scope:recipient.highest_held_title_tier
+								}
+							}
+							change_title_holder = {
+								holder = scope:puppet_or_actor
+								change = scope:change
+							}
+						}
+						every_vassal = {
+							custom = custom.recipient_every_vassal
+							change_liege = {
+								LIEGE = scope:puppet_or_actor
+								CHANGE = scope:change
+							}
+						}
+						hidden_effect = {
+							change_liege = {
+								LIEGE = scope:puppet_or_actor
+								CHANGE = scope:change
+							}
+						}
+					}
+					resolve_title_and_vassal_change = scope:change
+					every_player = {
+						limit = {
+							NOR = {
+								this = scope:puppet_or_actor
+								this = scope:recipient
+							}
+							top_liege = scope:puppet_or_actor.top_liege
+						}
+						trigger_event = diarchy.8023
+					}
+				}
+				# Regardless, this is legit politics, so we don't deduct legitimacy for it.
+				save_scope_value_as = {
+					name = suppress_legitimacy_from_crime
+					value = yes
+				}
+			}
+		}
+		# Now, the rest of it.
+		if = {
+			limit = { scope:recipient = { is_imprisoned_by = scope:puppet_or_actor } }
+			# Are you HumSac'ing the HoF of a faith that doesn't practice HumSac?
+			hidden_effect = {
+				scope:puppet_or_actor = {
+					humsacd_a_hof_effect = {
+						SACRIFICER = scope:puppet_or_actor
+						SACRIFICED_HOF = scope:recipient
+					}
+				}
+			}
+			if = {
+				limit = { always = scope:execution_public }
+				if = {
+					limit = {
+						scope:puppet_or_actor.capital_county = {
+							NOT = { has_county_modifier = held_public_execution_modifier }
+						}
+					}
+					custom_description_no_bullet = {
+						subject = scope:puppet_or_actor
+						text = public_execution_tooltip
+					}
+
+					scope:puppet_or_actor = {
+						capital_county = {
+							add_county_modifier = {
+								modifier = held_public_execution_modifier
+								days = 1850
+							}
+						}
+						custom_tooltip = public_execution_control_effect
+						hidden_effect = {
+							every_held_title = {
+								title_tier = county
+								change_county_control = executioner_control_value
+							}
+						}
+					}
+				}
+				else = {
+					custom_description_no_bullet = {
+						text = public_execution_too_soon_tooltip
+					}
+				}
+			}
+			# Other Effects
+			if = { # Boil their skull?
+				limit = {
+					NOT = { always = scope:execution_devour }
+					scope:puppet_or_actor = {
+						has_relation_rival = scope:recipient
+						has_personality_malicious_trigger = yes
+						has_royal_court = yes
+						has_dlc_feature = court_artifacts
+					}
+					scope:recipient = {
+						is_adult = yes
+					}
+				}
+				scope:puppet_or_actor = {
+					random = {
+						chance = {
+							value = 25
+							if = {
+								limit = {
+									has_relation_nemesis = scope:recipient
+								}
+								add = 75
+							}
+						}
+						hidden_effect = {
+							scope:recipient = {
+								save_scope_as = skull_to_boil
+							}
+							trigger_event = {
+								id = artifact.7000
+								days = { 3 10 }
+							}
+						}
+					}
+				}
+			}
+			if = {
+				limit = {
+					NOT = { always = scope:execution_devour }
+					scope:puppet_or_actor = {
+						is_adult = no
+						age >= 4
+						is_ai = no
+						NOT = { has_character_flag = witnessed_execution_flag }
+					}
+					scope:recipient = {
+						is_adult = yes
+					}
+				}
+				scope:puppet_or_actor = { trigger_event = bp1_yearly.9045 }
+			}
+			else_if = {
+				limit = {
+					NOT = { always = scope:execution_devour }
+					scope:puppet_or_actor = {
+						OR = {
+							has_relation_friend = scope:recipient
+							has_relation_lover = scope:recipient
+						}
+						is_ai = no
+					}
+					scope:recipient = {
+						is_adult = yes
+					}
+				}
+				scope:puppet_or_actor = { trigger_event = bp1_yearly.9044 }
+			}
+			# Gallowsbait.
+			scope:puppet_or_actor = {
+				if = {
+					limit = {
+						has_government = landless_adventurer_government
+						scope:recipient = {
+							is_landless_adventurer = no
+							is_ruler = yes
+						}
+					}
+					if = {
+						limit = { scope:recipient.highest_held_title_tier >= tier_empire }
+						laamp_rewards_apply_criminal_xp_effect = {
+							TRACK = marauder
+							XP_MAX = gallowsbait_xp_massive_gain
+							XP_MIN = gallowsbait_xp_massive_gain
+						}
+					}
+					else_if = {
+						limit = { scope:recipient.highest_held_title_tier >= tier_kingdom }
+						laamp_rewards_apply_criminal_xp_effect = {
+							TRACK = marauder
+							XP_MAX = gallowsbait_xp_major_gain
+							XP_MIN = gallowsbait_xp_major_gain
+						}
+					}
+					else_if = {
+						limit = { scope:recipient.highest_held_title_tier >= tier_duchy }
+						laamp_rewards_apply_criminal_xp_effect = {
+							TRACK = marauder
+							XP_MAX = gallowsbait_xp_medium_gain
+							XP_MIN = gallowsbait_xp_medium_gain
+						}
+					}
+					else_if = {
+						limit = { scope:recipient.highest_held_title_tier >= tier_barony }
+						laamp_rewards_apply_criminal_xp_effect = {
+							TRACK = marauder
+							XP_MAX = gallowsbait_xp_minor_gain
+							XP_MIN = gallowsbait_xp_minor_gain
+						}
+					}
+					else = {
+						laamp_rewards_apply_criminal_xp_effect = {
+							TRACK = marauder
+							XP_MAX = 2
+							XP_MIN = 2
+						}
+					}
+				}
+			}
+
+			# FP3
+			# Struggle Catalysts
+			scope:puppet_or_actor = {
+				if = { # Execute important
+					limit = {
+						scope:recipient = { is_important_or_vip_struggle_character = yes }
+						any_character_struggle = {
+							activate_struggle_catalyst_secondary_character_involvement_either_trigger = {
+								CATALYST = catalyst_execute_important
+								CHAR = scope:recipient
+							}
+						}
+					}
+					every_character_struggle = {
+						limit = {
+							activate_struggle_catalyst_secondary_character_involvement_either_trigger = {
+								CATALYST = catalyst_execute_important
+								CHAR = scope:recipient
+							}
+						}
+						activate_struggle_catalyst = {
+							catalyst = catalyst_execute_important
+							character = scope:puppet_or_actor
+						}
+					}
+				}
+				if = { # Execute Supporter/Detractor
+					limit = {
+						fp3_struggle_involves_one_supporter_and_one_detractor = {
+							FIRST = scope:puppet_or_actor
+							SECOND = scope:recipient
+						}
+					}
+					if = {
+						limit = {
+							scope:recipient = { has_trait = fp3_struggle_detractor }
+							struggle:persian_struggle = {
+								activate_struggle_catalyst_secondary_character_involvement_either_trigger = {
+									CATALYST = catalyst_execute_detractor
+									CHAR = scope:recipient
+								}
+							}
+						}
+						every_character_struggle = {
+							involvement = involved
+							limit = {
+								activate_struggle_catalyst_secondary_character_involvement_either_trigger = {
+									CATALYST = catalyst_execute_detractor
+									CHAR = scope:recipient
+								}
+							}
+							activate_struggle_catalyst = {
+								catalyst = catalyst_execute_detractor
+								character = scope:puppet_or_actor
+							}
+							log_debug_variable_for_persian_struggle_effect = { VAR = stabil_catalyst_execute_detractor }
+						}
+					}
+					else_if = {
+						limit = {
+							scope:recipient = { has_trait = fp3_struggle_supporter }
+							any_character_struggle = {
+								involvement = involved
+								activate_struggle_catalyst_secondary_character_involvement_either_trigger = {
+									CATALYST = catalyst_execute_supporter
+									CHAR = scope:recipient
+								}
+							}
+						}
+						every_character_struggle = {
+							involvement = involved
+							limit = {
+								activate_struggle_catalyst_secondary_character_involvement_either_trigger = {
+									CATALYST = catalyst_execute_supporter
+									CHAR = scope:recipient
+								}
+							}
+							activate_struggle_catalyst = {
+								catalyst = catalyst_execute_supporter
+								character = scope:puppet_or_actor
+							}
+							log_debug_variable_for_persian_struggle_effect = { VAR = unrest_catalyst_execute_supporter }
+						}
+					}
+				}
+				# Free House Member CB target executed during war
+				if = {
+					limit = {
+						exists = scope:recipient.house
+						any_character_war = {
+							using_cb = fp3_free_house_member_cb
+							is_defender = scope:puppet_or_actor
+							primary_attacker.house = scope:recipient.house
+						}
+					}
+					random_character_war = {
+						limit = {
+							using_cb = fp3_free_house_member_cb
+							is_defender = scope:puppet_or_actor
+							primary_attacker.house = scope:recipient.house
+						}
+						primary_attacker = {
+							add_opinion = {
+								target = scope:puppet_or_actor
+								modifier = executed_close_relation_opinion
+							}
+						}
+					}
+					add_prestige = {
+						value = medium_piety_loss
+						multiply = {
+							value = ai_honor
+							add = 1
+						}
+					}
+					every_vassal = {
+						limit = {
+							OR = {
+								has_vassal_stance = courtly
+								has_vassal_stance = glory_hound
+								ai_honor > 0.48
+							}
+						}
+						add_opinion = {
+							target = scope:puppet_or_actor
+							modifier = executed_valuable_prisoner_modifier
+						}
+					}
+				}
+			}
+
+			if = {
+				limit = {
+					scope:puppet_or_actor.rite = {
+						rite_has_tenet = tenet_extinction_of_dharma
+					}
+					scope:recipient.rite = {
+						religion = scope:puppet_or_actor.faith.religion
+						NOT = {
+							rite_has_tenet = tenet_extinction_of_dharma
+						}
+					}
+				}
+				if = {
+					limit = {
+						scope:recipient = {
+							is_ruler = yes
+						}
+					}
+					scope:puppet_or_actor = {
+						add_piety = scope:recipient.tier_scaled_piety_value
+					}
+				}
+				else = {
+					scope:puppet_or_actor = {
+						add_piety = miniscule_piety_value
+					}
+				}
+			}
+			if = {
+				limit = {
+					scope:puppet_or_actor = {
+						tgp_cranial_trophies_collection_trigger = yes
+					}
+					scope:recipient = {
+						is_adult = yes
+						is_faith_dominant_gender = yes
+					}
+				}
+				tgp_cranial_trophies_beheading_effect = {
+					KILLER = scope:puppet_or_actor
+					DEAD = scope:recipient
+				}
+			}
+			# Kill the target
+			if = {
+				limit = {
+					scope:recipient = { is_ai = no }
+					scope:puppet_or_actor = { is_ai = yes }
+				}
+				scope:recipient = { trigger_event = char_interaction.0170 } # Give players a chance to see what's about to happen
+				show_as_tooltip = {
+					execute_prisoner_effect = {
+						VICTIM = scope:recipient
+						EXECUTIONER = scope:puppet_or_actor
+					}
+				}
+			}
+			else = {
+				scope:recipient = { trigger_event = char_interaction.0171 }
+				execute_prisoner_effect = {
+					VICTIM = scope:recipient
+					EXECUTIONER = scope:puppet_or_actor
+				}
+			}
+
+			if = {
+				limit = { always = scope:execution_devour }
+				scope:puppet_or_actor = {
+					custom_tooltip = devour_as_execution_tooltip
+				}
+			}
+
+			if = {
+				limit = { always = scope:execution_provisions }
+				scope:puppet_or_actor = {
+					domicile ?= {
+						change_provisions = human_provision_value
+					}
+				}
+			}
+
+			if = {
+				limit = {
+					always = scope:execution_burned
+					scope:puppet_or_actor.rite = { rite_has_doctrine = doctrine_pluralism_fundamentalist }
+					scope:puppet_or_actor.rite = { NOT = { rite_has_tenet = tenet_extinction_of_dharma } }
+				}
+				scope:puppet_or_actor = {
+					add_piety = miniscule_piety_value
+				}
+			}
+
+			scope:puppet_or_actor = {
+				hidden_effect = {
+					send_interface_message = {
+						type = interaction_prison_single_side
+						title = msg_execute_prisoner
+						right_icon = scope:recipient
+						custom_tooltip = msg_execute_prisoner_desc
+					}
+				}
+			}
+		}
+	}
+
+	options_heading = execution_options_heading
+
+	send_option = {
+		is_shown = {
+			scope:puppet_or_actor = {
+				OR = {
+					mpo_keep_prisoners_heads_trigger = yes
+					faith = scope:recipient.faith
+					rite = {
+						rite_has_parameter = killing_bestows_heads
+					}
+					has_personal_tenet_flag = killing_bestows_heads
+					culture_has_asian_heritage_pillar_trigger = yes
+				}
+				NOT = {
+					rite = { rite_has_parameter = human_sacrifice_active }
+				}
+			}
+		}
+		flag = execution_beheaded
+		localization = "EXECUTION_BEHEADED"
+	}
+
+	#Cannibal option. Should be treated as a "normal" execution, but that you eat the body afterwards (in secret if faith does not allow it).
+	send_option = {
+		is_shown = {
+			scope:puppet_or_actor = {
+				OR = {
+					rite = { rite_has_parameter = cannibalism_legal }
+					has_trait = cannibal
+					any_secret = { type = secret_cannibal }
+					has_personal_tenet_flag = tenet_ritual_cannibalism_devour_reward
+				}
+			}
+		}
+		flag = execution_devour
+		localization = "EXECUTION_DEVOUR"
+	}
+
+	send_option = {
+		is_shown = {
+			scope:puppet_or_actor = {
+				NOR = {
+					AND = {
+						faith = scope:recipient.faith
+						rite = { rite_has_parameter = human_sacrifice_active }
+					}
+					mpo_keep_prisoners_heads_trigger = yes
+					culture_has_asian_heritage_pillar_trigger = yes
+				}
+			}
+		}
+		flag = execution_burned
+		localization = "EXECUTION_BURNED"
+	}
+
+	send_option = {
+		is_shown = {
+			scope:puppet_or_actor.rite = { rite_has_parameter = human_sacrifice_active }
+		}
+		flag = execution_sacrifice
+		localization = "EXECUTION_SACRIFICE"
+	}
+
+	send_option = {
+		is_shown = {
+			scope:puppet_or_actor = {
+				employs_court_position = executioner_court_position
+				any_court_position_holder = {
+			        type = executioner_court_position
+			        is_physically_able = yes
+			    }
+				exists = capital_county
+			}
+		}
+		is_valid = {
+			scope:puppet_or_actor = {
+				NOT = {
+					capital_county = {
+						has_county_modifier = held_public_execution_modifier
+					}
+				}
+			}
+		}
+		flag = execution_public
+		localization = "EXECUTION_PUBLIC"
+	}
+
+	send_option = {
+		is_shown = {
+			scope:puppet_or_actor = {
+				employs_court_position = kennelperson_camp_officer
+				any_court_position_holder = {
+			        type = kennelperson_camp_officer
+			        is_physically_able = yes
+			    }
+			}
+		}
+		flag = execution_kennel
+		localization = "EXECUTION_KENNEL"
+	}
+
+	send_option = {
+		is_shown = {
+			scope:puppet_or_actor = {
+				has_government = landless_adventurer_government
+				has_perk = fear_tax_perk
+			}
+		}
+		flag = execution_provisions
+		localization = "EXECUTION_PROVISIONS"
+	}
+
+	send_options_exclusive = yes
+	auto_accept = yes
+}

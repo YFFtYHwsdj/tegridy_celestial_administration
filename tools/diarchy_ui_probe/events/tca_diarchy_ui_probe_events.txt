@@ -1,0 +1,109 @@
+﻿namespace = tca_diarchy_ui_probe
+# Disposable GUI fixture only. The runner copies this into its isolated CLI adapter.
+tca_diarchy_ui_probe.1 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        if = {
+            limit = { debug_only = yes this = title:h_china.holder }
+            add_realm_law_skip_effects = tca_tongpan_disabled_law
+            tca_refresh_tongpan_realm_effect = yes
+            create_character = { age = 40 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_ui_liege }
+            create_character = { age = 35 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_ui_governor }
+            scope:tca_ui_liege = {
+                create_dynasty = { spread_to_descendants = yes }
+                give_noble_family_title = { name = noble_family_name tier = county article = DEFAULT_TITLE_NAME_ARTICLE government = celestial_government save_scope_as = tca_ui_family }
+                create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_ui_change }
+                title:d_jiangxi = { change_title_holder = { holder = scope:tca_ui_liege change = scope:tca_ui_change } }
+                title:c_yunzhou_2 = { change_title_holder = { holder = scope:tca_ui_liege change = scope:tca_ui_change } }
+                resolve_title_and_vassal_change = scope:tca_ui_change
+                change_government = celestial_government
+                create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_ui_change }
+                change_liege = { liege = root change = scope:tca_ui_change }
+                resolve_title_and_vassal_change = scope:tca_ui_change
+                set_primary_title_to = title:d_jiangxi
+                change_merit = 10000
+                tca_test_protect_character_effect = yes
+            }
+            scope:tca_ui_governor = {
+                create_dynasty = { spread_to_descendants = yes }
+                give_noble_family_title = { name = noble_family_name tier = county article = DEFAULT_TITLE_NAME_ARTICLE government = celestial_government save_scope_as = tca_ui_family }
+                create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_ui_change }
+                title:c_hongzhou = { change_title_holder = { holder = scope:tca_ui_governor change = scope:tca_ui_change } }
+                resolve_title_and_vassal_change = scope:tca_ui_change
+                change_government = celestial_government
+                create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_ui_change }
+                change_liege = { liege = scope:tca_ui_liege change = scope:tca_ui_change }
+                resolve_title_and_vassal_change = scope:tca_ui_change
+                set_primary_title_to = title:c_hongzhou
+                change_merit = 10000
+                tca_test_protect_character_effect = yes
+            }
+            add_realm_law_skip_effects = tca_tongpan_enabled_law
+            tca_refresh_tongpan_realm_effect = yes
+            title:c_hongzhou.var:tca_tongpan_office.holder = {
+                save_scope_as = tca_ui_player
+                tca_test_protect_character_effect = yes
+                try_start_diarchy = temporary_regency
+                set_diarch = root
+            }
+            scope:tca_ui_liege = {
+                try_start_diarchy = temporary_regency
+                set_diarch = root
+            }
+            title:h_china = {
+                set_variable = { name = tca_ui_player value = scope:tca_ui_player }
+                set_variable = { name = tca_ui_liege value = scope:tca_ui_liege }
+                set_variable = { name = tca_ui_governor value = scope:tca_ui_governor }
+                set_variable = { name = tca_ui_ready value = 1 }
+            }
+            if = {
+                limit = {
+                    title:h_china = { var:tca_ui_ready = 1 exists = var:tca_ui_player exists = var:tca_ui_liege exists = var:tca_ui_governor }
+                    scope:tca_ui_player = { tca_can_open_tongpan_diarchy_trigger = yes has_diarchy_type = temporary_regency diarch = root liege = scope:tca_ui_liege }
+                    scope:tca_ui_liege = { has_diarchy_type = temporary_regency diarch = root }
+                    scope:tca_ui_governor = { tca_has_active_tongpan_trigger = yes }
+                }
+                debug_log = "TCA_GUI_FIXTURE_READY"
+            }
+            else = { debug_log = "TCA_GUI_PRECONDITION_FAIL" }
+        }
+        else = { debug_log = "TCA_GUI_PRECONDITION_FAIL" }
+    }
+}
+
+# Opt-in acceptance, deliberately fails until end-system gameplay exists.
+# Uses the real interaction and original deferred maintenance; no mock disable.
+tca_diarchy_ui_probe.2 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        if = {
+            limit = { debug_only = yes this = title:h_china.var:tca_ui_governor tca_has_active_tongpan_trigger = yes }
+            if = {
+                limit = { is_character_interaction_valid = { interaction = tca_tongpan_end_interaction recipient = title:h_china.var:tca_ui_player } }
+                run_interaction = { interaction = tca_tongpan_end_interaction actor = root recipient = title:h_china.var:tca_ui_player send_threshold = decline }
+                trigger_event = { id = tca_diarchy_ui_probe.3 days = 2 }
+            }
+            else = { debug_log = "TCA_GUI_FAIL_END_SYSTEM_AVAILABLE" debug_log = "TCA_GUI_COMPLETE" }
+        }
+        else = { debug_log = "TCA_GUI_PRECONDITION_FAIL" debug_log = "TCA_GUI_COMPLETE" }
+    }
+}
+tca_diarchy_ui_probe.3 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        if = {
+            limit = {
+                NOT = { has_diarchy_type = tca_tongpan }
+                tca_has_active_tongpan_trigger = no
+                tca_tongpan_efficiency_value = 0
+                tca_tongpan_prestige_surcharge_value = 0
+            }
+            debug_log = "TCA_GUI_PASS_END_SYSTEM"
+        }
+        else = { debug_log = "TCA_GUI_FAIL_END_SYSTEM_STATE" debug_log_scopes = yes }
+        debug_log = "TCA_GUI_COMPLETE"
+    }
+}

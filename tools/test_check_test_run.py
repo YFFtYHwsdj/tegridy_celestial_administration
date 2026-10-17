@@ -5,8 +5,20 @@ from check_test_run import inspect_run, expected_cases, selected_case_expectatio
 
 
 class RunEvidenceTests(unittest.TestCase):
+    def test_gui_file_shadow_error_without_custom_identifier_invalidates_pass(self):
+        error = "[10:00:00][E]: gui/window_diarchy.gui:123 Could not find data system function 'BrokenNativeName'"
+        issues, _ = inspect_run(self.run_log(), error, {'tca_test_example': 1})
+        self.assertTrue(any('data binding' in issue for issue in issues))
+
+    def test_native_mandate_tooltip_error_in_owned_window_invalidates_pass(self):
+        error = "[10:04:13][E][pdx_data_localize.cpp:161]: Data error in loc string 'DIARCHY_WINDOW_MANDATE_TOOLTIP'"
+        issues, _ = inspect_run(self.run_log(), error, {'tca_test_example': 1})
+        self.assertTrue(any('localization evaluation failure' in issue for issue in issues))
+        unrelated = error.replace('DIARCHY_WINDOW_MANDATE_TOOLTIP', 'game_concept_unrelated_desc')
+        self.assertEqual(inspect_run(self.run_log(), unrelated, {'tca_test_example': 1})[0], [])
+
     def test_focused_selection_counts_actual_continuation_assertions(self):
-        self.assertEqual(selected_case_expectations('tca_judicial_imperial_test.1'), {'tca_test_imperial_circuit_lifecycle': 14})
+        self.assertEqual(selected_case_expectations('tca_judicial_imperial_test.1'), {'tca_test_imperial_circuit_lifecycle': 15})
         with self.assertRaises(ValueError):
             selected_case_expectations('tca_judicial_imperial_test.1005')
 
@@ -39,6 +51,16 @@ class RunEvidenceTests(unittest.TestCase):
         error = "[15:44:33][E][jomini_scriptvalue.cpp:1499]: Value of wrong type in 'file: common/scripted_effects/tca_judicial_arrest_test_effects.txt line: 30'. Got value of type 'none'"
         issues, _ = inspect_run(self.run_log(), error, {'tca_test_example'})
         self.assertTrue(any('value type' in issue.lower() for issue in issues))
+
+    def test_duplicate_on_action_effect_invalidates_pass(self):
+        error = "[14:51:42][E][jomini_onaction.cpp:161]: There is more than one 'effect' defined using most recent:file: common/on_action/zz_tca_tongpan_diarchy_death_guard.txt line: 3 (on_left_diarchy)"
+        issues, _ = inspect_run(self.run_log(), error, {'tca_test_example'})
+        self.assertTrue(any('duplicate on_action effect' in issue for issue in issues))
+
+    def test_registered_vanilla_named_shadow_error_is_owned(self):
+        error = "[14:51:42][E][jomini_onaction.cpp:161]: There is more than one 'effect' defined using most recent:file: common/on_action/diarchy_on_action.txt line: 3 (on_left_diarchy)"
+        issues, _ = inspect_run(self.run_log(), error, {'tca_test_example'})
+        self.assertTrue(any('duplicate on_action effect' in issue for issue in issues))
 
     def test_unset_mod_variable_invalidates_pass(self):
         error = "[15:07:35][E][jomini_effect.cpp:1162]: Variable 'tca_official_military' is used but is never set. Setting it in an unused scripted trigger or effect does not count"
@@ -132,6 +154,15 @@ class RunEvidenceTests(unittest.TestCase):
 
     def run_log(self, name='tca_test_example'):
         return f'TCA_TEST SUITE_DISPATCH\nTCA_TEST BEGIN tca_example_test.1 {name}\nTCA_TEST CHECK_PASS {name} 1\nTCA_TEST PASS {name}\nTCA_TEST SUITE_ALL_PASSED'
+
+    def test_strict_preview_head_gate_rejects_diagnostic_even_when_business_passes(self):
+        diagnostic = 'TCA: native Tongpan appointment differs from pre-death title preview head'
+        log = self.run_log() + '\n' + diagnostic
+        self.assertEqual(inspect_run(log, '', {'tca_test_example': 1})[0], [])
+        self.assertTrue(any('Strict title succession failed' in x for x in
+                            inspect_run(log, '', {'tca_test_example': 1}, strict_title_heir=True)[0]))
+        self.assertEqual(inspect_run(diagnostic + '\n' + self.run_log(), '',
+                                     {'tca_test_example': 1}, strict_title_heir=True)[0], [])
 
     def test_complete_pass(self):
         issues, counts = inspect_run(self.run_log(), '', {'tca_test_example'})

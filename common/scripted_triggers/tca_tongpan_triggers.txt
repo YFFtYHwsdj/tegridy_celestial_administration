@@ -1,0 +1,84 @@
+﻿# County title scope. Eligibility is actual sovereignty, never hegemony de-jure.
+tca_is_tongpan_county_trigger = {
+    tier = tier_county
+    is_landless_type_title = no
+    is_noble_family_title = no
+    exists = holder
+    holder = {
+        is_alive = yes
+        is_independent_ruler = no
+        government_has_flag = government_is_celestial
+        primary_title = prev
+        top_liege = {
+            government_has_flag = government_is_celestial
+            highest_held_title_tier = tier_hegemony
+            has_realm_law_flag = tca_tongpan_enabled
+        }
+    }
+}
+tca_has_tongpan_office_trigger = {
+    exists = var:tca_tongpan_office
+    var:tca_tongpan_office = { exists = var:tca_tongpan_county var:tca_tongpan_county = prev }
+}
+tca_is_valid_tongpan_holder_trigger = {
+    exists = holder
+    holder = {
+        is_alive = yes
+        is_landed = no
+        is_independent_ruler = no
+        government_has_flag = government_is_celestial
+        primary_title = prev
+        highest_held_title_tier = tier_county
+        NOT = { any_held_title = { is_noble_family_title = no NOT = { this = prev.primary_title } } }
+    }
+}
+tca_is_initial_tongpan_candidate_trigger = {
+    is_alive = yes
+    is_diarch_valid_trigger = yes
+    is_landed = no
+    NOT = { has_character_flag = tca_history_defined_character }
+    NOT = { any_held_title = { is_noble_family_title = no } }
+    merit_level >= merit_level_expected_county_value
+    tgp_can_be_a_minister_trigger = { COURT_OWNER = scope:tca_tp_liege }
+    liege_or_court_owner ?= { top_liege = scope:tca_tp_sovereign }
+}
+# Character scope. Only a fully synchronized office enables costs and efficiency.
+tca_has_active_tongpan_trigger = {
+    exists = primary_title
+    primary_title = {
+        tca_is_tongpan_county_trigger = yes
+        tca_has_tongpan_office_trigger = yes
+        var:tca_tongpan_office = {
+            tca_is_valid_tongpan_holder_trigger = yes
+            holder = { is_diarch_valid_trigger = yes is_diarch_able_trigger = yes }
+        }
+    }
+    has_diarchy_type = tca_tongpan
+    diarch ?= primary_title.var:tca_tongpan_office.holder
+}
+tca_tongpan_reform_can_pass_trigger = {
+    is_imprisoned = no
+    custom_tooltip = { text = tca_tongpan_reform_cooldown NOT = { has_variable = tca_tongpan_reform_cooldown } }
+}
+
+# Only marked, bound office holders use the peer-governor loyalty model.
+tca_is_tongpan_for_loyalty_trigger = {
+    exists = primary_title
+    primary_title = { has_variable = tca_tongpan_title exists = var:tca_tongpan_county.holder }
+}
+
+# Character scope. Resolve the supervised county, not the officer's actual liege.
+tca_can_open_tongpan_diarchy_trigger = {
+    exists = primary_title
+    primary_title = {
+        has_variable = tca_tongpan_title
+        tca_is_valid_tongpan_holder_trigger = yes
+        exists = var:tca_tongpan_county
+        var:tca_tongpan_county = {
+            tca_has_tongpan_office_trigger = yes
+            var:tca_tongpan_office = prev
+            exists = holder
+            holder = { tca_has_active_tongpan_trigger = yes }
+        }
+    }
+}

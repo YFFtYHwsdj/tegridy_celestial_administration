@@ -41,6 +41,45 @@ class GameRunnerTests(unittest.TestCase):
             self.assertNotIn('tca_run_observer_tests_effect = yes', copied)
         self.assertEqual(source.read_bytes(), original)
 
+    def test_run_uses_immutable_runtime_snapshot_with_manifest(self):
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / 'repo'
+            (repo / 'events').mkdir(parents=True)
+            (repo / 'tools/cli_adapter/events').mkdir(parents=True)
+            source = repo / 'events/tca_fixture_events.txt'
+            source.write_text('original')
+            run = prepare_run(repo, Path(temp) / 'runs', Path(temp) / 'absent')
+            snapshot = run / 'mod/tca_main'
+            self.assertEqual((snapshot / 'events/tca_fixture_events.txt').read_text(), 'original')
+            source.write_text('changed after preparation')
+            self.assertEqual((snapshot / 'events/tca_fixture_events.txt').read_text(), 'original')
+            self.assertIn(str(snapshot), (run / 'mod/tca_main.mod').read_text())
+            manifest = json.loads((run / 'source_manifest.json').read_text())
+            self.assertIn('events/tca_fixture_events.txt', manifest['files'])
+            self.assertEqual(len(manifest['sha256']), 64)
+
+    def test_identical_content_has_same_digest_in_different_run_dirs(self):
+        with tempfile.TemporaryDirectory() as temp:
+            a = prepare_run(ROOT, Path(temp), Path(temp)/'absent')
+            b = prepare_run(ROOT, Path(temp), Path(temp)/'absent')
+            self.assertEqual(json.loads((a/'source_manifest.json').read_text())['sha256'],
+                             json.loads((b/'source_manifest.json').read_text())['sha256'])
+
+    def test_seal_rejects_modified_deleted_and_added_runtime_files(self):
+        from run_game_tests import seal_run, verify_snapshot
+        with tempfile.TemporaryDirectory() as temp:
+            run = prepare_run(ROOT, Path(temp), Path(temp) / 'absent')
+            target = run / 'mod/tca_main/events/tca_tongpan_test_events.txt'
+            self.assertEqual(verify_snapshot(run), [])
+            target.write_text('tampered')
+            self.assertTrue(verify_snapshot(run))
+            seal_run(run)
+            target.unlink()
+            self.assertTrue(verify_snapshot(run))
+            seal_run(run)
+            target.write_text('added')
+            self.assertTrue(verify_snapshot(run))
+
     def test_focused_run_rejects_unknown_and_continuation_events(self):
         for entry in ('not_an_event', 'tca_judicial_imperial_test.1005'):
             with self.assertRaises(ValueError):
@@ -63,7 +102,7 @@ class GameRunnerTests(unittest.TestCase):
             self.assertEqual(json.loads((root / 'latest.json').read_text())['run_dir'], str(second))
             mods = json.loads((second / 'dlc_load.json').read_text())['enabled_mods']
             self.assertEqual(mods, ['mod/tca_main.mod', 'mod/tca_cli_adapter.mod'])
-            self.assertIn(str(ROOT), (second / 'mod/tca_main.mod').read_text())
+            self.assertIn(str(second / 'mod/tca_main'), (second / 'mod/tca_main.mod').read_text())
             self.assertIn(str(second), (second / 'mod/tca_cli_adapter.mod').read_text())
             self.assertTrue((second / 'mod/tca_cli_adapter/events/tca_cli_events.txt').is_file())
 

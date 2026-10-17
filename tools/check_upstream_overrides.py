@@ -106,8 +106,10 @@ def load_registry(mod_dir):
         raise ValueError("localization_overrides must be a list")
     if not isinstance(data.get("auxiliary_extensions", []), list):
         raise ValueError("auxiliary_extensions must be a list")
-    for section in ("overrides", "known_extensions", "localization_overrides", "auxiliary_extensions"):
-        required = ("key", "mod", "vanilla", "baseline") if section in ("overrides", "localization_overrides", "auxiliary_extensions") else ("key", "mod", "vanilla")
+    if not isinstance(data.get("file_overrides", []), list):
+        raise ValueError("file_overrides must be a list")
+    for section in ("overrides", "known_extensions", "localization_overrides", "auxiliary_extensions", "file_overrides"):
+        required = ("key", "mod", "vanilla", "baseline") if section in ("overrides", "localization_overrides", "auxiliary_extensions", "file_overrides") else ("key", "mod", "vanilla")
         for index, entry in enumerate(data.get(section, [])):
             label = f"{section}[{index}]"
             if not isinstance(entry, dict):
@@ -227,6 +229,14 @@ def check(game_dir, mod_dir):
     registry = load_registry(mod_dir)
     known = {}
     changed = check_localization_overrides(registry, game_dir, mod_dir)
+    for entry in registry.get("file_overrides", []):
+        native = (game_dir / entry["vanilla"]).read_bytes()
+        baseline = (mod_dir / entry["baseline"]).read_bytes()
+        if native != baseline:
+            print(f"NEEDS REVIEW: installed-game file {entry['vanilla']} differs from its reviewed baseline.")
+            changed = 1
+        if not (mod_dir / entry["mod"]).is_file():
+            raise ValueError(f"mod file override missing {entry['mod']}")
     # Separate opt-in adapter mods live under tools/, outside the normal mod roots.
     # Check their registered native callbacks and reviewed baselines explicitly.
     for entry in registry.get("auxiliary_extensions", []):
@@ -289,6 +299,7 @@ def check(game_dir, mod_dir):
               f"{len(registry['known_extensions'])} additive on_action definitions are classified; "
               f"{len(registry.get('localization_overrides', []))} localization overrides checked; "
               f"{len(registry.get('auxiliary_extensions', []))} auxiliary extensions checked; "
+              f"{len(registry.get('file_overrides', []))} file overrides checked; "
               "no unregistered same-name definitions found.")
     return int(bool(changed))
 

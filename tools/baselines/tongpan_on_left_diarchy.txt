@@ -1,0 +1,101 @@
+on_left_diarchy = {
+	effect = {
+		# Notify the liege's vassals that they're out of a diarchy.
+		every_vassal_or_below = {
+			send_interface_message = {
+				type = msg_mandate_results_neutral_text
+				title = on_left_diarchy.notification.vassal.t
+				left_icon = root
+				right_icon = scope:old_diarch
+				desc = on_left_diarchy.notification.vassal.desc
+			}
+		}
+		scope:old_diarch ?= {
+			# If scope:old_diarch is still around and was plotting a coup, clear their conspirator list.
+			diarch_clean_up_conspiracy_variables_effect = yes
+			# Reset the cooldown on the intro event.
+			if = {
+				limit = { is_alive = yes }
+				trigger_event = {
+					id = diarchy.0022
+					days = 1
+				}
+			}
+			# If they were a vizier, they lose their wealth.
+			vizierate_remove_extravagance_modifiers_effect = yes
+			# Remove their co-ruler title.
+			if = {
+				limit = { has_variable = use_co_ruler_title }
+				remove_variable = use_co_ruler_title
+				# ... but also remember to flag that we had a co-ruler we just lost that might need transferring.
+				root = {
+					set_variable = {
+						name = co_ruler_to_transfer
+						value = scope:old_diarch
+						days = 7
+					}
+					# If we've got it, flag the transfer variable.
+					if = {
+						limit = {
+							scope:old_diarch = { has_variable = diarchy_transfer_type_duumvirate }
+						}
+						set_variable = {
+							name = diarchy_transfer_type_duumvirate
+							value = yes
+							days = 7
+						}
+					}
+				}
+				## And clean up that variable too.
+				remove_variable = diarchy_transfer_type_duumvirate
+			}
+		}
+		# Plus clean up the variable that tells the AI that they, themselves, appointed a vizier.
+		remove_variable = my_vizier
+
+		# Object explorer logging for number of diarchs by tier.
+		if = {
+			limit = { always = no }
+			# Empires
+			if = {
+				limit = { highest_held_title_tier = tier_empire }
+				every_held_title = {
+					remove_list_global_variable = {
+						name = current_empire_regencies
+						target = prev
+					}
+				}
+			}
+			# Kingdoms
+			if = {
+				limit = { highest_held_title_tier = tier_kingdom }
+				every_held_title = {
+					remove_list_global_variable = {
+						name = current_kingdom_regencies
+						target = prev
+					}
+				}
+			}
+			# Duchies
+			if = {
+				limit = { highest_held_title_tier = tier_duchy }
+				every_held_title = {
+					remove_list_global_variable = {
+						name = current_duchy_regencies
+						target = prev
+					}
+				}
+			}
+			# Counties
+			if = {
+				limit = { highest_held_title_tier = tier_county }
+				every_held_title = {
+					remove_list_global_variable = {
+						name = current_county_regencies
+						target = prev
+					}
+				}
+			}
+		}
+	}
+}

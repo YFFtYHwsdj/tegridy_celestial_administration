@@ -230,17 +230,13 @@ tca_judicial_imperial_test.1005 = {
             if = { limit = { scope:tca_test_em_commissioner = { liege = scope:tca_test_em_minister_2 tca_is_judicial_commissioner_trigger = yes } }
                 debug_log = "TCA_TEST CHECK_PASS tca_test_imperial_circuit_lifecycle 9" }
             else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_imperial_circuit_lifecycle 9" }
+            scope:tca_test_em_state = { add_character_flag = tca_test_em_trace_subject }
             create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_test_em_return }
             scope:tca_test_em_circuit = { change_title_holder = { holder = scope:tca_test_em_former change = scope:tca_test_em_return } }
             resolve_title_and_vassal_change = scope:tca_test_em_return
-            # Native grants can transfer de jure subjects. Prepare the direct
-            # imperial subject for this distinct phase before waiting for hooks.
-            scope:tca_test_em_state = {
-                create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_test_em_keep_direct }
-                change_liege = { liege = root change = scope:tca_test_em_keep_direct }
-                resolve_title_and_vassal_change = scope:tca_test_em_keep_direct
-            }
-            trigger_event = { id = tca_judicial_imperial_test.1006 days = 3 }
+            # Observe native title/council repair before preparing the distinct
+            # direct-imperial-subject permission phase. Do not pin the AI world.
+            trigger_event = { id = tca_judicial_imperial_test.1010 days = 1 }
         }
     }
 }
@@ -249,6 +245,20 @@ tca_judicial_imperial_test.1006 = {
     immediate = {
         tca_test_validate_environment_effect = yes
         if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            # First assert the original title/council callbacks before any
+            # direct-subject fixture preparation can affect the political graph.
+            if = { limit = {
+                scope:tca_test_em_circuit = { holder = scope:tca_test_em_former var:song_judicial_title = scope:tca_test_em_office }
+                scope:tca_test_em_commissioner = { liege = scope:tca_test_em_former tca_is_judicial_commissioner_trigger = yes }
+                scope:tca_test_em_office = { de_jure_liege = scope:tca_test_em_circuit }
+            } debug_log = "TCA_TEST CHECK_PASS tca_test_imperial_circuit_lifecycle 15" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_imperial_circuit_lifecycle 15" }
+            # This phase tests jurisdiction over an actual imperial direct vassal.
+            # Native retraction uses revoked, not an indirect vassal swearing fealty.
+            # Prepare that state only now; no judicial maintenance is called here.
+            create_title_and_vassal_change = { type = revoked add_claim_on_loss = no save_scope_as = tca_test_em_keep_direct }
+            scope:tca_test_em_state = { change_liege = { liege = root change = scope:tca_test_em_keep_direct } }
+            resolve_title_and_vassal_change = scope:tca_test_em_keep_direct
             scope:tca_test_em_circuit.holder = { save_scope_as = tca_test_em_return_holder }
             scope:tca_test_em_commissioner.liege = { save_scope_as = tca_test_em_return_liege }
             debug_log = "TCA_EM RETURN_STATE"
@@ -356,6 +366,7 @@ tca_judicial_imperial_test.1007 = {
             else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_imperial_circuit_lifecycle 13" }
             tca_test_cleanup_native_arrest_effect = yes
             scope:tca_test_em_direct_target = { tca_test_restore_character_effect = yes }
+            scope:tca_test_em_state = { remove_character_flag = tca_test_em_trace_subject }
             scope:tca_test_em_former = { tca_test_restore_character_effect = yes }
             scope:tca_test_em_minister_1 = { tca_test_restore_character_effect = yes }
             scope:tca_test_em_minister_2 = { tca_test_restore_character_effect = yes }
@@ -370,6 +381,30 @@ tca_judicial_imperial_test.1007 = {
             remove_character_flag = tca_test_case_failed
             remove_character_flag = tca_test_delayed_case_active
             tca_test_continue_delayed_effect = yes
+        }
+    }
+}
+
+# Trace the original three-day wait without repairing the subject during it.
+tca_judicial_imperial_test.1010 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_test_em_state = { liege = root } } debug_log = "TCA_EM DIRECT_DAY_ONE yes" }
+            else = { debug_log = "TCA_EM DIRECT_DAY_ONE no" }
+            trigger_event = { id = tca_judicial_imperial_test.1011 days = 1 }
+        }
+    }
+}
+tca_judicial_imperial_test.1011 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_test_em_state = { liege = root } } debug_log = "TCA_EM DIRECT_DAY_TWO yes" }
+            else = { debug_log = "TCA_EM DIRECT_DAY_TWO no" }
+            trigger_event = { id = tca_judicial_imperial_test.1006 days = 1 }
         }
     }
 }

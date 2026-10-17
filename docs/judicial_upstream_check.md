@@ -18,6 +18,8 @@ python3 tools/check_upstream_overrides.py
 
 `auxiliary_extensions`登记`tools/`下独立、按需加载的辅助模组同名追加对象，要求记录原版、适配文件及已审阅基线。通用上游检查核对其原版基线和追加对象存在性；它们不属于普通模组的`common/`／`events/`加载范围，不计入下述普通查漏扫描的失效登记。当前仅登记CLI测试适配的开局回调，见[CLI测试说明](cli_game_tests.md)。
 
+`file_overrides`登记整文件覆盖，当前为通判入口的`gui/hud.gui`及三关系标签的`gui/window_diarchy.gui`。通用检查逐字节核对完整原版与已审阅基线，并检查模组文件存在；缺文件报错，上游变化要求审阅，不自动刷新基线。独立查漏扫描仍只覆盖下述脚本范围。 file_overrides可用diagnostic_localization_keys显式登记被覆盖GUI引用的原版浮窗键，供check_test_run把无tca_、无文件路径的精确本地化错误归属到模组；目前仅登记DIARCHY_WINDOW_MANDATE_TOOLTIP，不会把所有原版本地化错误都判为模组问题。
+
 ## 独立覆盖查漏
 
 单独检查登记是否完整：

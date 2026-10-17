@@ -1,0 +1,459 @@
+﻿# Native regression. Each invocation creates its own governor and canonical duke.
+namespace = tca_tongpan_test
+tca_tongpan_test.1 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        if = { limit = { has_character_flag = tca_test_delayed_case_active } debug_log = "TCA_TEST CASE_BUSY" }
+        else = {
+            debug_log = "TCA_TEST BEGIN tca_tongpan_test.1 tca_test_tongpan_lifecycle"
+            remove_character_flag = tca_test_case_failed
+            if = {
+                limit = { debug_only = yes title:h_china.holder = root government_has_flag = government_is_celestial exists = title:c_hongzhou.holder exists = title:c_yunzhou_2.holder }
+                # Snapshot comes exclusively from the original after-lobby callback.
+                # Never call maintenance to satisfy this startup assertion.
+                if = { limit = { var:tca_test_tongpan_startup_count > 0 var:tca_test_tongpan_startup_missing = 0 } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 29" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 29" }
+                if = { limit = { has_realm_law = tca_tongpan_enabled_law } add_character_flag = tca_test_tp2_restore_law }
+                add_realm_law_skip_effects = tca_tongpan_disabled_law
+                tca_refresh_tongpan_realm_effect = yes
+                create_character = { age = 40 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_test_tp2_duke }
+                create_character = { age = 35 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite diplomacy = 1 martial = 1 stewardship = 1 intrigue = 1 learning = 1 save_scope_as = tca_test_tp2_governor }
+                scope:tca_test_tp2_duke = {
+                    create_dynasty = { spread_to_descendants = yes }
+                    give_noble_family_title = { name = noble_family_name tier = county article = DEFAULT_TITLE_NAME_ARTICLE government = celestial_government save_scope_as = tca_test_tp2_family }
+                    create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_test_tp2_change }
+                    title:d_jiangxi = { change_title_holder = { holder = scope:tca_test_tp2_duke change = scope:tca_test_tp2_change } }
+                    title:c_yunzhou_2 = { change_title_holder = { holder = scope:tca_test_tp2_duke change = scope:tca_test_tp2_change } }
+                    resolve_title_and_vassal_change = scope:tca_test_tp2_change
+                    change_government = celestial_government
+                    create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_test_tp2_fealty }
+                    change_liege = { liege = root change = scope:tca_test_tp2_fealty }
+                    resolve_title_and_vassal_change = scope:tca_test_tp2_fealty
+                    set_primary_title_to = title:d_jiangxi
+                    change_merit = 10000
+                    tca_test_protect_character_effect = yes
+                }
+                scope:tca_test_tp2_governor = {
+                    create_dynasty = { spread_to_descendants = yes }
+                    give_noble_family_title = { name = noble_family_name tier = county article = DEFAULT_TITLE_NAME_ARTICLE government = celestial_government save_scope_as = tca_test_tp2_family }
+                    create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_test_tp2_change }
+                    title:c_hongzhou = { change_title_holder = { holder = scope:tca_test_tp2_governor change = scope:tca_test_tp2_change } }
+                    resolve_title_and_vassal_change = scope:tca_test_tp2_change
+                    change_government = celestial_government
+                    create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_test_tp2_fealty }
+                    change_liege = { liege = scope:tca_test_tp2_duke change = scope:tca_test_tp2_fealty }
+                    resolve_title_and_vassal_change = scope:tca_test_tp2_fealty
+                    set_primary_title_to = title:c_hongzhou
+                    change_merit = 10000
+                    tca_test_protect_character_effect = yes
+                }
+                add_realm_law_skip_effects = tca_tongpan_enabled_law
+                tca_refresh_tongpan_realm_effect = yes
+                title:c_hongzhou.var:tca_tongpan_office = { save_scope_as = tca_test_tp2_office holder ?= { save_scope_as = tca_test_tp2_officer tca_test_protect_character_effect = yes } }
+                if = { limit = { scope:tca_test_tp2_office = title:c_tca_tongpan_hongzhou title:c_hongzhou = { tca_has_tongpan_office_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 1" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 1" }
+                if = { limit = { scope:tca_test_tp2_office = { de_jure_liege = title:d_jiangxi tca_is_valid_tongpan_holder_trigger = yes } scope:tca_test_tp2_officer = { liege = scope:tca_test_tp2_duke } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 2" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 2" }
+                if = { limit = { scope:tca_test_tp2_governor = { tca_has_active_tongpan_trigger = yes diarch = scope:tca_test_tp2_officer } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 3" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 3" }
+                if = { limit = { scope:tca_test_tp2_officer = { has_realm_law = celestial_appointment_succession_law tca_is_civil_official_trigger = yes vassal_contract_has_flag = tca_official_civil_obligation } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 4" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 4" }
+                title:c_hongzhou = { tca_refresh_tongpan_county_effect = yes }
+                if = { limit = { scope:tca_test_tp2_office.holder = scope:tca_test_tp2_officer } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 5" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 5" }
+                # Separate, deterministic aptitude fixture: skill-change effects
+                # can retain cached getters during this same engine tick.
+                create_character = { age = 35 gender_female_chance = 0 random_traits = no dynasty = none employer = scope:tca_test_tp2_duke culture = root.culture faith = root.faith rite = root.rite stewardship = 60 diplomacy = 20 learning = 20 save_scope_as = tca_test_tp2_aptitude_fixture }
+                scope:tca_test_tp2_officer = {
+                    save_scope_value_as = { name = tca_test_tp2_aptitude value = tca_tongpan_aptitude_value }
+                    save_scope_value_as = { name = tca_test_tp2_stewardship value = stewardship }
+                }
+                scope:tca_test_tp2_governor = { save_scope_value_as = { name = tca_test_tp2_efficiency value = tca_tongpan_efficiency_value } }
+                if = { limit = { scope:tca_test_tp2_aptitude_fixture = { tca_tongpan_aptitude_value = 100 } scope:tca_test_tp2_governor = { tca_tongpan_efficiency_value > 0 tca_tongpan_efficiency_value <= 0.4 } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 6" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 6" }
+                if = { limit = { scope:tca_test_tp2_officer = { tca_can_open_tongpan_diarchy_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 48" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 48" }
+                if = { limit = { scope:tca_test_tp2_governor = { tca_can_open_tongpan_diarchy_trigger = no } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 49" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 49" }
+                if = { limit = { scope:tca_test_tp2_aptitude_fixture = { tca_can_open_tongpan_diarchy_trigger = no } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 50" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 50" }
+                # Fixed personality fixtures have no office or opinion contribution.
+                create_character = { age = 35 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_test_tp2_neutral }
+                create_character = { age = 35 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite trait = just trait = honest save_scope_as = tca_test_tp2_dutiful }
+                create_character = { age = 35 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite trait = greedy trait = ambitious trait = deceitful save_scope_as = tca_test_tp2_selfish }
+                scope:tca_test_tp2_governor = { set_diarchy_swing = 0 }
+                if = { limit = { scope:tca_test_tp2_governor = { has_diarchy_active_parameter = tca_tongpan_cost_0 tca_tongpan_prestige_surcharge_value = 0 tca_tongpan_influence_surcharge_value = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 33" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 33" }
+                if = { limit = { scope:tca_test_tp2_neutral = { tca_tongpan_loyalty_value = 60 } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 34" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 34" }
+                if = { limit = { scope:tca_test_tp2_dutiful = { tca_tongpan_loyalty_value = 100 } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 35" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 35" }
+                if = { limit = { scope:tca_test_tp2_selfish = { tca_tongpan_loyalty_value = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 36" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 36" }
+                # Explicit zero base skills isolate each new contribution.
+                create_character = { age = 35 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite stewardship = 0 diplomacy = 0 learning = 0 martial = 20 intrigue = 0 save_scope_as = tca_test_tp2_military }
+                if = { limit = { scope:tca_test_tp2_military = { tca_tongpan_aptitude_value = 10 } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 37" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 37" debug_log_scopes = yes }
+                create_character = { age = 35 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite stewardship = 0 diplomacy = 0 learning = 0 martial = 0 intrigue = 20 save_scope_as = tca_test_tp2_intrigue }
+                if = { limit = { scope:tca_test_tp2_intrigue = { tca_tongpan_aptitude_value = 10 } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 38" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 38" debug_log_scopes = yes }
+                create_character = { age = 35 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite stewardship = 0 diplomacy = 0 learning = 0 martial = 0 intrigue = 0 save_scope_as = tca_test_tp2_uneducated }
+                if = { limit = { scope:tca_test_tp2_uneducated = { tca_tongpan_aptitude_value = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 39" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 39" debug_log_scopes = yes }
+                create_character = { age = 35 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite stewardship = 0 diplomacy = 0 learning = 0 martial = 0 intrigue = 0 trait = education_diplomacy_1 save_scope_as = tca_test_tp2_education_1 }
+                if = { limit = { scope:tca_test_tp2_education_1 = { tca_tongpan_aptitude_value = 4 } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 40" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 40" debug_log_scopes = yes }
+                create_character = { age = 35 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite stewardship = 0 diplomacy = 0 learning = 0 martial = 0 intrigue = 0 trait = education_diplomacy_2 save_scope_as = tca_test_tp2_education_2 }
+                if = { limit = { scope:tca_test_tp2_education_2 = { tca_tongpan_aptitude_value = 8 } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 41" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 41" debug_log_scopes = yes }
+                create_character = { age = 35 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite stewardship = 0 diplomacy = 0 learning = 0 martial = 0 intrigue = 0 trait = education_diplomacy_3 save_scope_as = tca_test_tp2_education_3 }
+                if = { limit = { scope:tca_test_tp2_education_3 = { tca_tongpan_aptitude_value = 12 } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 42" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 42" debug_log_scopes = yes }
+                create_character = { age = 35 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite stewardship = 0 diplomacy = 0 learning = 0 martial = 0 intrigue = 0 trait = education_diplomacy_4 save_scope_as = tca_test_tp2_education_4 }
+                if = { limit = { scope:tca_test_tp2_education_4 = { tca_tongpan_aptitude_value = 16 } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 43" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 43" debug_log_scopes = yes }
+                create_character = { age = 35 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite stewardship = 0 diplomacy = 0 learning = 0 martial = 0 intrigue = 0 trait = education_diplomacy_5 save_scope_as = tca_test_tp2_education_5 }
+                if = { limit = { scope:tca_test_tp2_education_5 = { tca_tongpan_aptitude_value = 21.5 } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 44" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 44" debug_log_scopes = yes }
+                scope:tca_test_tp2_governor = { set_diarchy_swing = 19 }
+                if = { limit = { scope:tca_test_tp2_governor = { tca_tongpan_prestige_surcharge_value = 0 tca_tongpan_influence_surcharge_value = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 7" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 7" }
+                scope:tca_test_tp2_governor = { set_diarchy_swing = 20 }
+                if = { limit = { scope:tca_test_tp2_governor = { tca_tongpan_prestige_surcharge_value = 25 tca_tongpan_influence_surcharge_value = 10 } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 8" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 8" }
+                scope:tca_test_tp2_governor = { set_diarchy_swing = 39 }
+                if = { limit = { scope:tca_test_tp2_governor = { tca_tongpan_prestige_surcharge_value = 25 } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 9" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 9" }
+                scope:tca_test_tp2_governor = { set_diarchy_swing = 40 }
+                if = { limit = { scope:tca_test_tp2_governor = { tca_tongpan_prestige_surcharge_value = 50 tca_tongpan_influence_surcharge_value = 20 } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 10" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 10" }
+                scope:tca_test_tp2_governor = { set_diarchy_swing = 59 }
+                if = { limit = { scope:tca_test_tp2_governor = { tca_tongpan_prestige_surcharge_value = 50 } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 11" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 11" }
+                scope:tca_test_tp2_governor = { set_diarchy_swing = 60 }
+                if = { limit = { scope:tca_test_tp2_governor = { tca_tongpan_prestige_surcharge_value = 100 tca_tongpan_influence_surcharge_value = 40 } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 12" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 12" }
+                scope:tca_test_tp2_governor = { set_diarchy_swing = 79 }
+                if = { limit = { scope:tca_test_tp2_governor = { tca_tongpan_prestige_surcharge_value = 100 } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 13" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 13" }
+                scope:tca_test_tp2_governor = { set_diarchy_swing = 80 }
+                if = { limit = { scope:tca_test_tp2_governor = { tca_tongpan_prestige_surcharge_value = 150 tca_tongpan_influence_surcharge_value = 60 } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 14" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 14" }
+                if = { limit = { scope:tca_test_tp2_duke = { tca_has_active_tongpan_trigger = no tca_tongpan_efficiency_value = 0 tca_tongpan_prestige_surcharge_value = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 15" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 15" }
+                add_character_flag = tca_test_delayed_case_active
+                debug_log = "TCA_TEST WAIT tca_test_tongpan_lifecycle 7 days"
+                trigger_event = { id = tca_tongpan_test.1001 days = 7 }
+            }
+            else = {
+                debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_tongpan_lifecycle"
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+                tca_test_continue_delayed_effect = yes
+            }
+        }
+    }
+}
+tca_tongpan_test.1001 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_test_tp2_governor = { tca_has_active_tongpan_trigger = yes diarch = scope:tca_test_tp2_officer } scope:tca_test_tp2_officer = { liege = scope:tca_test_tp2_duke } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 16" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 16" }
+            # The displayed opinion contribution must read the native opinion of the
+            # supervised governor, not diarch_loyalty (an actual-liege getter).
+            scope:tca_test_tp2_officer = {
+                save_scope_value_as = { name = tca_test_tp2_loyalty_engine value = diarch_loyalty }
+                save_scope_value_as = { name = tca_test_tp2_loyalty_model value = tca_tongpan_loyalty_value }
+            }
+            if = { limit = { scope:tca_test_tp2_officer = { tca_is_tongpan_for_loyalty_trigger = yes tca_tongpan_loyalty_opinion_value = "opinion(scope:tca_test_tp2_governor)" } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 30" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 30" debug_log_scopes = yes }
+            # Changing the actual superior's relationship must not change loyalty
+            # towards the supervised governor; the peer relationship is preserved.
+            scope:tca_test_tp2_officer = { set_relation_rival = scope:tca_test_tp2_duke }
+            if = { limit = { scope:tca_test_tp2_officer = { liege = scope:tca_test_tp2_duke tca_tongpan_loyalty_value = scope:tca_test_tp2_loyalty_model } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 31" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 31" }
+            # Read the native final and presented values, not only our helper.
+            scope:tca_test_tp2_governor = {
+                save_scope_value_as = { name = tca_test_tp2_eff_base value = { value = tca_native_governor_efficiency_value multiply = 100 subtract = 100 } }
+                save_scope_value_as = { name = tca_test_tp2_eff_delta value = { value = governor_efficiency_presented subtract = scope:tca_test_tp2_eff_base } }
+                save_scope_value_as = { name = tca_test_tp2_eff_error value = { value = scope:tca_test_tp2_eff_delta subtract = { value = diarch.tca_tongpan_aptitude_value multiply = 0.4 } } }
+            }
+            if = { limit = { scope:tca_test_tp2_governor = { governor_efficiency > tca_native_governor_efficiency_value } scope:tca_test_tp2_eff_delta > 0 scope:tca_test_tp2_eff_error >= -0.02 scope:tca_test_tp2_eff_error <= 0.02 } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 32" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 32" debug_log_scopes = yes }
+            add_realm_law_skip_effects = tca_tongpan_disabled_law
+            tca_refresh_tongpan_realm_effect = yes
+            if = { limit = { scope:tca_test_tp2_office = { NOT = { exists = holder } var:tca_tongpan_county = title:c_hongzhou } title:c_hongzhou = { var:tca_tongpan_office = scope:tca_test_tp2_office } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 17" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 17" }
+            if = { limit = { scope:tca_test_tp2_governor = { NOT = { has_diarchy_type = tca_tongpan } tca_tongpan_efficiency_value = 0 tca_tongpan_prestige_surcharge_value = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 18" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 18" }
+            add_realm_law_skip_effects = tca_tongpan_enabled_law
+            title:c_hongzhou = { tca_refresh_tongpan_county_effect = yes }
+            if = { limit = { title:c_hongzhou = { var:tca_tongpan_office = scope:tca_test_tp2_office } scope:tca_test_tp2_office = { tca_is_valid_tongpan_holder_trigger = yes de_jure_liege = title:d_jiangxi } scope:tca_test_tp2_governor = { tca_has_active_tongpan_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 19" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 19" }
+            # A fixture county absent from the generated lookup simulates the
+            # allocation request of a map extension. No map eligibility is faked.
+            title:c_tca_tongpan_probe = { tca_bind_tongpan_office_effect = yes }
+            if = { limit = { title:c_tca_tongpan_probe = { tca_has_tongpan_office_trigger = yes var:tca_tongpan_office = { var:tca_tongpan_county = title:c_tca_tongpan_probe } } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 20" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 20" }
+            scope:tca_test_tp2_governor = {
+                set_diarchy_swing = 80
+                add_prestige = 1000
+                change_influence = 1000
+                create_character = { age = 30 gender_female_chance = 0 dynasty = none employer = this culture = this.culture faith = this.faith rite = this.rite save_scope_as = tca_test_tp2_prisoner }
+                imprison = { target = scope:tca_test_tp2_prisoner type = dungeon }
+                add_opinion = { target = scope:tca_test_tp2_prisoner modifier = schemed_against_me }
+                set_relation_rival = scope:tca_test_tp2_prisoner
+                save_scope_value_as = { name = tca_test_tp2_before_prestige value = prestige }
+                save_scope_value_as = { name = tca_test_tp2_before_influence value = influence }
+                add_character_flag = tca_test_tp2_execution_probe
+                set_variable = { name = tca_test_tp2_execution_prestige value = prestige }
+                set_variable = { name = tca_test_tp2_execution_influence value = influence }
+                if = { limit = { is_character_interaction_valid = { interaction = execute_prisoner_interaction recipient = scope:tca_test_tp2_prisoner } } debug_log = "TCA: Tongpan execution fixture valid" }
+                else = { debug_log = "TCA: Tongpan execution fixture INVALID" }
+            }
+            run_interaction = { interaction = execute_prisoner_interaction actor = scope:tca_test_tp2_governor recipient = scope:tca_test_tp2_prisoner send_threshold = decline }
+            scope:tca_test_tp2_governor = {
+                save_scope_value_as = { name = tca_test_tp2_after_prestige value = prestige }
+                save_scope_value_as = { name = tca_test_tp2_after_influence value = influence }
+            }
+            debug_log = "TCA_TEST WAIT tca_test_tongpan_lifecycle 2 days"
+            trigger_event = { id = tca_tongpan_test.1002 days = 2 }
+        }
+    }
+}
+tca_tongpan_test.1002 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_test_tp2_prisoner = { is_alive = no } scope:tca_test_tp2_governor = { var:tca_test_tp2_execution_seen = yes var:tca_test_tp2_execution_prestige_paid = 150 } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 21" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 21" }
+            if = { limit = { scope:tca_test_tp2_governor = { var:tca_test_tp2_execution_influence_paid = 60 } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 22" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 22" }
+            scope:tca_test_tp2_governor = {
+                save_scope_value_as = { name = tca_test_tp2_execution_seen value = { value = 0 if = { limit = { var:tca_test_tp2_execution_seen ?= yes } add = 1 } } }
+                save_scope_value_as = { name = tca_test_tp2_execution_prestige_paid value = var:tca_test_tp2_execution_prestige_paid }
+                save_scope_value_as = { name = tca_test_tp2_execution_influence_paid value = var:tca_test_tp2_execution_influence_paid }
+                remove_character_flag = tca_test_tp2_execution_probe
+            }
+            # Snapshot the engine's title list without reproducing an appointment
+            # formula. Native appointment can select a different listed candidate
+            # when the preview head already holds another office (full-suite probe).
+            clear_saved_scope = tca_test_tp2_expected_heir
+            clear_saved_scope = tca_test_tp2_appointed_heir
+            every_in_list = { list = tca_test_tp2_title_heirs_before_death remove_from_list = tca_test_tp2_title_heirs_before_death }
+            scope:tca_test_tp2_office = {
+                every_title_heir = {
+                    add_to_list = tca_test_tp2_title_heirs_before_death
+                    if = {
+                        limit = { scope:tca_test_tp2_office = { place_in_line_of_succession = { target = prev value = 1 } } }
+                        save_scope_as = tca_test_tp2_expected_heir
+                    }
+                }
+            }
+            if = { limit = { exists = scope:tca_test_tp2_expected_heir } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 45" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 45" }
+            scope:tca_test_tp2_office.holder ?= { save_scope_as = tca_test_tp2_dying_officer death = { death_reason = death_fight } }
+            # This immediate assertion precedes the deferred repair and therefore
+            # cannot pass merely because a maintenance effect filled the vacancy.
+            if = { limit = { scope:tca_test_tp2_office = { exists = holder NOT = { holder = scope:tca_test_tp2_dying_officer } holder = { has_realm_law = celestial_appointment_succession_law } } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 23" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 23" }
+            scope:tca_test_tp2_office.holder ?= { save_scope_as = tca_test_tp2_appointed_heir }
+            if = { limit = { scope:tca_test_tp2_appointed_heir = { is_in_list = tca_test_tp2_title_heirs_before_death } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 46" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 46" debug_log_scopes = yes }
+            # Preserve the strict preview-head comparison as a diagnostic. It is
+            # not a promise made by a UI that only reads native succession data.
+            if = {
+                limit = { NOT = { scope:tca_test_tp2_appointed_heir = scope:tca_test_tp2_expected_heir } }
+                debug_log = "TCA: native Tongpan appointment differs from pre-death title preview head"
+                debug_log_scopes = yes
+            }
+            debug_log = "TCA_TEST WAIT tca_test_tongpan_lifecycle 2 days"
+            trigger_event = { id = tca_tongpan_test.1003 days = 2 }
+        }
+    }
+}
+tca_tongpan_test.1003 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            scope:tca_test_tp2_office.holder ?= { save_scope_as = tca_test_tp2_successor }
+            title:c_hongzhou.holder ?= { save_scope_as = tca_test_tp2_current_governor }
+            if = { limit = { scope:tca_test_tp2_office = { tca_is_valid_tongpan_holder_trigger = yes } title:c_hongzhou.holder = { tca_has_active_tongpan_trigger = yes diarch = scope:tca_test_tp2_office.holder } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 24" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 24" }
+            if = { limit = { title:c_hongzhou.holder = { diarch = scope:tca_test_tp2_appointed_heir } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 47" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 47" debug_log_scopes = yes }
+            scope:tca_test_tp2_office.holder = { save_scope_as = tca_test_tp2_blocked_officer add_character_flag = cannot_be_diarch }
+            title:c_hongzhou = { tca_refresh_tongpan_county_effect = yes }
+            if = { limit = { scope:tca_test_tp2_office.holder = scope:tca_test_tp2_blocked_officer title:c_hongzhou.holder = { tca_has_active_tongpan_trigger = no tca_tongpan_efficiency_value = 0 tca_tongpan_prestige_surcharge_value = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 25" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 25" }
+                if = { limit = { scope:tca_test_tp2_blocked_officer = { tca_can_open_tongpan_diarchy_trigger = no } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 51" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 51" }
+            scope:tca_test_tp2_blocked_officer = { remove_character_flag = cannot_be_diarch }
+            title:c_hongzhou = { tca_refresh_tongpan_county_effect = yes }
+            if = { limit = { scope:tca_test_tp2_office.holder = scope:tca_test_tp2_blocked_officer title:c_hongzhou.holder = { tca_has_active_tongpan_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 26" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 26" }
+                if = { limit = { scope:tca_test_tp2_blocked_officer = { tca_can_open_tongpan_diarchy_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 52" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 52" }
+            # Exercise the original government-change callback, without manually
+            # calling maintenance to make the exit assertion pass.
+            title:c_hongzhou.holder = { save_scope_as = tca_test_tp2_reforming_governor change_government = feudal_government }
+            debug_log = "TCA_TEST WAIT tca_test_tongpan_lifecycle 2 days"
+            trigger_event = { id = tca_tongpan_test.1004 days = 2 }
+        }
+    }
+}
+tca_tongpan_test.1004 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_test_tp2_office = { NOT = { exists = holder } } title:c_hongzhou = { var:tca_tongpan_office = scope:tca_test_tp2_office } scope:tca_test_tp2_reforming_governor = { NOT = { has_diarchy_type = tca_tongpan } } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 27" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 27" }
+            scope:tca_test_tp2_reforming_governor = { change_government = celestial_government }
+            debug_log = "TCA_TEST WAIT tca_test_tongpan_lifecycle 2 days"
+            trigger_event = { id = tca_tongpan_test.1005 days = 2 }
+        }
+    }
+}
+tca_tongpan_test.1005 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { title:c_hongzhou = { var:tca_tongpan_office = scope:tca_test_tp2_office } scope:tca_test_tp2_office = { tca_is_valid_tongpan_holder_trigger = yes } title:c_hongzhou.holder = { tca_has_active_tongpan_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 28" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 28" }
+            # Use freshly created fixed-stat characters rather than skill-change
+            # effects whose getters can remain cached during the same tick.
+            scope:tca_test_tp2_office.holder = { save_scope_as = tca_test_tp2_boundary_original_officer }
+            scope:tca_test_tp2_aptitude_fixture = {
+                create_dynasty = { spread_to_descendants = yes }
+                give_noble_family_title = { name = noble_family_name tier = county article = DEFAULT_TITLE_NAME_ARTICLE government = celestial_government save_scope_as = tca_test_tp2_boundary_family }
+                tca_test_protect_character_effect = yes
+            }
+            create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_test_tp2_boundary_change }
+            scope:tca_test_tp2_office = { change_title_holder = { holder = scope:tca_test_tp2_aptitude_fixture change = scope:tca_test_tp2_boundary_change } }
+            resolve_title_and_vassal_change = scope:tca_test_tp2_boundary_change
+            scope:tca_test_tp2_aptitude_fixture = {
+                change_government = celestial_government
+                set_primary_title_to = scope:tca_test_tp2_office
+                create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_test_tp2_boundary_fealty }
+                change_liege = { liege = scope:tca_test_tp2_duke change = scope:tca_test_tp2_boundary_fealty }
+                resolve_title_and_vassal_change = scope:tca_test_tp2_boundary_fealty
+            }
+            title:c_hongzhou = { tca_refresh_tongpan_county_effect = yes }
+            if = { limit = { scope:tca_test_tp2_aptitude_fixture = { tca_tongpan_aptitude_value = 100 } title:c_hongzhou.holder = { tca_has_active_tongpan_trigger = yes tca_tongpan_efficiency_value = 0.4 } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 53" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 53" debug_log_scopes = yes }
+            scope:tca_test_tp2_uneducated = {
+                create_dynasty = { spread_to_descendants = yes }
+                give_noble_family_title = { name = noble_family_name tier = county article = DEFAULT_TITLE_NAME_ARTICLE government = celestial_government save_scope_as = tca_test_tp2_boundary_family }
+                tca_test_protect_character_effect = yes
+            }
+            create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_test_tp2_boundary_change }
+            scope:tca_test_tp2_office = { change_title_holder = { holder = scope:tca_test_tp2_uneducated change = scope:tca_test_tp2_boundary_change } }
+            resolve_title_and_vassal_change = scope:tca_test_tp2_boundary_change
+            scope:tca_test_tp2_uneducated = {
+                change_government = celestial_government
+                set_primary_title_to = scope:tca_test_tp2_office
+                create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_test_tp2_boundary_fealty }
+                change_liege = { liege = scope:tca_test_tp2_duke change = scope:tca_test_tp2_boundary_fealty }
+                resolve_title_and_vassal_change = scope:tca_test_tp2_boundary_fealty
+            }
+            title:c_hongzhou = { tca_refresh_tongpan_county_effect = yes }
+            if = { limit = { scope:tca_test_tp2_uneducated = { tca_tongpan_aptitude_value = 0 } title:c_hongzhou.holder = { tca_has_active_tongpan_trigger = yes tca_tongpan_efficiency_value = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 54" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 54" debug_log_scopes = yes }
+            create_character = { age = 35 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite stewardship = 100 diplomacy = 100 learning = 100 martial = 100 intrigue = 100 save_scope_as = tca_test_tp2_high_governor }
+            scope:tca_test_tp2_high_governor = {
+                create_dynasty = { spread_to_descendants = yes }
+                give_noble_family_title = { name = noble_family_name tier = county article = DEFAULT_TITLE_NAME_ARTICLE government = celestial_government save_scope_as = tca_test_tp2_boundary_family }
+                tca_test_protect_character_effect = yes
+            }
+            create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_test_tp2_boundary_change }
+            title:c_hongzhou = { change_title_holder = { holder = scope:tca_test_tp2_high_governor change = scope:tca_test_tp2_boundary_change } }
+            resolve_title_and_vassal_change = scope:tca_test_tp2_boundary_change
+            scope:tca_test_tp2_high_governor = {
+                change_government = celestial_government
+                set_primary_title_to = title:c_hongzhou
+                create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_test_tp2_boundary_fealty }
+                change_liege = { liege = scope:tca_test_tp2_duke change = scope:tca_test_tp2_boundary_fealty }
+                resolve_title_and_vassal_change = scope:tca_test_tp2_boundary_fealty
+            }
+            create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_test_tp2_boundary_change }
+            scope:tca_test_tp2_office = { change_title_holder = { holder = scope:tca_test_tp2_aptitude_fixture change = scope:tca_test_tp2_boundary_change } }
+            resolve_title_and_vassal_change = scope:tca_test_tp2_boundary_change
+            scope:tca_test_tp2_aptitude_fixture = {
+                change_government = celestial_government
+                set_primary_title_to = scope:tca_test_tp2_office
+                create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_test_tp2_boundary_fealty }
+                change_liege = { liege = scope:tca_test_tp2_duke change = scope:tca_test_tp2_boundary_fealty }
+                resolve_title_and_vassal_change = scope:tca_test_tp2_boundary_fealty
+            }
+            title:c_hongzhou = { tca_refresh_tongpan_county_effect = yes }
+            if = { limit = { scope:tca_test_tp2_high_governor = { tca_has_active_tongpan_trigger = yes tca_native_governor_efficiency_value = 1.5 tca_tongpan_efficiency_value = 0.4 governor_efficiency = 1.5 } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 55" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 55" debug_log_scopes = yes }
+            create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_test_tp2_boundary_change }
+            title:c_hongzhou = { change_title_holder = { holder = scope:tca_test_tp2_governor change = scope:tca_test_tp2_boundary_change } }
+            resolve_title_and_vassal_change = scope:tca_test_tp2_boundary_change
+            scope:tca_test_tp2_governor = {
+                change_government = celestial_government
+                set_primary_title_to = title:c_hongzhou
+                create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_test_tp2_boundary_fealty }
+                change_liege = { liege = scope:tca_test_tp2_duke change = scope:tca_test_tp2_boundary_fealty }
+                resolve_title_and_vassal_change = scope:tca_test_tp2_boundary_fealty
+            }
+            create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_test_tp2_boundary_change }
+            scope:tca_test_tp2_office = { change_title_holder = { holder = scope:tca_test_tp2_boundary_original_officer change = scope:tca_test_tp2_boundary_change } }
+            resolve_title_and_vassal_change = scope:tca_test_tp2_boundary_change
+            scope:tca_test_tp2_boundary_original_officer = {
+                change_government = celestial_government
+                set_primary_title_to = scope:tca_test_tp2_office
+                create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_test_tp2_boundary_fealty }
+                change_liege = { liege = scope:tca_test_tp2_duke change = scope:tca_test_tp2_boundary_fealty }
+                resolve_title_and_vassal_change = scope:tca_test_tp2_boundary_fealty
+            }
+            title:c_hongzhou = { tca_refresh_tongpan_county_effect = yes }
+            if = { limit = { title:c_hongzhou.holder = scope:tca_test_tp2_governor scope:tca_test_tp2_office.holder = scope:tca_test_tp2_boundary_original_officer scope:tca_test_tp2_governor = { tca_has_active_tongpan_trigger = yes diarch = scope:tca_test_tp2_boundary_original_officer } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 56" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 56" debug_log_scopes = yes }
+            # Exercise the exact read-only helper used by GuiScope in the window.
+            scope:tca_test_tp2_office = { save_scope_as = tca_tp_office }
+            scope:tca_test_tp2_boundary_original_officer = {
+                save_scope_value_as = { name = tca_test_tp2_native_candidate_score value = "appointment_candidate_score(scope:tca_tp_office)" }
+            }
+            if = { limit = { scope:tca_test_tp2_boundary_original_officer = { tca_tongpan_title_candidate_score_value = scope:tca_test_tp2_native_candidate_score } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 57" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 57" debug_log_scopes = yes }
+            # Prepare our own vacant office; the shared probe title can already have a holder.
+            # Keep the zero expectation and assert vacancy before querying the GUI helper.
+            scope:tca_test_tp2_office = { tca_destroy_tongpan_office_effect = yes save_scope_as = tca_tp_office }
+            if = { limit = { scope:tca_tp_office = { NOT = { exists = holder } } scope:tca_test_tp2_boundary_original_officer = { tca_tongpan_title_candidate_score_value = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 58" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 58" debug_log_scopes = yes }
+            scope:tca_test_tp2_aptitude_fixture = { tca_test_restore_character_effect = yes }
+            scope:tca_test_tp2_uneducated = { tca_test_restore_character_effect = yes }
+            scope:tca_test_tp2_high_governor = { tca_test_restore_character_effect = yes }
+            scope:tca_test_tp2_governor = { tca_test_restore_character_effect = yes }
+            scope:tca_test_tp2_officer = { tca_test_restore_character_effect = yes }
+            scope:tca_test_tp2_duke = { tca_test_restore_character_effect = yes }
+            if = { limit = { NOT = { has_character_flag = tca_test_tp2_restore_law } } add_realm_law_skip_effects = tca_tongpan_disabled_law }
+            remove_character_flag = tca_test_tp2_restore_law
+            tca_refresh_tongpan_realm_effect = yes
+            if = { limit = { has_character_flag = tca_test_case_failed }
+                debug_log = "TCA_TEST FAIL tca_test_tongpan_lifecycle"
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+            }
+            else = {
+                debug_log = "TCA_TEST PASS tca_test_tongpan_lifecycle"
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } }
+            }
+            remove_character_flag = tca_test_case_failed
+            remove_character_flag = tca_test_delayed_case_active
+            tca_test_continue_delayed_effect = yes
+        }
+    }
+}

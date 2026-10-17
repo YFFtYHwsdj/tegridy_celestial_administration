@@ -1,0 +1,64 @@
+﻿# Office holder scope. A single source for mandate aptitude and actual benefit.
+tca_tongpan_aptitude_value = {
+    value = 0
+    add = { desc = stewardship_concept value = stewardship multiply = 2 }
+    add = { desc = diplomacy_concept value = diplomacy }
+    add = { desc = learning_concept value = learning }
+    add = { desc = martial_concept value = martial multiply = 0.5 }
+    add = { desc = intrigue_concept value = intrigue multiply = 0.5 }
+    add = { desc = tca_tongpan_education_bonus value = tca_tongpan_education_bonus_value }
+    if = { limit = { has_trait = diligent } add = { desc = trait_diligent value = 10 } }
+    if = { limit = { has_trait = just } add = { desc = trait_just value = 10 } }
+    if = { limit = { has_trait = lazy } add = { desc = trait_lazy value = -10 } }
+    if = { limit = { has_trait = arbitrary } add = { desc = trait_arbitrary value = -10 } }
+    min = 0
+    max = 100
+}
+# Native five-skill education ranks; use only the highest rank if malformed
+# characters hold several education traits. Prowess education is separate.
+tca_tongpan_education_bonus_value = {
+    value = 0
+    if = { limit = { has_education_rank_5_trigger = yes } add = 10 }
+    else_if = { limit = { has_education_rank_4_trigger = yes } add = 8 }
+    else_if = { limit = { has_education_rank_3_trigger = yes } add = 6 }
+    else_if = { limit = { has_education_rank_2_trigger = yes } add = 4 }
+    else_if = { limit = { has_education_rank_1_trigger = yes } add = 2 }
+}
+# Governor scope. Additive efficiency, 0..0.4, not a tax multiplier.
+tca_tongpan_efficiency_value = {
+    value = 0
+    if = {
+        limit = { tca_has_active_tongpan_trigger = yes }
+        add = primary_title.var:tca_tongpan_office.holder.tca_tongpan_aptitude_value
+        multiply = 0.4
+        divide = 100
+    }
+}
+tca_tongpan_prestige_surcharge_value = {
+    value = 0
+    if = { limit = { tca_has_active_tongpan_trigger = yes }
+        if = { limit = { diarchy_swing >= 80 } add = 150 }
+        else_if = { limit = { diarchy_swing >= 60 } add = 100 }
+        else_if = { limit = { diarchy_swing >= 40 } add = 50 }
+        else_if = { limit = { diarchy_swing >= 20 } add = 25 }
+    }
+}
+tca_tongpan_influence_surcharge_value = {
+    value = tca_tongpan_prestige_surcharge_value
+    multiply = 0.4
+}
+# Native engine candidate score; callers supply the actual office scope.
+tca_tongpan_candidate_weight_value = {
+    value = "appointment_candidate_score(scope:tca_tp_office)"
+    min = 1
+}
+
+# Display the native appointment score for this title, without the draw's min=1.
+# Candidate root and office are supplied by GuiScope, never cached on characters.
+tca_tongpan_title_candidate_score_value = {
+    value = 0
+    if = {
+        limit = { exists = scope:tca_tp_office.holder }
+        add = "appointment_candidate_score(scope:tca_tp_office)"
+    }
+}

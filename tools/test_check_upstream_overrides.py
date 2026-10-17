@@ -29,6 +29,28 @@ class UpstreamCheckTests(unittest.TestCase):
             result = check(self.game, self.mod)
         return result, output.getvalue()
 
+    def test_file_override_detects_drift_and_missing_replacement(self):
+        self.write(self.game / "common/empty.txt", "")
+        self.write(self.mod / "common/empty.txt", "")
+        entry = {"key": "hud", "vanilla": "gui/hud.gui", "mod": "gui/hud.gui",
+                 "baseline": "tools/baselines/hud.gui"}
+        self.write(self.mod / "tools/upstream_overrides.json", json.dumps({
+            "schema_version": 1, "overrides": [], "known_extensions": [],
+            "file_overrides": [entry]}))
+        self.write(self.game / entry["vanilla"], 'widget = { name = "original" }')
+        self.write(self.mod / entry["baseline"], 'widget = { name = "original" }')
+        self.write(self.mod / entry["mod"], 'widget = { name = "modified" }')
+        self.assertEqual(self.run_check()[0], 0)
+        before = (self.mod / entry["baseline"]).read_bytes()
+        self.write(self.game / entry["vanilla"], 'widget = { name = "updated" }')
+        result, output = self.run_check()
+        self.assertEqual(result, 1)
+        self.assertIn("NEEDS REVIEW", output)
+        self.assertEqual((self.mod / entry["baseline"]).read_bytes(), before)
+        (self.mod / entry["mod"]).unlink()
+        with self.assertRaisesRegex(ValueError, "mod file override missing"):
+            self.run_check()
+
     def test_additive_extension_checks_reviewed_native_baseline(self):
         vanilla = 'common/on_action/council.txt'
         mod = 'common/on_action/tca_council.txt'

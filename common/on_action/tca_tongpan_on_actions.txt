@@ -1,0 +1,67 @@
+﻿# Additive native callbacks; debounce at the sovereign while transactions settle.
+on_game_start_after_lobby = { on_actions = { tca_tongpan_startup } }
+yearly_global_pulse = { on_actions = { tca_tongpan_setup } }
+on_title_gain = { on_actions = { tca_tongpan_changed } }
+on_government_change = { on_actions = { tca_tongpan_changed } }
+on_vassal_change = { on_actions = { tca_tongpan_changed } }
+quarterly_playable_pulse = { on_actions = { tca_tongpan_periodic } }
+on_title_destroyed = { on_actions = { tca_tongpan_destroyed } }
+on_fired_from_council = { on_actions = { tca_tongpan_changed } }
+on_councillor_left = { on_actions = { tca_tongpan_council_left } }
+on_councillors_swapped = { on_actions = { tca_tongpan_council_swapped } }
+tca_tongpan_setup = { effect = { every_independent_ruler = { tca_request_tongpan_maintenance_effect = yes } } }
+tca_tongpan_changed = {
+    trigger = { OR = { government_has_flag = government_is_celestial any_held_title = { has_variable = tca_tongpan_title } any_held_title = { has_variable = tca_tongpan_office } } }
+    effect = {
+        tca_request_tongpan_maintenance_effect = yes
+        scope:title ?= {
+            if = { limit = { has_variable = tca_tongpan_title } var:tca_tongpan_county.holder ?= { tca_request_tongpan_maintenance_effect = yes } }
+        }
+    }
+}
+tca_tongpan_periodic = {
+    trigger = { is_independent_ruler = yes government_has_flag = government_is_celestial highest_held_title_tier = tier_hegemony }
+    effect = { tca_request_tongpan_maintenance_effect = yes }
+}
+tca_tongpan_destroyed = {
+    effect = {
+        scope:landed_title = {
+            if = {
+                limit = { has_variable = tca_tongpan_title }
+                tca_stop_tongpan_diarchy_effect = yes
+                # The outgoing officer may now be an independent family head.
+                # Queue repair through the supervised county's current realm.
+                var:tca_tongpan_county.holder ?= { tca_request_tongpan_maintenance_effect = yes }
+            }
+            else_if = { limit = { tca_has_tongpan_office_trigger = yes } var:tca_tongpan_office = { tca_destroy_tongpan_office_effect = yes } }
+        }
+        tca_request_tongpan_maintenance_effect = yes
+    }
+}
+tca_tongpan_council_left = { effect = { scope:old_employer ?= { tca_request_tongpan_maintenance_effect = yes } } }
+tca_tongpan_council_swapped = { effect = { scope:councillor_liege ?= { tca_request_tongpan_maintenance_effect = yes } } }
+
+# Initial offices must exist before the first date advance. Later title changes
+# still use the debounced worker while native transactions settle.
+tca_tongpan_startup = {
+    effect = {
+        every_independent_ruler = {
+            limit = { government_has_flag = government_is_celestial highest_held_title_tier = tier_hegemony }
+            tca_refresh_tongpan_realm_effect = yes
+            # Capture the original startup result, before any test/next-day repair.
+            if = {
+                limit = { debug_only = yes }
+                set_variable = { name = tca_test_tongpan_startup_count value = 0 }
+                set_variable = { name = tca_test_tongpan_startup_missing value = 0 }
+                every_vassal_or_below = {
+                    limit = { primary_title = { tca_is_tongpan_county_trigger = yes } }
+                    top_liege = { change_variable = { name = tca_test_tongpan_startup_count add = 1 } }
+                    if = {
+                        limit = { NOT = { tca_has_active_tongpan_trigger = yes } }
+                        top_liege = { change_variable = { name = tca_test_tongpan_startup_missing add = 1 } }
+                    }
+                }
+            }
+        }
+    }
+}

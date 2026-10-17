@@ -1,0 +1,119 @@
+﻿widget = {
+    name = "tca_gui_probe_start"
+    datacontext = "[GetTitleByKey('h_china')]"
+    size = { 1 1 }
+    alwaystransparent = yes
+    widget = {
+        size = { 1 1 }
+        visible_at_creation = no
+        visible = "[IsInGame]"
+        state = { name = _show on_start = "[ExecuteConsoleCommand(Localize('tca_gui_play_command'))]" }
+    }
+    widget = {
+        size = { 1 1 }
+        visible_at_creation = no
+        visible = "[IsInGame]"
+        state = {
+            name = _show
+            duration = 1
+            next = tca_gui_open_governor
+        }
+        state = {
+            name = tca_gui_open_governor
+            on_start = "[OpenGameViewData('diarchy', GetTitleByKey('h_china').MakeScope.Var('tca_ui_governor').Char.GetID)]"
+        }
+    }
+}
+
+template tca_gui_probe_sequence {
+# Timed actions always advance: a wrong binding produces FAIL, not a silent stall.
+widget = {
+    size = { 1 1 }
+    alwaystransparent = yes
+    visible_at_creation = no
+    visible = "[And(Not(IsManuallyPaused), Not(EqualTo_CFixedPoint(GetTitleByKey('h_china').MakeScope.Var('tca_ui_end_sent').GetValue, '(CFixedPoint)1')))]"
+    state = { name = _show on_start = "[OnPause]" }
+}
+widget = {
+    size = { 1 1 }
+    alwaystransparent = yes
+    visible_at_creation = no
+    visible = "[DiarchyWindow.IsVisible]"
+    state = {
+        name = _show
+        on_start = "[DiarchyWindow.SetYourDiarchyTab]"
+        on_start = "[GetScriptedGui('tca_gui_mark_window').Execute(GuiScope.AddScope('owner', DiarchyWindow.GetDiarchyOwner.MakeScope).AddScope('displayed', DiarchyWindow.GetDisplayedDiarch.MakeScope).AddScope('player', GetPlayer.MakeScope).End)]"
+        duration = 0.5
+        next = tca_gui_check_governor
+    }
+    state = {
+        name = tca_gui_check_governor
+        on_start = "[GetScriptedGui(Select_CString(And(Not(DiarchyWindow.CanChangeMandate), And(ObjectsEqual(DiarchyWindow.GetDiarchyOwner.Self, GetTitleByKey('h_china').MakeScope.Var('tca_ui_governor').Char.Self), And(ObjectsEqual(DiarchyWindow.GetDisplayedDiarch.Self, GetPlayer.Self), And(@SELECT_TONGPAN@, Nor(@SELECT_SELF@, @SELECT_LIEGE@))))), 'tca_gui_mark_governor', 'tca_gui_fail_governor')).Execute(GuiScope.AddScope('owner', DiarchyWindow.GetDiarchyOwner.MakeScope).AddScope('displayed', DiarchyWindow.GetDisplayedDiarch.MakeScope).AddScope('player', GetPlayer.MakeScope).End)]"
+        duration = 0.25
+        next = tca_gui_action_self_0
+    }
+    state = {
+        name = tca_gui_action_self_0
+        using = tca_gui_probe_select_self
+        duration = 0.5
+        next = tca_gui_check_self
+    }
+    state = {
+        name = tca_gui_check_self
+        on_start = "[GetScriptedGui(Select_CString(And(DiarchyWindow.CanChangeMandate, And(ObjectsEqual(DiarchyWindow.GetDiarchyOwner.Self, GetPlayer.Self), And(ObjectsEqual(DiarchyWindow.GetDisplayedDiarch.Self, GetTitleByKey('h_china').GetHolder.Self), And(@SELECT_SELF@, Nor(@SELECT_LIEGE@, @SELECT_TONGPAN@))))), 'tca_gui_mark_self', 'tca_gui_fail_self')).Execute(GuiScope.AddScope('owner', DiarchyWindow.GetDiarchyOwner.MakeScope).AddScope('displayed', DiarchyWindow.GetDisplayedDiarch.MakeScope).AddScope('player', GetPlayer.MakeScope).End)]"
+        duration = 0.25
+        next = tca_gui_action_liege_1
+    }
+    state = {
+        name = tca_gui_action_liege_1
+        using = tca_gui_probe_select_liege
+        duration = 0.5
+        next = tca_gui_check_liege
+    }
+    state = {
+        name = tca_gui_check_liege
+        on_start = "[GetScriptedGui(Select_CString(And(Not(DiarchyWindow.CanChangeMandate), And(ObjectsEqual(DiarchyWindow.GetDiarchyOwner.Self, GetPlayer.GetLiege.Self), And(ObjectsEqual(DiarchyWindow.GetDisplayedDiarch.Self, GetTitleByKey('h_china').GetHolder.Self), And(@SELECT_LIEGE@, Nor(@SELECT_SELF@, @SELECT_TONGPAN@))))), 'tca_gui_mark_liege', 'tca_gui_fail_liege')).Execute(GuiScope.AddScope('owner', DiarchyWindow.GetDiarchyOwner.MakeScope).AddScope('displayed', DiarchyWindow.GetDisplayedDiarch.MakeScope).AddScope('player', GetPlayer.MakeScope).End)]"
+        duration = 0.25
+        next = tca_gui_action_tongpan_2
+    }
+    state = {
+        name = tca_gui_action_tongpan_2
+        using = tca_gui_probe_select_tongpan
+        duration = 0.5
+        next = tca_gui_check_tongpan
+    }
+    state = {
+        name = tca_gui_check_tongpan
+        on_start = "[GetScriptedGui(Select_CString(And(Not(DiarchyWindow.CanChangeMandate), And(ObjectsEqual(DiarchyWindow.GetDiarchyOwner.Self, GetTitleByKey('h_china').MakeScope.Var('tca_ui_governor').Char.Self), And(ObjectsEqual(DiarchyWindow.GetDisplayedDiarch.Self, GetPlayer.Self), And(@SELECT_TONGPAN@, Nor(@SELECT_SELF@, @SELECT_LIEGE@))))), 'tca_gui_mark_tongpan', 'tca_gui_fail_tongpan')).Execute(GuiScope.AddScope('owner', DiarchyWindow.GetDiarchyOwner.MakeScope).AddScope('displayed', DiarchyWindow.GetDisplayedDiarch.MakeScope).AddScope('player', GetPlayer.MakeScope).End)]"
+        duration = 0.25
+        next = tca_gui_action_self_3
+    }
+    state = {
+        name = tca_gui_action_self_3
+        using = tca_gui_probe_select_self
+        duration = 0.5
+        next = tca_gui_check_return
+    }
+    state = {
+        name = tca_gui_check_return
+        on_start = "[GetScriptedGui(Select_CString(And(DiarchyWindow.CanChangeMandate, And(ObjectsEqual(DiarchyWindow.GetDiarchyOwner.Self, GetPlayer.Self), And(ObjectsEqual(DiarchyWindow.GetDisplayedDiarch.Self, GetTitleByKey('h_china').GetHolder.Self), And(@SELECT_SELF@, Nor(@SELECT_LIEGE@, @SELECT_TONGPAN@))))), 'tca_gui_mark_return', 'tca_gui_fail_return')).Execute(GuiScope.AddScope('owner', DiarchyWindow.GetDiarchyOwner.MakeScope).AddScope('displayed', DiarchyWindow.GetDisplayedDiarch.MakeScope).AddScope('player', GetPlayer.MakeScope).End)]"
+        duration = 0.25
+        next = tca_gui_end_acceptance
+    }
+    state = {
+        name = tca_gui_end_acceptance
+        on_start = "[GetVariableSystem.Set('tca_gui_probe_phase', 'acceptance')]"
+        on_start = "[GetScriptedGui('tca_gui_check_end_system').Execute(GuiScope.End)]"
+    }
+}
+}
+
+widget = {
+    name = "tca_gui_end_unpause"
+    size = { 1 1 }
+    alwaystransparent = yes
+    visible_at_creation = no
+    datacontext = "[GetTitleByKey('h_china')]"
+    visible = "[And(IsManuallyPaused, EqualTo_CFixedPoint(Title.MakeScope.Var('tca_ui_end_sent').GetValue, '(CFixedPoint)1'))]"
+    state = { name = _show on_start = "[OnPause]" }
+}
