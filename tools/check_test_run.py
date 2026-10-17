@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check latest suite coverage plus mod-related errors throughout this game launch."""
+"""核对最新测试组覆盖，以及本次游戏启动全程的模组相关错误。"""
 import argparse
 import json
 from collections import Counter
@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def expected_cases(root=ROOT):
-    """Read maintained native events; never generate or run game scripts."""
+    """读取直接维护的原生事件，绝不生成或运行游戏脚本。"""
     entries = {}
     checks = {}
     for path in sorted((root / 'events').glob('tca_*test*_events.txt')):
@@ -43,13 +43,13 @@ def expected_cases(root=ROOT):
 
 
 def inspect_engine_errors(errors):
-    """Include reviewed whole-file GUI shadows even when errors contain no tca_ ID."""
+    """纳入已审阅的整文件 GUI 覆盖，即使错误中没有 tca_ 标识。"""
     registry = json.loads((ROOT / 'tools/upstream_overrides.json').read_text())
     owned_paths = {entry['mod'] for section in ('overrides', 'file_overrides')
                    for entry in registry.get(section, [])}
     owned_loc_keys = {key for entry in registry.get('file_overrides', [])
                       for key in entry.get('diagnostic_localization_keys', [])}
-    # Startup failures matter even when no errors occur during the suite itself.
+    # 即使测试运行期间没有错误，启动阶段失败也必须计入。
     findings = Counter()
     for entry in re.split(r'(?=\[\d{2}:\d{2}:\d{2}\])', errors):
         if 'is not a valid event ID, has to be < 10000' in entry:
@@ -77,9 +77,9 @@ def inspect_engine_errors(errors):
         elif any(message in entry for message in (
                 'is used but is never set', 'is set but is never used',
                 'is orphaned', 'is scripted as an orphan, but has callers')):
-            # Include the identifier so diagnostics remain actionable. Events
-            # intentionally kept for compatibility declare orphan = yes and
-            # therefore do not produce an orphan diagnostic in the first place.
+            # 保留标识以便定位诊断。为兼容用途刻意保留的事件
+            # 应声明 orphan = yes，
+            # 因此本就不会产生孤立事件诊断。
             detail = entry.split(']: ', 1)[-1].strip()
             findings[detail] += 1
         elif 'should be in utf8-bom encoding' in entry:
@@ -125,7 +125,7 @@ def inspect_run(debug, errors, expected, strict_title_heir=False):
         issues.append('Strict title succession failed: appointed officer differs from preview head')
     if any('TCA_TEST SUITE_ABORTED' in line for line in lines[starts[-1]:]):
         issues.append('Suite aborted: test environment invalid')
-    # A newer observer attempt must not silently inherit an older suite's pass.
+    # 较新的观察者尝试不能静默继承旧测试组的通过结果。
     observer_attempts = [line for line in lines[starts[-1] + 1:]
                          if 'TCA_TEST OBSERVER_ENTRY_REJECTED' in line
                          or 'TCA_TEST OBSERVER_ENTRY_DISPATCH' in line]

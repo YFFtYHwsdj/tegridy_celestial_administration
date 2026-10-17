@@ -1,4 +1,5 @@
-﻿# Character scope. Ordinary civilian circuits and subordinate state/county offices.
+﻿# 司法拘捕身份、辖区与回复重查；保存的互动参与者是跨回复恢复上下文的依据。
+# 角色作用域；普通文官路及其下属州县官职。
 tca_is_judicial_governor_trigger = {
     is_alive = yes
     is_imprisoned = no
@@ -7,6 +8,7 @@ tca_is_judicial_governor_trigger = {
     NOT = { tgp_is_any_minister = yes }
 }
 
+# 角色作用域；主头衔须为有效提刑官职，绑定的路仍启用且双向官职绑定有效。
 tca_is_judicial_commissioner_trigger = {
     exists = primary_title
     primary_title ?= { has_variable = tca_judicial_title }
@@ -24,6 +26,8 @@ tca_is_judicial_commissioner_trigger = {
     trigger_else = { always = no }
 }
 
+# 角色作用域；司法启用时纳入地方长官、有效提刑及仍持标记官职者，用于互动分流。
+# 纳入分流不等于获得拘捕资格，具体发送仍检查辖区及有效官职。
 tca_uses_judicial_arrest_trigger = {
     tca_has_judicial_institutions_trigger = yes
     OR = {
@@ -36,7 +40,7 @@ tca_uses_judicial_arrest_trigger = {
     }
 }
 
-# Shared circuit membership; protected offices are classified by score, not excluded.
+# 共享路归属判断；受保护官职按评分分类，不直接排除。
 tca_is_judicial_target_in_circuit_trigger = {
     $CIRCUIT$ = { save_temporary_scope_as = tca_membership_circuit }
     trigger_if = { limit = { tca_is_hosted_court_guest_trigger = yes } host.top_liege = scope:tca_membership_circuit.holder.top_liege }
@@ -55,13 +59,13 @@ tca_is_judicial_target_in_circuit_trigger = {
     }
 }
 
-# Character scope: one primary office assigns the person and their shared court.
-# A circuit holder is included only when this circuit is their primary title.
+# 角色作用域；由单一主官职决定本人及其共用宫廷归属。
+# 路持有人仅在该路为其主头衔时纳入。
 tca_has_office_in_judicial_circuit_trigger = {
     trigger_if = {
         limit = { primary_title ?= { is_noble_family_title = yes } }
-        # Family-primary holders and their court follow the real estate county.
-        # Missing estate/location has no superior-office fallback.
+        # 以家门为主头衔者及其宫廷跟随真实庄园所在县。
+        # 缺少庄园或位置时，不向上级官职兜底。
         domicile ?= {
             OR = { is_domicile_type = estate is_domicile_type = east_asian_estate is_domicile_type = japanese_manor }
             domicile_location.county ?= { target_is_de_jure_liege_or_above = $CIRCUIT$ }
@@ -81,7 +85,7 @@ tca_has_office_in_judicial_circuit_trigger = {
     }
 }
 
-# Use engine-saved participants; arbitrary redirect scopes are not assumed durable.
+# 使用引擎保存的参与者，不假设任意 redirect 作用域可持久保存。
 tca_judicial_arrest_context_valid_trigger = {
     scope:actor = scope:puppet_or_actor
     scope:actor = { is_alive = yes is_imprisoned = no }
@@ -116,6 +120,7 @@ tca_judicial_arrest_context_valid_trigger = {
     }
 }
 
+# 互动结算门槛；在回复时重新检查上下文及后续原生限制，不能沿用发送时已通过的结论。
 tca_judicial_arrest_still_valid_trigger = {
     tca_judicial_arrest_context_valid_trigger = yes
     trigger_if = {
@@ -152,8 +157,8 @@ tca_judicial_arrest_still_valid_trigger = {
     }
 }
 
-# Native imprison_interaction's unlanded exemption, restricted to AI recipient replies.
-# Do not use this as request auto_accept: that would also approve the intermediary.
+# 原版 imprison_interaction 的无地豁免，仅限 AI 目标回复。
+# 不要用作请求 auto_accept，否则中间审批也会自动通过。
 tca_judicial_arrest_ai_cannot_refuse_trigger = {
     is_ai = yes
     is_landed = no

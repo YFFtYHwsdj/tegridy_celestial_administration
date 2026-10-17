@@ -1,5 +1,7 @@
-﻿# Maintained native CK3 test scripts. Edit this file directly; no generator.
-# Explicit debug entry only; no automatic gameplay caller.
+﻿# 司法法律与权限回归；各用例重建状态，检查启停、绑定复用、审批失效、身份评分及囚犯交接。
+# 测试调用正式入口，不因同文件用例曾执行而省略场景准备。
+# 直接维护的原生 CK3 测试脚本；直接编辑本文件，不使用生成器。
+# 仅显式调试入口，无正常玩法自动调用者。
 namespace = tca_judicial_law_test
 
 tca_judicial_law_test.1 = {
@@ -2115,9 +2117,9 @@ tca_judicial_law_test.26 = {
                 add_character_flag = tca_test_case_failed
                 debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_law_approval_thresholds 15"
             }
-            # Restore the disposable father before checking isolation.
+            # 检查隔离性前，恢复可丢弃父亲。
             scope:tca_test_law_target = { set_father = scope:tca_test_threshold_fixture_father }
-            # A score fixture must not remain an imperial child or change the heir.
+            # 评分夹具不能遗留为皇帝子女，也不能改变继承人。
             if = {
                 limit = {
                     scope:tca_test_law_target = { father = scope:tca_test_threshold_fixture_father }
@@ -2674,16 +2676,16 @@ tca_judicial_law_test.35 = {
                 add_character_flag = tca_test_case_failed
                 debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_maintenance_coalesced 2"
             }
-            # Fresh native character with no employer; wait for pool/realm state to settle.
+            # 新建无雇主原生角色，等待候选池／政权状态稳定。
             clear_saved_scope = tca_test_law_target
             create_character = { age = 30 gender_female_chance = 0 random_traits = no dynasty = none location = title:c_middlesex.title_province culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_test_law_target }
             if = { limit = { scope:tca_test_law_target = { pool_character_is_pruneable_trigger = yes } }
                 debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_maintenance_coalesced 6" }
             else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_maintenance_coalesced 6" }
-            # The delayed fixture must survive native pool cleanup, without moving it to court.
+            # 延迟夹具须经受原生候选池清理，不能为此移入宫廷。
             scope:tca_test_law_target = {
-                # Native pool pruning explicitly excludes historical characters.
-                # This is a disposable generated fixture, not a historical person.
+                # 原生候选池裁剪显式排除历史人物。
+                # 这是可丢弃的生成夹具，不是历史人物。
                 add_trait = historical_character
                 tca_test_protect_character_effect = yes
             }
@@ -2720,7 +2722,7 @@ tca_judicial_law_test.1035 = {
                 else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_maintenance_coalesced 3" }
             }
             else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_maintenance_coalesced 3" }
-            # Give the original queued maintenance event time to run; do not call its worker.
+            # 给予原排队维护事件执行时间，不直接调用工作入口。
             trigger_event = { id = tca_judicial_law_test.2035 days = 2 }
         }
     }
@@ -3248,8 +3250,8 @@ tca_judicial_law_test.42 = {
     }
 }
 
-# Exact request redirect path: governor -> sitting commissioner -> central approver.
-# This does not simulate the engine's interaction queue or claim a real AI reply.
+# 精确请求重定向路径：长官 → 在任提刑 → 中央审批者。
+# 不模拟引擎互动队列，也不声称得到真实 AI 回复。
 tca_judicial_law_test.43 = {
     type = character_event
     hidden = yes
@@ -3280,7 +3282,7 @@ tca_judicial_law_test.43 = {
                 title:h_china.holder = { tca_test_prepare_judicial_law_realm_effect = yes }
                 scope:tca_test_law_circuit.holder = { save_scope_as = actor save_scope_as = puppet_or_actor }
                 scope:tca_test_law_commissioner = { save_scope_as = recipient }
-                # Call both formal redirect effects; never pre-populate intermediary.
+                # 调用两个正式 redirect 效果，不预先设置 intermediary。
                 tca_setup_judicial_arrest_roles_effect = yes
                 tca_setup_judicial_approval_effect = yes
                 tca_trace_judicial_arrest_effect = { STAGE = TEST_COMMISSIONER_REDIRECT }
@@ -3311,7 +3313,7 @@ tca_judicial_law_test.43 = {
     }
 }
 
-# Required local approval must not silently become direct custody if the role is lost.
+# 地方审批必需时，审批角色失职不能静默转为直接收押。
 tca_judicial_law_test.44 = {
     type = character_event
     hidden = yes

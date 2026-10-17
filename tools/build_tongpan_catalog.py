@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Build office assets from vanilla landed titles; never generate test events/baselines."""
+"""从原版有地头衔生成官职资源，绝不生成测试事件或基线。"""
 import argparse
 from pathlib import Path
 import re
 from check_upstream_overrides import tokens
 
 ROOT = Path(__file__).resolve().parents[1]
-# This title ID collides with a Workshop gte_contest.1013.bold.failure in Jomini localization.
+# 此头衔 ID 与 Workshop 的 gte_contest.1013.bold.failure 在 Jomini 本地化中发生哈希冲突。
 TITLE_NAME_KEYS = {'c_tca_tongpan_yingzhou_2': 'tca_tongpan_name_yingzhou_2'}
 DEFAULT_GAME = Path.home() / 'Library/Application Support/Steam/steamapps/common/Crusader Kings III/game'
 
@@ -38,8 +38,8 @@ def write_assets(game_dir, mod_dir, reserve_count):
     if not counties:
         raise ValueError('no vanilla counties found')
     counties = sorted(counties)
-    titles = ['# Generated office assets. Run tools/build_tongpan_catalog.py to rebuild.']
-    effects = ['# Generated fixed lookup and reserve inventory; no appointments or tests.',
+    titles = ['# 从原版 landed_titles 生成固定通判官职及预留池；不逐条手改。\n# 维护入口：python3 tools/build_tongpan_catalog.py --game-dir <CK3 game目录>；默认预留128个，详见 docs/song_tongpan_implementation.md。']
+    effects = ['# 从原版县目录生成固定绑定与预留库存；任命逻辑在 tca_tongpan_effects.txt。\n# 维护入口：python3 tools/build_tongpan_catalog.py --game-dir <CK3 game目录>；不逐条手改。',
                'tca_initialize_tongpan_catalog_effect = {',
                '    if = {', '        limit = { NOT = { has_global_variable = tca_tongpan_catalog_v1 } }']
     loc = {'english': ['l_english:'], 'simp_chinese': ['l_simp_chinese:']}
@@ -57,16 +57,16 @@ def write_assets(game_dir, mod_dir, reserve_count):
         loc['english'].append(f' {office}: "Tongpan Office"')
         loc['simp_chinese'].append(f' {office}: "通判司"')
     effects += ['        set_global_variable = { name = tca_tongpan_catalog_v1 value = yes }', '    }', '}']
-    # Explicit title lists keep office names out of ordinary county flavourization.
+    # 显式头衔列表避免官职名称进入普通县称号规则。
     office_ids = [line.split(' = ', 1)[0] for line in titles[1:]]
-    flavors = ['# Generated holder names for fixed offices and the reserve pool.']
+    flavors = ['# 生成的通判持有人称号；显式列举固定官职及预留池，避免套用普通县称号。\n# 维护入口：python3 tools/build_tongpan_catalog.py --game-dir <CK3 game目录>；不逐条手改。']
     for gender in ('male', 'female'):
         flavors += [f'tca_tongpan_holder_{gender} = {{', '    type = character',
                     f'    gender = {gender}', '    special = holder', '    tier = county',
                     '    priority = 500', '    governments = { celestial_government }',
                     '    titles = {', *['        ' + office for office in office_ids], '    }',
                     '    flavourization_rules = { only_vassals = yes only_holder = yes spouse_takes_title = no top_liege = no }', '}']
-    effects += ['tca_repair_tongpan_name_effect = {']
+    effects += ['# 通判官职头衔作用域；仅修复已知本地化键冲突，其他名称沿用生成资源。', 'tca_repair_tongpan_name_effect = {']
     for office, name_key in TITLE_NAME_KEYS.items():
         if office in office_ids:
             effects.append(f'    if = {{ limit = {{ this = title:{office} }} set_title_name = {name_key} }}')

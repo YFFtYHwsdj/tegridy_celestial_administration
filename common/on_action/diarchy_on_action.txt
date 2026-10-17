@@ -1,8 +1,8 @@
-﻿# Called when liege just entered the diarchy. Diarchy is already created
-# root - liege who just entered diarchy
-# scope:reason is the reason for starting it
-## scope:reason = flag:new_diarchy is the default case when liege becomes valid for diarchy
-## scope:reason = flag:inheritance when liege inherits a bigger realm with higher tier in a diarchy, and inherits it along the way
+﻿# 领主刚进入分权时调用，此时分权已经创建。
+# root：刚进入分权的领主。
+# scope:reason：启动分权的原因。
+## scope:reason = flag:new_diarchy：领主满足分权资格时的默认情形。
+## scope:reason = flag:inheritance：继承更高等级且已有分权的较大政权，同时继承其分权。
 on_entered_diarchy = {
 	effect = {
 		diarch = { save_scope_as = diarch }
@@ -27,7 +27,7 @@ on_entered_diarchy = {
 			}
 		}
 
-		# Notify the liege's vassals that they're in a diarchy.
+		# 通知领主的封臣，其已进入分权。
 		every_vassal_or_below = {
 			send_interface_message = {
 				type = msg_mandate_results_neutral_text
@@ -43,32 +43,32 @@ on_entered_diarchy = {
 				left_icon = root
 				right_icon = root.diarch
 				desc = {
-					# Always give the preamble.
+					# 始终提供开场说明。
 					desc = on_entered_diarchy.notification.vassal.desc
-					# But then state a rationale, if we can.
+					# 如有可能，再说明原因。
 					first_valid = {
-						# Child.
+						# 未成年。
 						triggered_desc = {
 							trigger = {
 								root = { is_adult = no }
 							}
 							desc = on_entered_diarchy.notification.vassal.desc.outro.child
 						}
-						# Incapability.
+						# 无能。
 						triggered_desc = {
 							trigger = {
 								root = { is_incapable = yes }
 							}
 							desc = on_entered_diarchy.notification.vassal.desc.outro.incapable
 						}
-						# Imprisoned.
+						# 被囚。
 						triggered_desc = {
 							trigger = {
 								root = { is_imprisoned = yes }
 							}
 							desc = on_entered_diarchy.notification.vassal.desc.outro.imprisonment
 						}
-						# Travel.
+						# 旅行。
 						triggered_desc = {
 							trigger = {
 								root = { is_travelling = yes }
@@ -79,7 +79,7 @@ on_entered_diarchy = {
 				}
 			}
 		}
-		# And tell the diarch that they're... now a diarch.
+		# 同时通知分权者，其已成为分权者。
 		diarch = {
 			if = {
 				limit = {
@@ -89,16 +89,16 @@ on_entered_diarchy = {
 			}
 		}
 
-		# If appropriate, set the co-ruler flag.
+		# 适用时设置共治者标记。
 		trigger_event = {
 			id = diarchy.0023
 			days = 1
 		}
 
-		# Object explorer logging for number of diarchs by tier.
+		# 向对象浏览器记录各等级分权者数量。
 		if = {
 			limit = { always = no }
-			# Empires
+			# 帝国。
 			if = {
 				limit = { highest_held_title_tier = tier_empire }
 				add_to_global_variable_list = {
@@ -106,7 +106,7 @@ on_entered_diarchy = {
 					target = primary_title
 				}
 			}
-			# Kingdoms
+			# 王国。
 			if = {
 				limit = { highest_held_title_tier = tier_kingdom }
 				add_to_global_variable_list = {
@@ -114,7 +114,7 @@ on_entered_diarchy = {
 					target = primary_title
 				}
 			}
-			# Duchies
+			# 公国。
 			if = {
 				limit = { highest_held_title_tier = tier_duchy }
 				add_to_global_variable_list = {
@@ -122,7 +122,7 @@ on_entered_diarchy = {
 					target = primary_title
 				}
 			}
-			# Counties
+			# 县。
 			if = {
 				limit = { highest_held_title_tier = tier_county }
 				add_to_global_variable_list = {
@@ -131,20 +131,20 @@ on_entered_diarchy = {
 				}
 			}
 		}
-		# Invalidate grand weddings
+		# 使大婚失效。
 		invalidate_diarch_grand_wedding_effect = yes
 	}
 }
 
-# Called when liege just left the diarchy. Diarchy is already destroyed
-# It might also be called on liege death or destruction, so check for
-# valid and alive liege if needed. In some cases of inheritance old diarch might
-# even no longer be a vassal of the liege
-# root - liege who just left diarchy
-# scope:old_diarch - character who was the diarch
+# 领主刚退出分权时调用，此时分权已经销毁。
+# 领主死亡或销毁时也可能调用；如有需要，检查领主
+# 是否有效且存活。某些继承情形中，旧分权者甚至可能
+# 已不再是该领主的封臣。
+# root：刚退出分权的领主。
+# scope:old_diarch：此前担任分权者的角色。
 on_left_diarchy = {
 	effect = {
-		# Notify the liege's vassals that they're out of a diarchy.
+		# 通知领主的封臣，其已退出分权。
 		every_vassal_or_below = {
 			send_interface_message = {
 				type = msg_mandate_results_neutral_text
@@ -155,9 +155,9 @@ on_left_diarchy = {
 			}
 		}
 		scope:old_diarch ?= {
-			# If scope:old_diarch is still around and was plotting a coup, clear their conspirator list.
+			# 若 scope:old_diarch 仍存在且曾策划政变，清空其同谋列表。
 			diarch_clean_up_conspiracy_variables_effect = yes
-			# Reset the cooldown on the intro event.
+			# 重置介绍事件的冷却。
 			if = {
 				limit = { is_alive = yes }
 				trigger_event = {
@@ -165,20 +165,20 @@ on_left_diarchy = {
 					days = 1
 				}
 			}
-			# If they were a vizier, they lose their wealth.
+			# 若其为维齐尔，则失去财富。
 			vizierate_remove_extravagance_modifiers_effect = yes
-			# Remove their co-ruler title.
+			# 移除其共治头衔。
 			if = {
 				limit = { is_alive = yes has_variable = use_co_ruler_title }
 				remove_variable = use_co_ruler_title
-				# ... but also remember to flag that we had a co-ruler we just lost that might need transferring.
+				# 同时记录刚失去共治者，后续可能需要转移。
 				root = {
 					set_variable = {
 						name = co_ruler_to_transfer
 						value = scope:old_diarch
 						days = 7
 					}
-					# If we've got it, flag the transfer variable.
+					# 若存在该状态，设置转移变量。
 					if = {
 						limit = {
 							scope:old_diarch = { has_variable = diarchy_transfer_type_duumvirate }
@@ -190,17 +190,17 @@ on_left_diarchy = {
 						}
 					}
 				}
-				## And clean up that variable too.
+				## 同时清理该变量。
 				remove_variable = diarchy_transfer_type_duumvirate
 			}
 		}
-		# Plus clean up the variable that tells the AI that they, themselves, appointed a vizier.
+		# 清理用于告知 AI 自己曾任命维齐尔的变量。
 		remove_variable = my_vizier
 
-		# Object explorer logging for number of diarchs by tier.
+		# 向对象浏览器记录各等级分权者数量。
 		if = {
 			limit = { always = no }
-			# Empires
+			# 帝国。
 			if = {
 				limit = { highest_held_title_tier = tier_empire }
 				every_held_title = {
@@ -210,7 +210,7 @@ on_left_diarchy = {
 					}
 				}
 			}
-			# Kingdoms
+			# 王国。
 			if = {
 				limit = { highest_held_title_tier = tier_kingdom }
 				every_held_title = {
@@ -220,7 +220,7 @@ on_left_diarchy = {
 					}
 				}
 			}
-			# Duchies
+			# 公国。
 			if = {
 				limit = { highest_held_title_tier = tier_duchy }
 				every_held_title = {
@@ -230,7 +230,7 @@ on_left_diarchy = {
 					}
 				}
 			}
-			# Counties
+			# 县。
 			if = {
 				limit = { highest_held_title_tier = tier_county }
 				every_held_title = {
@@ -244,46 +244,46 @@ on_left_diarchy = {
 	}
 }
 
-# Called when diarch changes. Diarchy already has new diarch
-# root - liege whos diarch changed
-# scope:old_diarch - character who was the diarch
-# scope:reason is the reason for change
-## scope:reason = flag:death means the prior diarch died
-## scope:reason = flag:depose means the prior diarch was deposed via the depose_diarch effect
-## scope:reason = flag:invalid means the prior diarch invalidated out
-## scope:reason = flag:inheritance when character changed diarchy during inheritance when going up the rank
-## scope:reason = flag:regular default reason, should not really be used, but rather help catch special cases
+# 分权者更换时调用，此时已设置新分权者。
+# root：分权者发生更换的领主。
+# scope:old_diarch：此前担任分权者的角色。
+# scope:reason：更换原因。
+## scope:reason = flag:death：此前分权者死亡。
+## scope:reason = flag:depose：此前分权者经 depose_diarch 效果被罢免。
+## scope:reason = flag:invalid：此前分权者资格失效。
+## scope:reason = flag:inheritance：角色因等级提升，在继承期间更换分权。
+## scope:reason = flag:regular：默认原因，通常不应使用，仅用于捕捉特殊情形。
 on_diarch_change = {
 	effect = {
-		# Save some scopes for easy loc.
+		# 保存若干作用域，便于本地化。
 		save_scope_as = liege
 		diarch = {
 			save_scope_as = diarch
-			# And if you weren't the old diarch also, then you get the starting event.
+			# 若此前不是同一分权者，则触发入职事件。
 			if = {
 				limit = {
 					this != scope:old_diarch
 				}
 				trigger_event = diarchy.0021
-				# If appropriate, set the co-ruler flag.
+				# 适用时设置共治者标记。
 				trigger_event = {
 					id = diarchy.0023
 					days = 1
 				}
 			}
 		}
-		# First, check what kind of change we're dealing with.
-		## Death.
+		# 先检查更换类型。
+		## 死亡。
 		if = {
 			limit = { scope:reason = flag:death }
-			# Notify the liege.
+			# 通知领主。
 			send_interface_message = {
 				type = msg_mandate_results_neutral_text
 				title = on_diarch_change.notification.liege.death.t
 				left_icon = root.diarch
 				desc = on_diarch_change.notification.liege.death.desc
 			}
-			# Notify the liege's vassals.
+			# 通知领主的封臣。
 			every_vassal_or_below = {
 				send_interface_message = {
 					type = msg_mandate_results_neutral_text
@@ -293,17 +293,17 @@ on_diarch_change = {
 				}
 			}
 		}
-		## Deposition.
+		## 罢免。
 		else_if = {
 			limit = { scope:reason = flag:depose }
-			# Notify the liege.
+			# 通知领主。
 			send_interface_message = {
 				type = msg_mandate_results_neutral_text
 				title = on_diarch_change.notification.liege.deposition.t
 				left_icon = root.diarch
 				desc = on_diarch_change.notification.liege.deposition.desc
 			}
-			# Notify the liege's vassals.
+			# 通知领主的封臣。
 			every_vassal_or_below = {
 				send_interface_message = {
 					type = msg_mandate_results_neutral_text
@@ -313,17 +313,17 @@ on_diarch_change = {
 				}
 			}
 		}
-		## Invalidation.
+		## 资格失效。
 		else_if = {
 			limit = { scope:reason = flag:invalid }
-			# Notify the liege.
+			# 通知领主。
 			send_interface_message = {
 				type = msg_mandate_results_neutral_text
 				title = on_diarch_change.notification.liege.invalidation.t
 				left_icon = root.diarch
 				desc = on_diarch_change.notification.liege.invalidation.desc
 			}
-			# Notify the liege's vassals.
+			# 通知领主的封臣。
 			every_vassal_or_below = {
 				send_interface_message = {
 					type = msg_mandate_results_neutral_text
@@ -333,17 +333,17 @@ on_diarch_change = {
 				}
 			}
 		}
-		## Inheritance.
+		## 继承。
 		else_if = {
 			limit = { scope:reason = flag:inheritance }
-			# Notify the liege.
+			# 通知领主。
 			send_interface_message = {
 				type = msg_mandate_results_neutral_text
 				title = on_diarch_change.notification.liege.inheritance.t
 				left_icon = root.diarch
 				desc = on_diarch_change.notification.liege.inheritance.desc
 			}
-			# Notify the liege's vassals.
+			# 通知领主的封臣。
 			every_vassal_or_below = {
 				send_interface_message = {
 					type = msg_mandate_results_neutral_text
@@ -353,16 +353,16 @@ on_diarch_change = {
 				}
 			}
 		}
-		## Fallback.
+		## 兜底。
 		else = {
-			# Notify the liege.
+			# 通知领主。
 			send_interface_message = {
 				type = msg_mandate_results_neutral_text
 				title = on_diarch_change.notification.liege.fallback.t
 				left_icon = root.diarch
 				desc = on_diarch_change.notification.liege.fallback.desc
 			}
-			# Notify the liege's vassals.
+			# 通知领主的封臣。
 			every_vassal_or_below = {
 				send_interface_message = {
 					type = msg_mandate_results_neutral_text
@@ -373,24 +373,24 @@ on_diarch_change = {
 			}
 		}
 		scope:old_diarch ?= {
-			# If scope:old_diarch is still around and was plotting a coup, clear their conspirator list.
+			# 若 scope:old_diarch 仍存在且曾策划政变，清空其同谋列表。
 			diarch_clean_up_conspiracy_variables_effect = yes
-			# Reset the cooldown on the intro event.
+			# 重置介绍事件的冷却。
 			if = {
 				limit = { is_alive = yes }
 				trigger_event = {
 					id = diarchy.0022
 					days = 1
 				}
-				# Remove any extravagance modifiers.
+				# 移除所有奢靡修正。
 				vizierate_remove_extravagance_modifiers_effect = yes
-				# Remove their co-ruler title.
+				# 移除其共治头衔。
 				remove_variable = use_co_ruler_title
 			}
 		}
-		# Invalidate grand weddings
+		# 使大婚失效。
 		invalidate_diarch_grand_wedding_effect = yes
-		# Make sure that the Grand Secretariat ends when Hegemony of China no longer exist
+		# 中华霸权不再存在时，确保政事堂分权结束。
 		if = {
 			limit = {
 				has_diarchy_type = grand_secretariat
@@ -401,54 +401,54 @@ on_diarch_change = {
 	}
 }
 
-# Called when liege manually designates a diarch
-# Diarchy shouldn't exist
-# root - liege whos designated diarch changed
-# scope:former_designated_diarch - character who was previously designated diarch
-# former designated diarch might be empty scope
+# 领主手动指定分权者时调用。
+# 此时不应已有分权。
+# root：指定分权者发生更换的领主。
+# scope:former_designated_diarch：此前指定的分权者。
+# 此前指定的分权者可能为空作用域。
 on_diarch_designation = {
 	effect = {
-		# Designated_diarch is very happy!
+		# 新指定的分权者十分高兴。
 		reverse_add_opinion = {
 			target = root.designated_diarch
 			modifier = designated_me_regent_opinion
 		}
-		# Has designating a diarch pissed anyone off?
-		## We check to see if they're first in line first, since no one really objects to you picking the best available choice.
+		# 指定分权者是否引发他人不满？
+		## 先检查其是否位列首位；通常无人反对选用最佳候选。
 		if = {
 			limit = {
 				any_diarchy_succession_character = { diarchy_regent_succession_score_value > root.designated_diarch.diarchy_regent_succession_score_value }
 			}
-			# Try to annoy people higher up the order.
+			# 尝试使继任顺位更高的人不满。
 			every_diarchy_succession_character = {
 				limit = { diarchy_regent_succession_score_value > root.designated_diarch.diarchy_regent_succession_score_value }
-				# Calc how upset we should be.
-				## We set a variable because we need to account for this in over-dramatic courtly vassals later.
+				# 计算不满程度。
+				## 保存变量，以便稍后计入夸大反应的宫廷派封臣。
 				set_variable = {
 					name = degree_of_upset
 					value = {
-						# Get the base score
-						## We start in reverse so that we can grok min-maxs easier, and will invert it later.
+						# 获取基础评分。
+						## 先反向计算以便理解上下限，最后再反转符号。
 						value = diarchy_regent_succession_score_value
-						# Now, subtract their score to see how badly we were screwed.
+						# 减去对方评分，计算落差。
 						subtract = root.designated_diarch.diarchy_regent_succession_score_value
-						# Sweet, next up, add some extra to act as a decent maximum without smoothing the scores out too much.
+						# 再加入额外值，形成合理上限，同时避免过度抹平评分差异。
 						add = 10
-						# Make sure no one is ever _too_ pissed.
+						# 确保不满程度不会过高。
 						max = 40
-						# And, finally, invert.
+						# 最后反转符号。
 						multiply = -1
 					}
 				}
-				# Right, now that we've got our upset score, let's plug that in.
+				# 使用已计算的不满评分。
 				add_opinion = {
 					target = root
 					modifier = passed_me_over_for_regent_opinion
 					opinion = var:degree_of_upset
 				}
 			}
-			# Courtlies because the new designatee is...
-			## ... a lowborn non-family member.
+			# 新指定者的身份会影响宫廷派：
+			## ……出身低微且不是家族成员。
 			if = {
 				limit = {
 					root.designated_diarch = {
@@ -463,15 +463,15 @@ on_diarch_designation = {
 					limit = {
 						this != root.designated_diarch
 					}
-					# Account for over-dramatic courtly vassals who are in line for succession.
-					## ... as otherwise they may hate you more than if you'd murdered their child.
+					# 计入继任顺位内宫廷派封臣的夸大反应。
+					## ……否则其恨意可能超过你杀死其子女时的程度。
 					save_scope_value_as = {
 						name = degree_of_upset
 						value = {
 							value = courtly_offence_scandalise_value
 							if = {
 								limit = { has_variable = degree_of_upset }
-								# Subtract so that we get a double negative.
+								# 使用减法形成负负相抵。
 								subtract = var:degree_of_upset
 							}
 						}
@@ -486,7 +486,7 @@ on_diarch_designation = {
 					}
 				}
 			}
-			## ... a lowborn family member.
+			## ……出身低微的家族成员。
 			else_if = {
 				limit = {
 					root.designated_diarch = { is_lowborn = yes }
@@ -496,15 +496,15 @@ on_diarch_designation = {
 					limit = {
 						this != root.designated_diarch
 					}
-					# Account for over-dramatic courtly vassals who are in line for succession.
-					## ... as otherwise they may hate you more than if you'd murdered their child.
+					# 计入继任顺位内宫廷派封臣的夸大反应。
+					## ……否则其恨意可能超过你杀死其子女时的程度。
 					save_scope_value_as = {
 						name = degree_of_upset
 						value = {
 							value = courtly_offence_greatly_offend_value
 							if = {
 								limit = { has_variable = degree_of_upset }
-								# Subtract so that we get a double negative.
+								# 使用减法形成负负相抵。
 								subtract = var:degree_of_upset
 							}
 						}
@@ -519,7 +519,7 @@ on_diarch_designation = {
 					}
 				}
 			}
-			## ... someone with a weak succession score.
+			## ……继任评分偏低。
 			else_if = {
 				limit = { root.designated_diarch.diarchy_regent_succession_score_value <= courtly_offence_at_succession_threshold_low }
 				every_vassal = {
@@ -527,15 +527,15 @@ on_diarch_designation = {
 					limit = {
 						this != root.designated_diarch
 					}
-					# Account for over-dramatic courtly vassals who are in line for succession.
-					## ... as otherwise they may hate you more than if you'd murdered their child.
+					# 计入继任顺位内宫廷派封臣的夸大反应。
+					## ……否则其恨意可能超过你杀死其子女时的程度。
 					save_scope_value_as = {
 						name = degree_of_upset
 						value = {
 							value = courtly_offence_offend_value
 							if = {
 								limit = { has_variable = degree_of_upset }
-								# Subtract so that we get a double negative.
+								# 使用减法形成负负相抵。
 								subtract = var:degree_of_upset
 							}
 						}
@@ -550,7 +550,7 @@ on_diarch_designation = {
 					}
 				}
 			}
-			## ... someone with a medium succession score.
+			## ……继任评分中等。
 			else_if = {
 				limit = { root.designated_diarch.diarchy_regent_succession_score_value <= courtly_offence_at_succession_threshold_medium }
 				every_vassal = {
@@ -558,15 +558,15 @@ on_diarch_designation = {
 					limit = {
 						this != root.designated_diarch
 					}
-					# Account for over-dramatic courtly vassals who are in line for succession.
-					## ... as otherwise they may hate you more than if you'd murdered their child.
+					# 计入继任顺位内宫廷派封臣的夸大反应。
+					## ……否则其恨意可能超过你杀死其子女时的程度。
 					save_scope_value_as = {
 						name = degree_of_upset
 						value = {
 							value = courtly_offence_somewhat_offend_value
 							if = {
 								limit = { has_variable = degree_of_upset }
-								# Subtract so that we get a double negative.
+								# 使用减法形成负负相抵。
 								subtract = var:degree_of_upset
 							}
 						}
@@ -581,7 +581,7 @@ on_diarch_designation = {
 					}
 				}
 			}
-			## ... someone with a just-barely adequate succession score.
+			## ……继任评分勉强合格。
 			else_if = {
 				limit = { root.designated_diarch.diarchy_regent_succession_score_value <= courtly_offence_at_succession_threshold_high }
 				every_vassal = {
@@ -589,15 +589,15 @@ on_diarch_designation = {
 					limit = {
 						this != root.designated_diarch
 					}
-					# Account for over-dramatic courtly vassals who are in line for succession.
-					## ... as otherwise they may hate you more than if you'd murdered their child.
+					# 计入继任顺位内宫廷派封臣的夸大反应。
+					## ……否则其恨意可能超过你杀死其子女时的程度。
 					save_scope_value_as = {
 						name = degree_of_upset
 						value = {
 							value = courtly_offence_lightly_offend_value
 							if = {
 								limit = { has_variable = degree_of_upset }
-								# Subtract so that we get a double negative.
+								# 使用减法形成负负相抵。
 								subtract = var:degree_of_upset
 							}
 						}
@@ -612,7 +612,7 @@ on_diarch_designation = {
 					}
 				}
 			}
-			# Finally, clean up all those variables.
+			# 最后清理所有这些变量。
 			every_diarchy_succession_character = { remove_variable = degree_of_upset }
 		}
 	}
@@ -620,12 +620,12 @@ on_diarch_designation = {
 
 cycle_vizierate_politicking_events_on_action = {
 	random_events = {
-		# We always want these to cycle, so this is our chance of nothing happening event — it'll still prang the on_action cyclically.
+		# 始终保持循环；此为无事发生的概率分支，仍会使 on_action 周期性触发。
 		500 = vizierate.0051
-		# And now, the actual events.
-		250 = vizierate.0001 # Character furthers new relationships.
-		100 = vizierate.0031 # Character learns languages to further candidacy.
-		100 = vizierate.0041 # Character studies hard to further candidacy.
-		20 = vizierate.1001 # Characters offers to replace vizier and distribute their cash reserves.
+		# 实际事件。
+		250 = vizierate.0001 # 角色通过结交关系提高候选竞争力。
+		100 = vizierate.0031 # 角色通过学习语言提高候选竞争力。
+		100 = vizierate.0041 # 角色通过勤奋学习提高候选竞争力。
+		20 = vizierate.1001 # 角色提议接替维齐尔并分配其现金储备。
 	}
 }

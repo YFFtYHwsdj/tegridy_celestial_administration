@@ -1,7 +1,7 @@
 ﻿namespace = tca_judicial_imperial_test
 
-# Real imperial circuit, direct imperial landless governor, local approval,
-# native council replacement, unavailable minister, and return to a governor.
+# 真实帝直属路、直属皇帝的无地长官、地方审批，
+# 以及原生内阁替换、部职不可用和归回长官。
 tca_judicial_imperial_test.1 = {
     type = character_event hidden = yes
     immediate = {
@@ -13,16 +13,16 @@ tca_judicial_imperial_test.1 = {
                 tca_test_prepare_native_arrest_effect = { FAMILY = yes COMMISSIONER = no OFFICE = yes CONTROL = tca_test_arrest_force_approval CASE = tca_test_imperial_fixture }
                 scope:tca_test_arrest_actor = { save_scope_as = tca_test_em_former }
                 scope:tca_test_arrest_target = { save_scope_as = tca_test_em_state }
-                # A genuine dedicated kingdom title prevents unrelated native AI
-                # appointments to historical provinces from invalidating this case.
+                # 专用的真实王国头衔可防止无关原生 AI 对历史行省的
+                # 任命使本例失效。
                 create_dynamic_title = { tier = kingdom name = tca_test_judicial_circuit_name }
                 scope:new_title = { save_scope_as = tca_test_em_circuit set_capital_county = root.capital_county }
                 create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_test_em_take }
                 scope:tca_test_em_circuit = { change_title_holder = { holder = root change = scope:tca_test_em_take } }
                 resolve_title_and_vassal_change = scope:tca_test_em_take
                 scope:tca_test_em_state.primary_title = { set_de_jure_liege_title = scope:tca_test_em_circuit }
-                # Prepare the direct imperial subject; the office is created
-                # only by the real title/council hooks during the three-day wait.
+                # 准备帝直属臣属；官职仅由三日等待期间的
+                # 真实头衔／内阁回调创建。
                 scope:tca_test_em_state = {
                     create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_test_em_move_state }
                     change_liege = { liege = root change = scope:tca_test_em_move_state }
@@ -44,7 +44,7 @@ tca_judicial_imperial_test.1 = {
                 if = { limit = { scope:tca_test_em_state = { var:tca_test_arrest_case = flag:tca_test_imperial_fixture } scope:tca_test_em_circuit = { holder = root tca_is_judicial_circuit_trigger = yes } }
                     debug_log = "TCA_TEST CHECK_PASS tca_test_imperial_circuit_lifecycle 1" }
                 else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_imperial_circuit_lifecycle 1" }
-                # Wait for native title/council hooks, without calling the maintenance worker.
+                # 等待原生头衔／内阁回调，不调用维护工作入口。
                 add_character_flag = tca_test_delayed_case_active
                 trigger_event = { id = tca_judicial_imperial_test.1001 days = 3 }
             }
@@ -123,9 +123,9 @@ tca_judicial_imperial_test.1002 = {
             if = { limit = { tca_test_native_arrest_approval_result_trigger = yes tca_test_native_arrest_followup_consistent_trigger = { CASE = tca_test_imperial_local_approval } }
                 debug_log = "TCA_TEST CHECK_PASS tca_test_imperial_circuit_lifecycle 6" }
             else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_imperial_circuit_lifecycle 6" }
-            # Normal AI may appoint a governor during the 20-day request wait.
-            # Re-establish the imperial-ownership precondition for the separate
-            # council-replacement phase; do not repair after its assertions.
+            # 正常 AI 可能在20日请求等待期间任命长官。
+            # 为独立的内阁替换阶段重新建立帝直属前置条件，
+            # 不在其断言之后修复。
             scope:tca_test_em_circuit.holder = { save_scope_as = tca_test_em_holder_after_request }
             if = { limit = { scope:tca_test_em_circuit = { NOT = { holder = root } } }
                 debug_log = "TCA_EM REPREPARE_IMPERIAL_OWNERSHIP_AFTER_REQUEST"
@@ -169,7 +169,7 @@ tca_judicial_imperial_test.1003 = {
                 scope:tca_test_em_office = { de_jure_liege = scope:tca_test_em_circuit }
             } debug_log = "TCA_TEST CHECK_PASS tca_test_imperial_circuit_lifecycle 7" }
             else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_imperial_circuit_lifecycle 7" }
-            # Actual native imprisonment makes the current minister unavailable.
+            # 真实原生关押使当前部职官员不可用。
             imprison = { target = scope:tca_test_em_minister_2 type = house_arrest }
             trigger_event = { id = tca_judicial_imperial_test.1004 days = 1 }
         }
@@ -234,8 +234,8 @@ tca_judicial_imperial_test.1005 = {
             create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_test_em_return }
             scope:tca_test_em_circuit = { change_title_holder = { holder = scope:tca_test_em_former change = scope:tca_test_em_return } }
             resolve_title_and_vassal_change = scope:tca_test_em_return
-            # Observe native title/council repair before preparing the distinct
-            # direct-imperial-subject permission phase. Do not pin the AI world.
+            # 先观察原生头衔／内阁修复，再准备独立的
+            # 帝直属臣属权限阶段，不固定 AI 世界状态。
             trigger_event = { id = tca_judicial_imperial_test.1010 days = 1 }
         }
     }
@@ -245,17 +245,17 @@ tca_judicial_imperial_test.1006 = {
     immediate = {
         tca_test_validate_environment_effect = yes
         if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
-            # First assert the original title/council callbacks before any
-            # direct-subject fixture preparation can affect the political graph.
+            # 先断言原始头衔／内阁回调，再允许直属臣属
+            # 夹具准备影响政治关系图。
             if = { limit = {
                 scope:tca_test_em_circuit = { holder = scope:tca_test_em_former var:song_judicial_title = scope:tca_test_em_office }
                 scope:tca_test_em_commissioner = { liege = scope:tca_test_em_former tca_is_judicial_commissioner_trigger = yes }
                 scope:tca_test_em_office = { de_jure_liege = scope:tca_test_em_circuit }
             } debug_log = "TCA_TEST CHECK_PASS tca_test_imperial_circuit_lifecycle 15" }
             else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_imperial_circuit_lifecycle 15" }
-            # This phase tests jurisdiction over an actual imperial direct vassal.
-            # Native retraction uses revoked, not an indirect vassal swearing fealty.
-            # Prepare that state only now; no judicial maintenance is called here.
+            # 此阶段测试对真实帝直属封臣的管辖权。
+            # 原生收回封臣使用 revoked，不使用间接封臣宣誓效忠事务。
+            # 仅在此时准备该状态，此处不调用司法维护。
             create_title_and_vassal_change = { type = revoked add_claim_on_loss = no save_scope_as = tca_test_em_keep_direct }
             scope:tca_test_em_state = { change_liege = { liege = root change = scope:tca_test_em_keep_direct } }
             resolve_title_and_vassal_change = scope:tca_test_em_keep_direct
@@ -284,8 +284,8 @@ tca_judicial_imperial_test.1006 = {
                 else = { debug_log = "TCA_EM RETURN_SUBJECT no" }
                 debug_log_scopes = yes
             }
-            # Independent fresh target: the earlier requester accumulated
-            # standing and native relationships during its real arrest.
+            # 独立的新目标；此前请求者在真实拘捕期间已积累
+            # 政治地位及原生关系。
             create_character = { age = 35 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_test_em_direct_target }
             create_dynamic_title = { tier = duchy name = tca_test_arrest_office_name }
             scope:new_title = {
@@ -316,8 +316,8 @@ tca_judicial_imperial_test.1009 = {
     immediate = {
         tca_test_validate_environment_effect = yes
         if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
-            # Commissioner acts against a governor directly under the emperor,
-            # although the circuit itself now has a different local holder.
+            # 提刑对直属皇帝的长官行动，
+            # 即使该路此时已有另一名地方持有人。
             scope:tca_test_em_commissioner = {
                 save_scope_as = actor save_scope_as = puppet_or_actor
                 add_opinion = { target = scope:tca_test_em_direct_target modifier = schemed_against_me }
@@ -385,7 +385,7 @@ tca_judicial_imperial_test.1007 = {
     }
 }
 
-# Trace the original three-day wait without repairing the subject during it.
+# 跟踪原始三日等待，期间不修复受测对象。
 tca_judicial_imperial_test.1010 = {
     type = character_event hidden = yes
     immediate = {

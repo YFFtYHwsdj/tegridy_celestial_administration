@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Inventory common/ objects and event IDs shared by the mod and vanilla.
+"""盘点模组与原版共有的 common/ 对象及事件 ID。
 
-This read-only scan compares discovery with the manual registry. It does not
-read or refresh reviewed baselines. Same-path script files need separate review.
+此只读扫描将发现结果与人工登记表比较，不读取或刷新已审阅基线。
+同路径脚本文件须另行审阅。
 """
 import argparse
 import json

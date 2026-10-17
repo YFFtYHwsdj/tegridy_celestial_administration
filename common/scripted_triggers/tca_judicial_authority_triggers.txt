@@ -1,4 +1,5 @@
-﻿# Title scope. Civil offices include landless offices formally under a circuit.
+﻿# 司法官职、亲属、实际辖区与审批资格；计分身份和实际可拘捕范围分别判断。
+# 头衔作用域；文官官职包含正式隶属某路的无地官职。
 tca_is_local_administrative_title_trigger = {
     tier >= tier_county
     tier <= tier_kingdom
@@ -22,7 +23,7 @@ tca_is_local_administrative_title_trigger = {
     }
 }
 
-# Character scope. Primary office determines court affiliation, not physical location.
+# 角色作用域；宫廷归属由主官职决定，不按实际所在地判断。
 tca_is_target_in_administrative_title_trigger = {
     $TITLE$ = { save_temporary_scope_as = tca_jurisdiction_title }
     exists = scope:tca_jurisdiction_title
@@ -64,21 +65,24 @@ tca_is_target_in_administrative_title_trigger = {
     }
 }
 
-# Character scope. Used by the scoring values, including relatives who are not initiators.
+# 角色作用域；供评分数值调用，也包括并非发起者的亲属。
 tca_has_central_office_trigger = { tgp_is_any_minister = yes }
+# 角色作用域；路级官职包括提刑标记头衔或王国级地方文官头衔。
 tca_has_regional_office_trigger = {
     OR = {
         any_held_title = { has_variable = tca_judicial_title }
         any_held_title = { tca_is_local_administrative_title_trigger = yes tier = tier_kingdom }
     }
 }
+# 角色作用域；州县地方文官身份，供官亲评分使用。
 tca_has_state_office_trigger = {
     any_held_title = { tca_is_local_administrative_title_trigger = yes tier <= tier_duchy }
 }
+# 角色作用域；通过当前家主持有的世族家门头衔识别家族身份。
 tca_has_noble_family_trigger = {
     house.house_head ?= { any_held_title = { is_noble_family_title = yes } }
 }
-# Only spouse/parents/children; siblings and extended kin do not inherit this bonus.
+# 仅计配偶／父母／子女，兄弟姐妹和远亲不继承此加分。
 tca_has_official_relative_trigger = {
     OR = {
         any_spouse = { is_alive = yes tca_is_in_scored_target_realm_trigger = { TARGET = prev } $CLASS$ = yes }
@@ -90,7 +94,7 @@ tca_has_official_relative_trigger = {
         }
     }
 }
-# A hosted guest is a court guest awaiting recruitment, not a passing traveler.
+# 受接待宾客指等待招募的宫廷宾客，不包括路过旅行者。
 tca_is_hosted_court_guest_trigger = {
     exists = host
     OR = { is_foreign_court_guest = yes is_pool_guest = yes }
@@ -99,7 +103,7 @@ tca_is_hosted_court_guest_trigger = {
         is_foreign_court_or_pool_guest_of = host
     }
 }
-# Candidate character scope; score relatives against the guest host's realm.
+# 候选角色作用域；以宾客 host 所属政权计算亲属评分。
 tca_is_in_scored_target_realm_trigger = {
     trigger_if = {
         limit = { $TARGET$ = { tca_is_hosted_court_guest_trigger = yes } }
@@ -107,6 +111,7 @@ tca_is_in_scored_target_realm_trigger = {
     }
     trigger_else = { top_liege = $TARGET$.top_liege }
 }
+# 目标角色作用域；一等皇亲仅配偶、父母和子女；宾客按实际 host 的最高领主判定。
 tca_is_emperor_first_degree_kin_trigger = {
     trigger_if = {
         limit = { tca_is_hosted_court_guest_trigger = yes }
@@ -125,8 +130,8 @@ tca_is_emperor_first_degree_kin_trigger = {
     }
 }
 
-# Character scope. Extend only native basic affiliation to subordinate hosted guests.
-# Interaction jurisdiction, advanced restrictions and native common rules remain mandatory.
+# 角色作用域；仅将原生基础从属检查扩展至下属接待的宾客。
+# 互动辖区、高级限制和原生通用规则仍必须满足。
 tca_basic_allowed_to_arrest_character_trigger = {
     save_temporary_scope_as = tca_basic_arrest_authority
     OR = {
@@ -143,8 +148,9 @@ tca_basic_allowed_to_arrest_character_trigger = {
     }
 }
 
-# Candidate scope. Central offices are resolved inside the relevant emperor's council.
+# 候选作用域；中央职位从相关皇帝实际内阁中解析。
 tca_is_available_judicial_approver_trigger = { is_alive = yes is_imprisoned = no }
+# 以下三个条件在君主角色作用域检查其实际内阁席位，分别对应刑部、御史、丞相可用性。
 tca_has_available_justice_trigger = {
     any_councillor = { has_council_position = minister_justice tca_is_available_judicial_approver_trigger = yes }
 }
@@ -154,7 +160,7 @@ tca_has_available_censor_trigger = {
 tca_has_available_chancellor_trigger = {
     any_councillor = { has_council_position = councillor_chancellor tca_is_available_judicial_approver_trigger = yes }
 }
-# Candidate scope, COURT is a character. First available office, not a worldwide title holder.
+# 候选作用域，COURT 为角色；使用首个可用职位，不查询全世界的头衔持有人。
 tca_is_current_central_approver_trigger = {
     tca_is_available_judicial_approver_trigger = yes
     trigger_if = {
@@ -175,7 +181,7 @@ tca_is_current_central_approver_trigger = {
     trigger_else = { this = $COURT$ }
 }
 
-# Circuit TITLE scope.
+# 路头衔作用域。
 tca_has_available_tixing_trigger = {
     tca_has_judicial_title_trigger = yes
     var:song_judicial_title = {
@@ -183,7 +189,7 @@ tca_has_available_tixing_trigger = {
         holder = { tca_is_available_judicial_approver_trigger = yes }
     }
 }
-# Actor scope. Limit to an ordinary circuit or its subordinate civilian offices.
+# 发起者作用域；仅限普通路或其下属文官官职。
 tca_has_judicial_circuit_context_trigger = {
     save_temporary_scope_as = tca_context_actor
     any_in_global_list = {
@@ -195,7 +201,7 @@ tca_has_judicial_circuit_context_trigger = {
         }
     }
 }
-# Interaction scope. Actual jurisdiction never expands because of a high score.
+# 互动作用域；高评分绝不扩大实际辖区。
 tca_judicial_actor_has_jurisdiction_trigger = {
     scope:recipient = {
         is_alive = yes
@@ -228,7 +234,7 @@ tca_judicial_actor_has_jurisdiction_trigger = {
     }
 
 }
-# Interaction scope, valid only after restoring/resolving tca_circuit.
+# 互动上下文；调用者必须先设置临时 scope:tca_checked_circuit，供缺员上提判断。
 tca_judicial_requires_central_trigger = {
     OR = {
         scope:recipient = { any_held_title = { tca_is_judicial_circuit_trigger = yes } }
@@ -236,6 +242,7 @@ tca_judicial_requires_central_trigger = {
         scope:tca_checked_circuit = { tca_has_available_tixing_trigger = no }
     }
 }
+# 互动上下文；路主官必须审批，普通目标仅最低档或提刑面对第四档以下者可直接拘捕。
 tca_judicial_direct_authorized_trigger = {
     scope:recipient = { NOT = { any_held_title = { tca_is_judicial_circuit_trigger = yes } } }
     scope:recipient = {

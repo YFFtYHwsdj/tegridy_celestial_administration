@@ -1,4 +1,4 @@
-"""Static GUI binding checks, not a simulation of native status effects."""
+"""静态 GUI 绑定检查，不模拟原生状态效果。"""
 from pathlib import Path
 import unittest
 

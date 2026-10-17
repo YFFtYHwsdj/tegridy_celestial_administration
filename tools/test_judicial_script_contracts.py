@@ -1,4 +1,4 @@
-"""Regression checks for engine loading contracts, not simulated game rules."""
+"""引擎加载约定的回归检查，不模拟游戏规则。"""
 from pathlib import Path
 import re
 import unittest
@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class JudicialLoadingTests(unittest.TestCase):
     def test_review_linked_tooltip_does_not_require_event_role_aliases(self):
-        # #tooltip localization has no inherited event actor/recipient context.
+        # #tooltip 本地化不继承事件 actor／recipient 上下文。
         for language in ('english', 'simp_chinese'):
             text = (ROOT / f'localization/{language}/tca_custody_review_l_{language}.yml').read_text(encoding='utf-8-sig')
             linked_keys = set(re.findall(r'#tooltip:(tca_review_\w+)', text))
@@ -59,7 +59,7 @@ class JudicialLoadingTests(unittest.TestCase):
         self.assertFalse(list((ROOT / 'tests').glob('tca_*_tests.txt')))
 
     def test_serial_dispatch_reaches_all_delayed_cases_before_summary(self):
-        # Count registration alone cannot catch a premature summary in the wait chain.
+        # 仅检查数量登记无法发现等待链提前汇总的问题。
         suite = definitions((ROOT / 'events/tca_tests_events.txt').read_text(encoding='utf-8-sig'))
         stages = {}
         delayed_entries = set()
@@ -109,9 +109,9 @@ class JudicialLoadingTests(unittest.TestCase):
         request = ' '.join(interactions['tca_request_imprison_interaction'])
         self.assertIn('auto_accept = no', request)
         self.assertNotRegex(request, r'(?<!\w)auto_accept = \{')
-        # The direct interaction keeps the native auto-accept rule.
+        # 直接互动保留原生自动接受规则。
         self.assertIn('auto_accept = {', ' '.join(interactions['tca_judicial_imprison_interaction']))
-        # Apply ordinary scoring first; reset and set the recipient endpoint last.
+        # 先应用普通评分，最后重置并设置目标接受度终值。
         self.assertRegex(request, r'ai_accept = \{ base = 0 tca_judicial_target_acceptance = yes modifier = \{ factor = 0 scope:recipient = \{ tca_judicial_arrest_ai_cannot_refuse_trigger = yes \} \} modifier = \{ add = 100 desc = tca_judicial_arrest_cannot_refuse_reason scope:recipient = \{ tca_judicial_arrest_ai_cannot_refuse_trigger = yes \} \} \}')
 
     def test_modifier_calls_only_pass_declared_arguments(self):

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run an opt-in native GUI-controller regression in a disposable graphical game."""
+"""在可丢弃的图形游戏局中运行可选原生 GUI 控制器回归。"""
 import argparse
 import json
 from collections import Counter
@@ -29,7 +29,7 @@ def inspect_probe(debug, errors):
         issues.append('Fixture preconditions failed')
     counts = Counter()
     for line in debug.splitlines():
-        # Console-command traces can echo command text; only effect output counts.
+        # 控制台命令跟踪可能回显命令文本，只有效果输出才算证据。
         if 'jomini_effect_impl.cpp' in line and 'TCA_GUI_PASS_' in line:
             counts[line.rsplit('TCA_GUI_PASS_', 1)[1].strip()] += 1
     for step in EXPECTED:
@@ -44,7 +44,7 @@ def inspect_probe(debug, errors):
 
 
 def tab_probe_templates(window):
-    """Reuse actual GUI callbacks; do not recreate controller logic in the probe."""
+    """复用实际 GUI 回调，不在探针中重新实现控制器逻辑。"""
     result = []
     for name in ('self', 'liege', 'tongpan'):
         match = re.search(r'template tca_diarchy_select_' + name + r' \{([^{}]+)\}', window)
@@ -96,7 +96,7 @@ def validate_succession_geometry(window):
 
 
 def bind_tab_selections(source, window):
-    """Assert the actual down predicates and reject simultaneous selections."""
+    """断言实际按下状态条件，并拒绝多个标签同时选中。"""
     names = {'SELF': 'your_regent_tab_tutorial_uses_this',
              'LIEGE': 'liege_tab_tutorial_uses_this',
              'TONGPAN': 'tca_tongpan_relation_tab'}
@@ -115,15 +115,15 @@ def prepare_probe(args):
     run = prepare_run(ROOT, args.run_root, args.settings)
     adapter = run / 'mod/tca_cli_adapter'
     shutil.copytree(ROOT / 'tools/diarchy_ui_probe', adapter, dirs_exist_ok=True)
-    # Prepare the native fixture during after-lobby setup, before GUI bindings are built.
-    # No simulation day needs to advance: the GUI controller sequence runs while paused.
+    # 在离开大厅后的初始化中准备原生夹具，早于 GUI 绑定建立。
+    # 无需推进模拟日期，GUI 控制器序列在暂停状态下运行。
     startup = adapter / 'common/on_action/tca_cli_on_actions.txt'
     startup.write_text('on_game_start_after_lobby = { on_actions = { tca_cli_start } }\ntca_cli_start = { effect = { title:h_china.holder = { trigger_event = tca_diarchy_ui_probe.1 } } }\n', encoding='utf-8-sig')
     registration = adapter / 'gui/scripted_widgets/tca_cli_widgets.txt'
     registration.write_text('gui/tca_diarchy_ui_probe.gui = tca_gui_probe_start\ngui/tca_diarchy_ui_probe.gui = tca_gui_end_unpause\n', encoding='utf-8-sig')
     (adapter / 'events/tca_cli_events.txt').unlink()
-    # Keep the native controller context. Copy the real tab callbacks into
-    # opt-in assertion states; phase variables are local to this window.
+    # 保留原生控制器上下文，把真实标签回调复制到
+    # 可选断言状态中；阶段变量仅属于本窗口。
     window = (run / 'mod/tca_main/gui/window_diarchy.gui').read_text(encoding='utf-8-sig')
     validate_succession_geometry(window)
     probe_gui = adapter / 'gui/tca_diarchy_ui_probe.gui'

@@ -1,15 +1,17 @@
-﻿# Shared roles: tca_review_actor, keeper, prisoner. No custody-origin filter.
-# Office correspondence does not require participants to be idle or at home.
+﻿# 详覆资格分层：身份用于菜单，发送资格包含冷却与费用，结算资格校验已保存请求。
+# 共享角色为 tca_review_actor、keeper、prisoner，不按羁押来源过滤。
+# 公职书信往来不要求参与者空闲或在家。
 tca_review_actor_identity_trigger = {
     is_alive = yes
     is_adult = yes
     is_imprisoned = no
     tca_is_judicial_commissioner_trigger = yes
 }
+# 提刑角色作用域；保留统一可用性入口，当前与身份资格相同，不额外要求空闲。
 tca_review_actor_available_trigger = {
     tca_review_actor_identity_trigger = yes
 }
-# Explicit inputs: menu checks must not depend on redirect-created event targets.
+# 显式传入参数：菜单检查不得依赖 redirect 创建的事件目标。
 tca_review_keeper_identity_trigger = {
     trigger_if = {
         limit = { $ACTOR$ = { tca_review_actor_identity_trigger = yes } }
@@ -25,11 +27,13 @@ tca_review_keeper_identity_trigger = {
     trigger_else = { always = no }
 }
 
+# 关押者作用域，ACTOR 为提刑；在身份和辖区检查之外排除交战双方。
 tca_review_keeper_trigger = {
     tca_review_keeper_identity_trigger = { ACTOR = $ACTOR$ }
     NOT = { is_at_war_with = $ACTOR$ }
 }
 
+# 囚犯作用域；ACTOR、KEEPER 为角色参数。排除参与者本人、待司法交接及正在受刑者。
 tca_review_prisoner_trigger = {
     is_alive = yes
     is_imprisoned_by = $KEEPER$
@@ -38,22 +42,27 @@ tca_review_prisoner_trigger = {
     NOT = { has_variable = tca_pending_judicial_title }
     NOT = { has_character_flag = is_being_tortured }
 }
+# 提刑角色作用域；发送前检查个人冷却及待处理请求，身份合格不代表可再次发送。
 tca_review_actor_can_start_trigger = {
     tca_review_actor_available_trigger = yes
     NOT = { has_character_flag = tca_review_actor_pending }
     NOT = { has_character_flag = tca_review_send_cooldown }
 }
+# 囚犯作用域，ACTOR／KEEPER 为角色参数；检查囚犯冷却及提刑可负担性。
+# 仅真实互动扣费后设置的 tca_review_cost_paid 可跳过余额复查，避免对已扣费用重复要求余额。
 tca_review_prisoner_can_start_trigger = {
     tca_review_prisoner_trigger = { ACTOR = $ACTOR$ KEEPER = $KEEPER$ }
     NOT = { has_character_flag = tca_review_pending }
     NOT = { has_character_flag = tca_review_prisoner_cooldown }
     trigger_if = { limit = { NOT = { scope:tca_review_cost_paid ?= yes } } $ACTOR$ = { influence >= prev.tca_review_start_cost } }
 }
+# 显式角色参数 ACTOR／KEEPER／PRISONER；汇总双方与囚犯的发送资格，不检查牵制选项。
 tca_review_eligible_start_trigger = {
     $ACTOR$ = { tca_review_actor_can_start_trigger = yes }
     $KEEPER$ = { tca_review_keeper_trigger = { ACTOR = $ACTOR$ } }
     $PRISONER$ = { tca_review_prisoner_can_start_trigger = { ACTOR = $ACTOR$ KEEPER = $KEEPER$ } }
 }
+# 正式操作入口条件；读取 tca_review_actor／keeper／prisoner，使用牵制时额外验证可用性。
 tca_review_can_start_trigger = {
     tca_review_eligible_start_trigger = { ACTOR = scope:tca_review_actor KEEPER = scope:tca_review_keeper PRISONER = scope:tca_review_prisoner }
     trigger_if = {
@@ -61,7 +70,7 @@ tca_review_can_start_trigger = {
         scope:tca_review_actor = { has_usable_hook = scope:tca_review_keeper }
     }
 }
-# Native interaction roles exist independently on every GUI evaluation.
+# 每次 GUI 求值均独立提供原生互动角色。
 tca_review_interaction_shown_trigger = {
     scope:actor = { tca_review_actor_identity_trigger = yes }
     scope:recipient = {
@@ -69,6 +78,7 @@ tca_review_interaction_shown_trigger = {
         any_prisoner = { tca_review_prisoner_trigger = { ACTOR = scope:actor KEEPER = scope:recipient } }
     }
 }
+# 互动上下文；actor 是提刑、recipient 是关押者、secondary_recipient 是囚犯。未选择囚犯时不可发送。
 tca_review_interaction_send_trigger = {
     trigger_if = {
         limit = { exists = scope:secondary_recipient }
@@ -77,6 +87,8 @@ tca_review_interaction_send_trigger = {
     }
     trigger_else = { always = no }
 }
+# 结算上下文；检查准备阶段保存的角色、官职、路、政权与请求序号仍匹配。
+# 换任、囚犯转移、冷却标记失效或牵制失效均会使请求失效，不能只重查最初的身份资格。
 tca_review_context_valid_trigger = {
     trigger_if = {
         limit = {
@@ -114,6 +126,7 @@ tca_review_context_valid_trigger = {
     trigger_else = { always = no }
 }
 
+# 角色作用域，OTHER 为另一角色；AI 最优先援助的配偶、父母子女、挚友与灵魂伴侣。
 tca_review_close_trigger = {
     OR = {
         is_spouse_of = $OTHER$
@@ -123,6 +136,7 @@ tca_review_close_trigger = {
         has_relation_soulmate = $OTHER$
     }
 }
+# 角色作用域，OTHER 为另一角色；包含 close 关系并扩展到其他亲属、朋友与情人，供 AI 牵制和兴趣判断。
 tca_review_dear_trigger = {
     OR = {
         tca_review_close_trigger = { OTHER = $OTHER$ }
@@ -133,7 +147,7 @@ tca_review_dear_trigger = {
     }
 }
 
-# Native fixture precondition: matches the existing realm-preparation contract.
+# 原生夹具前置条件，与现有政权准备约定一致。
 tca_test_review_world_trigger = {
     debug_only = yes
     game_start_date = 1066.9.15

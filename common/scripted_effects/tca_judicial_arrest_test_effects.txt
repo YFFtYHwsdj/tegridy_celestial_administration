@@ -1,4 +1,4 @@
-﻿# Test-only observations. Never change the framework's reserved counters/flags.
+﻿# 仅测试观察，绝不修改框架保留的计数器或标记。
 tca_test_record_arrest_send_effect = {
     scope:actor ?= { if = { limit = { debug_only = yes has_character_flag = tca_test_arrest_native_active } change_variable = { name = tca_test_arrest_sent add = 1 } } }
 }
@@ -12,7 +12,7 @@ tca_test_record_arrest_target_accept_effect = {
     scope:actor ?= { if = { limit = { debug_only = yes has_character_flag = tca_test_arrest_native_active } change_variable = { name = tca_test_arrest_target_accepted add = 1 } } }
 }
 
-# Called after the real imprisonment effect; never substitutes for it.
+# 在真实关押效果后调用，绝不替代关押。
 tca_test_record_arrest_custody_effect = {
     scope:actor ?= {
         if = {
@@ -31,17 +31,17 @@ tca_test_record_arrest_custody_effect = {
     }
 }
 
-# Character scope. Native appointment can already grant this perk.
+# 角色作用域；原生任命可能已授予此能力。
 tca_test_ensure_arrest_perk_effect = {
     if = { limit = { NOT = { has_perk = prison_feudal_complex_perk } } add_perk = prison_feudal_complex_perk }
 }
 
-# Independent disposable governor for every case: no inherited request cooldown.
-# ROOT remains the suite reporter; no player switching and no direct imprisonment.
+# 每例使用独立可丢弃长官，避免继承请求冷却。
+# ROOT 保持为测试报告者，不切换玩家，也不直接关押。
 tca_test_prepare_native_arrest_effect = {
     title:h_china.holder = { tca_test_prepare_judicial_law_realm_effect = yes }
-    # Never replace an earlier case's disposable governor. Repeated appointment
-    # can trigger nested native title destruction while that governor has vassals.
+    # 绝不替换此前用例的可丢弃长官；若其仍有封臣，重复任命
+    # 可能触发嵌套的原生头衔销毁。
     clear_saved_scope = tca_test_law_circuit
     clear_saved_scope = tca_test_law_position
     clear_saved_scope = tca_test_law_commissioner
@@ -53,12 +53,12 @@ tca_test_prepare_native_arrest_effect = {
                 tca_is_judicial_circuit_trigger = yes
                 holder.primary_title = this
             }
-            # Replace the inherited alias unconditionally for each eligible entry.
-            # The last eligible entry wins; never gate selection on alias existence.
+            # 每个合格条目均无条件覆盖继承而来的别名。
+            # 最后一个合格条目生效，绝不以别名是否存在控制选择。
             save_scope_as = tca_test_law_circuit
         }
     }
-    # Mark only the selected circuit, after the iteration has completed.
+    # 遍历完成后，仅标记选中的路。
     scope:tca_test_law_circuit = { set_variable = { name = tca_test_arrest_fixture_used value = yes } }
     scope:tca_test_law_circuit = { save_scope_as = tca_test_arrest_estate_circuit }
     scope:tca_test_law_circuit.var:song_judicial_title ?= { save_scope_as = tca_test_law_position }
@@ -76,12 +76,12 @@ tca_test_prepare_native_arrest_effect = {
     tca_test_log_native_arrest_fixture_effect = { STAGE = BEFORE_APPOINTMENT }
     scope:tca_test_arrest_actor = {
         tca_test_protect_character_effect = yes
-        # Prepare the native family before rank-up, outside the appointment transaction.
-        # This avoids a nested CreateNobleFamilyTitle while the old governor loses office.
+        # 在晋升前、任命事务之外准备原生家门。
+        # 避免旧长官失职期间嵌套调用 CreateNobleFamilyTitle。
         create_dynasty = { spread_to_descendants = yes }
         give_noble_family_title = { name = noble_family_name tier = county article = DEFAULT_TITLE_NAME_ARTICLE government = celestial_government save_scope_as = tca_test_arrest_actor_family }
-        # Prepare a specific test ruler with a native grant. A career appointment
-        # can select another native successor instead of the requested fixture.
+        # 使用原生授予准备指定测试统治者；职业任命
+        # 可能选中其他原生继任者，而非指定夹具。
         change_merit = kingdom_starting_merit_value
         create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_test_arrest_governor_change }
         scope:tca_test_law_circuit = { change_title_holder = { holder = scope:tca_test_arrest_actor change = scope:tca_test_arrest_governor_change } }
@@ -118,7 +118,7 @@ tca_test_prepare_native_arrest_effect = {
         if = {
             limit = { always = $FAMILY$ }
             create_dynasty = { spread_to_descendants = yes }
-            # Native family title primitive, without the career event queued by the wrapper.
+            # 使用原生家门头衔基础效果，不调用会排入仕宦事件的包装。
             give_noble_family_title = { name = noble_family_name tier = county article = DEFAULT_TITLE_NAME_ARTICLE government = celestial_government save_scope_as = tca_test_arrest_family }
             domicile ?= { move_domicile = scope:tca_test_law_circuit.title_capital_county.title_province }
         }
@@ -144,7 +144,7 @@ tca_test_prepare_native_arrest_effect = {
             resolve_title_and_vassal_change = scope:tca_test_arrest_office_change
             change_government = celestial_government
         }
-        # Maintain exact sending-time no-family control, even if native rank-up created one.
+        # 即使原生晋升创建了家门，也保持发送时无家门对照的精确条件。
         if = { limit = { NOT = { always = $FAMILY$ } } every_held_title = { limit = { is_noble_family_title = yes } save_scope_as = tca_test_arrest_family_to_remove holder = { destroy_title = scope:tca_test_arrest_family_to_remove } } }
         create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_test_arrest_target_liege_change }
         change_liege = { liege = scope:tca_test_arrest_actor change = scope:tca_test_arrest_target_liege_change }
@@ -155,7 +155,7 @@ tca_test_prepare_native_arrest_effect = {
         add_trait_xp = { trait = confucian_education value = 100 }
     }
     scope:tca_test_arrest_actor = {
-        # Native legal reason permits the AI governor to send. Approval is separately controlled.
+        # 原生合法理由使 AI 长官可以发送，审批结果独立控制。
         add_opinion = { target = scope:tca_test_arrest_target modifier = schemed_against_me }
         save_scope_as = actor save_scope_as = puppet_or_actor
     }
@@ -167,8 +167,8 @@ tca_test_prepare_native_arrest_effect = {
 }
 
 tca_test_send_native_arrest_effect = {
-    # Default execute_threshold is the disabled enum (3); do not use execute_threshold=accept.
-    # send_threshold uses the command/queue path also used by the player's Send button.
+    # 默认 execute_threshold 为禁用枚举值 3，不要使用 execute_threshold=accept。
+    # send_threshold 使用与玩家发送按钮相同的命令／队列路径。
     run_interaction = {
         interaction = tca_request_imprison_interaction
         actor = scope:tca_test_arrest_actor
@@ -177,7 +177,7 @@ tca_test_send_native_arrest_effect = {
     }
 }
 
-# Real estate outside the requesting governor's circuit; actual vassalage stays fixed.
+# 真实庄园位于请求长官的路外，实际封臣关系保持不变。
 tca_test_move_arrest_estate_to_other_circuit_effect = {
     scope:tca_test_law_sovereign = {
         every_in_list = {
@@ -205,7 +205,7 @@ tca_test_cleanup_native_arrest_effect = {
     }
 }
 
-# Observe the day-20 state; callback evidence does not establish the cause of release/death.
+# 观察第20日状态；回调证据不能证明释放或死亡原因。
 tca_test_log_native_arrest_final_effect = {
     if = {
         limit = { debug_only = yes }
@@ -230,7 +230,7 @@ tca_test_log_native_arrest_final_effect = {
     }
 }
 
-# Observe fixture transactions without repairing the world or changing assertions.
+# 观察夹具事务，不修复世界状态，也不修改断言。
 tca_test_log_native_arrest_fixture_effect = {
     if = {
         limit = { debug_only = yes }
@@ -249,7 +249,7 @@ tca_test_log_native_arrest_fixture_effect = {
     }
 }
 
-# Observe real direct-interaction participants, not inherited event participants.
+# 观察真实直接互动参与者，不使用继承的事件参与者。
 tca_test_record_direct_arrest_context_effect = {
     if = {
         limit = { debug_only = yes scope:actor = { has_variable = tca_test_direct_arrest_probe } }

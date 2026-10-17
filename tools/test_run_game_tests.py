@@ -1,4 +1,4 @@
-"""Launcher isolation and outcome tests; these do not simulate CK3 rules."""
+"""启动隔离及结果测试，不模拟 CK3 规则。"""
 from pathlib import Path
 import json
 import subprocess

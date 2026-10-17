@@ -1,4 +1,6 @@
-﻿tca_test_protect_character_effect = {
+﻿# 测试环境保护与恢复；只拥有本轮新增的临时状态，不能把保护恢复扩展到原有特质。
+# 角色作用域；仅在本次新增保护特质时记录 ownership 标记，重复调用不覆盖原有保护来源。
+tca_test_protect_character_effect = {
     if = {
         limit = { NOT = { has_trait = tca_test_death_protection } }
         set_variable = { name = tca_test_protection_added value = yes }
@@ -6,9 +8,10 @@
     }
 }
 
+# 角色作用域；仅移除本测试拥有的保护特质并清除死亡报告指针，保留既有特质。
 tca_test_restore_character_effect = {
     if = {
-        # Dead characters no longer support variable operations in this engine.
+        # 此引擎中已故角色不再支持变量操作。
         limit = { is_alive = yes }
         if = {
             limit = { has_variable = tca_test_protection_added }
@@ -19,6 +22,7 @@ tca_test_restore_character_effect = {
     }
 }
 
+# 测试报告者作用域；保护报告者及当前中国君主，保存原君主引用供延迟续接检查。
 tca_test_begin_lifecycle_effect = {
     save_scope_as = tca_test_lifecycle_reporter
     tca_test_protect_character_effect = yes
@@ -33,12 +37,14 @@ tca_test_begin_lifecycle_effect = {
     }
 }
 
+# 测试报告者作用域；恢复报告者及原君主的临时保护并移除保存引用，完成或中断时共用。
 tca_test_cleanup_lifecycle_effect = {
     var:tca_test_lifecycle_sovereign ?= { tca_test_restore_character_effect = yes }
     tca_test_restore_character_effect = yes
     remove_variable = tca_test_lifecycle_sovereign
 }
 
+# 测试报告者作用域；环境失效时冻结状态并同时标记角色与 h_china 中断，禁止在污染测试局重新开始。
 tca_test_abort_environment_effect = {
     if = {
         limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
@@ -61,6 +67,7 @@ tca_test_abort_environment_effect = {
     }
 }
 
+# 测试报告者作用域；每次延迟续接先检查报告者／原君主仍有效，失败走统一中断清理。
 tca_test_validate_environment_effect = {
     if = {
         limit = { tca_test_environment_intact_trigger = no }
@@ -68,7 +75,7 @@ tca_test_validate_environment_effect = {
     }
 }
 
-# Called in the dying character's scope, before the native death completes.
+# 在将死角色作用域调用，早于原生死亡完成。
 tca_test_record_monitored_death_effect = {
     save_scope_as = tca_test_dying_character
     var:tca_test_death_reporter ?= {

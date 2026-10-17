@@ -1,4 +1,7 @@
-﻿tca_request_imprison_interaction = {
+﻿# 司法拘捕双入口；actor 是实际发起者，recipient 是目标，intermediary 仅承担审批角色。
+# 辖区、身份档和审批资格由共享 trigger 决定；回复时重建内部 saved scopes，避免依赖菜单 redirect 残留。
+# 需审批的司法拘捕；由原生 intermediary 队列先处理许可，再由目标接受或拒捕。
+tca_request_imprison_interaction = {
     desc = tca_request_imprison_interaction_desc
     redirect = {
         tca_setup_judicial_arrest_roles_effect = yes
@@ -17,7 +20,7 @@
     ai_intermediary_maybe = yes
     ai_intermediary_accept = {
         base = 20
-        # Native queue regression control. Only disposable debug actors carry these flags.
+        # 原生队列回归控制；只有可丢弃的调试角色携带这些标记。
         modifier = { add = -1000 scope:actor = { debug_only = yes has_character_flag = tca_test_arrest_force_veto } }
         modifier = { add = 1000 scope:actor = { debug_only = yes has_character_flag = tca_test_arrest_force_approval } }
         modifier = { add = 80 desc = tca_judicial_approval_reason scope:actor = { has_imprisonment_reason = scope:recipient } }
@@ -98,13 +101,13 @@
     on_accept = { tca_handle_judicial_arrest_accept_effect = yes }
     on_decline = { tca_handle_judicial_arrest_decline_effect = yes }
     on_auto_accept = { tca_trace_judicial_arrest_effect = { STAGE = REQUEST_AUTO_ACCEPT } }
-    # Whole-interaction auto_accept also approves the intermediary in CK3.
+    # CK3 的互动级 auto_accept 也会自动通过中间审批。
     auto_accept = no
     ai_accept = {
         base = 0
         tca_judicial_target_acceptance = yes
-        # MTTH modifiers execute in order: reset only exempt AI targets, then add 100.
-        # This affects recipient acceptance after approval, never intermediary acceptance.
+        # MTTH 修正按顺序执行：仅重置豁免的 AI 目标，再加 100。
+        # 此项仅影响审批后的目标接受度，不影响中间审批者接受度。
         modifier = {
             factor = 0
             scope:recipient = { tca_judicial_arrest_ai_cannot_refuse_trigger = yes }
@@ -121,6 +124,7 @@
     ai_targets = { ai_recipients = courtiers chance = 0.25 }
 }
 
+# 可直接执行的司法拘捕；与审批互动互斥，仍通过同一正式回复处理和资格重查。
 tca_judicial_imprison_interaction = {
     desc = tca_judicial_imprison_interaction_desc
     redirect = { tca_setup_judicial_arrest_roles_effect = yes }
@@ -189,7 +193,7 @@ tca_judicial_imprison_interaction = {
 			limit = {
 				scope:recipient = {
 					is_landed = no
-					# Landless prelates: a cardinalate or clerical region cannot sustain the refusal war
+					# 无地教长：枢机或圣职区头衔无法维持拒捕战争。
 					OR = {
 						exists = clerical_elector_title
 						any_held_title = {

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Read-only drift check for reviewed CK3 vanilla object overrides.
+"""对已审阅的 CK3 原版对象覆盖执行只读漂移检查。
 
-The registry explicitly lists replaced vanilla objects and same-name additive
-on_action extensions. Reviewed baselines are never refreshed automatically.
+登记表显式列出替换的原版对象及同名追加的 on_action 扩展。
+绝不自动刷新已审阅基线。
 """
 import argparse
 import difflib
@@ -18,7 +18,7 @@ MATH_TOKEN = re.compile(r'\#[^\n]*|\s+|@\[|[+\-*/%^(),\[\]]|[^\s+\-*/%^(),\[\]{}
 
 
 def tokens(text):
-    """Return tokens without silently skipping malformed quotes or operators."""
+    """返回 token，遇到损坏的引号或运算符时不得静默跳过。"""
     result = []
     end = 0
     math_depth = 0
@@ -41,7 +41,7 @@ def tokens(text):
 
 
 def definitions(text, allow_duplicates=False, ignored_keys=()):
-    """Extract complete RHS tokens for top-level blocks, scalars and expressions."""
+    """提取顶层块、标量和表达式的完整等号右侧 token。"""
     seq = tokens(text)
     found = {}
     i = 0
@@ -84,7 +84,7 @@ def definitions(text, allow_duplicates=False, ignored_keys=()):
 
 
 def body(text, name):
-    """Extract block contents for parser unit tests."""
+    """提取块内容，供解析器单元测试使用。"""
     parsed = definitions(text)
     if name not in parsed:
         raise ValueError(f"expected top-level {name}, found none")
@@ -132,17 +132,17 @@ def read_definitions(path, allow_duplicates=False, ignored_keys=()):
 
 
 def script_type(relative_path):
-    """Keep event IDs separate from common/ object types and their subfolders."""
+    """事件 ID 与 common/ 对象类型及其子目录分别处理。"""
     if relative_path.parts[0] == "events":
         return ("events",)
     directories = relative_path.parts[1:-1]
-    # The native .info files define contract groups and obligations separately.
+    # 原生 .info 文件分别定义契约组和义务。
     category = directories[:2] if directories[:1] == ("subject_contracts",) else directories[:1]
     return ("common",) + category
 
 
 def script_files(root):
-    """Scan supported script roots, failing if the required common/ root is absent."""
+    """扫描受支持脚本根目录，缺少必需的 common/ 根目录时失败。"""
     if not (root / "common").is_dir():
         raise ValueError(f"missing script directory: {root / 'common'}")
     return sorted(path for directory in ("common", "events")
@@ -157,7 +157,7 @@ def global_keys(path, relative_path):
 
 
 def discover_collisions(game_dir, mod_dir):
-    """Find same-named top-level definitions in mod and installed game scripts."""
+    """查找模组与已安装游戏脚本中的同名顶层定义。"""
     native_by_key = {}
     for path in script_files(game_dir):
         relative = path.relative_to(game_dir)
@@ -178,7 +178,7 @@ def _entry_identity(entry):
 
 
 def entry_definitions(entry, path):
-    # Multiple namespace declarations are valid metadata, not duplicate events.
+    # 多个 namespace 声明属于有效元数据，不是重复事件。
     ignored = ("namespace",) if Path(entry["vanilla"]).parts[:1] == ("events",) else ()
     return read_definitions(path, ignored_keys=ignored)
 
@@ -197,7 +197,7 @@ def _compare_entry(entry, label, expected, source_path, definition_key):
 
 
 def localization_values(path):
-    """Read quoted localization entries, preserving literal escapes for drift checks."""
+    """读取带引号的本地化条目，保留字面转义供漂移检查。"""
     result = {}
     for line in path.read_text(encoding="utf-8-sig").splitlines():
         match = re.match(r'^\s*([A-Za-z0-9_]+):(?:\d+)?\s*"((?:\\.|[^"\\])*)"\s*(?:#.*)?$', line)
@@ -237,8 +237,8 @@ def check(game_dir, mod_dir):
             changed = 1
         if not (mod_dir / entry["mod"]).is_file():
             raise ValueError(f"mod file override missing {entry['mod']}")
-    # Separate opt-in adapter mods live under tools/, outside the normal mod roots.
-    # Check their registered native callbacks and reviewed baselines explicitly.
+    # 独立可选适配模组位于 tools/，不在普通模组根目录中。
+    # 显式核对其已登记原生回调和审阅基线。
     for entry in registry.get("auxiliary_extensions", []):
         baseline = entry_definitions(entry, mod_dir / entry["baseline"]).get(entry["key"])
         if baseline is None:
@@ -263,8 +263,8 @@ def check(game_dir, mod_dir):
         mod_definitions = entry_definitions(entry, mod_path)
         if entry["key"] not in mod_definitions:
             raise ValueError(f"mod override {entry['key']} is missing from {mod_path}")
-        # Some overrides retain an unmodified native helper under a separate
-        # tca_* ID. Compare that helper to the vanilla baseline when declared.
+        # 部分覆盖在独立 tca_* ID 下保留未修改的原版辅助对象；
+        # 若登记了该辅助对象，则将其与原版基线比较。
         native_copy_key = entry.get("native_copy_key")
         if native_copy_key:
             changed |= _compare_entry(entry, f"mod-native-copy:{native_copy_key}", baseline,

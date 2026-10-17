@@ -1,12 +1,15 @@
-﻿# All values below evaluate in TARGET character scope.
-# Realm-relative values use the target's top_liege, or the actual host's top_liege for court guests.
-# Shared identity bands. Raw score comparisons belong only to this classifier.
+﻿# 司法目标身份评分与统一五档分类；各分项内部择高，最终组合方式见 authority_score。
+# 下列所有数值均在目标角色作用域求值。
+# 相对政权数值使用目标的 top_liege；宫廷宾客使用实际 host 的 top_liege。
+# 共享身份档位；原始评分比较只集中在此分类器中。
 tca_judicial_identity_tier_2_threshold = 30
 tca_judicial_identity_tier_3_threshold = 50
 tca_judicial_identity_tier_4_threshold = 80
 tca_judicial_identity_tier_5_threshold = 100
+# 兼容调用的阈值别名：提刑权限使用第二档门槛，中央权限使用第四档门槛。
 tca_judicial_tixing_threshold = { value = tca_judicial_identity_tier_2_threshold }
 tca_judicial_central_threshold = { value = tca_judicial_identity_tier_4_threshold }
+# 目标角色作用域；由高至低选唯一身份档，供审批、详覆费用和本地化共用。
 tca_judicial_identity_tier = {
     value = 1
     if = { limit = { tca_judicial_authority_score >= tca_judicial_identity_tier_5_threshold } value = 5 }
@@ -15,6 +18,7 @@ tca_judicial_identity_tier = {
     else_if = { limit = { tca_judicial_authority_score >= tca_judicial_identity_tier_2_threshold } value = 2 }
 }
 
+# 官职分只取最高命中类别；下方权重依次对应中央、路、州、县，不叠加兼任官职。
 tca_judicial_office_score = {
     value = 0
     if = { limit = { tca_has_central_office_trigger = yes } add = tca_judicial_office_score_1_weight }
@@ -27,6 +31,7 @@ tca_judicial_office_score_2_weight = 80
 tca_judicial_office_score_3_weight = 35
 tca_judicial_office_score_4_weight = 30
 
+# 家族身份只取最高类别：显赫、强大家族、有世族家门头衔、一般非出身低微。
 tca_judicial_family_score = {
     value = 0
     if = { limit = { house ?= { is_dominant_family = yes } } add = tca_judicial_family_score_1_weight }
@@ -39,6 +44,7 @@ tca_judicial_family_score_2_weight = 25
 tca_judicial_family_score_3_weight = 15
 tca_judicial_family_score_4_weight = 5
 
+# 宗族威望按最高达到档取一次加分，下方权重与分支自上而下对应。
 tca_judicial_dynasty_score = {
     value = 0
     if = { limit = { dynasty ?= { dynasty_prestige_level >= 10 } } add = tca_judicial_dynasty_score_1_weight }
@@ -53,6 +59,7 @@ tca_judicial_dynasty_score_3_weight = 9
 tca_judicial_dynasty_score_4_weight = 6
 tca_judicial_dynasty_score_5_weight = 3
 
+# 家主额外加分；拥有世族家门的家主优先于一般家主，两个档位互斥。
 tca_judicial_family_head_score = {
     value = 0
     if = { limit = { is_house_head = yes tca_has_noble_family_trigger = yes } add = tca_judicial_family_head_score_1_weight }
@@ -61,6 +68,7 @@ tca_judicial_family_head_score = {
 tca_judicial_family_head_score_1_weight = 10
 tca_judicial_family_head_score_2_weight = 5
 
+# 按目标所属政权君主计算皇亲分：一等亲、同家族、同宗族互斥；宾客使用实际 host 的政权。
 tca_judicial_royal_score = {
     value = 0
     if = { limit = { tca_is_emperor_first_degree_kin_trigger = yes } add = tca_judicial_royal_score_1_weight }
@@ -77,6 +85,7 @@ tca_judicial_royal_score_1_weight = 80
 tca_judicial_royal_score_2_weight = 30
 tca_judicial_royal_score_3_weight = 15
 
+# 配偶／父母／子女中的最高官职类别加分，只计同政权亲属，不逐人累计。
 tca_judicial_official_kin_score = {
     value = 0
     if = { limit = { tca_has_official_relative_trigger = { CLASS = tca_has_central_office_trigger } } add = tca_judicial_official_kin_score_1_weight }
@@ -87,6 +96,7 @@ tca_judicial_official_kin_score_1_weight = 30
 tca_judicial_official_kin_score_2_weight = 20
 tca_judicial_official_kin_score_3_weight = 10
 
+# 功绩等级按最高达到档计分，权重自高至低排列。
 tca_judicial_merit_score = {
     value = 0
     if = { limit = { merit_level >= 9 } add = tca_judicial_merit_score_1_weight }
@@ -101,6 +111,7 @@ tca_judicial_merit_score_3_weight = 15
 tca_judicial_merit_score_4_weight = 10
 tca_judicial_merit_score_5_weight = 5
 
+# 科举只计最高通过层级；多个考试标记不会重复加分。
 tca_judicial_exam_score = {
     value = 0
     if = { limit = { tgp_passed_palace_examination = yes } add = tca_judicial_exam_score_1_weight }
@@ -113,6 +124,7 @@ tca_judicial_exam_score_2_weight = 10
 tca_judicial_exam_score_3_weight = 5
 tca_judicial_exam_score_4_weight = 2
 
+# 目标角色作用域；威望等级取最高达到档，负等级及未达首档为零。
 tca_judicial_prestige_score = {
     value = 0
     if = { limit = { prestige_level >= 5 } add = tca_judicial_prestige_score_1_weight }
@@ -127,6 +139,7 @@ tca_judicial_prestige_score_3_weight = 6
 tca_judicial_prestige_score_4_weight = 3
 tca_judicial_prestige_score_5_weight = 1
 
+# 目标角色作用域；虔诚等级取最高达到档，与威望分独立计算。
 tca_judicial_piety_score = {
     value = 0
     if = { limit = { piety_level >= 5 } add = tca_judicial_piety_score_1_weight }
@@ -141,6 +154,7 @@ tca_judicial_piety_score_3_weight = 6
 tca_judicial_piety_score_4_weight = 3
 tca_judicial_piety_score_5_weight = 1
 
+# 目标角色作用域；儒学特质按最高经验档计一次身份分，与详覆能力评分的儒学加分分开。
 tca_judicial_confucian_score = {
     value = 0
     if = { limit = { has_trait = confucian_education has_trait_xp = { trait = confucian_education value >= 100 } } add = tca_judicial_confucian_score_1_weight }
@@ -157,6 +171,7 @@ tca_judicial_confucian_score_4_weight = 6
 tca_judicial_confucian_score_5_weight = 3
 tca_judicial_confucian_score_6_weight = 1
 
+# 目标角色作用域；汇总各项身份分，具体审批还须另查实际辖区和官职。
 tca_judicial_authority_score = {
     value = 0
     add = { value = tca_judicial_office_score desc = tca_judicial_score_office }
@@ -172,7 +187,9 @@ tca_judicial_authority_score = {
     add = { value = tca_judicial_confucian_score desc = tca_judicial_score_confucian }
 }
 
-# Actor-scope native AI inputs, also safe when custom redirect scopes are unavailable.
+# 发起者作用域的原生 AI 输入；自定义 redirect 作用域不可用时也可安全求值。
+# 发起角色作用域，需互动 recipient；提刑按目标实际领主／路主官／最高领主解析军事支持。
+# 供原生接受度计算，不改变实际发起者和最终收押者。
 tca_judicial_backing_strength = {
     value = current_military_strength
     if = {
@@ -188,6 +205,7 @@ tca_judicial_backing_strength = {
         }
     }
 }
+# 与 backing_strength 使用同一支持者选择规则，提供其战争资金；不实际转移金钱。
 tca_judicial_backing_gold = {
     value = gold
     if = {

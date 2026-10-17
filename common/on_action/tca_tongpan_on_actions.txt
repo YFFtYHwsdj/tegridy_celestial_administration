@@ -1,4 +1,4 @@
-﻿# Additive native callbacks; debounce at the sovereign while transactions settle.
+﻿# 追加原生回调；事务完成期间在君主处合并重复请求。
 on_game_start_after_lobby = { on_actions = { tca_tongpan_startup } }
 yearly_global_pulse = { on_actions = { tca_tongpan_setup } }
 on_title_gain = { on_actions = { tca_tongpan_changed } }
@@ -9,7 +9,9 @@ on_title_destroyed = { on_actions = { tca_tongpan_destroyed } }
 on_fired_from_council = { on_actions = { tca_tongpan_changed } }
 on_councillor_left = { on_actions = { tca_tongpan_council_left } }
 on_councillors_swapped = { on_actions = { tca_tongpan_council_swapped } }
+# 年度全局入口；分别向独立领主排队，实际维护自行判断政权资格并清理旧绑定。
 tca_tongpan_setup = { effect = { every_independent_ruler = { tca_request_tongpan_maintenance_effect = yes } } }
+# 变动角色作用域；排队维护自身政权，若 scope:title 为通判官职，再通知被辅佐县当前政权。
 tca_tongpan_changed = {
     trigger = { OR = { government_has_flag = government_is_celestial any_held_title = { has_variable = tca_tongpan_title } any_held_title = { has_variable = tca_tongpan_office } } }
     effect = {
@@ -19,18 +21,20 @@ tca_tongpan_changed = {
         }
     }
 }
+# 独立天朝霸权君主的季度补漏；非符合政权由其他变动与年度入口处理。
 tca_tongpan_periodic = {
     trigger = { is_independent_ruler = yes government_has_flag = government_is_celestial highest_held_title_tier = tier_hegemony }
     effect = { tca_request_tongpan_maintenance_effect = yes }
 }
+# scope:landed_title 为销毁对象；销毁官职先结束分权并通知县所在政权，销毁县则撤销绑定官职。
 tca_tongpan_destroyed = {
     effect = {
         scope:landed_title = {
             if = {
                 limit = { has_variable = tca_tongpan_title }
                 tca_stop_tongpan_diarchy_effect = yes
-                # The outgoing officer may now be an independent family head.
-                # Queue repair through the supervised county's current realm.
+                # 离任官员此时可能已成为独立家主。
+                # 通过被辅佐县当前所在政权排队修复。
                 var:tca_tongpan_county.holder ?= { tca_request_tongpan_maintenance_effect = yes }
             }
             else_if = { limit = { tca_has_tongpan_office_trigger = yes } var:tca_tongpan_office = { tca_destroy_tongpan_office_effect = yes } }
@@ -38,17 +42,18 @@ tca_tongpan_destroyed = {
         tca_request_tongpan_maintenance_effect = yes
     }
 }
+# 内阁离任／交换分组；使用原生给出的旧雇主或内阁领主排队，避免只维护离任者的新政权。
 tca_tongpan_council_left = { effect = { scope:old_employer ?= { tca_request_tongpan_maintenance_effect = yes } } }
 tca_tongpan_council_swapped = { effect = { scope:councillor_liege ?= { tca_request_tongpan_maintenance_effect = yes } } }
 
-# Initial offices must exist before the first date advance. Later title changes
-# still use the debounced worker while native transactions settle.
+# 首次推进日期前必须建立初始官职；后续头衔变化
+# 仍在原生事务完成期间通过合并请求的工作入口处理。
 tca_tongpan_startup = {
     effect = {
         every_independent_ruler = {
             limit = { government_has_flag = government_is_celestial highest_held_title_tier = tier_hegemony }
             tca_refresh_tongpan_realm_effect = yes
-            # Capture the original startup result, before any test/next-day repair.
+            # 记录最初开局结果，早于任何测试或次日修复。
             if = {
                 limit = { debug_only = yes }
                 set_variable = { name = tca_test_tongpan_startup_count value = 0 }

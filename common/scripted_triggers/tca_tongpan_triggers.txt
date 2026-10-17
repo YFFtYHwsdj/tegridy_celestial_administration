@@ -1,4 +1,5 @@
-﻿# County title scope. Eligibility is actual sovereignty, never hegemony de-jure.
+﻿# 通判县资格、官职有效性与初次候选；县资格以主头衔和实际最高领主为边界。
+# 县头衔作用域；资格取决于实际主权，而非霸权 de_jure 关系。
 tca_is_tongpan_county_trigger = {
     tier = tier_county
     is_landless_type_title = no
@@ -16,10 +17,12 @@ tca_is_tongpan_county_trigger = {
         }
     }
 }
+# 被辅佐县头衔作用域；正向官职指针和官职反向县指针必须一致，空缺官职也可保留绑定。
 tca_has_tongpan_office_trigger = {
     exists = var:tca_tongpan_office
     var:tca_tongpan_office = { exists = var:tca_tongpan_county var:tca_tongpan_county = prev }
 }
+# 通判官职头衔作用域；持有人须以此为主头衔、仅持该非家门官职且仍是无地县级天朝臣属。
 tca_is_valid_tongpan_holder_trigger = {
     exists = holder
     holder = {
@@ -32,6 +35,8 @@ tca_is_valid_tongpan_holder_trigger = {
         NOT = { any_held_title = { is_noble_family_title = no NOT = { this = prev.primary_title } } }
     }
 }
+# 候选角色作用域；调用者提供 tca_tp_liege／tca_tp_sovereign。
+# 仅初次补缺选人，排除已登记的历史人物与其他实职持有人；后续继任使用原生任命继承。
 tca_is_initial_tongpan_candidate_trigger = {
     is_alive = yes
     is_diarch_valid_trigger = yes
@@ -42,7 +47,7 @@ tca_is_initial_tongpan_candidate_trigger = {
     tgp_can_be_a_minister_trigger = { COURT_OWNER = scope:tca_tp_liege }
     liege_or_court_owner ?= { top_liege = scope:tca_tp_sovereign }
 }
-# Character scope. Only a fully synchronized office enables costs and efficiency.
+# 角色作用域；仅完全同步的官职启用费用与效率。
 tca_has_active_tongpan_trigger = {
     exists = primary_title
     primary_title = {
@@ -56,18 +61,19 @@ tca_has_active_tongpan_trigger = {
     has_diarchy_type = tca_tongpan
     diarch ?= primary_title.var:tca_tongpan_office.holder
 }
+# 改革者作用域；只检查被囚及通判改革独立冷却，启用范围由法律和县资格另行控制。
 tca_tongpan_reform_can_pass_trigger = {
     is_imprisoned = no
     custom_tooltip = { text = tca_tongpan_reform_cooldown NOT = { has_variable = tca_tongpan_reform_cooldown } }
 }
 
-# Only marked, bound office holders use the peer-governor loyalty model.
+# 仅有标记且已绑定的官职持有人使用同级州主管忠诚模型。
 tca_is_tongpan_for_loyalty_trigger = {
     exists = primary_title
     primary_title = { has_variable = tca_tongpan_title exists = var:tca_tongpan_county.holder }
 }
 
-# Character scope. Resolve the supervised county, not the officer's actual liege.
+# 角色作用域；解析被辅佐县，不使用官员实际领主。
 tca_can_open_tongpan_diarchy_trigger = {
     exists = primary_title
     primary_title = {

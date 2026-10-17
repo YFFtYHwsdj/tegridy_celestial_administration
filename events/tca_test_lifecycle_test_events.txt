@@ -1,5 +1,8 @@
-﻿namespace = tca_test_lifecycle_test
+﻿# 生命周期回归：区分本次新增与原有保护，重复恢复不得删掉既有特质。
+# 死亡场景调用真实 death，次日检查 on_death 已记录并恢复临时状态，不能直接调用观察效果代替。
+namespace = tca_test_lifecycle_test
 
+# 保护恢复场景；新加保护应移除，原有保护与无能等既有特质应保留，重复操作结果不变。
 tca_test_lifecycle_test.1 = {
     type = character_event
     hidden = yes
@@ -30,7 +33,7 @@ tca_test_lifecycle_test.1 = {
                 scope:tca_test_protection_existing = { tca_test_restore_character_effect = yes }
                 if = { limit = { scope:tca_test_protection_existing = { has_trait = immortal has_trait = tca_test_death_protection } } debug_log = "TCA_TEST CHECK_PASS tca_test_protection_restore 6" }
                 else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_protection_restore 6" }
-                # These two traits were explicitly prepared only on this disposable fixture.
+                # 这两个特质仅在本可丢弃夹具上显式准备。
                 scope:tca_test_protection_existing = { remove_trait = immortal remove_trait = tca_test_death_protection }
                 if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_protection_restore" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
                 else = { debug_log = "TCA_TEST PASS tca_test_protection_restore" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
@@ -41,6 +44,7 @@ tca_test_lifecycle_test.1 = {
     }
 }
 
+# 显式死亡应触发真实原生观察；自然死亡保护不能阻止脚本 death，也不能误中断非运行夹具。
 tca_test_lifecycle_test.2 = {
     type = character_event
     hidden = yes
@@ -56,7 +60,7 @@ tca_test_lifecycle_test.2 = {
                 scope:tca_test_death_fixture_target = {
                     tca_test_protect_character_effect = yes
                     set_variable = { name = tca_test_death_reporter value = scope:tca_test_death_fixture_reporter }
-                    # Real death path: do not directly call the on_death callback.
+                    # 真实死亡路径，不直接调用 on_death 回调。
                     death = { death_reason = death_fight }
                 }
                 add_character_flag = tca_test_delayed_case_active
@@ -68,6 +72,7 @@ tca_test_lifecycle_test.2 = {
     }
 }
 
+# 前例死亡后的次日断言；检查真实死亡、回调报告与清理观察后才结束本延迟例。
 tca_test_lifecycle_test.1102 = {
     type = character_event
     hidden = yes

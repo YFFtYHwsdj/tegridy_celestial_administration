@@ -1,4 +1,6 @@
-﻿# Native regression. Each invocation creates its own governor and canonical duke.
+﻿# 通判完整生命周期场景；检查绑定、分权、费用、效率、换任和死亡后的同步，使用正式效果与原生事务。
+# 死亡前继任顺位与实际接任者分别记录；名单成员检查不能代替严格首位继任验收，见 docs/song_tongpan_implementation.md。
+# 原生回归；每次调用创建独立长官及所属公爵。
 namespace = tca_tongpan_test
 tca_tongpan_test.1 = {
     type = character_event
@@ -10,8 +12,8 @@ tca_tongpan_test.1 = {
             remove_character_flag = tca_test_case_failed
             if = {
                 limit = { debug_only = yes title:h_china.holder = root government_has_flag = government_is_celestial exists = title:c_hongzhou.holder exists = title:c_yunzhou_2.holder }
-                # Snapshot comes exclusively from the original after-lobby callback.
-                # Never call maintenance to satisfy this startup assertion.
+                # 快照仅来自原始离开大厅后回调。
+                # 绝不通过调用维护满足此开局断言。
                 if = { limit = { var:tca_test_tongpan_startup_count > 0 var:tca_test_tongpan_startup_missing = 0 } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 29" }
                 else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 29" }
                 if = { limit = { has_realm_law = tca_tongpan_enabled_law } add_character_flag = tca_test_tp2_restore_law }
@@ -62,8 +64,8 @@ tca_tongpan_test.1 = {
                 title:c_hongzhou = { tca_refresh_tongpan_county_effect = yes }
                 if = { limit = { scope:tca_test_tp2_office.holder = scope:tca_test_tp2_officer } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 5" }
                 else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 5" }
-                # Separate, deterministic aptitude fixture: skill-change effects
-                # can retain cached getters during this same engine tick.
+                # 独立且确定性的称职度夹具；技能修改效果的
+                # getter 可能在同一引擎时刻仍读取缓存。
                 create_character = { age = 35 gender_female_chance = 0 random_traits = no dynasty = none employer = scope:tca_test_tp2_duke culture = root.culture faith = root.faith rite = root.rite stewardship = 60 diplomacy = 20 learning = 20 save_scope_as = tca_test_tp2_aptitude_fixture }
                 scope:tca_test_tp2_officer = {
                     save_scope_value_as = { name = tca_test_tp2_aptitude value = tca_tongpan_aptitude_value }
@@ -78,7 +80,7 @@ tca_tongpan_test.1 = {
                 else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 49" }
                 if = { limit = { scope:tca_test_tp2_aptitude_fixture = { tca_can_open_tongpan_diarchy_trigger = no } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 50" }
                 else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 50" }
-                # Fixed personality fixtures have no office or opinion contribution.
+                # 固定性格夹具无官职或好感贡献。
                 create_character = { age = 35 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_test_tp2_neutral }
                 create_character = { age = 35 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite trait = just trait = honest save_scope_as = tca_test_tp2_dutiful }
                 create_character = { age = 35 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite trait = greedy trait = ambitious trait = deceitful save_scope_as = tca_test_tp2_selfish }
@@ -91,7 +93,7 @@ tca_tongpan_test.1 = {
                 else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 35" }
                 if = { limit = { scope:tca_test_tp2_selfish = { tca_tongpan_loyalty_value = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 36" }
                 else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 36" }
-                # Explicit zero base skills isolate each new contribution.
+                # 显式清零基础技能，以隔离每个新增分项。
                 create_character = { age = 35 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite stewardship = 0 diplomacy = 0 learning = 0 martial = 20 intrigue = 0 save_scope_as = tca_test_tp2_military }
                 if = { limit = { scope:tca_test_tp2_military = { tca_tongpan_aptitude_value = 10 } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 37" }
                 else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 37" debug_log_scopes = yes }
@@ -162,20 +164,20 @@ tca_tongpan_test.1001 = {
         if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
             if = { limit = { scope:tca_test_tp2_governor = { tca_has_active_tongpan_trigger = yes diarch = scope:tca_test_tp2_officer } scope:tca_test_tp2_officer = { liege = scope:tca_test_tp2_duke } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 16" }
             else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 16" }
-            # The displayed opinion contribution must read the native opinion of the
-            # supervised governor, not diarch_loyalty (an actual-liege getter).
+            # 显示的好感贡献必须读取被辅佐州主管的原生好感，
+            # 而非 diarch_loyalty，后者读取实际领主。
             scope:tca_test_tp2_officer = {
                 save_scope_value_as = { name = tca_test_tp2_loyalty_engine value = diarch_loyalty }
                 save_scope_value_as = { name = tca_test_tp2_loyalty_model value = tca_tongpan_loyalty_value }
             }
             if = { limit = { scope:tca_test_tp2_officer = { tca_is_tongpan_for_loyalty_trigger = yes tca_tongpan_loyalty_opinion_value = "opinion(scope:tca_test_tp2_governor)" } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 30" }
             else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 30" debug_log_scopes = yes }
-            # Changing the actual superior's relationship must not change loyalty
-            # towards the supervised governor; the peer relationship is preserved.
+            # 改变实际直属上级的关系，不得改变对被辅佐
+            # 州主管的忠诚度；同僚关系应保留。
             scope:tca_test_tp2_officer = { set_relation_rival = scope:tca_test_tp2_duke }
             if = { limit = { scope:tca_test_tp2_officer = { liege = scope:tca_test_tp2_duke tca_tongpan_loyalty_value = scope:tca_test_tp2_loyalty_model } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 31" }
             else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 31" }
-            # Read the native final and presented values, not only our helper.
+            # 读取原生最终及显示数值，不仅检查本模组辅助值。
             scope:tca_test_tp2_governor = {
                 save_scope_value_as = { name = tca_test_tp2_eff_base value = { value = tca_native_governor_efficiency_value multiply = 100 subtract = 100 } }
                 save_scope_value_as = { name = tca_test_tp2_eff_delta value = { value = governor_efficiency_presented subtract = scope:tca_test_tp2_eff_base } }
@@ -193,8 +195,8 @@ tca_tongpan_test.1001 = {
             title:c_hongzhou = { tca_refresh_tongpan_county_effect = yes }
             if = { limit = { title:c_hongzhou = { var:tca_tongpan_office = scope:tca_test_tp2_office } scope:tca_test_tp2_office = { tca_is_valid_tongpan_holder_trigger = yes de_jure_liege = title:d_jiangxi } scope:tca_test_tp2_governor = { tca_has_active_tongpan_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 19" }
             else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 19" }
-            # A fixture county absent from the generated lookup simulates the
-            # allocation request of a map extension. No map eligibility is faked.
+            # 生成查找表中不存在的夹具县用于模拟地图扩展的
+            # 分配请求，不伪造地图资格。
             title:c_tca_tongpan_probe = { tca_bind_tongpan_office_effect = yes }
             if = { limit = { title:c_tca_tongpan_probe = { tca_has_tongpan_office_trigger = yes var:tca_tongpan_office = { var:tca_tongpan_county = title:c_tca_tongpan_probe } } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 20" }
             else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 20" }
@@ -240,9 +242,9 @@ tca_tongpan_test.1002 = {
                 save_scope_value_as = { name = tca_test_tp2_execution_influence_paid value = var:tca_test_tp2_execution_influence_paid }
                 remove_character_flag = tca_test_tp2_execution_probe
             }
-            # Snapshot the engine's title list without reproducing an appointment
-            # formula. Native appointment can select a different listed candidate
-            # when the preview head already holds another office (full-suite probe).
+            # 快照记录引擎头衔候选名单，不复制任命公式。
+            # 预览首位已任其他官职时，原生任命可能选中名单中的
+            # 另一名候选，此为完整回归中的探针结果。
             clear_saved_scope = tca_test_tp2_expected_heir
             clear_saved_scope = tca_test_tp2_appointed_heir
             every_in_list = { list = tca_test_tp2_title_heirs_before_death remove_from_list = tca_test_tp2_title_heirs_before_death }
@@ -258,15 +260,15 @@ tca_tongpan_test.1002 = {
             if = { limit = { exists = scope:tca_test_tp2_expected_heir } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 45" }
             else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 45" }
             scope:tca_test_tp2_office.holder ?= { save_scope_as = tca_test_tp2_dying_officer death = { death_reason = death_fight } }
-            # This immediate assertion precedes the deferred repair and therefore
-            # cannot pass merely because a maintenance effect filled the vacancy.
+            # 此即时断言早于延迟修复，因此不能仅因维护效果
+            # 补上空缺便通过。
             if = { limit = { scope:tca_test_tp2_office = { exists = holder NOT = { holder = scope:tca_test_tp2_dying_officer } holder = { has_realm_law = celestial_appointment_succession_law } } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 23" }
             else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 23" }
             scope:tca_test_tp2_office.holder ?= { save_scope_as = tca_test_tp2_appointed_heir }
             if = { limit = { scope:tca_test_tp2_appointed_heir = { is_in_list = tca_test_tp2_title_heirs_before_death } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 46" }
             else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 46" debug_log_scopes = yes }
-            # Preserve the strict preview-head comparison as a diagnostic. It is
-            # not a promise made by a UI that only reads native succession data.
+            # 保留严格比较预览首位的诊断；只读取原生继任数据的
+            # 界面并未承诺实际必定任命首位。
             if = {
                 limit = { NOT = { scope:tca_test_tp2_appointed_heir = scope:tca_test_tp2_expected_heir } }
                 debug_log = "TCA: native Tongpan appointment differs from pre-death title preview head"
@@ -301,8 +303,8 @@ tca_tongpan_test.1003 = {
             else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 26" }
                 if = { limit = { scope:tca_test_tp2_blocked_officer = { tca_can_open_tongpan_diarchy_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 52" }
                 else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 52" }
-            # Exercise the original government-change callback, without manually
-            # calling maintenance to make the exit assertion pass.
+            # 执行原始政体变化回调，不手动调用维护
+            # 使退出断言通过。
             title:c_hongzhou.holder = { save_scope_as = tca_test_tp2_reforming_governor change_government = feudal_government }
             debug_log = "TCA_TEST WAIT tca_test_tongpan_lifecycle 2 days"
             trigger_event = { id = tca_tongpan_test.1004 days = 2 }
@@ -331,8 +333,8 @@ tca_tongpan_test.1005 = {
         if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
             if = { limit = { title:c_hongzhou = { var:tca_tongpan_office = scope:tca_test_tp2_office } scope:tca_test_tp2_office = { tca_is_valid_tongpan_holder_trigger = yes } title:c_hongzhou.holder = { tca_has_active_tongpan_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 28" }
             else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 28" }
-            # Use freshly created fixed-stat characters rather than skill-change
-            # effects whose getters can remain cached during the same tick.
+            # 使用新建固定属性角色，不使用可能在同一时刻
+            # 仍由 getter 缓存旧值的技能修改效果。
             scope:tca_test_tp2_office.holder = { save_scope_as = tca_test_tp2_boundary_original_officer }
             scope:tca_test_tp2_aptitude_fixture = {
                 create_dynasty = { spread_to_descendants = yes }
@@ -422,15 +424,15 @@ tca_tongpan_test.1005 = {
             title:c_hongzhou = { tca_refresh_tongpan_county_effect = yes }
             if = { limit = { title:c_hongzhou.holder = scope:tca_test_tp2_governor scope:tca_test_tp2_office.holder = scope:tca_test_tp2_boundary_original_officer scope:tca_test_tp2_governor = { tca_has_active_tongpan_trigger = yes diarch = scope:tca_test_tp2_boundary_original_officer } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 56" }
             else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 56" debug_log_scopes = yes }
-            # Exercise the exact read-only helper used by GuiScope in the window.
+            # 执行窗口中 GuiScope 使用的精确只读辅助值。
             scope:tca_test_tp2_office = { save_scope_as = tca_tp_office }
             scope:tca_test_tp2_boundary_original_officer = {
                 save_scope_value_as = { name = tca_test_tp2_native_candidate_score value = "appointment_candidate_score(scope:tca_tp_office)" }
             }
             if = { limit = { scope:tca_test_tp2_boundary_original_officer = { tca_tongpan_title_candidate_score_value = scope:tca_test_tp2_native_candidate_score } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 57" }
             else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 57" debug_log_scopes = yes }
-            # Prepare our own vacant office; the shared probe title can already have a holder.
-            # Keep the zero expectation and assert vacancy before querying the GUI helper.
+            # 准备独立空缺官职；共享探针头衔可能已有持有人。
+            # 保留零值预期，查询 GUI 辅助值前先断言空缺。
             scope:tca_test_tp2_office = { tca_destroy_tongpan_office_effect = yes save_scope_as = tca_tp_office }
             if = { limit = { scope:tca_tp_office = { NOT = { exists = holder } } scope:tca_test_tp2_boundary_original_officer = { tca_tongpan_title_candidate_score_value = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 58" }
             else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 58" debug_log_scopes = yes }

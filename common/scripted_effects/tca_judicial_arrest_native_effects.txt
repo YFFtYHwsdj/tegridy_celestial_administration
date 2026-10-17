@@ -1,6 +1,8 @@
-﻿# Adapted vanilla on_accept/on_decline and war_for_imprison_effect.
-# These bodies run only after tca_judicial_arrest_still_valid_trigger.
-# tca_authority is the actual initiator, tca_governor provides military backing.
+﻿# 司法拘捕原生改编效果；正式回复入口先恢复上下文并通过 still_valid 检查，再调用接受／拒绝分支。
+# 原版来源入口为 imprison_interaction 的 on_accept／on_decline 与 war_for_imprison_effect；差异与验收见 docs/judicial_arrest.md。
+# 改编自原版 on_accept／on_decline 与 war_for_imprison_effect。
+# 这些主体仅在通过 tca_judicial_arrest_still_valid_trigger 后执行。
+# tca_authority 是实际发起者，tca_governor 提供军事支持。
 tca_judicial_arrest_success_native_effect = {
 		if = {
 			limit = { scope:is_puppet_action ?= yes }
@@ -92,8 +94,8 @@ tca_judicial_arrest_success_native_effect = {
 				joined_faction = { save_scope_as = retaliating_faction }
 			}
 		}
-		# Tyranny remains with the initiator.
-        # Approval never changes custody: the actual initiator imprisons.
+		# 暴政由发起者承担。
+        # 批准不改变羁押归属，实际发起者负责关押。
         scope:puppet_or_actor = { imprison_tyranny_effect = yes save_scope_as = tca_custodian }
         save_scope_value_as = { name = disable_display_rightful_imprisonment_tooltip value = yes }
         rightfully_imprison_character_effect = {
@@ -104,10 +106,10 @@ tca_judicial_arrest_success_native_effect = {
             limit = { scope:puppet_or_actor = { tca_is_judicial_commissioner_trigger = yes } }
             scope:recipient = { tca_register_judicial_prisoner_effect = yes }
         }
-		# If they recently revoked your title, or asked for your excommunication, they become your rival
+		# 若对方近期撤销过你的头衔或请求绝罚你，则升级为仇敌。
 		imprison_attempt_escalates_rivalry_effect = yes
 		scope:puppet_or_actor = {
-			# Native event previews imprisonment by the initiator, so use a custody-aware toast below.
+			# 原生事件预览发起者收押，因此下方使用反映实际羁押者的弹出通知。
 			if = {
 				limit = {
 					has_imprisonment_reason = scope:recipient
@@ -137,8 +139,8 @@ tca_judicial_arrest_success_native_effect = {
 			scope:puppet_or_actor = { remove_character_flag = flag_hostile_actions_disabled_delay }
 		}
 
-		# If we're a clan this interaction affects unity
-		if = { # If you don't have an imprisonment reason, and the target is landed, you lose more unity
+		# 氏族政体下，此互动影响团结度。
+		if = { # 无拘捕理由且目标有地时，团结度损失较大。
 			limit = {
 				NOT = { scope:puppet_or_actor = { has_imprisonment_reason = scope:recipient } }
 				scope:recipient = { is_landed_or_landless_administrative_or_theocratic = yes }
@@ -151,7 +153,7 @@ tca_judicial_arrest_success_native_effect = {
 				REVERSE_NON_HOUSE_TARGET = no
 			}
 		}
-		else_if = { # If you don't have an imprisonment reason, and the target is unlanded, you lose slightly less unity
+		else_if = { # 无拘捕理由且目标无地时，团结度损失稍小。
 			limit = {
 				NOT = { scope:puppet_or_actor = { has_imprisonment_reason = scope:recipient } }
 				scope:recipient = { is_landed_or_landless_administrative_or_theocratic = no }
@@ -164,7 +166,7 @@ tca_judicial_arrest_success_native_effect = {
 				REVERSE_NON_HOUSE_TARGET = no
 			}
 		}
-		else = { # If you have a valid reason, you lose only a tiny bit of unity (criminal or not, they are still family)
+		else = { # 有正当理由时仅损失少量团结度：无论是否犯罪，对方仍是家人。
 			add_clan_unity_interaction_effect = {
 				CHARACTER = scope:puppet_or_actor
 				TARGET = scope:recipient
@@ -174,7 +176,7 @@ tca_judicial_arrest_success_native_effect = {
 			}
 		}
 
-		# Harrying logic.
+		# 劫掠处理逻辑。
 		scope:puppet_or_actor = {
 			if = {
 				limit = {
@@ -208,14 +210,15 @@ tca_judicial_arrest_success_native_effect = {
     }
 }
 
+# 目标拒捕分支；沿用原生拒捕后果及战争处理，军事支持使用恢复后的 tca_governor。
 tca_judicial_arrest_decline_native_effect = {
-		#Close family might get rival progress
+		#至亲可能获得仇敌关系进度。
 		if = {
 			limit = {
 				scope:recipient = {
 					is_close_family_of = scope:puppet_or_actor
 				}
-				#Legal imprisonment
+				#合法拘捕。
 				trigger_if = {
 					limit = {
 						scope:puppet_or_actor = {
@@ -229,7 +232,7 @@ tca_judicial_arrest_decline_native_effect = {
 						}
 					}
 				}
-				#Illegal imprisonment
+				#非法拘捕。
 				trigger_else = {
 					scope:recipient = {
 						NOT = {
@@ -267,7 +270,7 @@ tca_judicial_arrest_decline_native_effect = {
 						}
 					}
 					else = {
-						# Remove them immediately.
+						# 立即移除。
 						remove_laamp_from_exiled_county_automatically_effect = {
 							PROVINCE = scope:recipient.location
 							LAAMP = scope:recipient
@@ -281,7 +284,7 @@ tca_judicial_arrest_decline_native_effect = {
 					imprison_tyranny_effect = yes
 				}
 				scope:recipient = {
-					#If target is count or higher, start war.
+					#目标为伯爵或更高等级时，发动战争。
 					if = {
 						limit = {
 							is_playable_character = yes
@@ -298,7 +301,7 @@ tca_judicial_arrest_decline_native_effect = {
 								}
 							}
 							joined_faction = {
-								save_scope_as = retaliating_faction # For loc
+								save_scope_as = retaliating_faction # 供本地化使用。
 								imprisonment_retribution_start_faction_war_if_valid = yes
 							}
 							hidden_effect = {
@@ -318,9 +321,9 @@ tca_judicial_arrest_decline_native_effect = {
 							}
 						}
 					}
-					#If target is a baron or unlanded, have them escape.
+					#目标为男爵或无地角色时，使其逃走。
 					else = {
-						if = { #To block them from being instantly rehired
+						if = { #防止其立即被重新雇用。
 							limit = {
 								is_councillor_of = scope:puppet_or_actor
 								can_be_fired_from_council_trigger = { COURT_OWNER = scope:puppet_or_actor }
@@ -389,7 +392,7 @@ tca_judicial_arrest_decline_native_effect = {
 				}
 			}
 
-			#Remove them as guardian/ward for any courtier (feedback given in char_interaction.0230)
+			#解除其与所有廷臣的监护关系；反馈由 char_interaction.0230 提供。
 			scope:puppet_or_actor = {
 				if = {
 					limit = {
@@ -491,8 +494,8 @@ tca_judicial_arrest_decline_native_effect = {
 				}
 			}
 
-			# If we're a clan this interaction affects unity
-			if = { # If you don't have an imprisonment reason, and the target is landed, you lose more unity
+			# 氏族政体下，此互动影响团结度。
+			if = { # 无拘捕理由且目标有地时，团结度损失较大。
 				limit = {
 					NOT = {
 						scope:puppet_or_actor = { has_imprisonment_reason = scope:recipient }
@@ -507,7 +510,7 @@ tca_judicial_arrest_decline_native_effect = {
 					REVERSE_NON_HOUSE_TARGET = no
 				}
 			}
-			else_if = { # If you don't have an imprisonment reason, and the target is unlanded, you lose slightly less unity
+			else_if = { # 无拘捕理由且目标无地时，团结度损失稍小。
 				limit = {
 					NOT = {
 						scope:puppet_or_actor = { has_imprisonment_reason = scope:recipient }
@@ -522,7 +525,7 @@ tca_judicial_arrest_decline_native_effect = {
 					REVERSE_NON_HOUSE_TARGET = no
 				}
 			}
-			else = { # If you have a valid reason, you lose only a tiny bit of unity (criminal or not, they are still family)
+			else = { # 有正当理由时仅损失少量团结度：无论是否犯罪，对方仍是家人。
 				add_clan_unity_interaction_effect = {
 					CHARACTER = scope:puppet_or_actor
 					TARGET = scope:recipient
@@ -546,7 +549,7 @@ tca_judicial_arrest_decline_native_effect = {
     }
 }
 
-# Native refusal CB, faction allies and bloc behavior; only reason-owner checks differ.
+# 沿用原生拒捕宣战理由、派系盟友及集团行为，仅调整拘捕理由持有人检查。
 tca_judicial_war_for_imprison_effect = {
 	$LIEGE$ = { save_temporary_scope_as = liege_temp }
 	$REBEL$ = {
@@ -560,28 +563,28 @@ tca_judicial_war_for_imprison_effect = {
 			target = scope:liege_temp
 		}
 	}
-	# Disgruntled vassals
+	# 不满的封臣。
 	if = {
 		limit = {
 			scope:tca_authority = { NOT = { has_imprisonment_reason = scope:rebel_temp } }
 		}
 		scope:liege_temp = {
-			every_vassal = { #Vassals joining the rebel.
+			every_vassal = { #加入叛乱者的封臣。
 				limit = {
 					vassal_would_join_rebel_faction_base_trigger = yes
 					OR = {
-						#Lovers and friends always back rebel (unless also lovers/friends of the liege)
+						#情人与朋友始终支持叛乱者，除非同时也是领主的情人或朋友。
 						vassal_would_join_rebel_faction_relation_trigger = yes
-						#Vassals that either like recipient or have high honor will rally if the liege is being tyrannical.
+						#领主实施暴政时，喜欢目标或重视荣誉的封臣会响应。
 						AND = {
-							# Special imprisonment checks
+							# 特殊拘捕检查。
 							NOT = {
 								scope:tca_authority = { has_imprisonment_reason = scope:rebel_temp }
 							}
-							# If they can't join a faction against the liege they should not revolt
+							# 若无法加入反领主派系，则不应起兵。
 							vassal_would_join_rebel_faction_tyranny_trigger = yes
 						}
-						#And finally, vassals that really hate their liege will join regardless (provided that they also do not hate recipient).
+						#最后，极其厌恶领主的封臣也会加入，但不能同时厌恶目标。
 						AND = {
 							OR = {
 								opinion = {
@@ -629,7 +632,7 @@ tca_judicial_war_for_imprison_effect = {
 							}
 						}
 					}
-					# TGP bloc members follow their leader
+					# 天朝扩展：集团成员跟随领袖。
 					trigger_if = {
 						limit = { exists = house.house_confederation.leading_house.house_head }
 						house.house_confederation.leading_house.house_head = this
@@ -639,7 +642,7 @@ tca_judicial_war_for_imprison_effect = {
 			}
 		}
 	}
-	# Bloc members join despite legality
+	# 即使拘捕合法，集团成员也会加入。
 	bloc_member_join_war_effect = yes
 	every_in_list = {
 		list = joining_vassals

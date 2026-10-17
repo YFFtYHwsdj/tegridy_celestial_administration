@@ -48,6 +48,8 @@ CK3 天朝行政体系重做 mod。中央、地方官制分别提供因便／宋
 
 王国级圣职区验证已终止：宗教层级、共同显示与宗教竞争不适合用作天朝官职，测试文件及原版事件覆盖已移除。完整结果与原型源码见[验证记录及归档附录](docs/clerical_region_probe.md)。正式提刑仍使用原有公国方案。
 
+开发注释的职责、写法与检查方式见[代码注释维护](docs/code_comments.md)。
+
 ## 测试框架
 
 支持 CLI 自动新开专用观察者测试局：`python3 tools/run_game_tests.py`。当前为 macOS 带窗口运行，无需 computer use；自动启用 debug/develop、推进日期、执行全组并核对独立日志。适配模组仅由工具加载，正常开局不自动运行。参数、退出码与限制见[CLI 测试说明](docs/cli_game_tests.md)。

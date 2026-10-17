@@ -1,5 +1,5 @@
-﻿# Test-only fixtures. Never called from gameplay on_actions or decisions.
-# Character scope: disposable test emperor. Rebuilds state for each case.
+﻿# 仅供测试的夹具，正常玩法 on_actions 或决议不调用。
+# 角色作用域为可丢弃的测试皇帝，每例重新建立状态。
 tca_test_prepare_judicial_law_realm_effect = {
     save_scope_as = tca_test_law_sovereign
     clear_saved_scope = tca_test_law_circuit
@@ -28,8 +28,8 @@ tca_test_prepare_judicial_law_realm_effect = {
         }
     }
     tca_refresh_court_system_realm_effect = yes
-    # Appointment/title callbacks can change the political graph during repair.
-    # Take the assertion snapshot AFTER repair, not from its earlier input set.
+    # 任命／头衔回调可能在修复期间改变政治关系。
+    # 断言快照在修复后获取，不使用此前输入集合。
     every_vassal_or_below = {
         every_held_title = {
             limit = { tca_is_judicial_circuit_trigger = yes }
@@ -51,8 +51,8 @@ tca_test_prepare_judicial_law_realm_effect = {
             }
         }
     }
-    # Assign both aliases from the repaired current snapshot unconditionally.
-    # Do not choose slots by testing whether a cleared inherited alias exists.
+    # 从修复后的当前快照无条件设置两个别名。
+    # 不通过检查已清理的继承别名是否存在来选择槽位。
     ordered_in_list = {
         variable = tca_test_law_circuits
         limit = { tca_is_judicial_circuit_trigger = yes }
@@ -69,11 +69,11 @@ tca_test_prepare_judicial_law_realm_effect = {
     }
     scope:tca_test_law_circuit.var:song_judicial_title ?= { save_scope_as = tca_test_law_position }
     scope:tca_test_law_position.holder ?= { save_scope_as = tca_test_law_commissioner }
-    # Isolate prisoner cases from previously registered disposable characters.
+    # 使囚犯场景与此前登记的可丢弃角色隔离。
     scope:tca_test_law_position ?= { tca_retire_judicial_prisoners_effect = yes }
 }
 
-# Lowborn civilian in the chosen actor's own court; no inherited office/family score.
+# 在选定发起者宫廷中生成出身低微文官，不继承官职或家族评分。
 tca_test_create_judicial_law_target_effect = {
     create_character = {
         age = 30
@@ -87,8 +87,8 @@ tca_test_create_judicial_law_target_effect = {
     }
 }
 
-# Interaction fixture: exactly 30 authority from a complete Confucian education.
-# Assert the resulting score in each case; do not substitute the business score.
+# 互动夹具：完整儒学教育恰好提供 30 点权限评分。
+# 每例断言实际所得评分，不替代正式评分逻辑。
 tca_test_prepare_judicial_approval_reply_effect = {
     tca_test_prepare_judicial_law_realm_effect = yes
     scope:tca_test_law_circuit.holder = {
@@ -113,8 +113,8 @@ tca_test_prepare_judicial_approval_reply_effect = {
     tca_setup_judicial_approval_effect = yes
 }
 
-# Only the newly generated disposable score target, never a real official.
-# Zero fame/devotion/merit inputs and native exam flags before exact boundaries.
+# 仅处理新生成的可丢弃评分目标，不处理真实官员。
+# 测试精确边界前，将名望／奉献／功绩输入及原生考试标记清零。
 tca_test_normalize_judicial_score_target_effect = {
     add_prestige_experience = -100000
     add_piety_experience = -100000
@@ -125,8 +125,8 @@ tca_test_normalize_judicial_score_target_effect = {
     remove_character_flag = passed_palace_exam
 }
 
-# Test-only native replacement transaction, with a fresh dedicated-office scholar.
-# Do not borrow an existing commissioner: native rank-up may resign other offices.
+# 仅供测试的原生替换事务，使用新建专职学者。
+# 不借用现任提刑：原生晋升可能使其辞去其他官职。
 tca_test_replace_judicial_approver_effect = {
     scope:actor = { save_scope_as = tca_test_replacement_requester }
     scope:recipient = { save_scope_as = tca_test_replacement_target }
@@ -161,7 +161,7 @@ tca_test_replace_judicial_approver_effect = {
         holder ?= { tca_ensure_native_judicial_realm_succession_effect = yes }
         holder ?= { tca_ensure_official_contract_effect = yes }
     }
-    # Keep the original pending interaction participants through preparation callbacks.
+    # 准备回调期间保留原排队互动参与者。
     scope:tca_test_replacement_requester = { save_scope_as = actor save_scope_as = puppet_or_actor }
     scope:tca_test_replacement_target = { save_scope_as = recipient }
     scope:tca_test_replacement_old_approver = { save_scope_as = intermediary }

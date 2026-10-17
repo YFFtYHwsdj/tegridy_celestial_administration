@@ -1,4 +1,4 @@
-﻿# Recreate named effect scopes from the engine's standard saved interaction roles.
+﻿# 从引擎标准保存的互动角色重建命名效果作用域。
 tca_restore_judicial_arrest_context_effect = {
     clear_saved_scope = tca_position
     clear_saved_scope = tca_commissioner
@@ -9,13 +9,13 @@ tca_restore_judicial_arrest_context_effect = {
             limit = { tca_is_judicial_commissioner_trigger = yes exists = scope:tca_circuit }
             save_scope_as = tca_commissioner
             primary_title = { save_scope_as = tca_position }
-            # Keep the backing ruler selected by the shared role resolver.
+            # 保留共享角色解析器选定的军事支持统治者。
         }
     }
 }
 
-# Use engine-saved roles directly for approval feedback, including human replies.
-# Approval uses the feed; veto uses the upper-screen toast with visible text.
+# 直接使用引擎保存的角色提供审批反馈，包括人工回复。
+# 批准使用消息流，否决使用带可见正文的屏幕上方弹出通知。
 tca_judicial_arrest_approved_effect = {
     scope:actor = {
         send_interface_message = {
@@ -28,9 +28,9 @@ tca_judicial_arrest_approved_effect = {
     }
 }
 
-# A veto never counts as the target resisting arrest.
+# 否决绝不视为目标拒捕。
 tca_judicial_arrest_veto_effect = {
-    # The requester bears the political cost; the commissioner is doing their job.
+    # 请求者承担政治代价，提刑仅履行职责。
     scope:actor = {
         custom_tooltip = tca_judicial_arrest_veto_preview
         add_prestige = -100
@@ -60,6 +60,7 @@ tca_judicial_arrest_veto_effect = {
     }
 }
 
+# 已恢复互动上下文；清除发起者临时敌对行动锁并提示失效，不执行拘捕或否决处罚。
 tca_judicial_arrest_invalidated_effect = {
     scope:tca_authority ?= {
         remove_character_flag = flag_hostile_actions_disabled_delay
@@ -71,7 +72,7 @@ tca_judicial_arrest_invalidated_effect = {
     }
 }
 
-# Prisoner character scope. Keep an office-indexed list, not a world scan.
+# 囚犯角色作用域；维护按官职索引的列表，不扫描整个世界。
 tca_register_judicial_prisoner_effect = {
     set_variable = { name = tca_judicial_prison_title value = scope:tca_position }
     save_scope_as = tca_registered_prisoner
@@ -83,6 +84,7 @@ tca_register_judicial_prisoner_effect = {
     }
 }
 
+# 囚犯角色作用域；从原登记官职列表移除自己并清除反向指针，官职缺失时仍清除本地登记。
 tca_unregister_judicial_prisoner_effect = {
     save_scope_as = tca_released_prisoner
     var:tca_judicial_prison_title ?= {
@@ -91,11 +93,11 @@ tca_unregister_judicial_prisoner_effect = {
     remove_variable = tca_judicial_prison_title
 }
 
-# Prisoner scope, scope:tca_custodian is the next keeper.
-# Use only the engine effect: never reapply arrest opinions, tyranny or reason checks.
-# The engine rejects imprison on an existing prisoner. Release and re-imprison
-# synchronously; the transfer flag protects our registry during release callbacks.
-# Native release/imprison on_actions still run and need gameplay acceptance.
+# 囚犯作用域；scope:tca_custodian 是下一任羁押者。
+# 仅使用引擎效果，不重新施加拘捕好感、暴政或理由检查。
+# 引擎拒绝对已被囚者使用 imprison，因此同步释放再关押；
+# 转移标记在释放回调期间保护本模组登记。
+# 原生释放／关押 on_actions 仍会执行，需要完整玩法验收。
 tca_transfer_judicial_prisoner_effect = {
     if = {
         limit = {
@@ -121,7 +123,7 @@ tca_transfer_judicial_prisoner_effect = {
     }
 }
 
-# Judicial title scope. Runs after existing appointment/liege maintenance.
+# 提刑头衔作用域；在现有任命／领主维护后执行。
 tca_reconcile_judicial_prisoners_effect = {
     if = {
         limit = { exists = var:song_judicial_circuit.holder has_variable_list = tca_judicial_prisoners }
@@ -141,7 +143,7 @@ tca_reconcile_judicial_prisoners_effect = {
     }
 }
 
-# Judicial title scope; retire custody BEFORE withdrawing the office holder.
+# 提刑头衔作用域；在撤下持有人之前退休羁押登记。
 tca_retire_judicial_prisoners_effect = {
     clear_saved_scope = tca_custodian
     if = {
@@ -150,7 +152,7 @@ tca_retire_judicial_prisoners_effect = {
         every_in_list = {
             variable = tca_judicial_prisoners
             tca_transfer_judicial_prisoner_effect = yes
-            # Keep a failed handoff registered rather than silently losing custody data.
+            # 交接失败时保留登记，避免静默丢失羁押数据。
             if = {
                 limit = {
                     OR = {
@@ -165,7 +167,7 @@ tca_retire_judicial_prisoners_effect = {
     }
 }
 
-# Prisoner scope, after the native refusal war or battle has actually captured them.
+# 囚犯作用域；原生拒捕战争或战斗已实际捕获目标后处理。
 tca_resolve_pending_judicial_capture_effect = {
     if = {
         limit = {
@@ -187,7 +189,7 @@ tca_resolve_pending_judicial_capture_effect = {
                 tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:tca_position.var:song_judicial_circuit }
             }
             scope:tca_position.holder = { save_scope_as = tca_custodian }
-            # Clear before transfer, since imprison can fire another on_imprison.
+            # 转移前先清除，因为 imprison 可能再次触发 on_imprison。
             remove_variable = tca_pending_judicial_title
             remove_variable = tca_pending_judicial_governor
             tca_transfer_judicial_prisoner_effect = yes
@@ -203,7 +205,7 @@ tca_resolve_pending_judicial_capture_effect = {
     }
 }
 
-# Shared reply dispatch: the interactions and regression tests use identical gates.
+# 共享回复调度：正式互动和回归测试使用相同门槛。
 tca_handle_judicial_approval_accept_effect = {
     tca_restore_judicial_arrest_context_effect = yes
     tca_test_record_arrest_approval_effect = yes
@@ -215,6 +217,7 @@ tca_handle_judicial_approval_accept_effect = {
     else = { tca_judicial_arrest_invalidated_effect = yes }
 }
 
+# 审批者否决回调；先恢复参与者并重查，只有仍有效的请求才执行否决代价。
 tca_handle_judicial_approval_decline_effect = {
     tca_restore_judicial_arrest_context_effect = yes
     tca_test_record_arrest_veto_effect = yes
@@ -226,6 +229,7 @@ tca_handle_judicial_approval_decline_effect = {
     else = { tca_judicial_arrest_invalidated_effect = yes }
 }
 
+# 目标接受回调；恢复并重查后调用原生改编拘捕效果，审批同意本身不执行此收押步骤。
 tca_handle_judicial_arrest_accept_effect = {
     tca_restore_judicial_arrest_context_effect = yes
     tca_test_record_arrest_target_accept_effect = yes
@@ -242,6 +246,7 @@ tca_handle_judicial_arrest_accept_effect = {
     }
 }
 
+# 目标拒捕回调；恢复并重查后进入原生失败／战争分支，不能与审批者否决混用。
 tca_handle_judicial_arrest_decline_effect = {
     tca_restore_judicial_arrest_context_effect = yes
     tca_trace_judicial_arrest_effect = { STAGE = TARGET_DECLINE }

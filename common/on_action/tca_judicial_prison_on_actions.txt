@@ -1,7 +1,10 @@
-﻿on_imprison = { on_actions = { tca_judicial_capture tca_judicial_minister_availability } }
+﻿# 司法囚犯生命周期接线：原生关押／释放／死亡、拒捕战争结束与刑部可用性维护。
+# 追加 on_actions 保留原版处理；测试观察回调只记录带专用标记的临时人物。
+on_imprison = { on_actions = { tca_judicial_capture tca_judicial_minister_availability } }
 on_release_from_prison = { on_actions = { tca_judicial_prison_release tca_test_arrest_native_release tca_judicial_minister_availability } }
 on_death = { on_actions = { tca_judicial_prison_death tca_test_monitored_death tca_test_arrest_native_death } }
 
+# 仅有测试报告指针的角色进入死亡证据记录；正式死亡处理独立执行。
 tca_test_monitored_death = {
     trigger = { has_variable = tca_test_death_reporter }
     effect = { tca_test_record_monitored_death_effect = yes }
@@ -11,6 +14,7 @@ on_war_won_defender = { on_actions = { tca_judicial_refusal_war_ended } }
 on_war_white_peace = { on_actions = { tca_judicial_refusal_war_ended } }
 on_war_invalidated = { on_actions = { tca_judicial_refusal_war_ended } }
 
+# 被囚／获释的刑部官员作用域；立即刷新帝直属提刑上级，并排队完整维护以跟随可用性变化。
 tca_judicial_minister_availability = {
     trigger = { OR = { has_council_position = minister_justice has_title = title:e_minister_of_justice } }
     effect = {
@@ -22,6 +26,7 @@ tca_judicial_minister_availability = {
     }
 }
 
+# 被捕角色作用域；待交接囚犯仍与提供军事支持的长官交战时，排队次日重查。
 tca_judicial_capture = {
     trigger = {
         has_variable = tca_pending_judicial_title
@@ -31,8 +36,8 @@ tca_judicial_capture = {
     effect = { trigger_event = { id = tca_judicial_prison.1 days = 1 } }
 }
 
-# Defer until native CB effects have imprisoned the defeated rebel.
-# Always clear the pending designation on peace, victory or invalidation.
+# 延迟至原生宣战理由效果已关押战败叛乱者后处理。
+# 和平、胜利或战争失效时，始终清除待交接指定。
 tca_judicial_refusal_war_ended = {
     trigger = {
         scope:attacker ?= {
@@ -43,9 +48,10 @@ tca_judicial_refusal_war_ended = {
     effect = { scope:attacker = { trigger_event = { id = tca_judicial_prison.1 days = 1 } } }
 }
 
+# 获释角色作用域；仅对真正离开监禁且不在同步转押中的已登记囚犯注销。
 tca_judicial_prison_release = {
     trigger = {
-        # A queued release callback must not unregister someone already re-imprisoned.
+        # 排队中的释放回调不得注销已经重新被囚的人。
         is_imprisoned = no
         NOT = { has_character_flag = tca_judicial_transfer_in_progress }
         has_variable = tca_judicial_prison_title
@@ -53,13 +59,14 @@ tca_judicial_prison_release = {
     effect = { tca_unregister_judicial_prisoner_effect = yes }
 }
 
+# 死亡角色作用域；先注销其囚犯登记，若其为提刑则把该官职登记的囚犯交回路主官。
 tca_judicial_prison_death = {
     effect = {
         if = {
             limit = { has_variable = tca_judicial_prison_title }
             tca_unregister_judicial_prisoner_effect = yes
         }
-        # on_death runs before death: secure only office prisoners with the governor.
+        # on_death 在死亡前执行；只把公职囚犯交由长官暂管。
         if = {
             limit = { tca_is_judicial_commissioner_trigger = yes }
             primary_title = { save_scope_as = tca_dying_judicial_title }
@@ -75,7 +82,7 @@ tca_judicial_prison_death = {
     }
 }
 
-# Only disposable native-arrest regression actors; observe actual release callbacks.
+# 仅针对可丢弃的原生拘捕回归角色，观察真实释放回调。
 tca_test_arrest_native_release = {
     trigger = { debug_only = yes has_character_flag = tca_test_arrest_native_target }
     effect = {
@@ -97,7 +104,7 @@ tca_test_arrest_native_release = {
     }
 }
 
-# on_death provides the native death_reason while the character is still valid.
+# on_death 提供原生 death_reason，此时角色仍有效。
 tca_test_arrest_native_death = {
     trigger = { debug_only = yes has_character_flag = tca_test_arrest_native_target }
     effect = { var:tca_test_arrest_requester ?= { add_to_variable_list = { name = tca_test_arrest_dead_cases target = root.var:tca_test_arrest_case } } debug_log = "TCA_ARREST_DEATH NATIVE_CALLBACK" debug_log_scopes = yes }

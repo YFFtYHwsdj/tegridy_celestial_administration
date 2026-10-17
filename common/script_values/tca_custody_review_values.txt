@@ -1,4 +1,5 @@
-﻿# Prisoner-scope prices: tune each value independently of identity scoring.
+﻿# 详覆价格与评分；身份费用在囚犯作用域计算，能力分项在被评分者作用域计算。
+# 囚犯作用域的费用；各项数值可独立于身份评分调节。
 tca_review_tier_1_start_cost = 15
 tca_review_tier_1_influence_loss = 15
 tca_review_tier_1_prestige_loss = 30
@@ -14,6 +15,7 @@ tca_review_tier_4_prestige_loss = 250
 tca_review_tier_5_start_cost = 100
 tca_review_tier_5_influence_loss = 200
 tca_review_tier_5_prestige_loss = 500
+# 囚犯作用域；以统一身份五档选择发送影响力费用，不能在提刑作用域计算。
 tca_review_start_cost = {
     value = tca_review_tier_1_start_cost
     if = { limit = { tca_judicial_identity_tier = 5 } value = tca_review_tier_5_start_cost }
@@ -21,6 +23,7 @@ tca_review_start_cost = {
     else_if = { limit = { tca_judicial_identity_tier = 3 } value = tca_review_tier_3_start_cost }
     else_if = { limit = { tca_judicial_identity_tier = 2 } value = tca_review_tier_2_start_cost }
 }
+# 囚犯作用域；根据囚犯身份确定提刑评分失败的额外影响力代价。
 tca_review_influence_loss = {
     value = tca_review_tier_1_influence_loss
     if = { limit = { tca_judicial_identity_tier = 5 } value = tca_review_tier_5_influence_loss }
@@ -28,6 +31,7 @@ tca_review_influence_loss = {
     else_if = { limit = { tca_judicial_identity_tier = 3 } value = tca_review_tier_3_influence_loss }
     else_if = { limit = { tca_judicial_identity_tier = 2 } value = tca_review_tier_2_influence_loss }
 }
+# 囚犯作用域；根据囚犯身份确定提刑评分失败的额外威望代价。
 tca_review_prestige_loss = {
     value = tca_review_tier_1_prestige_loss
     if = { limit = { tca_judicial_identity_tier = 5 } value = tca_review_tier_5_prestige_loss }
@@ -35,20 +39,22 @@ tca_review_prestige_loss = {
     else_if = { limit = { tca_judicial_identity_tier = 3 } value = tca_review_tier_3_prestige_loss }
     else_if = { limit = { tca_judicial_identity_tier = 2 } value = tca_review_tier_2_prestige_loss }
 }
-# Native confirmation roles; no prisoner selected means no price preview yet.
+# 使用原生确认页角色；未选择囚犯时不显示费用预览。
 tca_review_interaction_cost = {
     value = 0
     if = { limit = { exists = scope:secondary_recipient } value = scope:secondary_recipient.tca_review_start_cost }
 }
-# Settlement uses the send-time snapshot even if transferring changes status.
+# 结算使用发送时快照，即使移交导致身份变化也保持不变。
 tca_review_settlement_prestige_loss = {
     value = scope:tca_review_prisoner.tca_review_prestige_loss
     if = { limit = { exists = scope:tca_review_prestige_loss_at_start } value = scope:tca_review_prestige_loss_at_start }
 }
+# 与威望结算同样优先读取发送快照，直接调用且未准备快照时才按当前囚犯身份计算。
 tca_review_settlement_influence_loss = {
     value = scope:tca_review_prisoner.tca_review_influence_loss
     if = { limit = { exists = scope:tca_review_influence_loss_at_start } value = scope:tca_review_influence_loss_at_start }
 }
+# 评分角色作用域；先给儒学特质基础加分，再按最高已达经验档补足该档加分。
 tca_review_confucian_bonus = {
     value = 0
     if = { limit = { has_trait = confucian_education }
@@ -59,11 +65,13 @@ tca_review_confucian_bonus = {
         else_if = { limit = { has_trait_xp = { trait = confucian_education value >= 20 } } add = 2 }
     }
 }
+# 评分角色作用域；公正与专断分别累加修正，其他性格不参与正式胜负评分。
 tca_review_personality_bonus = {
     value = 0
     if = { limit = { has_trait = just } add = 3 }
     if = { limit = { has_trait = arbitrary } subtract = 3 }
 }
+# 评分角色作用域；以下三个分项分别提供学识、半数外交及非学识合计，供评分与回归引用。
 tca_review_learning_bonus = { value = learning }
 tca_review_diplomacy_bonus = { value = diplomacy multiply = 0.5 }
 tca_review_non_learning_score = {
@@ -71,7 +79,7 @@ tca_review_non_learning_score = {
     add = tca_review_confucian_bonus
     add = tca_review_personality_bonus
 }
-# Labels belong to the actual scoring terms; GetScriptValueDesc builds the tooltip.
+# 说明标签绑定实际评分分项，由 GetScriptValueDesc 构建提示。
 tca_review_score = {
     value = 0
     add = { desc = tca_review_learning_contribution value = tca_review_learning_bonus }
@@ -79,6 +87,7 @@ tca_review_score = {
     add = { desc = tca_review_confucian_contribution value = tca_review_confucian_bonus }
     add = { desc = tca_review_personality_contribution value = tca_review_personality_bonus }
 }
+# 需 tca_review_actor／keeper；双方评分差线性转为随机权重，各自下限为 1，权重不是百分比。
 tca_review_actor_weight = {
     value = scope:tca_review_actor.tca_review_score
     subtract = scope:tca_review_keeper.tca_review_score
@@ -86,6 +95,7 @@ tca_review_actor_weight = {
     add = 50
     min = 1
 }
+# 与提刑权重镜像计算并独立截断，保证弱方仍保留非零权重。
 tca_review_keeper_weight = {
     value = scope:tca_review_keeper.tca_review_score
     subtract = scope:tca_review_actor.tca_review_score
@@ -93,12 +103,15 @@ tca_review_keeper_weight = {
     add = 50
     min = 1
 }
+# 以双方截断后权重之和归一化为百分比；下方关押者概率取补数，不能直接使用未归一化权重。
 tca_review_actor_probability = {
     value = tca_review_actor_weight
     divide = { value = tca_review_actor_weight add = tca_review_keeper_weight }
     multiply = 100
 }
 tca_review_keeper_probability = { value = 100 subtract = tca_review_actor_probability }
+# 需 tca_review_actor／keeper／prisoner；关系、胜率和性格累加为 AI 选择兴趣。
+# 此值只排序发送意愿，不修改正式评分胜率；有可用牵制且关系亲近时免除低胜率减分。
 tca_review_ai_interest = {
     value = -20
     if = { limit = { scope:tca_review_actor = { tca_review_close_trigger = { OTHER = scope:tca_review_prisoner } } } add = 60 }

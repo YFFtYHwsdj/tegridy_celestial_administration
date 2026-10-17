@@ -1,5 +1,5 @@
-﻿# Character scope: the relevant emperor, not a global minister title.
-# Resolve only the first available office. A target cannot approve their own arrest.
+﻿# 角色作用域为相关皇帝，不使用全局部职头衔。
+# 仅解析首个可用职位；目标不能批准对自身的拘捕。
 tca_resolve_central_judicial_authority_effect = {
     if = {
         limit = { tca_has_available_justice_trigger = yes }
@@ -25,8 +25,8 @@ tca_resolve_central_judicial_authority_effect = {
     else = { save_scope_as = tca_approver }
 }
 
-# Character scope. Resolve the target's single circuit from the bounded registry.
-# The recipient has already passed the actor's narrower jurisdiction check.
+# 角色作用域；从有限注册表解析目标唯一所属路。
+# 目标已通过发起者更窄的实际辖区检查。
 tca_find_arrest_circuit_effect = {
     every_in_global_list = {
         variable = tca_judicial_circuits
@@ -39,7 +39,7 @@ tca_find_arrest_circuit_effect = {
     }
 }
 
-# Internal context is reconstructed; do not put backing officials in UI participant slots.
+# 重建内部上下文，不把军事支持官员放入界面参与者槽位。
 tca_setup_judicial_arrest_roles_effect = {
     clear_saved_scope = tca_circuit
     if = {
@@ -53,7 +53,7 @@ tca_setup_judicial_arrest_roles_effect = {
                 limit = { tca_is_judicial_commissioner_trigger = yes }
                 primary_title.var:song_judicial_circuit = { save_scope_as = tca_circuit }
                 scope:tca_circuit.holder = { save_scope_as = tca_governor }
-                # A native refusal war must target the rebel's actual liege.
+                # 原生拒捕战争必须针对叛乱者的实际领主。
                 if = { limit = { scope:recipient = { is_ruler = yes exists = liege } } scope:recipient.liege = { save_scope_as = tca_governor } }
                 else_if = { limit = { NOT = { scope:tca_governor = { tca_basic_allowed_to_arrest_character_trigger = { CHARACTER = scope:recipient } } } } top_liege = { save_scope_as = tca_governor } }
             }
@@ -62,6 +62,8 @@ tca_setup_judicial_arrest_roles_effect = {
     }
 }
 
+# 互动上下文；调用者先解析 tca_circuit 并确认需要审批。
+# 输出 tca_approver 与原生 intermediary；路内交提刑，须上提时按当前君主内阁递补。
 tca_setup_judicial_approval_effect = {
     clear_saved_scope = tca_approver
     if = {

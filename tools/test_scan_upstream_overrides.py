@@ -1,4 +1,4 @@
-"""Discovery/registry coverage checks independent of reviewed baseline files."""
+"""独立于审阅基线文件的发现／登记覆盖检查。"""
 import contextlib
 import io
 import json

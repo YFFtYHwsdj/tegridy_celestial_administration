@@ -1,4 +1,7 @@
-﻿# Prepare only after tca_review_can_start_trigger; shared by start and native tests.
+﻿# 详覆共享操作、AI 选择及互动预览；正式发送与确认页预览分开，预览不得建立请求。
+# 仅在通过 tca_review_can_start_trigger 后准备；正式启动与原生测试共用。
+# 调用者先通过 can_start；必需角色 scope:tca_review_actor／keeper／prisoner，可选 tca_review_hook。
+# 保存官职／路／政权及发送时处罚快照；仅未设置 cost_paid 时扣费，并建立双向请求和超时事件。
 tca_review_prepare_effect = {
         save_scope_value_as = { name = tca_review_prestige_loss_at_start value = scope:tca_review_prisoner.tca_review_prestige_loss }
         save_scope_value_as = { name = tca_review_influence_loss_at_start value = scope:tca_review_prisoner.tca_review_influence_loss }
@@ -11,6 +14,7 @@ tca_review_prepare_effect = {
             save_scope_value_as = { name = tca_review_serial value = var:tca_review_serial }
             if = { limit = { NOT = { scope:tca_review_cost_paid ?= yes } } change_influence = { value = scope:tca_review_prisoner.tca_review_start_cost multiply = -1 } }
             add_character_flag = { flag = tca_review_send_cooldown months = 3 }
+            # 30 天事件负责超时清理；pending 多留一天，使该事件仍能识别请求，事件未执行时标记也能自然失效。
             add_character_flag = { flag = tca_review_actor_pending days = 31 }
             set_variable = { name = tca_review_prisoner value = scope:tca_review_prisoner }
             trigger_event = { id = tca_custody_review.3 days = 30 }
@@ -23,7 +27,7 @@ tca_review_prepare_effect = {
         }
 
 }
-# Both the interaction and bounded AI pulse call this same start operation.
+# 互动与限定范围的 AI 脉冲调用同一启动操作。
 tca_review_start_effect = {
     if = {
         limit = { tca_review_can_start_trigger = yes }
@@ -32,6 +36,8 @@ tca_review_start_effect = {
         else = { tca_review_debate_effect = yes }
     }
 }
+# 使用准备阶段的角色与序号；双方分别核对关系和序号后才清理，防止旧事件删除新请求。
+# 清除 pending 及请求指针，保留发送／囚犯冷却与提刑递增序号。
 tca_review_cleanup_effect = {
     scope:tca_review_actor ?= {
         if = { limit = { is_alive = yes var:tca_review_prisoner ?= scope:tca_review_prisoner var:tca_review_serial = scope:tca_review_serial }
@@ -47,6 +53,7 @@ tca_review_cleanup_effect = {
         }
     }
 }
+# 向仍在世的提刑提示取消，再按关系与序号清理本请求；不退还发送费用或撤销冷却。
 tca_review_cancel_effect = {
     scope:tca_review_actor ?= {
         if = { limit = { is_alive = yes }
@@ -55,6 +62,8 @@ tca_review_cancel_effect = {
     }
     tca_review_cleanup_effect = yes
 }
+# 读取准备阶段上下文并自行重查有效性；移交成功后迁移官署登记，牵制仅在成功后消耗。
+# 成功和失效均清理请求；调用者须检查实际关押者，不能仅以调用完成认定移交成功。
 tca_review_transfer_effect = {
     if = {
         limit = { tca_review_context_valid_trigger = yes }
@@ -76,7 +85,7 @@ tca_review_transfer_effect = {
                 limit = { scope:tca_review_hook ?= yes }
                 scope:tca_review_actor = { use_hook = scope:tca_review_keeper }
             }
-            # A scored transfer is announced with its final review result below.
+            # 经评分的移交由下方最终详覆结果统一通知。
             if = {
                 limit = { scope:tca_review_hook ?= yes }
                 scope:tca_review_actor = { send_interface_toast = { type = event_toast_text_good title = tca_review_transferred desc = tca_review_actor_hook_desc left_icon = scope:tca_review_prisoner right_icon = scope:tca_review_keeper } }
@@ -89,10 +98,10 @@ tca_review_transfer_effect = {
     }
     else = { tca_review_cancel_effect = yes }
 }
-# tca_review_loser and winner only set by a valid completed review.
+# 只有有效完成的详覆才设置 tca_review_loser 和 winner。
 tca_review_defeat_effect = {
-    # Taking custody is an official action, not proof of the keeper's misconduct.
-    # Only an unsuccessful requester pays the extra failure penalty.
+    # 接管羁押属于公职行为，不证明原关押者存在失当。
+    # 只有失败的请求者支付额外失败代价。
     if = {
         limit = { scope:tca_review_loser = scope:tca_review_actor }
         scope:tca_review_actor = {
@@ -111,6 +120,7 @@ tca_review_defeat_effect = {
         scope:tca_review_keeper = { send_interface_toast = { type = event_toast_text_good title = tca_review_custody_retained desc = tca_review_keeper_success_desc left_icon = scope:tca_review_prisoner right_icon = scope:tca_review_actor } }
     }
 }
+# 评分成功回调；先验证并移交，确认囚犯确由提刑关押后才设置胜负角色并通知。
 tca_review_actor_wins_effect = {
     if = {
         limit = { tca_review_context_valid_trigger = yes }
@@ -124,6 +134,7 @@ tca_review_actor_wins_effect = {
     }
     else = { tca_review_cancel_effect = yes }
 }
+# 评分失败回调；有效请求保持原羁押，设置胜负角色、扣除提刑失败代价并清理请求。
 tca_review_keeper_wins_effect = {
     if = {
         limit = { tca_review_context_valid_trigger = yes }
@@ -134,6 +145,7 @@ tca_review_keeper_wins_effect = {
     }
     else = { tca_review_cancel_effect = yes }
 }
+# 正式评分入口；只对有效请求调用共享随机结果，回调负责结算，失效请求转取消。
 tca_review_debate_effect = {
     if = {
         limit = { tca_review_context_valid_trigger = yes }
@@ -146,7 +158,8 @@ tca_review_debate_effect = {
     }
     else = { tca_review_cancel_effect = yes }
 }
-# Quarterly, one bounded highest-interest candidate from this circuit, 25% chance.
+# 提刑角色作用域；季度回调在外层以 25% 概率进入此效果，本效果本身不再抽取执行机会。
+# 遍历政权内合格关押者，按本路资格选一个兴趣严格大于 9 的最佳囚犯；低胜率且关系亲近时考虑牵制。
 tca_review_ai_pulse_effect = {
     save_scope_as = tca_review_actor
     clear_saved_scope = tca_review_hook
@@ -169,6 +182,8 @@ tca_review_ai_pulse_effect = {
     }
 }
 
+# 关押者作用域；调用者提供 tca_review_actor 与 best_interest 初值。
+# 遍历其囚犯，仅以可发送且兴趣更高者更新 best_prisoner／best_keeper／best_interest，供外层统一发送。
 tca_review_ai_consider_keeper_effect = {
     if = {
         limit = { tca_review_keeper_trigger = { ACTOR = scope:tca_review_actor } }
@@ -185,8 +200,8 @@ tca_review_ai_consider_keeper_effect = {
     }
 }
 
-# A real default selection makes the menu usable before the picker is opened.
-# Only native actor/recipient roles are used; preserve an already chosen prisoner.
+# 设置真实默认选中囚犯，使菜单在打开选择器前即可使用。
+# 仅使用原生 actor／recipient 角色，保留已选中的囚犯。
 tca_review_interaction_pick_prisoner_effect = {
     if = {
         limit = { NOT = { exists = scope:secondary_recipient } scope:actor = { tca_review_actor_identity_trigger = yes } }
@@ -203,9 +218,9 @@ tca_review_interaction_pick_prisoner_effect = {
     }
 }
 
-# Real interaction send only. Never call this from an effect-preview field.
+# 仅供真实互动发送使用，绝不可从效果预览字段调用。
 tca_review_interaction_send_effect = {
-    # The interaction engine handles cost; AI/test start without this marker pays in prepare.
+    # 互动引擎负责扣费；AI／测试未带此标记启动时，在 prepare 中扣费。
     save_scope_value_as = { name = tca_review_cost_paid value = yes }
     scope:actor = { save_scope_as = tca_review_actor }
     scope:recipient = { save_scope_as = tca_review_keeper }
@@ -216,8 +231,9 @@ tca_review_interaction_send_effect = {
     clear_saved_scope = tca_review_cost_paid
 }
 
-# Shared composite-score roll for settlement and read-only confirmation preview.
-# Inline weights use the supplied roles, without requiring pending request scopes.
+# 正式结算与只读确认预览共用复合评分随机判定。
+# 内联权重使用传入角色，不要求已建立待处理请求作用域。
+# ACTOR／KEEPER 为角色，SUCCESS／FAILURE 为 effect 名；正式回调可结算，预览回调必须置于 show_as_tooltip。
 tca_review_random_result_effect = {
     random_list = {
         0 = {
@@ -238,8 +254,8 @@ tca_review_random_result_effect = {
         }
     }
 }
-# Preview-only callbacks: caller must wrap them in show_as_tooltip.
-# Native effects retain the interaction roles when evaluating prisoner tariffs.
+# 仅供预览的回调：调用者必须包在 show_as_tooltip 内。
+# 计算囚犯费用时，原生效果保留互动角色上下文。
 tca_review_preview_success_effect = { custom_tooltip = tca_review_preview_success }
 tca_review_preview_failure_effect = {
     custom_tooltip = tca_review_preview_failure
@@ -252,8 +268,8 @@ tca_review_preview_failure_effect = {
         add_opinion = { target = scope:recipient modifier = tca_review_defeated_opinion years = 2 }
     }
 }
-# Native roles exist in the confirmation preview without any pending-state setup.
-# show_as_tooltip prevents an actual roll/operation in the real on_accept callback.
+# 确认预览中原生角色已存在，无需准备待处理状态。
+# show_as_tooltip 防止真实 on_accept 回调执行实际抽签或操作。
 tca_review_interaction_preview_effect = {
     if = {
         limit = { scope:hook ?= yes }

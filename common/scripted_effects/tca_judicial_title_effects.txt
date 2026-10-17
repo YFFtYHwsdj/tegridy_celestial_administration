@@ -1,4 +1,4 @@
-﻿# Title scope. Create/bind, then maintain native realm succession and office identity.
+﻿# 头衔作用域；先创建／绑定，再维护原生领地继承和官职身份。
 tca_ensure_judicial_title_effect = {
     tca_register_historical_characters_effect = yes
     if = {
@@ -8,7 +8,7 @@ tca_ensure_judicial_title_effect = {
             NOT = { tca_has_judicial_title_trigger = yes }
         }
         save_scope_as = tca_circuit
-        # Forget a missing object. A valid reverse-bound position is never replaced.
+        # 清除不存在的对象引用；有效反向绑定的官职绝不替换。
         remove_variable = song_judicial_title
         clear_saved_scope = tca_position
         var:tca_static_judicial_title ?= { save_scope_as = tca_position }
@@ -28,7 +28,7 @@ tca_ensure_judicial_title_effect = {
             set_no_automatic_claims = yes
             set_can_be_named_after_dynasty = no
             set_can_use_nomadic_naming = no
-            # Fixed offices already declare delete_on_destroy = no in landed_titles.
+            # 固定官职已在 landed_titles 中声明 delete_on_destroy = no。
             if = {
                 limit = { NOT = { has_variable = tca_judicial_static_title } }
                 set_delete_on_destroy = no
@@ -38,8 +38,8 @@ tca_ensure_judicial_title_effect = {
             set_variable = { name = song_judicial_circuit value = scope:tca_circuit }
             tca_sync_judicial_title_de_jure_effect = yes
             set_coa = scope:tca_circuit
-            # No de-jure counties; initial appointment follows after binding.
-            # Explicitly disable destruction on succession; this is a persistent office.
+            # 不包含 de_jure 县；绑定完成后再初次任命。
+            # 显式禁止继承时销毁，因为这是持久官职。
         }
         set_variable = { name = song_judicial_title value = scope:tca_position }
         if = {
@@ -48,7 +48,7 @@ tca_ensure_judicial_title_effect = {
             set_variable = { name = tca_judicial_registered value = yes }
         }
     }
-    # Refresh previously generated titles and follow subsequent circuit renames.
+    # 刷新此前生成的头衔，并跟随路后续改名。
     if = {
         limit = {
             tca_is_judicial_circuit_trigger = yes
@@ -60,9 +60,9 @@ tca_ensure_judicial_title_effect = {
     }
 }
 
-# Judicial title scope, scope:tca_circuit = associated circuit.
-# This is an engine location reference, not land ownership or an office building.
-# Order matters: set_capital_county MUST precede set_landless_title.
+# 提刑头衔作用域；scope:tca_circuit 为关联的路。
+# 这是引擎位置引用，不代表土地所有权或官署建筑。
+# 顺序不可更换：set_capital_county 必须先于 set_landless_title。
 tca_configure_judicial_title_location_effect = {
     if = {
         limit = { exists = scope:tca_circuit.title_capital_county }
@@ -76,10 +76,10 @@ tca_configure_judicial_title_location_effect = {
     }
 }
 
-# Native de-jure setter requires a non-null title. Delete a temporary parent
-# to detach the persistent office from real circuits. The engine retains the
-# retired parent reference. This removes real circuit ancestry, not necessarily
-# the parent pointer itself. Never delete the persistent judicial office.
+# 原生 de_jure 设置要求非空头衔；通过删除临时父头衔
+# 使持久官职脱离实际路。引擎会保留已退休父头衔的引用，
+# 因此移除的是实际路的祖先关系，不保证清空
+# 父指针本身。绝不删除持久提刑官职对象。
 tca_detach_judicial_title_de_jure_effect = {
     if = {
         limit = { exists = de_jure_liege NOT = { de_jure_liege = { has_variable = tca_judicial_retirement_parent } } }
@@ -119,8 +119,8 @@ tca_detach_judicial_title_de_jure_effect = {
     }
 }
 
-# Title scope: only an active, filled institution belongs to the de-jure tree.
-# Keep reverse binding data when detached, so re-establishment reuses this object.
+# 头衔作用域；仅启用且在任的机构进入 de_jure 树。
+# 脱离时保留反向绑定数据，使恢复时复用同一对象。
 tca_sync_judicial_title_de_jure_effect = {
     if = {
         limit = {
@@ -137,13 +137,13 @@ tca_sync_judicial_title_de_jure_effect = {
     else = { tca_detach_judicial_title_de_jure_effect = yes }
 }
 
-# Position title scope. Destruction retires custody but preserves office identity
-# and both circuit pointers, but detaches real circuit ancestry. Also called
-# by external on_title_destroyed events.
+# 官职头衔作用域；销毁时退休羁押，保留官职身份
+# 和双向路指针，但脱离实际路的祖先关系。外部
+# on_title_destroyed 事件也调用此效果。
 tca_retire_judicial_title_effect = {
     tca_retire_judicial_prisoners_effect = yes
     tca_detach_judicial_title_de_jure_effect = yes
-    # Fixed offices already declare delete_on_destroy = no in landed_titles.
+    # 固定官职已在 landed_titles 中声明 delete_on_destroy = no。
     if = {
         limit = { NOT = { has_variable = tca_judicial_static_title } }
         set_delete_on_destroy = no
@@ -151,9 +151,9 @@ tca_retire_judicial_title_effect = {
     set_destroy_on_succession = no
 }
 
-# Circuit title scope; scope:tca_lifecycle_actor must be a character.
-# Keep the object and binding, withdrawing only the current appointment.
-# The callback retires custody without recursively destroying this judicial office.
+# 路头衔作用域；scope:tca_lifecycle_actor 必须为角色。
+# 保留对象与绑定，仅撤销当前任职。
+# 回调退休羁押登记，避免递归销毁该提刑官职。
 tca_destroy_judicial_title_effect = {
     if = {
         limit = { tca_has_judicial_title_trigger = yes }
@@ -165,7 +165,7 @@ tca_destroy_judicial_title_effect = {
             limit = { exists = scope:tca_position_to_destroy.holder }
             scope:tca_position_to_destroy.holder = { destroy_title = scope:tca_position_to_destroy }
         }
-        # Already vacant offices need no further destruction transaction.
+        # 已空缺官职无需再次执行销毁事务。
     }
     else = {
         remove_variable = song_judicial_title
@@ -174,19 +174,20 @@ tca_destroy_judicial_title_effect = {
     }
 }
 
-# Explicit abolition keeps the yearly repair from immediately recreating the position.
-# Call from circuit title scope, with a character in scope:tca_lifecycle_actor.
+# 显式废除标记防止年度修复立即重建职位。
+# 在路头衔作用域调用，并在 scope:tca_lifecycle_actor 提供角色。
 tca_abolish_judicial_title_effect = {
     set_variable = { name = tca_judicial_disabled value = yes }
     tca_destroy_judicial_title_effect = yes
 }
 
+# 路头衔作用域；撤销显式停用标记后走正式刷新流程，重新启用既有绑定。
 tca_restore_judicial_title_effect = {
     remove_variable = tca_judicial_disabled
     tca_ensure_judicial_title_effect = yes
 }
 
-# Character scope: run after title transfers and government changes have settled.
+# 角色作用域；在头衔转移、政体和领主变化完成后执行。
 tca_refresh_character_circuits_effect = {
     tca_ensure_court_system_law_effect = yes
     tca_refresh_official_name_flags_effect = yes
@@ -204,7 +205,7 @@ tca_refresh_character_circuits_effect = {
     }
 }
 
-# Empty/global scope: bounded yearly repair, not a daily world scan.
+# 空／全局作用域；限定范围的年度修复，不每日扫描世界。
 tca_refresh_all_judicial_titles_effect = {
     every_independent_ruler = {
         tca_ensure_court_system_law_effect = yes
@@ -212,8 +213,8 @@ tca_refresh_all_judicial_titles_effect = {
         every_vassal_or_below = { tca_refresh_official_name_flags_effect = yes }
     }
     tca_initialize_static_judicial_bindings_effect = yes
-    # Preserve inactive circuits in the registry so their offices remain reachable.
-    # Pick one surviving ruler as the lifecycle context; this grants no position.
+    # 注册表保留停用的路，使其官职仍可访问。
+    # 选一名存活统治者作为生命周期上下文，此举不授予职位。
     every_independent_ruler = {
         limit = { NOT = { exists = scope:tca_lifecycle_actor } }
         save_scope_as = tca_lifecycle_actor
@@ -251,8 +252,8 @@ tca_refresh_all_judicial_titles_effect = {
     }
 }
 
-# Title scope. Restore identity LAST: native title/liege callbacks can rename
-# titles or update CoAs. Applies equally to existing objects in older saves.
+# 头衔作用域；最后恢复身份，因为原生头衔／领主回调可能改名
+# 或更新纹章。旧存档中的既有对象同样适用。
 tca_restore_judicial_title_identity_effect = {
     if = {
         limit = {
@@ -265,15 +266,15 @@ tca_restore_judicial_title_identity_effect = {
         set_definitive_form = yes
         tca_set_judicial_title_name_effect = yes
         set_coa = scope:tca_circuit
-        # Fixed offices already declare delete_on_destroy = no in landed_titles.
+        # 固定官职已在 landed_titles 中声明 delete_on_destroy = no。
         if = {
             limit = { NOT = { has_variable = tca_judicial_static_title } }
             set_delete_on_destroy = no
         }
         set_destroy_on_succession = no
-        # Old saves may retain the office-specific override. The holder's native
-        # realm law is ensured by the appointment/maintenance caller before this.
-        # Remove only our legacy law; family and other title laws stay untouched.
+        # 旧存档可能保留官职专用覆盖法律；此前任命／维护调用者
+        # 已确保持有人具备原生领地法律。
+        # 仅移除本模组旧法，家门及其他头衔法律保持不变。
         if = {
             limit = { has_title_law = tca_judicial_appointment_succession_law }
             remove_title_law = tca_judicial_appointment_succession_law
@@ -281,9 +282,9 @@ tca_restore_judicial_title_identity_effect = {
     }
 }
 
-# Character scope: coalesce gain/government/liege callbacks until the next day.
-# Timed marker also recovers if a queued event cannot run; keep it during repair
-# so appointments performed by that repair do not schedule themselves again.
+# 角色作用域；合并受封／改制／换领主回调，次日执行。
+# 若排队事件无法执行，定时标记到期也可恢复；修复期间保留标记，
+# 防止修复中的任命再次排队自身维护。
 tca_request_judicial_maintenance_effect = {
     if = {
         limit = { is_alive = yes NOT = { has_variable = tca_judicial_maintenance_pending } }
@@ -292,6 +293,7 @@ tca_request_judicial_maintenance_effect = {
     }
 }
 
+# 角色作用域；延迟维护工作入口，刷新该角色相关路与已持提刑官职后释放排队标记。
 tca_run_judicial_maintenance_effect = {
     if = {
         limit = { is_alive = yes }

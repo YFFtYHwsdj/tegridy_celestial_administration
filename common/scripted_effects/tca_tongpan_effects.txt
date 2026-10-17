@@ -1,4 +1,4 @@
-﻿# County title scope. Fixed titles and pool slots are bound once, even after destroy.
+﻿# 县头衔作用域；固定头衔与池槽位只绑定一次，销毁后也保留。
 tca_bind_tongpan_office_effect = {
     if = {
         limit = { NOT = { tca_has_tongpan_office_trigger = yes } }
@@ -28,8 +28,8 @@ tca_bind_tongpan_office_effect = {
     }
 }
 
-# County scope. Resolve canonical duchy, then canonical circuit, then Secretariat.
-# No emperor fallback: a vacant Secretariat leaves this commission vacant.
+# 县作用域；依次解析所属公国、所属路、政事堂。
+# 不以皇帝兜底；政事堂空缺时本委任也空缺。
 tca_resolve_tongpan_liege_effect = {
     clear_saved_scope = tca_tp_liege
     holder.top_liege = { save_scope_as = tca_tp_sovereign }
@@ -63,20 +63,20 @@ tca_resolve_tongpan_liege_effect = {
     }
 }
 
-# Character scope. Only initially vacant/invalid offices draw from this pool.
+# 角色作用域；仅初始空缺或无效官职从此池选人。
 tca_collect_tongpan_candidates_effect = {
     if = { limit = { tca_is_initial_tongpan_candidate_trigger = yes } add_to_list = tca_tp_candidates }
     every_courtier = { limit = { tca_is_initial_tongpan_candidate_trigger = yes } add_to_list = tca_tp_candidates }
 }
 
-# Office scope; caller establishes county, liege and sovereign.
+# 官职作用域；调用者建立县、上级和君主作用域。
 tca_fill_tongpan_office_effect = {
     if = {
         limit = { NOT = { tca_is_valid_tongpan_holder_trigger = yes } }
         clear_saved_scope = tca_tp_candidate
-        # The engine rejects appointment-score queries on an unheld title. Hold
-        # the vacant/invalid commission under its resolved superior only during
-        # this transaction, then replace it with the selected dedicated official.
+        # 引擎拒绝查询无持有人头衔的任命评分；仅在本次事务期间
+        # 把空缺或无效官职暂交已解析的上级，
+        # 随后由选中的专职官员替换。
         create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_tp_caretaker_change }
         change_title_holder = { holder = scope:tca_tp_liege change = scope:tca_tp_caretaker_change }
         resolve_title_and_vassal_change = scope:tca_tp_caretaker_change
@@ -112,9 +112,9 @@ tca_fill_tongpan_office_effect = {
                 if = { limit = { is_lowborn = yes } create_dynasty = { spread_to_descendants = yes } }
                 create_noble_family_effect = { GOVERNMENT_GIVER = scope:tca_tp_liege }
             }
-            # The weighted draw already chose this person. A native appointment
-            # transaction can substitute its cached successor; grant the office
-            # to the selected official, then retain normal appointment succession.
+            # 加权抽取已选定该人；原生任命
+            # 事务可能替换为缓存继任者，因此先授予官职
+            # 给选定官员，再保留正常任命继承。
             create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_tp_appointment }
             scope:tca_tp_office = { change_title_holder = { holder = scope:tca_tp_candidate change = scope:tca_tp_appointment } }
             resolve_title_and_vassal_change = scope:tca_tp_appointment
@@ -126,7 +126,7 @@ tca_fill_tongpan_office_effect = {
     }
 }
 
-# Office scope. End the old supervisor's diarchy before replacing or destroying.
+# 官职作用域；替换或销毁前，结束旧州主管的分权。
 tca_stop_tongpan_diarchy_effect = {
     save_scope_as = tca_tp_stopping_office
     var:tca_tongpan_supervisor ?= {
@@ -144,6 +144,8 @@ tca_stop_tongpan_diarchy_effect = {
     }
     remove_variable = tca_tongpan_supervisor
 }
+# 通判官职头衔作用域；先结束旧辅佐关系再销毁现任官职。
+# 只 destroy，不 delete；保留县与官职双向绑定，使重新启用时复用同一对象。
 tca_destroy_tongpan_office_effect = {
     tca_stop_tongpan_diarchy_effect = yes
     if = {
@@ -153,7 +155,7 @@ tca_destroy_tongpan_office_effect = {
     }
 }
 
-# County scope, normal maintenance. Reuse valid holders, native succession and IDs.
+# 县作用域的日常维护；复用有效持有人、原生继承和对象 ID。
 tca_refresh_tongpan_county_effect = {
     if = {
         limit = { tca_is_tongpan_county_trigger = yes }
@@ -211,7 +213,7 @@ tca_refresh_tongpan_county_effect = {
     }
 }
 
-# Sovereign scope. Registry handles departures and destroyed county titles as well.
+# 君主作用域；注册表也处理离开政权及已销毁县头衔。
 tca_refresh_tongpan_realm_effect = {
     tca_initialize_tongpan_catalog_effect = yes
     tca_register_historical_characters_effect = yes
@@ -238,6 +240,8 @@ tca_refresh_tongpan_realm_effect = {
         }
     }
 }
+# 角色作用域；把维护合并到实际最高领主，三天 pending 标记防重复排队，次日执行 tca_tongpan.1。
+# 执行期间保留标记以吸收事务回调，事件结束主动清除；事件未运行时标记到期允许重新排队。
 tca_request_tongpan_maintenance_effect = {
     top_liege ?= {
         if = {

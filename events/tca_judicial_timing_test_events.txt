@@ -1,7 +1,10 @@
-﻿# Maintained native CK3 test scripts. Edit this file directly; no generator.
-# Explicit debug entry only; no automatic gameplay caller.
+﻿# 延迟维护回归；通过真实排队与跨日推进检查普通维护、司法关闭／开启及提刑死亡后的处理。
+# 等待期间不直接补调正式维护，以免掩盖原始回调或调度缺陷。
+# 直接维护的原生 CK3 测试脚本；直接编辑本文件，不使用生成器。
+# 仅显式调试入口，无正常玩法自动调用者。
 namespace = tca_judicial_timing_test
 
+# 普通延迟维护场景；先触发正式排队，等待后再检查修复，避免只验证直接调用效果。
 tca_judicial_timing_test.1 = {
     type = character_event
     hidden = yes
@@ -36,6 +39,7 @@ tca_judicial_timing_test.1 = {
     }
 }
 
+# 两日后核对已排队维护的结果，再清理并继续延迟队列。
 tca_judicial_timing_test.1101 = {
     type = character_event
     hidden = yes
@@ -76,6 +80,7 @@ tca_judicial_timing_test.1101 = {
     }
 }
 
+# 关闭司法的跨日场景；检查正式法律路径及后续维护没有恢复已停用机构。
 tca_judicial_timing_test.2 = {
     type = character_event
     hidden = yes
@@ -87,8 +92,8 @@ tca_judicial_timing_test.2 = {
         if = {
             limit = { game_start_date = 1066.9.15 title:h_china = { exists = holder holder = { is_alive = yes is_imprisoned = no is_independent_ruler = yes government_has_flag = government_is_celestial tca_external_official_names_trigger = no any_vassal_or_below = { count >= 2 is_alive = yes is_imprisoned = no government_has_flag = government_is_celestial highest_held_title_tier = tier_kingdom NOT = { tgp_is_any_minister = yes } NOT = { vassal_contract_has_flag = celestial_province_military } NOT = { vassal_contract_has_flag = celestial_province_protectorate } any_held_title = { tier = tier_kingdom is_landless_type_title = no is_noble_family_title = no OR = { exists = title_capital_county exists = holder.capital_county } } } } } }
             title:h_china.holder = { tca_test_prepare_judicial_law_realm_effect = yes }
-            # Positive control: the collected offices are filled and visible in
-            # each circuit's native direct de-jure list before the formal law change.
+            # 正向对照：正式改法前，收集的官职均已在任，且出现在
+            # 各路原生直接 de_jure 列表中。
             if = { limit = {
                 scope:tca_test_law_sovereign = {
                     any_in_list = { variable = tca_test_law_circuits count >= 2 }
@@ -100,8 +105,8 @@ tca_judicial_timing_test.2 = {
             } debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_delayed_law_disabled 1" }
             else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_delayed_law_disabled 1" }
             scope:tca_test_law_sovereign = { if = { limit = { NOT = { has_realm_law = tca_judicial_institutions_enabled_law } } add_realm_law_skip_effects = tca_judicial_institutions_enabled_law } tca_refresh_court_system_realm_effect = yes remove_variable = tca_court_system_cooldown add_realm_law = tca_judicial_institutions_disabled_law }
-            # No direct maintenance after add_realm_law: test the native law callbacks,
-            # before any queued next-day callback can conceal an immediate defect.
+            # add_realm_law 后不直接维护：先测试原生法律回调，
+            # 避免排队的次日回调掩盖即时缺陷。
             if = { limit = {
                 scope:tca_test_law_sovereign = { NOT = { any_in_list = {
                     variable = tca_test_law_circuits
@@ -143,6 +148,7 @@ tca_judicial_timing_test.2 = {
     }
 }
 
+# 关闭法律后的次日核对；退休状态不能被已排队工作重新开启。
 tca_judicial_timing_test.1201 = {
     type = character_event
     hidden = yes
@@ -183,6 +189,7 @@ tca_judicial_timing_test.1201 = {
     }
 }
 
+# 开启司法的跨日场景；等待正式回调后检查机构恢复与原对象复用。
 tca_judicial_timing_test.3 = {
     type = character_event
     hidden = yes
@@ -195,7 +202,7 @@ tca_judicial_timing_test.3 = {
             limit = { game_start_date = 1066.9.15 title:h_china = { exists = holder holder = { is_alive = yes is_imprisoned = no is_independent_ruler = yes government_has_flag = government_is_celestial tca_external_official_names_trigger = no any_vassal_or_below = { count >= 2 is_alive = yes is_imprisoned = no government_has_flag = government_is_celestial highest_held_title_tier = tier_kingdom NOT = { tgp_is_any_minister = yes } NOT = { vassal_contract_has_flag = celestial_province_military } NOT = { vassal_contract_has_flag = celestial_province_protectorate } any_held_title = { tier = tier_kingdom is_landless_type_title = no is_noble_family_title = no OR = { exists = title_capital_county exists = holder.capital_county } } } } } }
             title:h_china.holder = { tca_test_prepare_judicial_law_realm_effect = yes }
             scope:tca_test_law_sovereign = { add_realm_law_skip_effects = tca_judicial_institutions_disabled_law tca_refresh_court_system_realm_effect = yes }
-            # Start detached, then enact through native law callbacks only.
+            # 从脱离状态开始，只通过原生法律回调颁布。
             if = { limit = {
                 scope:tca_test_law_sovereign = {
                     any_in_list = { variable = tca_test_law_circuits count >= 2 }
@@ -239,6 +246,7 @@ tca_judicial_timing_test.3 = {
     }
 }
 
+# 开启后的延迟结果断言；核对有效机构与稳定绑定后继续队列。
 tca_judicial_timing_test.1301 = {
     type = character_event
     hidden = yes
@@ -279,6 +287,7 @@ tca_judicial_timing_test.1301 = {
     }
 }
 
+# 提刑死亡的跨日场景；使用真实死亡路径，等待继任与维护后核对官职及囚犯。
 tca_judicial_timing_test.4 = {
     type = character_event
     hidden = yes
@@ -331,6 +340,7 @@ tca_judicial_timing_test.4 = {
     }
 }
 
+# 死亡后的延迟结果断言；不在核对前主动维护，以保留原生路径的回归意义。
 tca_judicial_timing_test.1401 = {
     type = character_event
     hidden = yes

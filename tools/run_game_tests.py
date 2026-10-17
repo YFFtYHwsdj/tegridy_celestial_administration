@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Launch an isolated graphical CK3 observer test game (macOS, no UI automation)."""
+"""启动独立的 CK3 图形观察者测试局，适用于 macOS，不使用界面自动化。"""
 import argparse
 import hashlib
 import json
@@ -26,7 +26,7 @@ def write_json(path, data):
 
 
 def descriptor(name, path):
-    # Paradox quoted strings do not use JSON's ASCII escape conventions.
+    # Paradox 引号字符串不使用 JSON 的 ASCII 转义约定。
     value = path.as_posix()
     if any(char in value for char in ('"', '\n', '\r')):
         raise ValueError('mod path contains an unsupported quote or newline')
@@ -34,7 +34,7 @@ def descriptor(name, path):
 
 
 def isolated_settings(source):
-    """Copy only game/graphics preferences, never account or cloud credentials."""
+    """仅复制游戏／图形偏好，不复制账户或云凭据。"""
     parsed = definitions(source.read_text(encoding='utf-8-sig')) if source.is_file() else {}
     game = ' '.join(parsed.get('"game"', ['{', '}']))
     graphics = ' '.join(parsed.get('"Graphics"', ['{', '}']))
@@ -111,7 +111,7 @@ def prepare_run(repo, run_root, settings, selected_case=None):
         write_json(run / 'selection.json', {'case': selected_case, 'stage': stage})
     snapshot = run / 'mod/tca_main'
     snapshot.mkdir()
-    # Copy game content, never Git metadata, editor state, tools or reports.
+    # 仅复制游戏内容，不复制 Git 元数据、编辑器状态、工具或报告。
     for path in sorted(repo.iterdir()):
         if path.name.startswith('.') or path.name in {'tools', 'docs'}:
             continue
@@ -209,7 +209,7 @@ def run_game(args, run):
         finally:
             stop_owned_process(process)
     condition = condition or 'timeout'
-    # Read the final flushed log, including errors emitted during shutdown.
+    # 读取最终已刷新的日志，包括退出期间产生的错误。
     debug = run / 'logs/debug.log'
     log = debug.read_text(errors='replace') if debug.exists() else ''
     state = progress(log, time.monotonic() - start, False)

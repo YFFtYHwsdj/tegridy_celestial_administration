@@ -1,7 +1,7 @@
-﻿# Real native estates; no surrogate location variables or business-rule simulation.
+﻿# 使用真实原生庄园，不用替代位置变量或业务规则模拟。
 namespace = tca_judicial_estate_test
 
-# Native approval queue keeps the old participant; estate relocation invalidates it.
+# 原生审批队列保留旧参与者，庄园迁移应使其失效。
 tca_judicial_estate_test.2 = {
     type = character_event hidden = yes
     immediate = {
@@ -62,17 +62,17 @@ tca_judicial_estate_test.1 = {
             debug_log = "TCA_TEST BEGIN tca_judicial_estate_test.1 tca_test_judicial_estate_jurisdiction"
             remove_character_flag = tca_test_case_failed
             if = { limit = { tca_test_review_world_trigger = yes title:h_china.holder = { any_councillor = { has_council_position = minister_justice } } }
-                # Seed stale out-of-realm entries: fixture rebuilding must remove
-                # all old values, including adjacent entries in the same list.
+                # 注入过期的政权外条目：夹具重建须移除
+                # 全部旧值，包括同列表中的相邻条目。
                 title:h_china.holder = {
                     add_to_variable_list = { name = tca_test_law_circuits target = title:k_england }
                     add_to_variable_list = { name = tca_test_law_circuits target = title:k_scotland }
                     add_to_variable_list = { name = tca_test_law_circuits target = title:k_wales }
                 }
-                # An inherited saved alias must also be overwritten, not merely
-                # cleared and then selected through a cached existence check.
+                # 继承的 saved alias 也必须覆盖，不能仅
+                # 清除后再通过可能缓存的存在性检查选择。
                 title:k_england = { save_scope_as = tca_test_law_circuit save_scope_as = tca_test_law_other_circuit }
-                # Prime the same existence queries earlier cases can leave cached.
+                # 预先执行与早先用例可能留下缓存相同的存在性查询。
                 if = { limit = { exists = scope:tca_test_law_circuit exists = scope:tca_test_law_other_circuit } debug_log = "TCA_ESTATE FIXTURE_OLD_ALIASES_PRIMED" }
                 tca_test_review_fixture_effect = yes
                 if = { limit = {
@@ -180,8 +180,8 @@ tca_judicial_estate_test.1001 = {
     immediate = {
         tca_test_validate_environment_effect = yes
         if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
-                # Resolve live political roles on the continuation day. Earlier
-                # snapshot holders can have lost office during native callbacks.
+                # 在续接日解析当前政治角色；此前快照中的
+                # 持有人可能已在原生回调期间离任。
                 title:h_china.holder = { tca_test_select_current_judicial_pair_effect = yes }
                 scope:tca_test_estate_a.holder ?= { save_scope_as = tca_test_estate_governor_a }
                 scope:tca_test_estate_b.holder ?= { save_scope_as = tca_test_estate_governor_b }
@@ -207,7 +207,7 @@ tca_judicial_estate_test.1001 = {
                 if = { limit = { scope:tca_test_estate_courtier = { liege_or_court_owner = scope:tca_test_estate_family tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:tca_test_estate_b } NOT = { tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:tca_test_estate_a } } } }
                     debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_estate_jurisdiction 3" }
                 else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_estate_jurisdiction 3" }
-                # An actual superior in B changes no geographical membership.
+                # 实际直属上级在 B 不改变地理辖区归属。
                 scope:tca_test_estate_family = {
                     create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_test_estate_fealty_b }
                     change_liege = { liege = scope:tca_test_estate_governor_b change = scope:tca_test_estate_fealty_b }
@@ -235,7 +235,7 @@ tca_judicial_estate_test.1001 = {
                 if = { limit = { scope:tca_test_estate_family = { tca_review_keeper_identity_trigger = { ACTOR = scope:tca_test_estate_judge_b } NOT = { tca_review_keeper_identity_trigger = { ACTOR = scope:tca_test_estate_judge_a } } } }
                     debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_estate_jurisdiction 7" }
                 else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_estate_jurisdiction 7" }
-                # Real native relocation immediately changes both person and household.
+                # 真实原生迁居立即改变本人及家庭的辖区。
                 scope:tca_test_estate_family.domicile = { move_domicile = scope:tca_test_estate_a.title_capital_county.title_province }
                 if = { limit = { scope:tca_test_estate_family = { liege = title:h_china.holder domicile.domicile_location.county = scope:tca_test_estate_a.title_capital_county tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:tca_test_estate_a } NOT = { tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:tca_test_estate_b } } } scope:tca_test_estate_courtier = { tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:tca_test_estate_a } NOT = { tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:tca_test_estate_b } } } }
                     debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_estate_jurisdiction 8" }
@@ -243,7 +243,7 @@ tca_judicial_estate_test.1001 = {
                 if = { limit = { scope:tca_test_estate_family = { tca_review_keeper_identity_trigger = { ACTOR = scope:tca_test_estate_judge_a } NOT = { tca_review_keeper_identity_trigger = { ACTOR = scope:tca_test_estate_judge_b } } } }
                     debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_estate_jurisdiction 9" }
                 else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_estate_jurisdiction 9" }
-                # A real prisoner and formal pending review; moving invalidates the old verdict.
+                # 使用真实囚犯和正式待处理详覆，迁居使旧裁决失效。
                 scope:tca_test_estate_family = {
                     create_character = { age = 25 gender_female_chance = 0 random_traits = no dynasty = none employer = this culture = this.culture faith = this.faith rite = this.rite save_scope_as = tca_test_estate_prisoner }
                     imprison = { target = scope:tca_test_estate_prisoner type = house_arrest }
@@ -268,7 +268,7 @@ tca_judicial_estate_test.1001 = {
                 if = { limit = { scope:tca_test_estate_prisoner = { is_imprisoned_by = scope:tca_test_estate_family NOT = { has_character_flag = tca_review_pending } NOT = { has_variable = tca_judicial_prison_title } } scope:tca_test_estate_judge_a = { NOT = { has_character_flag = tca_review_actor_pending } } }
                     debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_estate_jurisdiction 13" }
                 else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_estate_jurisdiction 13" }
-                # New B requester uses the real start and native hook transfer path.
+                # B 的新请求者走真实启动及原生牵制移交路径。
                 scope:tca_test_estate_prisoner = { remove_character_flag = tca_review_prisoner_cooldown }
                 scope:tca_test_estate_judge_b = { save_scope_as = tca_review_actor change_influence = 1000 remove_character_flag = tca_review_actor_pending remove_character_flag = tca_review_send_cooldown add_hook = { target = scope:tca_test_estate_family type = loyalty_hook } }
                 save_scope_value_as = { name = tca_review_hook value = yes }
@@ -280,13 +280,13 @@ tca_judicial_estate_test.1001 = {
                 if = { limit = { scope:tca_test_estate_prisoner = { is_imprisoned_by = scope:tca_test_estate_judge_b var:tca_judicial_prison_title = scope:tca_test_estate_b.var:song_judicial_title NOT = { has_character_flag = tca_review_pending } } scope:tca_test_estate_judge_b = { NOT = { has_character_flag = tca_review_actor_pending } NOT = { has_usable_hook = scope:tca_test_estate_family } } }
                     debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_estate_jurisdiction 15" }
                 else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_estate_jurisdiction 15" }
-                # A foreign de-jure county supplies no circuit or superior-office fallback.
+                # 外国 de_jure 县不提供路归属或上级官职兜底。
                 scope:tca_test_estate_family.domicile = { move_domicile = title:c_middlesex.title_province }
                 if = { limit = { scope:tca_test_estate_family = { domicile.domicile_location.county = title:c_middlesex NOT = { tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:tca_test_estate_a } } NOT = { tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:tca_test_estate_b } } NOT = { tca_review_keeper_identity_trigger = { ACTOR = scope:tca_test_estate_judge_a } } NOT = { tca_review_keeper_identity_trigger = { ACTOR = scope:tca_test_estate_judge_b } } } }
                     debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_estate_jurisdiction 16" }
                 else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_estate_jurisdiction 16" }
                 scope:tca_test_estate_family.domicile = { move_domicile = scope:tca_test_estate_b.title_capital_county.title_province }
-                # Administrative primary A overrides contradictory estate B.
+                # 行政主头衔 A 优先于矛盾的庄园 B。
                 scope:tca_test_estate_governor_a = { create_dynamic_title = { tier = duchy name = tca_test_de_jure_office_name } }
                 scope:new_title = {
                     save_scope_as = tca_test_estate_office
@@ -312,7 +312,7 @@ tca_judicial_estate_test.1001 = {
                 if = { limit = { scope:tca_test_estate_family = { primary_title = scope:tca_test_estate_family_title tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:tca_test_estate_b } NOT = { tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:tca_test_estate_a } } } scope:tca_test_estate_courtier = { tca_is_judicial_target_in_circuit_trigger = { CIRCUIT = scope:tca_test_estate_b } } }
                     debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_estate_jurisdiction 18" }
                 else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_estate_jurisdiction 18" }
-                # Estate county is actually held by A while its de-jure circuit stays B.
+                # 庄园县实际由 A 持有，但其 de_jure 路仍为 B。
                 scope:tca_test_estate_b.title_capital_county = {
                     save_scope_as = tca_test_estate_county
                     holder = { save_scope_as = tca_test_estate_county_holder }
@@ -333,7 +333,7 @@ tca_judicial_estate_test.1001 = {
                     resolve_title_and_vassal_change = scope:tca_test_estate_county_restore
                 }
                 scope:tca_test_estate_county = { set_de_jure_liege_title = scope:tca_test_estate_county_duchy }
-                # An estate does not grant authority over a member of another independent realm.
+                # 庄园不授予对其他独立政权成员的权限。
                 scope:tca_test_estate_family = {
                     create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_test_estate_foreign_fealty }
                     change_liege = { liege = title:k_england.holder change = scope:tca_test_estate_foreign_fealty }
@@ -347,7 +347,7 @@ tca_judicial_estate_test.1001 = {
                     change_liege = { liege = title:h_china.holder change = scope:tca_test_estate_home_fealty }
                     resolve_title_and_vassal_change = scope:tca_test_estate_home_fealty
                 }
-                # Abolished institutions cannot arrest or review geographical members.
+                # 已废除机构不能拘捕或详覆地理辖区内成员。
                 scope:tca_test_estate_governor_b = { save_scope_as = tca_lifecycle_actor }
                 scope:tca_test_estate_b = { tca_abolish_judicial_title_effect = yes }
                 scope:tca_test_estate_judge_b = { save_scope_as = actor save_scope_as = puppet_or_actor }

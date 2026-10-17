@@ -1,4 +1,4 @@
-"""Engine-facing entry contracts; gameplay assertions live in native events."""
+"""面向引擎的入口约定；玩法断言位于原生事件中。"""
 from pathlib import Path
 import unittest
 from check_upstream_overrides import definitions

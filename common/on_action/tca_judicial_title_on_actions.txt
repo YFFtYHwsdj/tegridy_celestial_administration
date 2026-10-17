@@ -1,14 +1,16 @@
-﻿# Additive hooks; do not replace vanilla effect blocks.
+﻿# 追加回调，不替换原版 effect 块。
 on_game_start_after_lobby = { on_actions = { tca_judicial_setup } }
 yearly_global_pulse = { on_actions = { tca_judicial_setup } }
 on_title_gain = { on_actions = { tca_judicial_title_gain tca_judicial_position_gain } }
 on_government_change = { on_actions = { tca_judicial_government_change tca_judicial_position_government_change } }
 on_title_destroyed = { on_actions = { tca_judicial_title_destroyed } }
 
+# 开局及年度全局入口；从正式注册表初始化并维护司法机构。
 tca_judicial_setup = {
     effect = { tca_refresh_all_judicial_titles_effect = yes }
 }
 
+# 天朝受封者作用域；排队维护，刑部席位或官职变动同时通知最高领主。
 tca_judicial_title_gain = {
     trigger = { government_has_flag = government_is_celestial }
     effect = {
@@ -17,11 +19,14 @@ tca_judicial_title_gain = {
     }
 }
 
+# 天朝角色改制回调；延迟到原生政体事务后维护，离开天朝者由下方 position 回调处理。
 tca_judicial_government_change = {
     trigger = { government_has_flag = government_is_celestial }
     effect = { tca_request_judicial_maintenance_effect = yes }
 }
 
+# 回调角色先保存 lifecycle_actor，scope:landed_title 为被销毁头衔。
+# 销毁官职时退休其登记；销毁绑定路时走该路官职撤销流程，避免递归销毁同一对象。
 tca_judicial_title_destroyed = {
     effect = {
         save_scope_as = tca_lifecycle_actor
@@ -38,7 +43,7 @@ tca_judicial_title_destroyed = {
     }
 }
 
-# Fires on initial grant and later inheritance of an actual judicial title.
+# 实际提刑头衔首次授予及后续继承时触发。
 tca_judicial_position_gain = {
     trigger = {
         OR = {
@@ -49,9 +54,10 @@ tca_judicial_position_gain = {
     effect = { tca_request_judicial_maintenance_effect = yes }
 }
 
-# No invented monthly global pulse: use the native quarterly character hook.
+# 使用原生角色季度回调，不虚构每月全局脉冲。
 quarterly_playable_pulse = { on_actions = { tca_judicial_quarterly_maintenance tca_review_ai_quarterly } }
 
+# 角色季度补漏；包括仍残留命名标记或官职绑定者，使离开天朝后也能清理旧状态。
 tca_judicial_quarterly_maintenance = {
     trigger = {
         OR = {
@@ -68,24 +74,26 @@ tca_judicial_quarterly_maintenance = {
     }
 }
 
+# 角色改制／换领主后排队修复，覆盖仍有官名标记或提刑头衔的旧状态。
 tca_judicial_position_government_change = {
     trigger = { OR = { government_has_flag = government_is_celestial has_character_flag = tca_song_local_names has_character_flag = tca_song_central_names any_held_title = { has_variable = tca_judicial_title } } }
     effect = { tca_request_judicial_maintenance_effect = yes }
 }
 
-# A commissioner's new county/office or changed liege must also be checked.
+# 提刑获得新的县／官职或更换领主时，也必须检查。
 on_vassal_change = { on_actions = { tca_judicial_position_government_change tca_test_imperial_vassal_trace } }
 
-# Native council callbacks: emperor-owned commissions must follow the current
-# ministry, even when firing leaves a vacancy without a new title-gain callback.
+# 原生内阁回调：帝直属提刑必须跟随当前
+# 部职；即使解职导致空缺且未产生新头衔获得回调，也须处理。
 on_fired_from_council = { on_actions = { tca_judicial_council_fired } }
 on_councillor_left = { on_actions = { tca_judicial_council_left } }
 on_councillors_swapped = { on_actions = { tca_judicial_council_swapped } }
+# 内阁变动分组：被解职者使用自身政权，离任／交换使用原生提供的 old_employer／councillor_liege。
 tca_judicial_council_fired = { effect = { tca_request_judicial_maintenance_effect = yes } }
 tca_judicial_council_left = { effect = { scope:old_employer ?= { tca_request_judicial_maintenance_effect = yes } } }
 tca_judicial_council_swapped = { effect = { scope:councillor_liege ?= { tca_request_judicial_maintenance_effect = yes } } }
 
-# Read-only trace for the original vassal-change path of this disposable fixture.
+# 只读跟踪可丢弃夹具的原始封臣关系变更路径。
 tca_test_imperial_vassal_trace = {
     trigger = { debug_only = yes has_character_flag = tca_test_em_trace_subject }
     effect = {

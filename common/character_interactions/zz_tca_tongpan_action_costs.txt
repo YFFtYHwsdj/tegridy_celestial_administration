@@ -1,4 +1,6 @@
-﻿# Native interaction overrides: add Influence costs; prestige uses wrapped native values.
+﻿# 同名覆盖原版撤销头衔、收回封臣、拘捕、处决互动；保留原版主体，追加通判影响力附费。
+# 威望费用由 zz_tca_tongpan_native_values.txt 的原生数值包装计算；覆盖登记和基线见 tools/upstream_overrides.json。
+# 原版互动覆盖：追加影响力费用；威望使用包装后的原版数值。
 
 revoke_title_interaction = {
 	category = interaction_category_vassal
@@ -68,14 +70,14 @@ revoke_title_interaction = {
 
 	on_decline_summary = general_rebellion_decline_summary
 
-	# actor character giving the titles
-	# recipient character receiving the titles
+	# actor：授予头衔的角色。
+	# recipient：接收头衔的角色。
 
 	is_shown = {
 		scope:recipient = {
-			NOT = { government_has_flag = government_is_herder } # They have their own interaction without cooldowns/maluses
+			NOT = { government_has_flag = government_is_herder } # 其已有独立互动，不附带冷却或负面修正。
 			is_landed_or_landless_administrative = yes
-			# should be shown but be disabled for indirect vassals
+			# 对间接封臣显示但禁用。
 			target_is_liege_or_above = scope:puppet_or_actor
 			# is_vassal_of = scope:puppet_or_actor
 		}
@@ -83,7 +85,7 @@ revoke_title_interaction = {
 
 	is_valid_showing_failures_only = {
 		title_revocation_standard_valid_showing_failures_only_trigger = yes
-		# Plus make sure there's a legal right to revoke.
+		# 同时确认拥有合法撤销权。
 		scope:puppet_or_actor = {
 			trigger_if = {
 				limit = { government_has_flag = government_is_tribal }
@@ -145,11 +147,11 @@ revoke_title_interaction = {
 				}
 			}
 		}
-		# And uhh... the sensible check.
+		# 基本合理性检查。
 		scope:recipient = {
 			is_vassal_of = scope:puppet_or_actor
 			NOT = { has_strong_hook = scope:puppet_or_actor }
-			trigger_if = { # If admin, they need to hold a title that isn't their noble family title
+			trigger_if = { # 行政角色必须持有家门头衔之外的头衔。
 				limit = { government_has_mechanic = administrative }
 				custom_tooltip = {
 					text = admin_no_valid_appointment
@@ -190,11 +192,11 @@ revoke_title_interaction = {
 				}
 			}
 		}
-		# TGP
+		# 天朝扩展（TGP）。
 		tgp_ceremonial_title_revoke_restriction_trigger = yes
 	}
 
-	# Highlighted in the interaction menu when right-clicking a character
+	# 右键角色时在互动菜单中高亮。
 	is_highlighted = {
 		OR = {
 			scope:puppet_or_actor = {
@@ -252,7 +254,7 @@ revoke_title_interaction = {
 		}
 	}
 
-	#Use hook
+	#使用牵制。
 	send_option = {
 		is_valid = {
 			scope:puppet_or_actor = {
@@ -279,7 +281,7 @@ revoke_title_interaction = {
 	}
 
 	cost = {
-		# Usually, this action is free, but during certain diarchies, we want it to cost.
+		# 通常免费，但某些分权类型要求支付费用。
 		prestige = {
 			value = liege_diarchy_surcharge_interaction_revoke_title_interaction_value
 
@@ -289,7 +291,7 @@ revoke_title_interaction = {
 			}
 		}
 
-		# Admin has to pay an influence cost unless they have a revocation reason on the recipient
+		# 行政角色须支付影响力，除非对目标拥有撤销理由。
 		influence = {
 			value = 0
 			if = {
@@ -443,7 +445,7 @@ revoke_title_interaction = {
 			name = revoke_title_interaction
 			value = yes
 		}
-		if = { # Safety flag to ensure admin revocations behave properly
+		if = { # 保护标记，确保行政撤销按预期执行。
 			limit = {
 				scope:puppet_or_actor = { government_has_mechanic = administrative }
 				scope:recipient = { government_has_mechanic = administrative }
@@ -465,7 +467,7 @@ revoke_title_interaction = {
 			scope:puppet_or_actor = { remove_character_flag = flag_hostile_actions_disabled_delay }
 		}
 
-		# Harrying logic.
+		# 劫掠处理逻辑。
 		scope:puppet_or_actor = {
 			if = {
 				limit = {
@@ -497,7 +499,7 @@ revoke_title_interaction = {
 
 	on_decline = {
 		scope:puppet_or_actor = {
-			if = { # Admin has to pay an influence cost unless they have a revocation reason on the recipient
+			if = { # 行政角色须支付影响力，除非对目标拥有撤销理由。
 				limit = {
 					NOT = { scope:is_puppet_action ?= yes }
 					government_has_mechanic = administrative
@@ -509,7 +511,7 @@ revoke_title_interaction = {
 					}
 					NOT = { has_realm_law_flag = manor_reform_law }
 				}
-				show_as_tooltip = { # Actual cost is deducted in the the interaction cost
+				show_as_tooltip = { # 实际费用由互动 cost 扣除。
 					change_influence = {
 						scope:recipient ?= {
 							if = {
@@ -621,7 +623,7 @@ revoke_title_interaction = {
 			scope:recipient = {
 				add_opinion = {
 					target = scope:puppet_or_actor
-					opinion = -10 # Herders don't care much
+					opinion = -10 # 牧民对此不太在意。
 					modifier = revoked_title
 				}
 			}
@@ -653,7 +655,7 @@ revoke_title_interaction = {
 			}
 		}
 
-		# Harrying logic.
+		# 劫掠处理逻辑。
 		scope:puppet_or_actor = {
 			if = {
 				limit = {
@@ -752,7 +754,7 @@ revoke_title_interaction = {
 		}
 	}
 	ai_accept = {
-		base = 0 # Try to make it 0 for most interactions
+		base = 0 # 尽量使大多数互动的此项值为 0。
 
 		legalism_lawful_authority_acceptance_modifier = {
 			ACTOR = scope:puppet_or_actor
@@ -798,7 +800,7 @@ revoke_title_interaction = {
 			desc = MIGRATION_INTERACTION_HERDER
 		}
 
-		opinion_modifier = { # Opinion Factor
+		opinion_modifier = { # 好感因素。
 			who = scope:recipient
 			opinion_target = scope:puppet_or_actor
 			multiplier = 0.8
@@ -880,7 +882,7 @@ revoke_title_interaction = {
 			ai_honor  = {
 				if = {
 					limit = {
-						scope:recipient = { #If AI is honorable and the law compels to obey the liege, AI will be more likely to obey.
+						scope:recipient = { #若 AI 重视荣誉且法律要求服从领主，其更倾向于服从。
 							ai_honor > 0
 						}
 						scope:puppet_or_actor = {
@@ -891,14 +893,14 @@ revoke_title_interaction = {
 				}
 			}
 		}
-		modifier = { #I am a King!
+		modifier = { #我是国王！
 			desc = offer_vassalization_interaction_aibehavior_hightier_tt
 			trigger = {
 				scope:recipient = { highest_held_title_tier = tier_kingdom }
 			}
 			add = -20
 		}
-		modifier = { #Title is part of vassal's primary title de-jure. Not relevant for Admin.
+		modifier = { #头衔属于封臣主头衔的 de_jure 范围；行政制不适用。
 			add = -25
 			NOT = { scope:recipient = { government_has_mechanic = administrative } }
 			scope:recipient.primary_title.tier > tier_county
@@ -930,7 +932,7 @@ revoke_title_interaction = {
 			}
 			desc = COWED_REASON
 		}
-		modifier = { #Comparative military strength.
+		modifier = { #相对军事实力。
 			desc = offer_vassalization_interaction_aibehavior_power_tt
 	  	  	add = {
 				value = 1
@@ -942,7 +944,7 @@ revoke_title_interaction = {
 				max = 20
 	  		}
 		}
-		modifier = { # Legalistic tradition
+		modifier = { # 律法主义传统。
 			desc = tradition_legalistic_name
 			scope:puppet_or_actor = {
 				has_revoke_title_reason = scope:recipient
@@ -950,7 +952,7 @@ revoke_title_interaction = {
 			}
 			add = legalistic_vassal_punishment_acceptance
 		}
-		modifier = { # AI Mongols, tyranny wars just delay the inevitable fun!
+		modifier = { # 蒙古 AI：暴政战争只会拖延最终结果。
 			scope:puppet_or_actor = {
 				is_ai = yes
 				OR = {
@@ -973,11 +975,11 @@ revoke_title_interaction = {
 		}
 	}
 
-	# AI
+	# AI 行为。
 	ai_targets = {
 		ai_recipients = vassals
 	}
-	ai_frequency = 0 # This is handled via code instead; see REVOKE_TITLE_TICK in the AI defines. All the logic for *if* to send a revoke though is scripted below
+	ai_frequency = 0 # 此项由引擎处理，见 AI defines 的 REVOKE_TITLE_TICK；是否发送撤销请求的逻辑仍写在下方脚本中。
 
 	ai_potential = {
 		has_realm_law_flag = title_revocation_allowed
@@ -987,9 +989,9 @@ revoke_title_interaction = {
 	ai_will_do = {
 		base = -1000
 
-		# We want to avoid tyranny unless we've got a good reason
-		# And even if we can avoid tyranny we don't want to revoke just because we can, so this only gets us to -10
-		# Certain characters will revoke despite tyranny, if their rationality is sufficiently low
+		# 除非有充分理由，否则避免暴政。
+		# 即使可免暴政，也不应仅因能够撤销便行动，因此此项最多只使总值达到 -10。
+		# 理性足够低的特定角色会不顾暴政撤销头衔。
 		modifier = {
 			scope:puppet_or_actor = {
 				OR = {
@@ -1009,7 +1011,7 @@ revoke_title_interaction = {
 
 			add = 990
 		}
-		# Only certain rulers won't revoke vassals who have revolted against them
+		# 仅部分统治者会放过曾反叛的封臣。
 		modifier = {
 			scope:puppet_or_actor = {
 				ai_compassion <= 75
@@ -1021,7 +1023,7 @@ revoke_title_interaction = {
 						limit = {
 							NOT = { has_dlc_feature = landless_playable }
 						}
-						# Be kinder to players if they'd get game overed.
+						# 若玩家将因此结束游戏，适当宽容。
 						is_ai = yes
 					}
 					opinion = {
@@ -1062,7 +1064,7 @@ revoke_title_interaction = {
 				}
 			}
 		}
-		# Vengeful AI's want to revoke
+		# 记仇的 AI 更想撤销头衔。
 		modifier = {
 			scope:puppet_or_actor = {
 				ai_vengefulness > 0
@@ -1078,7 +1080,7 @@ revoke_title_interaction = {
 				multiply = 2
 			}
 		}
-		# Always revoke preferred capital and capital duchy
+		# 始终撤销偏好首都及首都公国。
 		modifier = {
 			years_from_game_start >= 3
 			OR = {
@@ -1099,7 +1101,7 @@ revoke_title_interaction = {
 					is_imprisoned_by = scope:puppet_or_actor
 				}
 			}
-			scope:puppet_or_actor = { # The HRE doesn't need endless civil wars
+			scope:puppet_or_actor = { # 避免神圣罗马帝国陷入无尽内战。
 				NOT = {
 					primary_title = title:e_hre
 				}
@@ -1109,7 +1111,7 @@ revoke_title_interaction = {
 				scope:landed_title = scope:puppet_or_actor.primary_title.title_capital_county
 				scope:landed_title = scope:puppet_or_actor.primary_title.title_capital_county.de_jure_liege
 			}
-			NAND = { # Don't revoke player titles tyranically, it must be possible to play and succeed as Ulm!
+			NAND = { # 不要以暴政撤销玩家头衔，须保留小领主玩家的发展空间。
 				scope:landed_title.holder = {
 					is_ai = no
 				}
@@ -1119,7 +1121,7 @@ revoke_title_interaction = {
 			}
 			add = 1100
 		}
-		# If below domain limit, try to revoke counties in your capital duchy despite tyranny, sometimes
+		# 低于直辖上限时，有时会不顾暴政撤销首都公国内的县。
 		modifier = {
 			years_from_game_start >= 3
 			OR = {
@@ -1140,7 +1142,7 @@ revoke_title_interaction = {
 					is_imprisoned_by = scope:puppet_or_actor
 				}
 			}
-			scope:puppet_or_actor = { # The HRE doesn't need endless civil wars
+			scope:puppet_or_actor = { # 避免神圣罗马帝国陷入无尽内战。
 				NOT = {
 					primary_title = title:e_hre
 				}
@@ -1163,14 +1165,14 @@ revoke_title_interaction = {
 			}
 			exists = scope:puppet_or_actor.primary_title.title_capital_county
 			OR = {
-				scope:puppet_or_actor.primary_title.title_capital_county.holder = scope:puppet_or_actor # You have your de jure capital already
+				scope:puppet_or_actor.primary_title.title_capital_county.holder = scope:puppet_or_actor # 已拥有自己的 de_jure 首都。
 				NOT = {
-					scope:puppet_or_actor.primary_title.title_capital_county.holder.top_liege = scope:puppet_or_actor.top_liege # Or your De Jure capital isn't in your realm
+					scope:puppet_or_actor.primary_title.title_capital_county.holder.top_liege = scope:puppet_or_actor.top_liege # 或 de_jure 首都不在自己的政权内。
 				}
 			}
-			scope:landed_title.tier = tier_county # Only Counties
-			OR = { # The AI gives away wrong-holding counties almost instantly, so we restrict to counties with holdings they can hold
-				scope:landed_title.title_province = { has_holding_type = castle_holding } # Everyone is valid for castles
+			scope:landed_title.tier = tier_county # 仅限县。
+			OR = { # AI 几乎会立即送出无法合法持有的领地，因此仅限其能持有当地地产的县。
+				scope:landed_title.title_province = { has_holding_type = castle_holding } # 所有角色都能持有城堡。
 				AND = {
 					scope:puppet_or_actor = {
 						government_has_flag = government_is_tribal
@@ -1193,7 +1195,7 @@ revoke_title_interaction = {
 					scope:landed_title.title_province = { has_holding_type = church_holding }
 				}
 			}
-			OR = { # And the capital duchy, if it exists at all
+			OR = { # 若存在，也包括首都公国。
 				AND = {
 					exists = scope:puppet_or_actor.primary_title.title_capital_county.de_jure_liege.holder
 					scope:puppet_or_actor.primary_title.title_capital_county.de_jure_liege.holder = scope:puppet_or_actor
@@ -1207,25 +1209,25 @@ revoke_title_interaction = {
 				}
 			}
 
-			scope:landed_title.de_jure_liege = scope:puppet_or_actor.primary_title.title_capital_county.de_jure_liege # Under the same Duchy as your capital
+			scope:landed_title.de_jure_liege = scope:puppet_or_actor.primary_title.title_capital_county.de_jure_liege # 与首都位于同一公国。
 
-			scope:recipient = { # Not from players
+			scope:recipient = { # 不针对玩家。
 				is_ai = yes
 			}
 
-			OR = { # Tyranny tolerance is based on rationality
+			OR = { # 暴政容忍度由理性决定。
 				AND = {
 					scope:puppet_or_actor.ai_rationality < 0
-					scope:puppet_or_actor.tyranny <= 15 # Don't go crazy with tyranny, just a bit is fine
+					scope:puppet_or_actor.tyranny <= 15 # 只容忍少量暴政，避免过度。
 				}
 				AND = {
 					scope:puppet_or_actor.ai_rationality >= 0
 					scope:puppet_or_actor.ai_rationality < 50
-					scope:puppet_or_actor.tyranny <= 5 # Don't go crazy with tyranny, just a bit is fine
+					scope:puppet_or_actor.tyranny <= 5 # 只容忍少量暴政，避免过度。
 				}
 				AND = {
 					scope:puppet_or_actor.ai_rationality >= 50
-					scope:puppet_or_actor.tyranny <= 0 # Don't go crazy with tyranny, just a bit is fine
+					scope:puppet_or_actor.tyranny <= 0 # 只容忍少量暴政，避免过度。
 				}
 				AND = {
 					scope:puppet_or_actor.ai_rationality >= 0
@@ -1241,9 +1243,9 @@ revoke_title_interaction = {
 					}
 				}
 			}
-			# To do this, the target must be weak or willing in some way
+			# 目标必须较弱，或有理由愿意接受。
 			OR = {
-				scope:puppet_or_actor.current_military_strength > scope:recipient.current_military_strength # Must be stronger
+				scope:puppet_or_actor.current_military_strength > scope:recipient.current_military_strength # 必须更强。
 				scope:recipient = {
 					is_imprisoned_by = scope:puppet_or_actor
 				}
@@ -1269,14 +1271,14 @@ revoke_title_interaction = {
 
 			add = 1100
 		}
-		# Revoke counties we're dejure liege of if below domain limit
+		# 低于直辖上限时，撤销自己为 de_jure 领主的县。
 		modifier = {
 			scope:puppet_or_actor.domain_size < scope:puppet_or_actor.domain_limit
 			scope:landed_title.tier = tier_county
 			scope:landed_title.de_jure_liege.holder = scope:puppet_or_actor
 			add = 500
 		}
-		# Revoke appropriate baronies if below domain limit, it's tyranny free
+		# 低于直辖上限时，撤销适合持有且不产生暴政的男爵领。
 		modifier = {
 			scope:puppet_or_actor.domain_size < scope:puppet_or_actor.domain_limit
 			scope:recipient = { highest_held_title_tier = tier_barony }
@@ -1300,7 +1302,7 @@ revoke_title_interaction = {
 			}
 			add = 1100
 		}
-		# Revoke from vassals of the wrong faith if you can do it without tyranny
+		# 可免暴政时，撤销异信仰封臣的头衔。
 		modifier = {
 			scope:puppet_or_actor = {
 				NOT = {
@@ -1316,7 +1318,7 @@ revoke_title_interaction = {
 					scope:puppet_or_actor.rite = { rite_has_doctrine = doctrine_pluralism_pluralistic }
 				}
 			}
-			OR = { # Chill a bit until you've dealth with the ones already in your prison
+			OR = { # 先处理已在自己监狱中的目标，再考虑其他人。
 				scope:recipient = {
 					is_imprisoned_by = scope:puppet_or_actor
 				}
@@ -1331,7 +1333,7 @@ revoke_title_interaction = {
 			}
 			add = 100
 		}
-		# Revoke from characters you dislike if you can do it without tyranny
+		# 可免暴政时，撤销厌恶角色的头衔。
 		modifier = {
 			scope:puppet_or_actor = {
 				NOT = {
@@ -1344,11 +1346,11 @@ revoke_title_interaction = {
 			}
 			add = 100
 		}
-		# Slight preference for higher-tier titles
+		# 略微偏好较高等级的头衔。
 		modifier = {
 			add = scope:landed_title.tier
 		}
-		# Do not revoke titles from certain characters
+		# 不撤销特定角色的头衔。
 		modifier = {
 			scope:puppet_or_actor = {
 				OR = {
@@ -1363,7 +1365,7 @@ revoke_title_interaction = {
 			}
 			add = -5000
 		}
-		# Do not revoke titles when the chance of success if exceedingly low
+		# 成功率极低时不撤销头衔。
 		modifier = {
 			NOR = {
 				scope:recipient = {
@@ -1400,17 +1402,17 @@ revoke_title_interaction = {
 			add = -2000
 		}
 
-		modifier = { # The AI will always use a Hook if they can
+		modifier = { # AI 只要能用牵制就会使用。
 			scope:hook = yes
 			add = 1
 		}
 
-		modifier = { # The AI shouldn't ruin the player's fun
+		modifier = { # AI 不应破坏玩家体验。
 			add = -5000
 			scope:recipient = { has_character_flag = is_party_baron }
 		}
 
-		# Revoke from prisoners whose deaths would diminish the realm through inheritance
+		# 若囚犯死亡将因继承使政权缩小，撤销其头衔。
 		modifier = {
 			add = 1000
 			scope:recipient = {
@@ -1427,7 +1429,7 @@ revoke_title_interaction = {
 			}
 		}
 
-		# Clan Government: Avoid revoking titles from house members if the AI wants to have high unity
+		# 氏族政体：希望保持高团结度的 AI 避免撤销家族成员头衔。
 		modifier = {
 			scope:puppet_or_actor = {
 				government_has_flag = government_is_clan
@@ -1439,14 +1441,14 @@ revoke_title_interaction = {
 				house ?= scope:puppet_or_actor.house
 			}
 			add = -1000
-		}		# Admin Government: Do not revoke titles from your house unless it's really needed
+		}		# 行政政体：除非确有必要，否则不撤销同家族成员头衔。
 		modifier = {
 			scope:puppet_or_actor = { government_has_mechanic = administrative }
 			exists = scope:recipient.house
 			scope:puppet_or_actor.house ?= scope:recipient.house
 			add = -500
 		}
-		# Japanese Admin wants to revoke Japanese Feudal if they have a reason
+		# 日本行政角色有理由时倾向撤销日本封建角色头衔。
 		modifier = {
 			add = 5000
 			scope:puppet_or_actor = {
@@ -1461,7 +1463,7 @@ revoke_title_interaction = {
 				house != scope:puppet_or_actor.house
 			}
 		}
-		# And Japanese Feudal wants to revoke Japanese Admin if they have a reason
+		# 日本封建角色有理由时也倾向撤销日本行政角色头衔。
 		modifier = {
 			add = 5000
 			scope:puppet_or_actor = {
@@ -1476,10 +1478,10 @@ revoke_title_interaction = {
 				house != scope:puppet_or_actor.house
 			}
 		}
-		# TGP Be more careful with blocs generally
+		# 天朝扩展：整体上更谨慎对待家族集团。
 		house_bloc_tyranny_war_modifiers = yes
 
-		modifier = { # Avoid triggering Tyranny wars mid-war
+		modifier = { # 避免在战争期间引发暴政战争。
 			factor = 0
 			scope:puppet_or_actor = {
 				is_at_war = yes
@@ -1494,7 +1496,7 @@ revoke_title_interaction = {
 			}
 		}
 
-		# Don't take a title off anyone when refusing would raise half the realm against us. A prisoner, baron and lawful revocations are exempt, because they don't cause civil wars
+		# 若拒绝会使半个政权反叛，则不撤销；囚犯、男爵和合法撤销除外，因为不会引发内战。
 		modifier = {
 			factor = 0
 			scope:recipient = {
@@ -1510,7 +1512,7 @@ revoke_title_interaction = {
 			}
 		}
 
-		# Recipient Ecclesiastical: Don't revoke if not excommunicated
+		# 教会制目标：未被绝罚时不撤销。
 		modifier = {
 			factor = 0
 			scope:recipient = {
@@ -1523,7 +1525,7 @@ revoke_title_interaction = {
 			}
 		}
 
-		modifier = { # Avoid triggering Tyranny wars mid-grand activity
+		modifier = { # 避免在大型活动期间引发暴政战争。
 			factor = 0
 			scope:puppet_or_actor = {
 				has_ongoing_grand_activity_trigger = yes
@@ -1538,7 +1540,7 @@ revoke_title_interaction = {
 			}
 		}
 
-		# Admin rulers should be less likely to revoke titles without a revocation reason, as they should prefer to depose governors
+		# 行政统治者无撤销理由时应较少撤销，更倾向于罢免长官。
 		modifier = {
 			scope:puppet_or_actor = {
 				government_has_mechanic = administrative
@@ -1555,7 +1557,7 @@ revoke_title_interaction = {
 				}
 				trigger_else = { highest_held_title_tier >= tier_duchy }
 			}
-			factor = { # Honorable AI's will never revoke titles without a reason
+			factor = { # 重视荣誉的 AI 绝不无理由撤销头衔。
 				value = 0
 				if = {
 					limit = {
@@ -1566,7 +1568,7 @@ revoke_title_interaction = {
 			}
 		}
 
-		#Don't revoke titles from the frankokratia leader
+		#不撤销法兰克统治派领袖的头衔。
 		modifier = {
 			scope:recipient = {
 				any_owned_story = {
@@ -1590,7 +1592,7 @@ retract_vassal_interaction = {
 	pause_on_receive = yes
 	icon = icon_liege
 
-	interface_priority = 109 #after revoke title
+	interface_priority = 109 #撤销头衔之后。
 
 	desc = retract_vassal_interaction_desc
 
@@ -1626,7 +1628,7 @@ retract_vassal_interaction = {
 
 	is_valid_showing_failures_only = {
 		vassal_retraction_standard_valid_showing_failures_only_trigger = yes
-		# Make sure this exactly matches "can_be_picked" section below
+		# 确保与下方 can_be_picked 区段完全一致。
 		scope:recipient = {
 			custom_description = {
 				text = "basic_vassal_to_retract"
@@ -1636,7 +1638,7 @@ retract_vassal_interaction = {
 				}
 			}
 		}
-		# Plus make sure there's a legal right to retract.
+		# 同时确认拥有合法收回封臣的权利。
 		scope:puppet_or_actor = {
 			trigger_if = {
 				limit = {
@@ -1697,7 +1699,7 @@ retract_vassal_interaction = {
 	}
 
 	cost = {
-		# Usually, this action is free, but during certain diarchies, we want it to cost.
+		# 通常免费，但某些分权类型要求支付费用。
 		prestige = {
 			value = liege_diarchy_surcharge_interaction_retract_vassal_interaction_value
 
@@ -1794,7 +1796,7 @@ retract_vassal_interaction = {
 	}
 
 	can_be_blocked = {
-		custom_description = { #Hook from Recipient can counteract, but only if Actor is not forcing the action via Strong Hook.
+		custom_description = { #目标持有的牵制可以抵消，但发起者使用强牵制强迫行动时除外。
 			text = "spending_hook"
 			subject = scope:recipient
 			object = scope:puppet_or_actor
@@ -1815,7 +1817,7 @@ retract_vassal_interaction = {
 	}
 
 	ai_accept = {
-		base = 0 # Try to make it 0 for most interactions
+		base = 0 # 尽量使大多数互动的此项值为 0。
 
 		legalism_lawful_authority_acceptance_modifier = {
 			ACTOR = scope:puppet_or_actor
@@ -1853,7 +1855,7 @@ retract_vassal_interaction = {
 			desc = SCHEME_WEAK_HOOK_USED
 		}
 
-		opinion_modifier = { # Opinion Factor
+		opinion_modifier = { # 好感因素。
 			who = scope:recipient
 			opinion_target = scope:puppet_or_actor
 			multiplier = 1.0
@@ -1906,7 +1908,7 @@ retract_vassal_interaction = {
 			ai_honor  = {
 				if = {
 					limit = {
-						scope:recipient = { #If AI is honorable and the law compels to obey the liege, AI will be more likely to obey.
+						scope:recipient = { #若 AI 重视荣誉且法律要求服从领主，其更倾向于服从。
 							ai_honor > 0
 						}
 						scope:puppet_or_actor = {
@@ -1953,7 +1955,7 @@ retract_vassal_interaction = {
 			desc = AI_VASSAL_IS_IN_CAPITAL_DUCHY
 		}
 
-		modifier = { #Sub-Vassal is NOT De jure of current Vassal.
+		modifier = { #次级封臣不属于当前封臣的 de_jure 范围。
 			add = 25
 			NOT = {
 				scope:recipient = {
@@ -1964,7 +1966,7 @@ retract_vassal_interaction = {
 			}
 			desc = AI_REFUSAL_IS_NOT_DE_JURE_LIEGE
 		}
-		modifier = { #Sub-Vassal is De jure of liege title.
+		modifier = { #次级封臣属于领主头衔的 de_jure 范围。
 			add = 15
 			scope:puppet_or_actor = {
 				any_held_title = {
@@ -1993,7 +1995,7 @@ retract_vassal_interaction = {
 			}
 			desc = COWED_REASON
 		}
-		modifier = { #Comparative military strength.
+		modifier = { #相对军事实力。
 			desc = offer_vassalization_interaction_aibehavior_power_tt
 			add = {
 				value = 1
@@ -2004,12 +2006,12 @@ retract_vassal_interaction = {
 				multiply = 100
 			}
 		}
-		modifier = { #Different faith, no pluralism.
+		modifier = { #信仰不同且不实行多元主义。
 			desc = AI_REFUSAL_SPLITTING_SAME_FAITH_VASSALS
 			trigger = {
-				scope:puppet_or_actor.faith = scope:secondary_recipient.faith #Will not care as much if the vassal being retracted is of a different faith.
+				scope:puppet_or_actor.faith = scope:secondary_recipient.faith #被收回的封臣信仰不同时，当前封臣较不在意。
 				scope:puppet_or_actor = {
-					NOR = { #Of two different faiths AND the potential vassal's faith is not pluralistic.
+					NOR = { #双方信仰不同，且潜在封臣的信仰不实行多元主义。
 						faith = scope:recipient.faith
 						rite = { rite_has_doctrine = doctrine_pluralism_pluralistic }
 					}
@@ -2041,7 +2043,7 @@ retract_vassal_interaction = {
 				}
 			}
 		}
-		modifier = { # AI Mongols, tyranny wars just delay the inevitable fun!
+		modifier = { # 蒙古 AI：暴政战争只会拖延最终结果。
 			scope:puppet_or_actor = {
 				is_ai = yes
 				OR = {
@@ -2063,7 +2065,7 @@ retract_vassal_interaction = {
 		}
 	}
 
-	#Use hook
+	#使用牵制。
 	send_option = {
 		is_valid = {
 			scope:puppet_or_actor = {
@@ -2082,7 +2084,7 @@ retract_vassal_interaction = {
 
 	can_send_despite_rejection = yes
 
-	# AI
+	# AI 行为。
 	ai_targets = {
 		ai_recipients = vassals
 	}
@@ -2098,9 +2100,9 @@ retract_vassal_interaction = {
 	ai_will_do = {
 		base = -1000
 
-		# We want to avoid tyranny unless we've got a good reason
-		# And even if we can avoid tyranny we don't want to retract just because we can, so this only gets us to -10
-		# Certain characters will retract despite tyranny, if their rationality is sufficiently low
+		# 除非有充分理由，否则避免暴政。
+		# 即使可免暴政，也不应仅因能够收回便行动，因此此项最多只使总值达到 -10。
+		# 理性足够低的特定角色会不顾暴政收回封臣。
 		modifier = {
 			scope:puppet_or_actor = {
 				OR = {
@@ -2118,7 +2120,7 @@ retract_vassal_interaction = {
 
 			add = 990
 		}
-		# Always retract preferred capital if you hold the duchy, or the duchy is uncreated
+		# 若持有公国或公国尚未创建，始终收回偏好首都。
 		modifier = {
 			years_from_game_start >= 3
 			OR = {
@@ -2130,7 +2132,7 @@ retract_vassal_interaction = {
 					is_imprisoned_by = scope:puppet_or_actor
 				}
 			}
-			scope:puppet_or_actor = { # The HRE doesn't need endless civil wars
+			scope:puppet_or_actor = { # 避免神圣罗马帝国陷入无尽内战。
 				NOT = {
 					primary_title = title:e_hre
 				}
@@ -2151,7 +2153,7 @@ retract_vassal_interaction = {
 					this = scope:puppet_or_actor.primary_title.title_capital_county
 				}
 			}
-			NAND = { # Don't retract player vassals tyrannically
+			NAND = { # 不要以暴政收回玩家的封臣。
 				scope:recipient = {
 					is_ai = no
 				}
@@ -2161,11 +2163,11 @@ retract_vassal_interaction = {
 			}
 			add = 1100
 		}
-		# If below domain limit, try to revoke counties in your capital duchy despite tyranny, sometimes
+		# 低于直辖上限时，有时会不顾暴政撤销首都公国内的县。
 		modifier = {
 			years_from_game_start >= 3
 			scope:puppet_or_actor = { is_at_war = no }
-			scope:puppet_or_actor = { # The HRE doesn't need endless civil wars
+			scope:puppet_or_actor = { # 避免神圣罗马帝国陷入无尽内战。
 				NOT = {
 					primary_title = title:e_hre
 				}
@@ -2187,18 +2189,18 @@ retract_vassal_interaction = {
 			}
 			exists = scope:puppet_or_actor.primary_title.title_capital_county
 			OR = {
-				scope:puppet_or_actor.primary_title.title_capital_county.holder = scope:puppet_or_actor # You have your de jure capital already
+				scope:puppet_or_actor.primary_title.title_capital_county.holder = scope:puppet_or_actor # 已拥有自己的 de_jure 首都。
 				NOT = {
-					scope:puppet_or_actor.primary_title.title_capital_county.holder.top_liege = scope:puppet_or_actor.top_liege # Or your De Jure capital isn't in your realm
+					scope:puppet_or_actor.primary_title.title_capital_county.holder.top_liege = scope:puppet_or_actor.top_liege # 或 de_jure 首都不在自己的政权内。
 				}
 			}
 			scope:secondary_recipient = {
 				primary_title.tier = tier_county
 				any_sub_realm_county = {
-					de_jure_liege = scope:puppet_or_actor.primary_title.title_capital_county.de_jure_liege # Under the same Duchy as your capital
+					de_jure_liege = scope:puppet_or_actor.primary_title.title_capital_county.de_jure_liege # 与首都位于同一公国。
 				}
 			}
-			OR = { # And the capital duchy, if it exists at all
+			OR = { # 若存在，也包括首都公国。
 				AND = {
 					exists = scope:puppet_or_actor.primary_title.title_capital_county.de_jure_liege.holder
 					scope:puppet_or_actor.primary_title.title_capital_county.de_jure_liege.holder = scope:puppet_or_actor
@@ -2212,23 +2214,23 @@ retract_vassal_interaction = {
 				}
 			}
 
-			scope:recipient = { # Not from players
+			scope:recipient = { # 不针对玩家。
 				is_ai = yes
 			}
 
-			OR = { # Tyranny tolernance is based on rationality
+			OR = { # 暴政容忍度由理性决定。
 				AND = {
 					scope:puppet_or_actor.ai_rationality < 0
-					scope:puppet_or_actor.tyranny <= 15 # Don't go crazy with tyranny, just a bit is fine
+					scope:puppet_or_actor.tyranny <= 15 # 只容忍少量暴政，避免过度。
 				}
 				AND = {
 					scope:puppet_or_actor.ai_rationality >= 0
 					scope:puppet_or_actor.ai_rationality < 50
-					scope:puppet_or_actor.tyranny <= 5 # Don't go crazy with tyranny, just a bit is fine
+					scope:puppet_or_actor.tyranny <= 5 # 只容忍少量暴政，避免过度。
 				}
 				AND = {
 					scope:puppet_or_actor.ai_rationality >= 50
-					scope:puppet_or_actor.tyranny <= 0 # Don't go crazy with tyranny, just a bit is fine
+					scope:puppet_or_actor.tyranny <= 0 # 只容忍少量暴政，避免过度。
 				}
 				AND = {
 					scope:puppet_or_actor.ai_rationality >= 0
@@ -2244,9 +2246,9 @@ retract_vassal_interaction = {
 					}
 				}
 			}
-			# To do this, the target must be weak or willing in some way
+			# 目标必须较弱，或有理由愿意接受。
 			OR = {
-				scope:puppet_or_actor.current_military_strength > scope:recipient.current_military_strength # Must be stronger
+				scope:puppet_or_actor.current_military_strength > scope:recipient.current_military_strength # 必须更强。
 				scope:recipient = {
 					is_imprisoned_by = scope:puppet_or_actor
 				}
@@ -2268,7 +2270,7 @@ retract_vassal_interaction = {
 
 			add = 1100
 		}
-		# Always retract preferred capital duchy
+		# 始终收回偏好首都公国。
 		modifier = {
 			exists = scope:puppet_or_actor.primary_title.title_capital_county
 			scope:secondary_recipient = {
@@ -2276,7 +2278,7 @@ retract_vassal_interaction = {
 					this = scope:puppet_or_actor.primary_title.title_capital_county.de_jure_liege
 				}
 			}
-			NAND = { # Don't retract player vassals tyranically
+			NAND = { # 不要以暴政收回玩家的封臣。
 				scope:recipient = {
 					is_ai = no
 				}
@@ -2286,7 +2288,7 @@ retract_vassal_interaction = {
 			}
 			add = 1000
 		}
-		# Retract vassal we're dejure liege of if below domain limit
+		# 低于直辖上限时，收回自己为 de_jure 领主的封臣。
 		modifier = {
 			scope:puppet_or_actor = {
 				vassal_limit_available > 0
@@ -2294,7 +2296,7 @@ retract_vassal_interaction = {
 			scope:secondary_recipient.primary_title.de_jure_liege.holder = scope:puppet_or_actor
 			add = 500
 		}
-		# Retract non-De Jure vassals from Megadukes (only if a revoke reason is present, so we don't end up in massive tyranny war spirals)
+		# 从大公爵手中收回非 de_jure 封臣；仅限有撤销理由时，以免陷入大规模暴政战争循环。
 		modifier = {
 			scope:puppet_or_actor = {
 				has_revoke_title_reason = scope:recipient
@@ -2308,7 +2310,7 @@ retract_vassal_interaction = {
 			scope:secondary_recipient.primary_title.de_jure_liege.holder != scope:recipient
 			add = 500
 		}
-		# Do not revoke titles from certain characters
+		# 不撤销特定角色的头衔。
 		modifier = {
 			scope:puppet_or_actor = {
 				OR = {
@@ -2321,7 +2323,7 @@ retract_vassal_interaction = {
 			}
 			add = -2000
 		}
-		# Do not revoke titles when the chance of success if exceedingly low
+		# 成功率极低时不撤销头衔。
 		modifier = {
 			NOT = {
 				scope:recipient = {
@@ -2340,17 +2342,17 @@ retract_vassal_interaction = {
 			add = -2000
 		}
 
-		modifier = { # The AI will only use a Hook if they couldn't otherwise do this
+		modifier = { # 仅在不使用牵制便无法执行时，AI 才使用牵制。
 			scope:hook = yes
 			add = -1
 		}
 
-		modifier = { # The AI shouldn't ruin the player's fun
+		modifier = { # AI 不应破坏玩家体验。
 			add = -2000
 			scope:recipient = { has_character_flag = is_party_baron }
 		}
 
-		modifier = { # Avoid triggering Tyranny wars mid-war
+		modifier = { # 避免在战争期间引发暴政战争。
 			factor = 0
 			scope:puppet_or_actor = {
 				is_at_war = yes
@@ -2362,7 +2364,7 @@ retract_vassal_interaction = {
 			}
 		}
 
-		modifier = { # Avoid triggering Tyranny wars mid-grand activity
+		modifier = { # 避免在大型活动期间引发暴政战争。
 			factor = 0
 			scope:puppet_or_actor = {
 				has_ongoing_grand_activity_trigger = yes
@@ -2501,7 +2503,7 @@ imprison_interaction = {
 				is_imprisoned = no
 			}
 		}
-		# Scope:recipient can't be visiting elsewhere.
+		# scope:recipient 不能正在别处访问。
 		trigger_if = {
 			limit = {
 				scope:recipient = { is_courtier_of = scope:puppet_or_actor }
@@ -2639,7 +2641,7 @@ imprison_interaction = {
 		}
 	}
 
-	#Use hook
+	#使用牵制。
 	send_option = {
 		is_valid = {
 			exists = scope:recipient
@@ -2658,7 +2660,7 @@ imprison_interaction = {
 	send_options_exclusive = no
 
 	cost = {
-		# Usually, this action is free, but during certain diarchies, we want it to cost.
+		# 通常免费，但某些分权类型要求支付费用。
 		prestige = {
 			value = liege_diarchy_surcharge_interaction_imprison_interaction_value
 			if = {
@@ -2707,7 +2709,7 @@ imprison_interaction = {
 	}
 
 	on_auto_accept = {
-		# the rest of the necessary logic is covered by auto_accept also triggering on_accept below
+		# 其他必要逻辑由下方 auto_accept 同时调用 on_accept 保证。
 		scope:recipient = {
 			trigger_event = char_interaction.0233
 		}
@@ -2810,7 +2812,7 @@ imprison_interaction = {
 			TARGET = scope:recipient
 			IMPRISONER = scope:puppet_or_actor
 		}
-		# If they recently revoked your title, or asked for your excommunication, they become your rival
+		# 若对方近期撤销过你的头衔或请求绝罚你，则升级为仇敌。
 		imprison_attempt_escalates_rivalry_effect = yes
 		scope:puppet_or_actor = {
 			trigger_event = char_interaction.0231
@@ -2843,8 +2845,8 @@ imprison_interaction = {
 			scope:puppet_or_actor = { remove_character_flag = flag_hostile_actions_disabled_delay }
 		}
 
-		# If we're a clan this interaction affects unity
-		if = { # If you don't have an imprisonment reason, and the target is landed, you lose more unity
+		# 氏族政体下，此互动影响团结度。
+		if = { # 无拘捕理由且目标有地时，团结度损失较大。
 			limit = {
 				NOT = { scope:puppet_or_actor = { has_imprisonment_reason = scope:recipient } }
 				scope:recipient = { is_landed_or_landless_administrative_or_theocratic = yes }
@@ -2857,7 +2859,7 @@ imprison_interaction = {
 				REVERSE_NON_HOUSE_TARGET = no
 			}
 		}
-		else_if = { # If you don't have an imprisonment reason, and the target is unlanded, you lose slightly less unity
+		else_if = { # 无拘捕理由且目标无地时，团结度损失稍小。
 			limit = {
 				NOT = { scope:puppet_or_actor = { has_imprisonment_reason = scope:recipient } }
 				scope:recipient = { is_landed_or_landless_administrative_or_theocratic = no }
@@ -2870,7 +2872,7 @@ imprison_interaction = {
 				REVERSE_NON_HOUSE_TARGET = no
 			}
 		}
-		else = { # If you have a valid reason, you lose only a tiny bit of unity (criminal or not, they are still family)
+		else = { # 有正当理由时仅损失少量团结度：无论是否犯罪，对方仍是家人。
 			add_clan_unity_interaction_effect = {
 				CHARACTER = scope:puppet_or_actor
 				TARGET = scope:recipient
@@ -2880,7 +2882,7 @@ imprison_interaction = {
 			}
 		}
 
-		# Harrying logic.
+		# 劫掠处理逻辑。
 		scope:puppet_or_actor = {
 			if = {
 				limit = {
@@ -2911,13 +2913,13 @@ imprison_interaction = {
 	}
 
 	on_decline = {
-		#Close family might get rival progress
+		#至亲可能获得仇敌关系进度。
 		if = {
 			limit = {
 				scope:recipient = {
 					is_close_family_of = scope:puppet_or_actor
 				}
-				#Legal imprisonment
+				#合法拘捕。
 				trigger_if = {
 					limit = {
 						scope:puppet_or_actor = {
@@ -2931,7 +2933,7 @@ imprison_interaction = {
 						}
 					}
 				}
-				#Illegal imprisonment
+				#非法拘捕。
 				trigger_else = {
 					scope:recipient = {
 						NOT = {
@@ -2969,7 +2971,7 @@ imprison_interaction = {
 						}
 					}
 					else = {
-						# Remove them immediately.
+						# 立即移除。
 						remove_laamp_from_exiled_county_automatically_effect = {
 							PROVINCE = scope:recipient.location
 							LAAMP = scope:recipient
@@ -2983,7 +2985,7 @@ imprison_interaction = {
 					imprison_tyranny_effect = yes
 				}
 				scope:recipient = {
-					#If target is count or higher, start war.
+					#目标为伯爵或更高等级时，发动战争。
 					if = {
 						limit = {
 							is_playable_character = yes
@@ -2999,7 +3001,7 @@ imprison_interaction = {
 								}
 							}
 							joined_faction = {
-								save_scope_as = retaliating_faction # For loc
+								save_scope_as = retaliating_faction # 供本地化使用。
 								imprisonment_retribution_start_faction_war_if_valid = yes
 							}
 							hidden_effect = {
@@ -3019,9 +3021,9 @@ imprison_interaction = {
 							}
 						}
 					}
-					#If target is a baron or unlanded, have them escape.
+					#目标为男爵或无地角色时，使其逃走。
 					else = {
-						if = { #To block them from being instantly rehired
+						if = { #防止其立即被重新雇用。
 							limit = {
 								is_councillor_of = scope:puppet_or_actor
 								can_be_fired_from_council_trigger = { COURT_OWNER = scope:puppet_or_actor }
@@ -3090,7 +3092,7 @@ imprison_interaction = {
 				}
 			}
 
-			#Remove them as guardian/ward for any courtier (feedback given in char_interaction.0230)
+			#解除其与所有廷臣的监护关系；反馈由 char_interaction.0230 提供。
 			scope:puppet_or_actor = {
 				if = {
 					limit = {
@@ -3192,8 +3194,8 @@ imprison_interaction = {
 				}
 			}
 
-			# If we're a clan this interaction affects unity
-			if = { # If you don't have an imprisonment reason, and the target is landed, you lose more unity
+			# 氏族政体下，此互动影响团结度。
+			if = { # 无拘捕理由且目标有地时，团结度损失较大。
 				limit = {
 					NOT = {
 						scope:puppet_or_actor = { has_imprisonment_reason = scope:recipient }
@@ -3208,7 +3210,7 @@ imprison_interaction = {
 					REVERSE_NON_HOUSE_TARGET = no
 				}
 			}
-			else_if = { # If you don't have an imprisonment reason, and the target is unlanded, you lose slightly less unity
+			else_if = { # 无拘捕理由且目标无地时，团结度损失稍小。
 				limit = {
 					NOT = {
 						scope:puppet_or_actor = { has_imprisonment_reason = scope:recipient }
@@ -3223,7 +3225,7 @@ imprison_interaction = {
 					REVERSE_NON_HOUSE_TARGET = no
 				}
 			}
-			else = { # If you have a valid reason, you lose only a tiny bit of unity (criminal or not, they are still family)
+			else = { # 有正当理由时仅损失少量团结度：无论是否犯罪，对方仍是家人。
 				add_clan_unity_interaction_effect = {
 					CHARACTER = scope:puppet_or_actor
 					TARGET = scope:recipient
@@ -3236,7 +3238,7 @@ imprison_interaction = {
 	}
 
 	auto_accept = {
-		# OR does not display properly here
+		# OR 在此处无法正确显示。
 		trigger_if = {
 			limit = {
 				scope:puppet_or_actor = {
@@ -3254,7 +3256,7 @@ imprison_interaction = {
 			limit = {
 				scope:recipient = {
 					is_landed = no
-					# Landless prelates: a cardinalate or clerical region cannot sustain the refusal war
+					# 无地教长：枢机或圣职区头衔无法维持拒捕战争。
 					OR = {
 						exists = clerical_elector_title
 						any_held_title = {
@@ -3288,7 +3290,7 @@ imprison_interaction = {
 	}
 
 	ai_accept = {
-		base = 0 # Try to make it 0 for most interactions
+		base = 0 # 尽量使大多数互动的此项值为 0。
 
 		modifier = {
 			add = -25
@@ -3338,7 +3340,7 @@ imprison_interaction = {
 			scope:hook = yes
 			desc = SCHEME_HOOK_USED
 		}
-		opinion_modifier = { # Opinion Factor
+		opinion_modifier = { # 好感因素。
 			who = scope:recipient
 			opinion_target = scope:puppet_or_actor
 			multiplier = 0.5
@@ -3357,7 +3359,7 @@ imprison_interaction = {
 			ai_honor = {
 				if = {
 					limit = {
-						scope:recipient = { #If AI is honorable and the law compels to obey the liege, AI will be more likely to obey.
+						scope:recipient = { #若 AI 重视荣誉且法律要求服从领主，其更倾向于服从。
 							ai_honor > 0
 						}
 						scope:puppet_or_actor = {
@@ -3384,12 +3386,12 @@ imprison_interaction = {
 			}
 			desc = AI_PRISON_FEUDAL_COMPLEX_PERK
 		}
-		modifier = { #I am a King!
+		modifier = { #我是国王！
 			desc = offer_vassalization_interaction_aibehavior_hightier_tt
 			scope:recipient = { highest_held_title_tier = tier_kingdom }
 			add = -40
 		}
-		modifier = { #Courtiers.
+		modifier = { #廷臣。
 			desc = AI_REFUSAL_COURTIER
 			scope:recipient = { is_ruler = no }
 			add = 50
@@ -3402,7 +3404,7 @@ imprison_interaction = {
 			scope:recipient = { is_ruler = no }
 			add = 25
 		}
-		modifier = { # Your young children can't really stop you
+		modifier = { # 年幼子女实际上无法阻止你。
 			desc = AI_REFUSAL_YOUNG_CHILD
 			scope:recipient = {
 				is_child_of = scope:puppet_or_actor
@@ -3411,7 +3413,7 @@ imprison_interaction = {
 			}
 			add = 200
 		}
-		modifier = { #They're a claimant against you
+		modifier = { #对方是针对你的宣称者。
 			desc = AI_CLAIMANT_PENALTY
 			scope:puppet_or_actor = {
 				OR = {
@@ -3428,7 +3430,7 @@ imprison_interaction = {
 			}
 			add = -70
 		}
-		modifier = { #Rank difference.
+		modifier = { #等级差异。
 			desc = AI_REFUSAL_RANK_DIFFERENCE
 			scope:recipient = {
 				is_ruler = yes
@@ -3459,7 +3461,7 @@ imprison_interaction = {
 					}
 					add = 5
 				}
-				if = { #King asking Baron, modifier becomes positive.
+				if = { #国王要求男爵服从时，修正转为正值。
 					limit = {
 						scope:puppet_or_actor = {
 							tier_difference = {
@@ -3517,7 +3519,7 @@ imprison_interaction = {
 			}
 			desc = COWED_REASON
 		}
-		modifier = { #Comparative military strength.
+		modifier = { #相对军事实力。
 			desc = offer_vassalization_interaction_aibehavior_power_tt
 			trigger = {
 				scope:puppet_or_actor = { is_ruler = yes }
@@ -3531,11 +3533,11 @@ imprison_interaction = {
 				}
 				multiply = 100
 				min = -1000
-				# This max needs to match the loc in offer_vassalization_interaction_aibehavior_power_tt
+				# 此上限须与 offer_vassalization_interaction_aibehavior_power_tt 本地化一致。
 				max = 20
 			}
 		}
-		modifier = { #Rivalry modifier.
+		modifier = { #仇敌关系修正。
 			desc = offer_vassalization_interaction_aibehavior_rival_tt
 			trigger = {
 				scope:recipient = {
@@ -3545,7 +3547,7 @@ imprison_interaction = {
 			}
 			add = -50
 		}
-		modifier = { #Nemesis modifier.
+		modifier = { #死敌关系修正。
 			desc = offer_vassalization_interaction_aibehavior_nemesis_tt
 			trigger = {
 				scope:recipient = {
@@ -3575,7 +3577,7 @@ imprison_interaction = {
 			}
 			desc = GRANDEUR_REASON
 		}
-		modifier = { # Legalistic tradition
+		modifier = { # 律法主义传统。
 			desc = tradition_legalistic_name
 			scope:puppet_or_actor = {
 				has_imprisonment_reason = scope:recipient
@@ -3583,7 +3585,7 @@ imprison_interaction = {
 			}
 			add = legalistic_vassal_punishment_acceptance
 		}
-		modifier = { # AI Mongols, tyranny wars just delay the inevitable fun!
+		modifier = { # 蒙古 AI：暴政战争只会拖延最终结果。
 			scope:puppet_or_actor = {
 				is_ai = yes
 				OR = {
@@ -3596,7 +3598,7 @@ imprison_interaction = {
 			}
 			add = 500
 		}
-		# Thug accolade increases imprison chance because they scary
+		# 恶徒骑士荣誉使目标畏惧，提高拘捕成功率。
 		modifier = {
 			scope:puppet_or_actor = {
 				any_active_accolade = {
@@ -3632,7 +3634,7 @@ imprison_interaction = {
 		}
 	}
 
-	# AI
+	# AI 行为。
 	ai_targets = {
 		ai_recipients = vassals
 		chance = 0.5
@@ -3654,19 +3656,19 @@ imprison_interaction = {
 	ai_will_do = {
 		base = -100
 
-		modifier = { # Make sure the AI uses hooks for this as it's % based
+		modifier = { # 此项按概率计算，确保 AI 使用牵制。
 			scope:hook = yes
 			add = 1
 		}
 
-		modifier = { # Default imprisonment reason weight
+		modifier = { # 默认拘捕理由权重。
 			add = 200
 			scope:puppet_or_actor = {
 				has_imprisonment_reason = scope:recipient
 			}
 		}
 
-		modifier = { # More likely to imprison criminal Soryo's if Ritsuryo
+		modifier = { # 律令制更倾向于拘捕犯罪的惣领。
 			add = 200
 			scope:puppet_or_actor = {
 				has_imprisonment_reason = scope:recipient
@@ -3677,7 +3679,7 @@ imprison_interaction = {
 			}
 		}
 
-		modifier = { # Even more imprisonment reason if you are a danger to the Kampaku
+		modifier = { # 威胁关白者的拘捕理由权重进一步提高。
 			add = 400
 			scope:puppet_or_actor = {
 				primary_title = title:e_japan
@@ -3689,10 +3691,10 @@ imprison_interaction = {
 			}
 		}
 
-		modifier = { # Avoid Tyranny wars at inopportune times
+		modifier = { # 避免在不合时宜时引发暴政战争。
 			add = -190
 			scope:puppet_or_actor = {
-				ai_rationality > -100 # Lunatics can do whatever, let the world burn...
+				ai_rationality > -100 # 精神错乱者不受限制，即使后果严重。
 				is_at_war = yes
 			}
 			scope:recipient = {
@@ -3700,10 +3702,10 @@ imprison_interaction = {
 			}
 		}
 
-		modifier = { # Avoid imprisonments in certain circumstances
+		modifier = { # 特定情形下避免拘捕。
 			add = -190
 			scope:puppet_or_actor = {
-				ai_rationality > -100 # Lunatics can do whatever, let the world burn...
+				ai_rationality > -100 # 精神错乱者不受限制，即使后果严重。
 				NOR = {
 					AND = {
 						intrigue > scope:recipient.intrigue
@@ -3726,22 +3728,22 @@ imprison_interaction = {
 			}
 		}
 
-		modifier = { # If the AI is not very bold, avoid imprisoning people unless you're more powerful
+		modifier = { # AI 不够大胆时，除非实力更强，否则避免拘捕。
 			add = -190
-			scope:puppet_or_actor.ai_rationality > -100 # Lunatics can do whatever, let the world burn...
+			scope:puppet_or_actor.ai_rationality > -100 # 精神错乱者不受限制，即使后果严重。
 			scope:puppet_or_actor.ai_boldness <= 25
 			scope:puppet_or_actor.current_military_strength < scope:recipient.one_and_a_half_times_current_military_strength
 		}
 
-		modifier = { # Avoid imprisoning people that would destroy you
+		modifier = { # 避免拘捕足以毁灭自己的目标。
 			add = -190
-			scope:puppet_or_actor.ai_rationality > -100 # Lunatics can do whatever, let the world burn...
+			scope:puppet_or_actor.ai_rationality > -100 # 精神错乱者不受限制，即使后果严重。
 			scope:puppet_or_actor.current_military_strength < scope:recipient.current_military_strength
 		}
 
-		modifier = { # Do not imprison when the chance of success if exceedingly low
+		modifier = { # 成功率极低时不拘捕。
 			add = -190
-			scope:puppet_or_actor.ai_rationality > -100 # Lunatics can do whatever, let the world burn...
+			scope:puppet_or_actor.ai_rationality > -100 # 精神错乱者不受限制，即使后果严重。
 			scope:recipient = {
 				is_playable_character = yes
 			}
@@ -3755,7 +3757,7 @@ imprison_interaction = {
 			}
 		}
 
-		modifier = { # Don't imprison people you like
+		modifier = { # 不拘捕喜欢的角色。
 			scope:puppet_or_actor = {
 				NOT = {
 					has_trait = sadistic
@@ -3775,7 +3777,7 @@ imprison_interaction = {
 			add = -1000
 		}
 
-		modifier = { # Don't imprison your own children... unless they're your rival/nemesis
+		modifier = { # 不拘捕自己的子女，除非对方是仇敌或死敌。
 			scope:recipient = {
 				is_child_of = scope:puppet_or_actor
 				NOR = {
@@ -3786,7 +3788,7 @@ imprison_interaction = {
 			add = -1000
 		}
 
-		modifier = { # Don't imprison your spouse, unless they're your rival/have cheated on you
+		modifier = { # 不拘捕配偶，除非对方是仇敌或曾经出轨。
 			scope:recipient = {
 				is_spouse_of = scope:puppet_or_actor
 				NOR = {
@@ -3798,13 +3800,13 @@ imprison_interaction = {
 			add = -1000
 		}
 
-		modifier = { # Try to avoid pointless imprisonments
+		modifier = { # 尽量避免无意义的拘捕。
 			scope:recipient = {
 				NOR = {
-					scope:puppet_or_actor = { # Sadists want people to torture
+					scope:puppet_or_actor = { # 虐待狂希望获得可折磨的囚犯。
 						has_trait = sadistic
 					}
-					AND = { # Imprisoning vassals you have revoke reasons on is relevant
+					AND = { # 拘捕对其拥有撤销理由的封臣有实际价值。
 						is_playable_character = yes
 						scope:puppet_or_actor = { has_revoke_title_reason = scope:recipient }
 					}
@@ -3812,13 +3814,13 @@ imprison_interaction = {
 					has_relation_rival = scope:puppet_or_actor
 					has_relation_nemesis = scope:puppet_or_actor
 					exposed_cheating_on_spouse_trigger = { SPOUSE = scope:puppet_or_actor }
-					scope:puppet_or_actor = { # Scheme Agents should be imprisoned indiscriminately
+					scope:puppet_or_actor = { # 对密谋同谋不作区别，一律倾向于拘捕。
 						any_targeting_scheme = {
 							hostile_scheme_trigger = yes
 							is_scheme_agent_exposed = scope:recipient
 						}
 					}
-					AND = { # Zealots will imprison characters of other faiths
+					AND = { # 狂热者会拘捕其他信仰的角色。
 						scope:puppet_or_actor.ai_zeal >= medium_positive_ai_value
 						scope:puppet_or_actor.faith != scope:recipient.faith
 					}
@@ -3940,7 +3942,7 @@ imprison_interaction = {
 			add = scope:recipient.primary_title.tier
 		}
 
-		# Agenda impact
+		# 议程影响。
 		modifier = {
 			scope:recipient = {
 				is_important_or_vip_struggle_character = yes
@@ -4038,10 +4040,10 @@ imprison_interaction = {
 			}
 		}
 
-		# TGP Be more careful with blocs generally
+		# 天朝扩展：整体上更谨慎对待家族集团。
 		house_bloc_tyranny_war_modifiers = yes
 
-		modifier = { # Avoid triggering Tyranny wars mid-grand activity
+		modifier = { # 避免在大型活动期间引发暴政战争。
 			factor = 0
 			scope:puppet_or_actor = {
 				has_ongoing_grand_activity_trigger = yes
@@ -4051,7 +4053,7 @@ imprison_interaction = {
 			}
 		}
 
-		modifier = { # Expel first, even if they criminals
+		modifier = { # 先驱逐，即使对方犯罪。
 			factor = 0
 			scope:puppet_or_actor = {
 				NOT = {
@@ -4111,7 +4113,7 @@ execute_prisoner_interaction = {
 			ai_compassion >= low_positive_ai_value
 			scope:recipient = { is_adult = no }
 		}
-		# Try to avoid Kinslaying
+		# 尽量避免弑亲。
 		modifier = {
 			add = -20
 			scope:puppet_or_actor.dynasty = scope:recipient.dynasty
@@ -4141,24 +4143,24 @@ execute_prisoner_interaction = {
 				}
 			}
 		}
-		modifier = { # Executing your way to new titles is a worthy cause...
+		modifier = { # 通过处决获得新头衔值得考虑。
 			add = 20
 			scope:puppet_or_actor = {
 				has_execute_reason = scope:recipient
 				ai_greed > 0
-				any_heir_title = { # Execute rulers you can inherit land from
+				any_heir_title = { # 处决自己能够继承其土地的统治者。
 					holder ?= scope:recipient
 				}
 			}
 		}
-		modifier = { # Vengeful characters enjoy executing their rivals
+		modifier = { # 记仇者喜欢处决仇敌。
 			add = 20
 			scope:puppet_or_actor = {
 				has_execute_reason = scope:recipient
 				ai_vengefulness >= medium_positive_ai_value
 				OR = {
-					has_relation_rival = scope:recipient # Execute rivals
-					has_relation_nemesis = scope:recipient # Execute rivals
+					has_relation_rival = scope:recipient # 处决仇敌。
+					has_relation_nemesis = scope:recipient # 处决仇敌。
 					scope:recipient = {
 						is_spouse_of = scope:puppet_or_actor
 						exposed_cheating_on_spouse_trigger = { SPOUSE = scope:puppet_or_actor }
@@ -4166,22 +4168,22 @@ execute_prisoner_interaction = {
 				}
 			}
 		}
-		modifier = { # Executing your way to new titles is a worthy cause... and very greedy characters need no execution reason
+		modifier = { # 通过处决获得新头衔值得考虑；极度贪婪者不需要处决理由。
 			add = 35
 			scope:puppet_or_actor = {
 				ai_greed >= very_high_positive_ai_value
-				any_heir_title = { # Execute rulers you can inherit land from
+				any_heir_title = { # 处决自己能够继承其土地的统治者。
 					holder ?= scope:recipient
 				}
 			}
 		}
-		modifier = { # Vengeful characters enjoy executing their rivals, and very vengeful characters need no execution reason
+		modifier = { # 记仇者喜欢处决仇敌；极度记仇者不需要处决理由。
 			add = 35
 			scope:puppet_or_actor = {
 				ai_vengefulness >= very_high_positive_ai_value
 				OR = {
-					has_relation_rival = scope:recipient # Execute rivals
-					has_relation_nemesis = scope:recipient # Execute rivals
+					has_relation_rival = scope:recipient # 处决仇敌。
+					has_relation_nemesis = scope:recipient # 处决仇敌。
 					scope:recipient = {
 						is_spouse_of = scope:puppet_or_actor
 						exposed_cheating_on_spouse_trigger = { SPOUSE = scope:puppet_or_actor }
@@ -4189,28 +4191,28 @@ execute_prisoner_interaction = {
 				}
 			}
 		}
-		#Scope:target has caused internal strife in the realm
+		#scope:target 曾引发政权内乱。
 		character_hates_scope_due_to_strife_modifier = { TARGET = scope:recipient }
 		modifier = {
 			factor = 0
 			scope:puppet_or_actor = {
-				NOR = { # Do not execute unless you have some sort of reason to do it
+				NOR = { # 除非有某种理由，否则不处决。
 					has_execute_reason = scope:recipient
-					has_relation_rival = scope:recipient # Execute rivals
-					has_relation_nemesis = scope:recipient # Execute rivals
+					has_relation_rival = scope:recipient # 处决仇敌。
+					has_relation_nemesis = scope:recipient # 处决仇敌。
 					scope:recipient = {
 						is_spouse_of = scope:puppet_or_actor
 						exposed_cheating_on_spouse_trigger = { SPOUSE = scope:puppet_or_actor }
 					}
-					any_heir_title = { # Execute rulers you can inherit land from
+					any_heir_title = { # 处决自己能够继承其土地的统治者。
 						holder ?= scope:recipient
 					}
-					has_trait = lunatic # Self explanatory
+					has_trait = lunatic # 条件含义直接见下方判断。
 				}
 			}
 		}
 
-		# Agenda impact
+		# 议程影响。
 		modifier = {
 			scope:recipient = {
 				any_character_struggle = {
@@ -4277,7 +4279,7 @@ execute_prisoner_interaction = {
 			}
 		}
 
-		#Nomads get the special beheading stuff
+		#游牧角色使用特殊斩首选项。
 		modifier = {
 			scope:puppet_or_actor = {
 				mpo_keep_prisoners_heads_trigger = yes
@@ -4301,9 +4303,9 @@ execute_prisoner_interaction = {
 			}
 			add = 10
 		}
-		#Boost further if actor if want to keep head
+		#发起者希望保留首级时进一步加权。
 		modifier = {
-			#want to keep head
+			#希望保留首级。
 			scope:puppet_or_actor = {
 				mpo_keep_prisoners_heads_trigger = yes
 			}
@@ -4316,9 +4318,9 @@ execute_prisoner_interaction = {
 			}
 			add = 20
 		}
-		#Boost further if actor wants to be scary
+		#发起者希望震慑他人时进一步加权。
 		modifier = {
-			#want to keep head
+			#希望保留首级。
 			scope:puppet_or_actor = {
 				mpo_keep_prisoners_heads_trigger = yes
 				scope:recipient = {
@@ -4382,14 +4384,14 @@ execute_prisoner_interaction = {
 				}
 			}
 		}
-		#don't kill prisoners that are tied with a prison break contract, we don't want it invalidating all the time
+		#不处决与越狱契约有关的囚犯，避免契约反复失效。
 		modifier = {
 			factor = 0
 			scope:recipient = {
 				has_character_flag = being_prisonbroken_by_laamp
 			}
 		}
-		#don't kill prisoners whose deaths would diminish the realm through inheritance
+		#不处决死亡将因继承使政权缩小的囚犯。
 		modifier = {
 			factor = 0
 			scope:recipient = {
@@ -4429,7 +4431,7 @@ execute_prisoner_interaction = {
 			}
 		}
 
-		# Blocked by current struggle phase
+		# 被当前斗争阶段阻止。
 		custom_tooltip = {
 			text = struggle_parameter_struggle_cannot_execute_involved_prisoners
 			NOT = {
@@ -4454,12 +4456,12 @@ execute_prisoner_interaction = {
 			}
 		}
 
-		# For use with co-ruler diarchs.
+		# 用于共治分权者。
 		scope:recipient = { is_imprisoned_by = scope:puppet_or_actor }
 	}
 
 	cost = {
-		# Usually, this action is free, but during certain diarchies, we want it to cost.
+		# 通常免费，但某些分权类型要求支付费用。
 		prestige = liege_diarchy_surcharge_interaction_execute_prisoner_interaction_value
 	
 		influence = { value = 0
@@ -4468,7 +4470,7 @@ execute_prisoner_interaction = {
 	}
 
 	on_accept = {
-		# If this is a co-ruler we're executing, tell us if we have alternatives.
+		# 若正在处决共治者，提示是否存在其他选择。
 		scope:puppet_or_actor = {
 			if = {
 				limit = {
@@ -4483,12 +4485,12 @@ execute_prisoner_interaction = {
 						}
 					}
 				}
-				# If the player doesn't have to execute their partner, point that out.
+				# 玩家不必处决搭档时，明确指出。
 				if = {
 					limit = { liege_can_maim_co_ruler_without_killing_them_trigger = yes }
 					custom_tooltip = execute_prisoner_interaction.tt.can_maim_diarch
 				}
-				# Otherwise, if they're out diarch, we end it.
+				# 否则，若对方是己方分权者，则结束分权。
 				if = {
 					limit = { scope:puppet_or_actor.diarch = scope:recipient }
 					end_diarchy = yes
@@ -4503,7 +4505,7 @@ execute_prisoner_interaction = {
 						trigger_event = diarchy.8022
 					}
 				}
-				# Else, usurp.
+				# 其他情形下，篡夺头衔。
 				else = {
 					custom_description_no_bullet = {
 						text = execute_prisoner_interaction_tt_co_emperor_usurpation
@@ -4557,17 +4559,17 @@ execute_prisoner_interaction = {
 						trigger_event = diarchy.8023
 					}
 				}
-				# Regardless, this is legit politics, so we don't deduct legitimacy for it.
+				# 无论如何，这属于正当政治行为，不扣正统性。
 				save_scope_value_as = {
 					name = suppress_legitimacy_from_crime
 					value = yes
 				}
 			}
 		}
-		# Now, the rest of it.
+		# 接下来处理其余效果。
 		if = {
 			limit = { scope:recipient = { is_imprisoned_by = scope:puppet_or_actor } }
-			# Are you HumSac'ing the HoF of a faith that doesn't practice HumSac?
+			# 是否正在以活人献祭处决不实行活人献祭信仰的宗教领袖？
 			hidden_effect = {
 				scope:puppet_or_actor = {
 					humsacd_a_hof_effect = {
@@ -4611,8 +4613,8 @@ execute_prisoner_interaction = {
 					}
 				}
 			}
-			# Other Effects
-			if = { # Boil their skull?
+			# 其他效果。
+			if = { # 是否煮制其头骨？
 				limit = {
 					NOT = { always = scope:execution_devour }
 					scope:puppet_or_actor = {
@@ -4679,7 +4681,7 @@ execute_prisoner_interaction = {
 				}
 				scope:puppet_or_actor = { trigger_event = bp1_yearly.9044 }
 			}
-			# Gallowsbait.
+			# 绞刑架之饵。
 			scope:puppet_or_actor = {
 				if = {
 					limit = {
@@ -4731,10 +4733,10 @@ execute_prisoner_interaction = {
 				}
 			}
 
-			# FP3
-			# Struggle Catalysts
+			# 波斯扩展（FP3）。
+			# 斗争催化剂。
 			scope:puppet_or_actor = {
-				if = { # Execute important
+				if = { # 处决重要角色。
 					limit = {
 						scope:recipient = { is_important_or_vip_struggle_character = yes }
 						any_character_struggle = {
@@ -4757,7 +4759,7 @@ execute_prisoner_interaction = {
 						}
 					}
 				}
-				if = { # Execute Supporter/Detractor
+				if = { # 处决支持者／反对者。
 					limit = {
 						fp3_struggle_involves_one_supporter_and_one_detractor = {
 							FIRST = scope:puppet_or_actor
@@ -4816,7 +4818,7 @@ execute_prisoner_interaction = {
 						}
 					}
 				}
-				# Free House Member CB target executed during war
+				# 战争期间，解救家族成员宣战理由的目标遭到处决。
 				if = {
 					limit = {
 						exists = scope:recipient.house
@@ -4905,13 +4907,13 @@ execute_prisoner_interaction = {
 					DEAD = scope:recipient
 				}
 			}
-			# Kill the target
+			# 杀死目标。
 			if = {
 				limit = {
 					scope:recipient = { is_ai = no }
 					scope:puppet_or_actor = { is_ai = yes }
 				}
-				scope:recipient = { trigger_event = char_interaction.0170 } # Give players a chance to see what's about to happen
+				scope:recipient = { trigger_event = char_interaction.0170 } # 让玩家有机会看到即将发生的事。
 				show_as_tooltip = {
 					execute_prisoner_effect = {
 						VICTIM = scope:recipient
@@ -4989,13 +4991,13 @@ execute_prisoner_interaction = {
 			}
 		}
 		flag = execution_beheaded
-		# Regression fixture selects the same option a player selects in the UI.
-		# It does not bypass permission, affordability, sending or settlement.
+		# 回归夹具选择与玩家在界面中相同的选项。
+		# 不绕过权限、可负担性、发送或结算。
 		starts_enabled = { debug_only = yes scope:actor = { has_character_flag = tca_test_tp2_execution_probe } }
 		localization = "EXECUTION_BEHEADED"
 	}
 
-	#Cannibal option. Should be treated as a "normal" execution, but that you eat the body afterwards (in secret if faith does not allow it).
+	#食人选项：按普通处决处理，但随后吃掉尸体；信仰禁止时秘密进行。
 	send_option = {
 		is_shown = {
 			scope:puppet_or_actor = {
