@@ -20,6 +20,8 @@ CK3 天朝行政体系重做 mod。中央、地方官制分别提供因便／宋
 
 历史考证独立保存在 [research/](research/README.md)，按[考证规范](research/standards.md)记录具体判断、原文出处、核验状态与游戏适配。[1066 开局提刑研究](research/song/1066_tidian_xingyu/README.md)纳入18路及三军路；当前结论统一在研究入口维护，研究人选尚未写入人物或官职历史。旧稿及其较宽的C口径另行归档。
 
+儒家思潮统计：作为后续生成倾向的数据基础，分别统计成年儒家人物的各 Rite 人数占比、强度占比及并列排行，并列出基础／教育／最高普通头衔／世族贡献；按本朝共享缓存季度更新，首次读取及过期时补算；仅debug下通过“调试：儒家思潮”决议查看并手动刷新。[权重、统计口径与验收](docs/confucian_statistics.md)。
+
 ## 本地加载
 
 在 CK3 启动器中将“一国三公 / Imperium in Imperio”加入播放集并启用。当前声明的游戏版本为本机 1.20.0.4，不表示已完成兼容性或游戏内验证。
@@ -67,6 +69,8 @@ CK3 天朝行政体系重做 mod。中央、地方官制分别提供因便／宋
 - `events/tca_judicial_timing_test_events.txt`：4项真实延迟测试，每项等待两日。
 - `events/tca_judicial_arrest_test_events.txt`：路长官对五类无地头衔目标的原生发送、批准／否决与收押回归。
 - `events/tca_tests_events.txt`：总入口和串行延迟调度。
+- `events/tca_confucian_statistics_test_events.txt`：成年儒家人物、人数／强度占比、排行、刷新及清理回归。
+- `events/tca_confucian_strength_test_events.txt`：教育分档、头衔与世族贡献、冒险者排除回归。
 - `events/tca_test_entry_test_events.txt`：观察者入口的角色解析回归。
 - `events/tca_test_lifecycle_test_events.txt`：临时死亡保护、恢复及真实死亡回调回归。
 - `events/tca_test_status_test_events.txt`：状态快照及关闭／重新显示回归。
@@ -75,7 +79,7 @@ CK3 天朝行政体系重做 mod。中央、地方官制分别提供因便／宋
 
 ### 游戏内运行
 
-重启专用1066中国debug测试局，通过“调试：模组一键测试”或`event tca_tests.1`运行；观察者使用`effect tca_run_observer_tests_effect = yes`。macOS优先运行`python3 tools/run_game_tests.py`，自动建立独立观察者局。当前源码117项、638个断言（含通判诊断和生命周期回归）；最新全组断言通过，但严格首位继任检查失败，整体NOT VERIFIED；本次验收见对应模块记录；此前115项的通过不覆盖新增用例。运行期间不重复启动、不切换请求角色。测试会修改世界状态，不在正常游玩存档运行。
+重启专用1066中国debug测试局，通过“调试：模组一键测试”或`event tca_tests.1`运行；观察者使用`effect tca_run_observer_tests_effect = yes`。macOS优先运行`python3 tools/run_game_tests.py`，自动建立独立观察者局。当前源码119项、687个断言（含通判诊断和生命周期回归）；2026-10-18季度缓存版本在种子1538798675下119项／687断言通过，观察到原生季度回调，未检出模组相关引擎错误，见[思潮统计验收](docs/confucian_statistics.md)。此前严格首位继任检查仍有未通过记录，本轮未复测该可选模式；界面画面另行验收。运行期间不重复启动、不切换请求角色。测试会修改世界状态，不在正常游玩存档运行。
 
 拘捕流程严格检查即时收押；第20日核对绑定观察标识的释放／死亡证据，未知原因单独记录。通判用例另检查原版处决的实际附费结算；原版赎回、释放的完整交互仍待验收。完成后核对同次日志；当前实现和最新验收见[统一测试文档](docs/mod_tests.md)，此前实验与失败记录见[历史记录](docs/history/mod_tests_history.md)。
 

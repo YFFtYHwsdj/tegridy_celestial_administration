@@ -1,0 +1,191 @@
+﻿# 儒家思潮统计回归：独立夹具检查成年、信仰、领主链、Rite归组与刷新清理。
+# 不依赖其他用例的遗留人数；正式本朝遍历使用本次扫描前后的差值，并与全世界参照扫描逐行核对。
+namespace = tca_confucian_statistics_test
+
+tca_confucian_statistics_test.1 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        if = { limit = { has_character_flag = tca_test_delayed_case_active } debug_log = "TCA_TEST CASE_BUSY" }
+        else = {
+            debug_log = "TCA_TEST BEGIN tca_confucian_statistics_test.1 tca_test_confucian_statistics"
+            remove_character_flag = tca_test_case_failed
+            if = {
+                limit = { debug_only = yes is_alive = yes exists = rite:jingxue exists = rite:daoxue top_liege = { government_has_flag = government_is_celestial } }
+                create_character = { age = 40 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = faith:mahayana_faith save_scope_as = tca_test_stats_viewer }
+                scope:tca_test_stats_viewer = {
+                    tca_refresh_confucian_statistics_effect = yes
+                    set_variable = { name = tca_test_stats_expected value = { value = var:tca_stats_total add = 3 } }
+                }
+                create_character = { age = 16 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture rite = rite:jingxue save_scope_as = tca_test_stats_a }
+                create_character = { age = 40 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture rite = rite:jingxue save_scope_as = tca_test_stats_b }
+                create_character = { age = 40 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture rite = rite:daoxue save_scope_as = tca_test_stats_c }
+                create_character = { age = 15 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture rite = rite:jingxue save_scope_as = tca_test_stats_child }
+                create_character = { age = 40 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture rite = rite:mahayana save_scope_as = tca_test_stats_other }
+                create_character = { age = 40 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture rite = rite:jingxue save_scope_as = tca_test_stats_dead }
+                scope:tca_test_stats_dead = { death = { death_reason = death_natural_causes } }
+                scope:tca_test_stats_viewer = { tca_refresh_confucian_statistics_effect = yes }
+                if = { limit = { scope:tca_test_stats_viewer = { var:tca_stats_total = var:tca_test_stats_expected } } debug_log = "TCA_TEST CHECK_PASS tca_test_confucian_statistics 1" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_confucian_statistics 1" }
+                # 全世界扫描只保留在测试中，独立核对局部收集没有漏人、重复或错归组。
+                scope:tca_test_stats_other = { tca_clear_confucian_statistics_effect = yes save_scope_as = tca_stats_viewer }
+                top_liege = { save_scope_as = tca_stats_realm }
+                every_living_character = { tca_collect_confucian_statistics_member_effect = yes }
+                scope:tca_test_stats_other = { tca_finalize_confucian_statistics_effect = yes }
+                if = { limit = { scope:tca_test_stats_viewer = { var:tca_stats_total = scope:tca_test_stats_other.var:tca_stats_total var:tca_stats_rite_count = scope:tca_test_stats_other.var:tca_stats_rite_count var:tca_stats_strength = scope:tca_test_stats_other.var:tca_stats_strength var:tca_stats_education = scope:tca_test_stats_other.var:tca_stats_education var:tca_stats_titles = scope:tca_test_stats_other.var:tca_stats_titles var:tca_stats_families = scope:tca_test_stats_other.var:tca_stats_families } } debug_log = "TCA_TEST CHECK_PASS tca_test_confucian_statistics 19" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_confucian_statistics 19" }
+                scope:tca_test_stats_viewer = { set_variable = { name = tca_test_stats_mismatch value = 0 } }
+                scope:tca_test_stats_other = {
+                    every_in_list = {
+                        variable = tca_stats_rows
+                        save_scope_as = tca_test_reference_row
+                        scope:tca_test_stats_viewer = {
+                            if = {
+                                limit = { NOT = { any_in_list = { variable = tca_stats_rows var:tca_stats_rite = scope:tca_test_reference_row.var:tca_stats_rite var:tca_stats_count = scope:tca_test_reference_row.var:tca_stats_count var:tca_stats_strength = scope:tca_test_reference_row.var:tca_stats_strength var:tca_stats_education = scope:tca_test_reference_row.var:tca_stats_education var:tca_stats_titles = scope:tca_test_reference_row.var:tca_stats_titles var:tca_stats_families = scope:tca_test_reference_row.var:tca_stats_families var:tca_stats_percent = scope:tca_test_reference_row.var:tca_stats_percent var:tca_stats_strength_percent = scope:tca_test_reference_row.var:tca_stats_strength_percent var:tca_stats_rank = scope:tca_test_reference_row.var:tca_stats_rank } } }
+                                set_variable = { name = tca_test_stats_mismatch value = 1 }
+                            }
+                        }
+                    }
+                }
+                if = { limit = { scope:tca_test_stats_viewer = { var:tca_test_stats_mismatch = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_confucian_statistics 20" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_confucian_statistics 20" }
+                scope:tca_test_stats_other = { tca_clear_confucian_statistics_effect = yes }
+                # 只把本用例夹具送入正式收集器，以获得可精确断言的2:1分布。
+                scope:tca_test_stats_viewer = { tca_clear_confucian_statistics_effect = yes save_scope_as = tca_stats_viewer }
+                top_liege = { save_scope_as = tca_stats_realm }
+                scope:tca_test_stats_a = { tca_collect_confucian_statistics_member_effect = yes }
+                scope:tca_test_stats_b = { tca_collect_confucian_statistics_member_effect = yes }
+                scope:tca_test_stats_c = { tca_collect_confucian_statistics_member_effect = yes }
+                scope:tca_test_stats_child = { tca_collect_confucian_statistics_member_effect = yes }
+                scope:tca_test_stats_other = { tca_collect_confucian_statistics_member_effect = yes }
+                scope:tca_test_stats_dead = { tca_collect_confucian_statistics_member_effect = yes }
+                scope:tca_test_stats_viewer = { tca_finalize_confucian_statistics_effect = yes }
+                if = { limit = { scope:tca_test_stats_viewer = { var:tca_stats_total = 3 any_in_list = { variable = tca_stats_rows count = 2 } } } debug_log = "TCA_TEST CHECK_PASS tca_test_confucian_statistics 2" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_confucian_statistics 2" }
+                if = { limit = { scope:tca_test_stats_viewer = { any_in_list = { variable = tca_stats_rows var:tca_stats_rite = rite:jingxue var:tca_stats_count = 2 var:tca_stats_percent > 66.5 var:tca_stats_percent < 66.8 } } } debug_log = "TCA_TEST CHECK_PASS tca_test_confucian_statistics 3" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_confucian_statistics 3" }
+                if = { limit = { scope:tca_test_stats_viewer = { any_in_list = { variable = tca_stats_rows var:tca_stats_rite = rite:daoxue var:tca_stats_count = 1 var:tca_stats_percent > 33.2 var:tca_stats_percent < 33.5 } } } debug_log = "TCA_TEST CHECK_PASS tca_test_confucian_statistics 4" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_confucian_statistics 4" }
+                scope:tca_test_stats_viewer = { tca_finalize_confucian_statistics_effect = yes }
+                if = { limit = { scope:tca_test_stats_viewer = { any_in_list = { variable = tca_stats_display_rows count = 2 } } } debug_log = "TCA_TEST CHECK_PASS tca_test_confucian_statistics 5" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_confucian_statistics 5" }
+                # 先确认零附加权重时退化为人数，再令少数学统具有更强教育影响。
+                if = { limit = { scope:tca_test_stats_viewer = { var:tca_stats_strength = 3 any_in_list = { variable = tca_stats_rows var:tca_stats_rite = rite:jingxue var:tca_stats_strength = 2 var:tca_stats_rank = 1 } } } debug_log = "TCA_TEST CHECK_PASS tca_test_confucian_statistics 14" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_confucian_statistics 14" }
+                scope:tca_test_stats_c = { add_trait = confucian_education add_trait_xp = { trait = confucian_education value = 100 } }
+                scope:tca_test_stats_viewer = { tca_clear_confucian_statistics_effect = yes }
+                scope:tca_test_stats_a = { tca_collect_confucian_statistics_member_effect = yes }
+                scope:tca_test_stats_b = { tca_collect_confucian_statistics_member_effect = yes }
+                scope:tca_test_stats_c = { tca_collect_confucian_statistics_member_effect = yes }
+                scope:tca_test_stats_viewer = { tca_finalize_confucian_statistics_effect = yes }
+                if = { limit = { scope:tca_test_stats_viewer = { var:tca_stats_total = 3 var:tca_stats_strength = 33 var:tca_stats_education = 30 var:tca_stats_titles = 0 var:tca_stats_families = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_confucian_statistics 15" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_confucian_statistics 15" }
+                if = { limit = { scope:tca_test_stats_viewer = { any_in_list = { variable = tca_stats_rows var:tca_stats_rite = rite:daoxue var:tca_stats_count = 1 var:tca_stats_strength = 31 var:tca_stats_education = 30 var:tca_stats_rank = 1 var:tca_stats_strength_percent > 93.8 var:tca_stats_strength_percent < 94.1 var:tca_stats_percent > 33.2 var:tca_stats_percent < 33.5 } } } debug_log = "TCA_TEST CHECK_PASS tca_test_confucian_statistics 16" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_confucian_statistics 16" }
+                if = { limit = { scope:tca_test_stats_viewer = { any_in_list = { variable = tca_stats_rows var:tca_stats_rite = rite:jingxue var:tca_stats_strength = 2 var:tca_stats_rank = 2 } } } debug_log = "TCA_TEST CHECK_PASS tca_test_confucian_statistics 17" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_confucian_statistics 17" }
+                # 两个同权重学统必须并列；排序重复执行不能累加名次或贡献。
+                scope:tca_test_stats_c = { remove_trait = confucian_education }
+                scope:tca_test_stats_viewer = { tca_clear_confucian_statistics_effect = yes }
+                scope:tca_test_stats_a = { tca_collect_confucian_statistics_member_effect = yes }
+                scope:tca_test_stats_c = { tca_collect_confucian_statistics_member_effect = yes }
+                scope:tca_test_stats_viewer = { tca_finalize_confucian_statistics_effect = yes tca_finalize_confucian_statistics_effect = yes }
+                if = { limit = { scope:tca_test_stats_viewer = { var:tca_stats_strength = 2 NOT = { any_in_list = { variable = tca_stats_rows var:tca_stats_rank != 1 } } any_in_list = { variable = tca_stats_display_rows count = 2 } } } debug_log = "TCA_TEST CHECK_PASS tca_test_confucian_statistics 18" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_confucian_statistics 18" }
+                # 恢复三人统计，再检查跨领主链排除。
+                scope:tca_test_stats_b = { tca_collect_confucian_statistics_member_effect = yes }
+                scope:tca_test_stats_viewer = { tca_finalize_confucian_statistics_effect = yes }
+                # 把另一个人物设为统计政权，证明同信仰夹具不会跨领主链进入。
+                scope:tca_test_stats_viewer = { save_scope_as = tca_stats_realm }
+                scope:tca_test_stats_a = { tca_collect_confucian_statistics_member_effect = yes }
+                if = { limit = { scope:tca_test_stats_viewer = { var:tca_stats_total = 3 } } debug_log = "TCA_TEST CHECK_PASS tca_test_confucian_statistics 6" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_confucian_statistics 6" }
+                scope:tca_test_stats_a = { set_character_faith = faith:mahayana_faith }
+                scope:tca_test_stats_viewer = { tca_refresh_confucian_statistics_effect = yes change_variable = { name = tca_test_stats_expected subtract = 1 } }
+                if = { limit = { scope:tca_test_stats_viewer = { var:tca_stats_total = var:tca_test_stats_expected } } debug_log = "TCA_TEST CHECK_PASS tca_test_confucian_statistics 7" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_confucian_statistics 7" }
+                scope:tca_test_stats_b = { death = { death_reason = death_natural_causes } }
+                scope:tca_test_stats_viewer = { tca_refresh_confucian_statistics_effect = yes change_variable = { name = tca_test_stats_expected subtract = 1 } }
+                if = { limit = { scope:tca_test_stats_viewer = { var:tca_stats_total = var:tca_test_stats_expected } } debug_log = "TCA_TEST CHECK_PASS tca_test_confucian_statistics 8" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_confucian_statistics 8" }
+                scope:tca_test_stats_viewer = { tca_refresh_confucian_statistics_effect = yes }
+                if = { limit = { scope:tca_test_stats_viewer = { var:tca_stats_total = var:tca_test_stats_expected } } debug_log = "TCA_TEST CHECK_PASS tca_test_confucian_statistics 9" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_confucian_statistics 9" }
+                scope:tca_test_stats_viewer = { tca_clear_confucian_statistics_effect = yes tca_finalize_confucian_statistics_effect = yes }
+                if = { limit = { scope:tca_test_stats_viewer = { var:tca_stats_total = 0 NOT = { has_variable_list = tca_stats_rows } NOT = { has_variable_list = tca_stats_display_rows } NOT = { any_owned_story = { type = tca_confucian_statistics_row } } } } debug_log = "TCA_TEST CHECK_PASS tca_test_confucian_statistics 10" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_confucian_statistics 10" }
+                scope:tca_test_stats_viewer = { tca_open_confucian_statistics_effect = yes }
+                if = { limit = { scope:tca_test_stats_viewer = { var:tca_stats_visible = 1 NOT = { has_character_flag = tca_stats_refresh_pending } top_liege = { has_variable = tca_stats_updated } } } debug_log = "TCA_TEST CHECK_PASS tca_test_confucian_statistics 11" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_confucian_statistics 11" }
+                scope:tca_test_stats_viewer = { tca_close_confucian_statistics_effect = yes }
+                if = { limit = { scope:tca_test_stats_viewer = { var:tca_stats_visible = 0 top_liege = { has_variable = tca_stats_updated has_variable_list = tca_stats_rows } } } debug_log = "TCA_TEST CHECK_PASS tca_test_confucian_statistics 12" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_confucian_statistics 12" }
+                # 旧版续接只消费兼容事件，不再产生每日轮询。
+                scope:tca_test_stats_viewer = { add_character_flag = tca_stats_refresh_pending trigger_event = tca_confucian_statistics.1 }
+                if = { limit = { scope:tca_test_stats_viewer = { NOT = { has_character_flag = tca_stats_refresh_pending } var:tca_stats_visible = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_confucian_statistics 13" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_confucian_statistics 13" }
+                # 正式缓存不依赖窗口；同朝不同调用者拿到同一最高君主及同一快照。
+                top_liege = { tca_clear_confucian_statistics_effect = yes save_scope_as = tca_test_cache_owner }
+                scope:tca_test_stats_viewer = { tca_ensure_confucian_statistics_effect = yes }
+                if = { limit = { scope:tca_stats_cache = scope:tca_test_cache_owner scope:tca_stats_cache = { has_variable = tca_stats_updated has_variable_list = tca_stats_rows } } debug_log = "TCA_TEST CHECK_PASS tca_test_confucian_statistics 21" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_confucian_statistics 21" }
+                scope:tca_test_cache_owner = {
+                    set_variable = { name = tca_test_cached_strength value = var:tca_stats_strength }
+                    random_in_list = { variable = tca_stats_rows save_scope_as = tca_test_cached_row }
+                }
+                scope:tca_test_cache_owner = { change_variable = { name = tca_stats_updated subtract = 89 } }
+                scope:tca_test_stats_c = {
+                    add_trait = confucian_education
+                    add_trait_xp = { trait = confucian_education value = 100 }
+                    tca_ensure_confucian_statistics_effect = yes
+                }
+                if = { limit = { scope:tca_stats_cache = scope:tca_test_cache_owner scope:tca_stats_cache = { var:tca_stats_strength = var:tca_test_cached_strength any_in_list = { variable = tca_stats_rows this = scope:tca_test_cached_row } } } debug_log = "TCA_TEST CHECK_PASS tca_test_confucian_statistics 22" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_confucian_statistics 22" }
+                scope:tca_test_stats_viewer = { tca_force_confucian_statistics_effect = yes }
+                scope:tca_test_cache_owner = { change_variable = { name = tca_test_cached_strength add = 30 } }
+                if = { limit = { scope:tca_test_cache_owner = { var:tca_stats_strength = var:tca_test_cached_strength } } debug_log = "TCA_TEST CHECK_PASS tca_test_confucian_statistics 23" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_confucian_statistics 23" }
+                scope:tca_test_stats_viewer = { tca_close_confucian_statistics_effect = yes }
+                if = { limit = { scope:tca_test_stats_viewer = { var:tca_stats_visible = 0 } scope:tca_test_cache_owner = { has_variable = tca_stats_updated var:tca_stats_strength = var:tca_test_cached_strength has_variable_list = tca_stats_rows } } debug_log = "TCA_TEST CHECK_PASS tca_test_confucian_statistics 24" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_confucian_statistics 24" }
+                # 人为设为91天前，验证过期补算；这是时间戳边界测试，不冒充自然季度回调。
+                scope:tca_test_stats_c = { remove_trait = confucian_education }
+                scope:tca_test_cache_owner = {
+                    change_variable = { name = tca_stats_updated subtract = 91 }
+                    change_variable = { name = tca_test_cached_strength subtract = 30 }
+                }
+                scope:tca_test_stats_viewer = { tca_ensure_confucian_statistics_effect = yes }
+                if = { limit = { scope:tca_test_cache_owner = { var:tca_stats_strength = var:tca_test_cached_strength tca_confucian_statistics_age_value = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_confucian_statistics 25" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_confucian_statistics 25" }
+                scope:tca_test_cache_owner = {
+                    remove_variable = tca_stats_updated
+                    trigger_event = { on_action = tca_confucian_statistics_quarterly }
+                }
+                if = { limit = { scope:tca_test_cache_owner = { has_variable = tca_stats_updated tca_confucian_statistics_age_value = 0 var:tca_stats_strength = var:tca_test_cached_strength } } debug_log = "TCA_TEST CHECK_PASS tca_test_confucian_statistics 26" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_confucian_statistics 26" }
+                # 模拟已有快照绑定旧主要头衔，读取必须重新绑定，不能仅看日期新鲜度。
+                scope:tca_test_cache_owner = { set_variable = { name = tca_stats_primary_title value = title:c_tca_confucian_strength_test } }
+                scope:tca_test_stats_viewer = { tca_ensure_confucian_statistics_effect = yes }
+                if = { limit = { scope:tca_test_cache_owner = { var:tca_stats_primary_title = primary_title var:tca_stats_strength = var:tca_test_cached_strength } } debug_log = "TCA_TEST CHECK_PASS tca_test_confucian_statistics 27" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_confucian_statistics 27" }
+                # 通过正式on_action触发，非独立查看者必须被回调门槛拒绝。
+                scope:tca_test_stats_viewer = { trigger_event = { on_action = tca_confucian_statistics_quarterly } }
+                if = { limit = { scope:tca_test_stats_viewer = { NOT = { has_variable = tca_stats_updated } } } debug_log = "TCA_TEST CHECK_PASS tca_test_confucian_statistics 28" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_confucian_statistics 28" }
+                scope:tca_test_cache_owner = { remove_variable = tca_test_cached_strength }
+                # 清理全部临时人物，避免改变后续任命候选或共享统计。
+                scope:tca_test_stats_viewer = { tca_clear_confucian_statistics_effect = yes death = { death_reason = death_natural_causes } }
+                scope:tca_test_stats_a = { death = { death_reason = death_natural_causes } }
+                scope:tca_test_stats_c = { death = { death_reason = death_natural_causes } }
+                scope:tca_test_stats_child = { death = { death_reason = death_natural_causes } }
+                scope:tca_test_stats_other = { death = { death_reason = death_natural_causes } }
+                scope:tca_test_cache_owner = { tca_refresh_confucian_statistics_effect = yes }
+
+                if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_confucian_statistics" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+                else = { debug_log = "TCA_TEST PASS tca_test_confucian_statistics" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            }
+            else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_confucian_statistics" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } }
+            remove_character_flag = tca_test_case_failed
+        }
+    }
+}

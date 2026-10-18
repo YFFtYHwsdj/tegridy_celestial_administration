@@ -1,0 +1,194 @@
+﻿# 人物作用域；清除当前缓存所有者的统计行及排序，不更改世界人口或宗教。
+tca_clear_confucian_statistics_effect = {
+    every_in_list = { variable = tca_stats_rows end_story = yes }
+    clear_variable_list = tca_stats_rows
+    clear_variable_list = tca_stats_seen
+    remove_variable = tca_stats_updated
+    clear_variable_list = tca_stats_display_rows
+    set_variable = { name = tca_stats_total value = 0 }
+    set_variable = { name = tca_stats_rite_count value = 0 }
+    set_variable = { name = tca_stats_strength value = 0 }
+    set_variable = { name = tca_stats_education value = 0 }
+    set_variable = { name = tca_stats_titles value = 0 }
+    set_variable = { name = tca_stats_families value = 0 }
+}
+
+# 被统计人物作用域；必需 tca_stats_viewer、tca_stats_realm。
+# 自行检查成年、存活、宗教及领主链；按当前 Rite 创建缓存所有者持有的统计行。
+tca_collect_confucian_statistics_member_effect = {
+    if = {
+        limit = { tca_is_confucian_statistics_member_trigger = yes }
+        rite = { save_scope_as = tca_stats_member_rite }
+        save_scope_as = tca_stats_member
+        clear_saved_scope = tca_stats_row
+        scope:tca_stats_viewer = {
+            every_in_list = {
+                variable = tca_stats_rows
+                limit = { var:tca_stats_rite = scope:tca_stats_member_rite }
+                save_scope_as = tca_stats_row
+            }
+            if = {
+                limit = { NOT = { exists = scope:tca_stats_row } }
+                create_story = { type = tca_confucian_statistics_row save_scope_as = tca_stats_row }
+                scope:tca_stats_row = {
+                    set_variable = { name = tca_stats_rite value = scope:tca_stats_member_rite }
+                    set_variable = { name = tca_stats_count value = 0 }
+                    set_variable = { name = tca_stats_percent value = 0 }
+                    set_variable = { name = tca_stats_strength value = 0 }
+                    set_variable = { name = tca_stats_education value = 0 }
+                    set_variable = { name = tca_stats_titles value = 0 }
+                    set_variable = { name = tca_stats_families value = 0 }
+                    set_variable = { name = tca_stats_strength_percent value = 0 }
+                    set_variable = { name = tca_stats_rank value = 0 }
+                }
+                add_to_variable_list = { name = tca_stats_rows target = scope:tca_stats_row }
+                change_variable = { name = tca_stats_rite_count add = 1 }
+            }
+            change_variable = { name = tca_stats_total add = 1 }
+            change_variable = { name = tca_stats_strength add = scope:tca_stats_member.tca_confucian_person_strength_value }
+            change_variable = { name = tca_stats_education add = scope:tca_stats_member.tca_confucian_education_strength_value }
+            change_variable = { name = tca_stats_titles add = scope:tca_stats_member.tca_confucian_title_strength_value }
+            change_variable = { name = tca_stats_families add = scope:tca_stats_member.tca_confucian_family_strength_value }
+        }
+        scope:tca_stats_row = {
+            change_variable = { name = tca_stats_count add = 1 }
+            change_variable = { name = tca_stats_strength add = scope:tca_stats_member.tca_confucian_person_strength_value }
+            change_variable = { name = tca_stats_education add = scope:tca_stats_member.tca_confucian_education_strength_value }
+            change_variable = { name = tca_stats_titles add = scope:tca_stats_member.tca_confucian_title_strength_value }
+            change_variable = { name = tca_stats_families add = scope:tca_stats_member.tca_confucian_family_strength_value }
+        }
+    }
+}
+
+# 缓存所有者作用域；人数占比除以人数，强度占比除以总强度。每人基础为1，非空时两分母均为正。
+# 百分比保存为0至100，GUI显示一位小数；四舍五入后合计可能略偏离100%。
+tca_finalize_confucian_statistics_effect = {
+    clear_variable_list = tca_stats_display_rows
+    if = {
+        limit = { var:tca_stats_total > 0 }
+        save_scope_as = tca_stats_viewer
+        ordered_in_list = {
+            variable = tca_stats_rows
+            order_by = var:tca_stats_strength
+            # 原生ordered迭代默认只取一项，超出实际行数又会报错；使用创建时维护的准确行数。
+            max = var:tca_stats_rite_count
+            set_variable = {
+                name = tca_stats_percent
+                value = { value = var:tca_stats_count multiply = 100 divide = scope:tca_stats_viewer.var:tca_stats_total }
+            }
+            set_variable = {
+                name = tca_stats_strength_percent
+                value = { value = var:tca_stats_strength multiply = 100 divide = scope:tca_stats_viewer.var:tca_stats_strength }
+            }
+            # 并列采用竞赛排名：比本行强的学统数加一，得到1、1、3而非任意打破并列。
+            save_scope_as = tca_stats_rank_row
+            set_variable = { name = tca_stats_rank value = 1 }
+            scope:tca_stats_viewer = {
+                every_in_list = {
+                    variable = tca_stats_rows
+                    limit = { var:tca_stats_strength > scope:tca_stats_rank_row.var:tca_stats_strength }
+                    scope:tca_stats_rank_row = { change_variable = { name = tca_stats_rank add = 1 } }
+                }
+            }
+            scope:tca_stats_viewer = { add_to_variable_list = { name = tca_stats_display_rows target = prev } }
+        }
+    }
+}
+
+# 候选人物作用域；必需 tca_stats_viewer、tca_stats_realm。局部遍历的路径可能重叠，
+# 例如本朝廷臣同时被本朝人物囚禁；临时列表仅在本次构建内去重，结束即清除。
+tca_visit_confucian_statistics_member_effect = {
+    save_scope_as = tca_stats_candidate
+    if = {
+        limit = {
+            tca_is_confucian_statistics_member_trigger = yes
+            NOT = { scope:tca_stats_viewer = { any_in_list = { variable = tca_stats_seen this = scope:tca_stats_candidate } } }
+        }
+        scope:tca_stats_viewer = { add_to_variable_list = { name = tca_stats_seen target = scope:tca_stats_candidate } }
+        tca_collect_confucian_statistics_member_effect = yes
+    }
+}
+
+# 宫廷主人作用域；遍历本人、廷臣／宾客及囚犯，领主链过滤外国人。
+# 囚犯可能不在廷臣列表中，必须补访；不把囚禁地点视作政治归属。
+tca_visit_confucian_statistics_court_effect = {
+    tca_visit_confucian_statistics_member_effect = yes
+    every_courtier_or_guest = { tca_visit_confucian_statistics_member_effect = yes }
+    every_prisoner = { tca_visit_confucian_statistics_member_effect = yes }
+}
+
+# 缓存所有者作用域；以其最高领主为政权重建快照。正式调用只在最高君主上保存；
+# 测试可使用独立人物作临时存储，不影响正式缓存。此入口不受debug门槛限制。
+# 只遍历本朝君主、各级封臣和各自宫廷，不扫描世界人口。
+tca_refresh_confucian_statistics_effect = {
+    save_scope_as = tca_stats_viewer
+    top_liege = { save_scope_as = tca_stats_realm }
+    tca_clear_confucian_statistics_effect = yes
+    set_variable = { name = tca_stats_realm value = scope:tca_stats_realm }
+    # 绑定主要头衔，防止曾独立的继任者沿用自己旧政权的快照。
+    remove_variable = tca_stats_primary_title
+    if = { limit = { exists = primary_title } set_variable = { name = tca_stats_primary_title value = primary_title } }
+    scope:tca_stats_realm = {
+        tca_visit_confucian_statistics_court_effect = yes
+        every_vassal_or_below = { tca_visit_confucian_statistics_court_effect = yes }
+    }
+    tca_finalize_confucian_statistics_effect = yes
+    clear_variable_list = tca_stats_seen
+    set_variable = { name = tca_stats_updated value = current_date }
+}
+
+# 任意本朝人物作用域；正式机制共享入口。返回 scope:tca_stats_cache 指向最高君主，
+# 不符合天朝资格则清除输出。首次读取、政权归属变化或距更新满90天时重建。
+# 人物生成可连续读取返回者的 rows／strength 等变量，批次内共用同一快照。
+tca_ensure_confucian_statistics_effect = {
+    clear_saved_scope = tca_stats_cache
+    if = {
+        limit = { is_alive = yes top_liege = { government_has_flag = government_is_celestial } }
+        top_liege = {
+            if = {
+                limit = {
+                    OR = {
+                        NOT = { has_variable = tca_stats_updated }
+                        NOT = { var:tca_stats_realm ?= this }
+                        NOT = { var:tca_stats_primary_title ?= primary_title }
+                        tca_confucian_statistics_age_value >= 90
+                    }
+                }
+                tca_refresh_confucian_statistics_effect = yes
+            }
+            save_scope_as = tca_stats_cache
+        }
+    }
+}
+
+# 独立天朝君主作用域；由原生季度回调调用，与调试窗口是否打开无关。
+# 失去独立或天朝资格的旧缓存不用作其他政权的读取来源。
+tca_quarterly_confucian_statistics_effect = {
+    if = {
+        limit = { is_alive = yes is_independent_ruler = yes government_has_flag = government_is_celestial }
+        tca_refresh_confucian_statistics_effect = yes
+    }
+}
+
+# 查看者作用域；打开只确保共享缓存可用，不强制重算，也不排队每日事件。
+tca_open_confucian_statistics_effect = {
+    if = {
+        limit = { tca_can_view_confucian_statistics_trigger = yes }
+        tca_ensure_confucian_statistics_effect = yes
+        set_variable = { name = tca_stats_visible value = 1 }
+    }
+}
+
+# 查看者作用域；手动按钮强制重算本朝共享快照，暂停时也可更新。
+tca_force_confucian_statistics_effect = {
+    if = {
+        limit = { tca_can_view_confucian_statistics_trigger = yes }
+        top_liege = { tca_refresh_confucian_statistics_effect = yes }
+        set_variable = { name = tca_stats_visible value = 1 }
+    }
+}
+
+# 关闭仅隐藏本人窗口；正式缓存仍可供生成和其他查看者读取。
+tca_close_confucian_statistics_effect = {
+    set_variable = { name = tca_stats_visible value = 0 }
+}

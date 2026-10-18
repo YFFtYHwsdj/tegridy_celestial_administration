@@ -1,0 +1,65 @@
+﻿# 本朝共享的统计快照；动态行来自story作用域，数据更新由正式效果负责。
+window = {
+    name = "tca_confucian_statistics_window"
+    parentanchor = center
+    size = { 800 640 }
+    layer = windows_layer
+    movable = yes
+    filter_mouse = all
+    allow_outside = yes
+    alwaystransparent = no
+    using = Window_Background
+    using = Window_Decoration
+    visible = "[And(IsInGame, And(GetPlayer.IsValid, GetScriptedGui('tca_confucian_statistics_visible_gui').IsShown(GuiScope.AddScope('tca_stats_player', GetPlayer.MakeScope).End)))]"
+    vbox = {
+        using = Window_Margins
+        spacing = 12
+        header_pattern = {
+            layoutpolicy_horizontal = expanding
+            blockoverride "header_text" { text = "tca_confucian_statistics_title" }
+            blockoverride "button_close" { onclick = "[GetScriptedGui('tca_close_confucian_statistics_gui').Execute(GuiScope.SetRoot(GetPlayer.MakeScope).End)]" }
+        }
+        text_single = { text = "tca_confucian_statistics_realm" }
+        text_multi = { max_width = 730 text = "tca_confucian_statistics_population" }
+        text_multi = { max_width = 730 text = "tca_confucian_statistics_total_strength" tooltip = "tca_confucian_statistics_rules" }
+        text_single = {
+            text = "tca_confucian_statistics_empty"
+            visible = "[EqualTo_CFixedPoint(GetPlayer.GetTopLiege.MakeScope.Var('tca_stats_total').GetValue, '(CFixedPoint)0')]"
+        }
+        scrollarea = {
+            layoutpolicy_horizontal = expanding
+            layoutpolicy_vertical = expanding
+            scrollbarpolicy_horizontal = always_off
+            scrollbar_vertical = { using = Scrollbar_Vertical }
+            scrollwidget = {
+                vbox = {
+                    layoutpolicy_horizontal = expanding
+                    spacing = 8
+                    datamodel = "[GetPlayer.GetTopLiege.MakeScope.GetList('tca_stats_display_rows')]"
+                    item = {
+                        vbox = {
+                            datacontext = "[Scope.Var('tca_stats_rite').Rite]"
+                            layoutpolicy_horizontal = expanding
+                            spacing = 4
+                            hbox = {
+                                spacing = 12
+                                text_single = { text = "tca_confucian_statistics_rank" }
+                                icon = { size = { 32 32 } texture = "[Rite.GetIcon]" }
+                                text_single = { text = "[Rite.GetName]" max_width = 500 }
+                            }
+                            text_single = { text = "tca_confucian_statistics_row" }
+                            text_multi = { max_width = 710 using = Font_Size_Small text = "tca_confucian_statistics_breakdown" tooltip = "tca_confucian_statistics_rules" }
+                        }
+                    }
+                }
+            }
+        }
+        text_multi = { max_width = 730 text = "tca_confucian_statistics_update" }
+        button_standard = {
+            size = { 160 40 }
+            text = "tca_confucian_statistics_refresh"
+            enabled = "[GetScriptedGui('tca_refresh_confucian_statistics_gui').IsValid(GuiScope.SetRoot(GetPlayer.MakeScope).End)]"
+            onclick = "[GetScriptedGui('tca_refresh_confucian_statistics_gui').Execute(GuiScope.SetRoot(GetPlayer.MakeScope).End)]"
+        }
+    }
+}

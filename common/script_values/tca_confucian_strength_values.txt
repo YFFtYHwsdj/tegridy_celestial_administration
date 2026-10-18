@@ -1,0 +1,52 @@
+﻿# 人物作用域；强度采用加法，教育与头衔分别取最高一档，世族独立加分。
+# 不读取功绩、财富或影响力余额，避免重复计权或因消费导致强度下降。
+tca_confucian_education_strength_value = {
+    value = 0
+    if = {
+        limit = { has_trait = confucian_education }
+        if = { limit = { has_trait_xp = { trait = confucian_education value >= 100 } } add = 30 }
+        else_if = { limit = { has_trait_xp = { trait = confucian_education value >= 80 } } add = 18 }
+        else_if = { limit = { has_trait_xp = { trait = confucian_education value >= 60 } } add = 10 }
+        else_if = { limit = { has_trait_xp = { trait = confucian_education value >= 40 } } add = 5 }
+        else_if = { limit = { has_trait_xp = { trait = confucian_education value >= 20 } } add = 2 }
+    }
+}
+
+# 只按最高非世族头衔计一次，实地／无地及文武不分；冒险者不获得头衔贡献。
+tca_confucian_title_strength_value = {
+    value = 0
+    if = {
+        limit = { NOT = { government_has_flag = government_is_landless_adventurer } }
+        if = { limit = { any_held_title = { is_noble_family_title = no tier = tier_hegemony } } add = 45 }
+        else_if = { limit = { any_held_title = { is_noble_family_title = no tier = tier_empire } } add = 30 }
+        else_if = { limit = { any_held_title = { is_noble_family_title = no tier = tier_kingdom } } add = 18 }
+        else_if = { limit = { any_held_title = { is_noble_family_title = no tier = tier_duchy } } add = 10 }
+        else_if = { limit = { any_held_title = { is_noble_family_title = no tier = tier_county } } add = 5 }
+        else_if = { limit = { any_held_title = { is_noble_family_title = no tier = tier_barony } } add = 2 }
+    }
+}
+
+# 世族头衔只给实际持有人加5，不随其名义等级或数量放大；冒险者同样排除。
+tca_confucian_family_strength_value = {
+    value = 0
+    if = {
+        limit = { NOT = { government_has_flag = government_is_landless_adventurer } any_held_title = { is_noble_family_title = yes } }
+        add = 5
+    }
+}
+
+tca_confucian_person_strength_value = {
+    value = 1
+    add = tca_confucian_education_strength_value
+    add = tca_confucian_title_strength_value
+    add = tca_confucian_family_strength_value
+}
+
+# 缓存所有者作用域；原生日期差按日计算，缺少时间戳时返回0，由ensure单独处理缺失。
+tca_confucian_statistics_age_value = {
+    value = 0
+    if = {
+        limit = { has_variable = tca_stats_updated }
+        add = { value = current_date subtract = var:tca_stats_updated }
+    }
+}
