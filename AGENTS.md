@@ -13,6 +13,14 @@
 - 默认只修改本模组文件；安装游戏与 Workshop 文件作为参考，除非用户明确要求修改。
 - 保留已有未提交改动，不擅自覆盖、撤销或重置。
 
+## macOS 常见目录
+
+以下为 Steam 默认安装位置，`~` 表示当前用户的主目录；使用自定义 Steam 库时，以实际安装路径为准。
+
+- CK3 游戏安装目录：`~/Library/Application Support/Steam/steamapps/common/Crusader Kings III/`；原版脚本和数据位于其 `game/` 子目录。
+- CK3 用户文档目录：`~/Documents/Paradox Interactive/Crusader Kings III/`；其中 `mod/` 存放本地模组，`logs/` 存放日志，`save games/` 存放存档。
+- CK3 Steam 创意工坊目录：`~/Library/Application Support/Steam/steamapps/workshop/content/1158310/`；`1158310` 为 CK3 的 Steam App ID，各订阅模组位于以 Workshop 项目 ID 命名的子目录中。
+
 ## 代码依据
 
 - 优先查阅本机原版及相关模组的实际实现，不凭空猜测 trigger、effect、GUI 接口或作用域。
