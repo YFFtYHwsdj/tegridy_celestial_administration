@@ -1,0 +1,402 @@
+﻿# 原版官员侧行政改约覆盖；保留费用、接受、选项与冷却，只接入官署权限和头衔待遇保存。
+admin_vassal_modify_vassal_contract_interaction = {
+	special_interaction = vassal_modify_vassal_contract
+	interface = modify_vassal_contract
+	category = interaction_category_vassal
+	interface_priority = 65
+	common_interaction = yes
+	icon = icon_contract_modification_single
+
+	filter_tags = { admin_liege }
+
+	send_name = "admin_vassal_modify_vassal_contract_interaction_send"
+	desc = admin_vassal_modify_vassal_contract_interaction_desc
+	notification_text = MODIFY_VASSAL_CONTRACT_NOTIFICATION_TO_LIEGE
+
+	is_shown = {
+		scope:puppet_or_actor = {
+			government_has_mechanic = administrative
+			vassal_contract_has_modifiable_obligations = yes
+			tgp_is_ceremonial_liege_trigger = no
+			top_liege != this
+			is_tributary = no # 默认排除朝贡契约。
+			this != scope:recipient
+			liege ?= scope:recipient
+			tca_can_edit_admin_contract_trigger = { EDITOR = scope:recipient }
+		}
+	}
+
+	is_valid_showing_failures_only = {
+		scope:puppet_or_actor = {
+			custom_tooltip = {
+				text = admin_vassal_not_holding_a_theme_desc
+				any_held_title = {
+					OR = {
+						tier >= holder.main_administrative_tier
+						tier >= holder.min_title_maa_tier
+					}
+					is_noble_family_title = no
+				}
+			}
+			NOT = { is_at_war_with = scope:recipient }
+		}
+	}
+
+	can_send = {
+		trigger_if = { # 操作被阻止时只显示阻止原因，保留原版行政分支。
+			limit = {
+				scope:puppet_or_actor = {
+					subject_contract_is_blocked_from_modification = yes
+				}
+			}
+			scope:puppet_or_actor = {
+				subject_contract_is_blocked_from_modification = no
+			}
+		}
+		trigger_else = {
+			# 分开检查两种冷却，避免同时显示互相矛盾的提示。
+			trigger_if = {
+				limit = {
+					scope:puppet_or_actor = {
+						has_variable = admin_contract_cooldown
+					}
+				}
+				custom_tooltip = {
+					text = admin_contract_cooldown_desc_vassal
+					scope:puppet_or_actor = {
+						NOT = { has_variable = admin_contract_cooldown }
+					}
+				}
+			}
+			trigger_else = {
+				custom_tooltip = {
+					text = admin_contract_request_cooldown_desc
+					scope:puppet_or_actor = {
+						NOT = { has_variable = admin_contract_request_cooldown }
+					}
+				}
+				scope:puppet_or_actor = {
+					has_changed_contract_obligation_trigger = yes
+				}
+			}
+
+			# 核对影响力费用。
+			trigger_if = {
+				limit = {
+					NOR = {
+						scope:hook = yes
+						scope:dominant_family = yes
+					}
+				}
+				scope:puppet_or_actor = {
+					influence >= major_influence_value
+				}
+			}
+		}
+	}
+
+	auto_accept = {
+		custom_tooltip = {
+			text = admin_vassal_force_obligation_change_desc
+			OR = {
+				scope:hook = yes
+				scope:dominant_family = yes
+				scope:diarch = yes
+			}
+		}
+	}
+
+	on_accept = {
+		# 接受后应用改约结果。
+		scope:puppet_or_actor = {
+			send_interface_message = {
+				type = msg_vassal_contract_change
+				title = modify_vassal_contract_interaction_notification
+				right_icon = scope:recipient
+
+				# 使用牵制时消耗牵制。
+				if = {
+					limit = { always = scope:hook }
+					use_hook = scope:recipient
+					add_achievement_flag_effect = { FLAG = achievement_fine_print_flag }
+				}
+
+				# 未使用牵制、强大家族或分权优势时支付影响力。
+				if = {
+					limit = {
+						has_changed_contract_obligation_trigger = yes # 只有实际修改契约时才显示费用。
+						NOR = {
+							scope:hook = yes
+							scope:dominant_family = yes
+							scope:diarch = yes
+						}
+					}
+					scope:puppet_or_actor = {
+						change_influence = major_influence_loss
+					}
+				}
+
+				# 设置改约冷却，防止领主立即改回。
+				hidden_effect = {
+					set_variable = {
+						name = admin_contract_cooldown
+						value = yes
+						years = admin_contract_cooldown_value
+					}
+				}
+
+				every_in_list = {
+					list = changed_obligations
+
+					save_scope_as = obligation
+
+					scope:puppet_or_actor = {
+						vassal_contract_set_obligation_level = {
+							type = scope:obligation.vassal_contract_type
+							level = scope:obligation
+						}
+						# 官员请求获准后，同样保存头衔经费，避免维护恢复旧档。
+						tca_record_changed_office_budget_effect = yes
+
+						# 同步天朝行省继承法，无需等待旧法律失效。
+						if = {
+							limit = {
+								government_has_flag = government_is_celestial
+								scope:obligation.vassal_contract_type = vassal_contract:celestial_provinces
+							}
+
+							if = {
+								limit = {
+									vassal_contract_has_flag = celestial_military_appointment
+									NOT = { has_realm_law = celestial_military_appointment_succession_law }
+								}
+								add_realm_law_skip_effects = celestial_military_appointment_succession_law
+							}
+							else_if = {
+								limit = {
+									vassal_contract_has_flag = celestial_civil_appointment
+									NOT = { has_realm_law = celestial_appointment_succession_law }
+								}
+								add_realm_law_skip_effects = celestial_appointment_succession_law
+							}
+						}
+						# 同步贤能制行省继承法，无需等待旧法律失效。
+						else_if = {
+							limit = {
+								OR = {
+									government_has_flag = government_is_meritocratic
+									government_has_flag = government_is_steppe_admin
+								}
+								scope:obligation.vassal_contract_type = vassal_contract:meritocratic_provinces
+							}
+							if = {
+								limit = {
+									vassal_contract_has_flag = meritocratic_military_appointment
+									NOT = { has_realm_law = meritocratic_military_appointment_succession_law }
+								}
+								add_realm_law_skip_effects = meritocratic_military_appointment_succession_law
+							}
+							else_if = {
+								limit = {
+									vassal_contract_has_flag = meritocratic_civil_appointment
+									NOT = { has_realm_law = meritocratic_appointment_succession_law }
+								}
+								add_realm_law_skip_effects = meritocratic_appointment_succession_law
+							}
+						}
+						# 同步日本行政行省继承法，无需等待旧法律失效。
+						else_if = {
+							limit = {
+								government_has_flag = government_is_japan_administrative
+								scope:obligation.vassal_contract_type = vassal_contract:japan_administrative_provinces
+							}
+							if = {
+								limit = {
+									NOT = { vassal_contract_has_flag = japan_administrative_military_appointment }
+									NOT = { has_realm_law = japanese_appointment_succession_law }
+								}
+								add_realm_law_skip_effects = japanese_appointment_succession_law
+							}
+							else_if = {
+								limit = {
+									vassal_contract_has_flag = japan_administrative_military_appointment
+									NOT = { has_realm_law = japanese_military_appointment_succession_law }
+								}
+								add_realm_law_skip_effects = japanese_military_appointment_succession_law
+							}
+						}
+					}
+				}
+			}
+		}
+
+		# 记录分权者使用自身改约权的情况。
+		diarch_changed_own_contract_effect = yes
+
+		hidden_effect = {
+			# 斗争催化剂。
+			# 先计算催化剂条件，避免效果改变原始状态。
+			if = {
+				limit = {
+					catalyst_granted_powerful_diff_faith_vassal_religious_protection_preliminary_trigger = { CHAR = scope:recipient }
+					scope:recipient = {
+						any_character_struggle = {
+							involvement = involved
+							activate_struggle_catalyst_secondary_character_involvement_involved_trigger = {
+								CATALYST = catalyst_granted_powerful_diff_faith_vassal_religious_protection
+								CHAR = scope:puppet_or_actor
+							}
+						}
+					}
+				}
+				scope:recipient = {
+					every_character_struggle = {
+						involvement = involved
+						limit = {
+							activate_struggle_catalyst_secondary_character_involvement_involved_trigger = {
+								CATALYST = catalyst_granted_powerful_diff_faith_vassal_religious_protection
+								CHAR = scope:puppet_or_actor
+							}
+						}
+						activate_struggle_catalyst = {
+							catalyst = catalyst_granted_powerful_diff_faith_vassal_religious_protection
+							character = scope:recipient
+						}
+					}
+				}
+			}
+			# 改善契约待遇的催化剂。
+			if = {
+				limit = {
+					scope:puppet_or_actor.count_obligation_improvements_for_vassal > 0
+					scope:recipient = {
+						is_diff_faith_or_culture_trigger = {
+							CHAR = scope:puppet_or_actor
+							STATUS = involved
+						}
+						any_character_struggle = {
+							involvement = involved
+							activate_struggle_catalyst_secondary_character_involvement_involved_trigger = {
+								CATALYST = catalyst_grant_privilege_to_diff_faith_culture_vassal
+								CHAR = scope:puppet_or_actor
+							}
+						}
+					}
+				}
+				scope:recipient = {
+					every_character_struggle = {
+						involvement = involved
+						limit = {
+							activate_struggle_catalyst_secondary_character_involvement_involved_trigger = {
+								CATALYST = catalyst_grant_privilege_to_diff_faith_culture_vassal
+								CHAR = scope:puppet_or_actor
+							}
+						}
+						activate_struggle_catalyst = {
+							catalyst = catalyst_grant_privilege_to_diff_faith_culture_vassal
+							character = scope:recipient
+						}
+					}
+				}
+			}
+		}
+	}
+
+	on_decline = {
+		# 设置请求冷却，保留原版对连续请求的限制。
+		hidden_effect = {
+			scope:puppet_or_actor = {
+				set_variable = {
+					name = admin_contract_request_cooldown
+					value = yes
+					years = admin_contract_cooldown_value
+				}
+			}
+		}
+	}
+
+	# 发送选项。
+	# 牵制。
+	send_option = {
+		is_valid = {
+			scope:puppet_or_actor = {
+				has_usable_hook = scope:recipient
+			}
+		}
+		flag = hook
+		localization = SCHEME_HOOK
+	}
+	# 强大家族。
+	send_option = {
+		is_shown = {
+			scope:puppet_or_actor = {
+				house ?= { is_dominant_family = yes }
+			}
+		}
+		flag = dominant_family
+		localization = OPTION_DOMINANT_FAMILY
+	}
+	# 分权者。
+	send_option = {
+		is_shown = {
+			scope:puppet_or_actor = { is_diarch_of_target = scope:recipient }
+		}
+		is_valid = {
+			scope:puppet_or_actor = {
+				trigger_if = {
+					limit = { has_variable_list = diarch_contract_rights_used_list }
+					NOT = {
+						is_target_in_variable_list = {
+							name = diarch_contract_rights_used_list
+							target = scope:recipient
+						}
+					}
+				}
+			}
+		}
+		flag = diarch
+		localization = CALL_IN_DIARCH_RIGHTS
+	}
+	should_use_extra_icon = {
+		scope:puppet_or_actor = { has_usable_hook = scope:recipient }
+	}
+	extra_icon = "gfx/interface/icons/character_interactions/hook_icon.dds"
+	send_options_exclusive = no
+
+	ai_accept = {
+		base = -25
+
+		# 好感权重。
+		opinion_modifier = {
+			who = scope:recipient
+			opinion_target = scope:puppet_or_actor
+			multiplier = 1
+			desc = AI_OPINION_REASON
+		}
+
+		# 治理效率越高，请求越容易被接受。
+		modifier = {
+			add = scope:puppet_or_actor.governor_efficiency_presented
+			desc = AI_GOVERNOR_EFFICIENCY
+		}
+
+		# 强大家族成员的请求更容易被接受。
+		modifier = {
+			scope:puppet_or_actor = {
+				house ?= { is_powerful_family = yes }
+				NOT = { house ?= scope:recipient.house }
+			}
+			add = 50
+			desc = AI_POWERFUL_FAMILY
+		}
+
+		# 皇族成员的请求更容易被接受。
+		modifier = {
+			scope:puppet_or_actor = {
+				house ?= scope:recipient.house
+			}
+			add = 60
+			desc = AI_SAME_HOUSE
+		}
+	}
+}

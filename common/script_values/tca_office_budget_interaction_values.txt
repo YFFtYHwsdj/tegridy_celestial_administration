@@ -1,0 +1,68 @@
+﻿# 官员人物作用域；展示和AI共用正式头衔待遇，不以人物临时缓存作为新数据源。
+tca_office_budget_current_value = { value = 2 if = { limit = { tca_is_landless_official_trigger = yes } primary_title = { value = tca_office_funding_level_value } } }
+tca_office_budget_base_value = {
+    value = 0
+    if = { limit = { tca_is_tongpan_official_trigger = yes } primary_title.var:tca_tongpan_county.holder = { value = tca_office_funding_base_value } }
+    else_if = { limit = { tca_is_judicial_official_trigger = yes } primary_title.var:song_judicial_circuit.holder = { value = tca_office_funding_base_value } }
+}
+# 官员人物作用域；actor 是管理者，只有请求互动中 actor 为本人、recipient 为管理者。
+# 仅按实际付款财政与政治待遇决策，尚不赋予经费不存在的办事能力收益。
+tca_office_budget_ai_target_value = {
+    value = 2
+    save_temporary_scope_as = tca_budget_ai_subject
+    if = { limit = { scope:actor = this } scope:recipient = { save_temporary_scope_as = tca_budget_ai_manager } }
+    else = { scope:actor = { save_temporary_scope_as = tca_budget_ai_manager } }
+    if = { limit = { tca_is_tongpan_official_trigger = yes } primary_title.var:tca_tongpan_county.holder = { save_temporary_scope_as = tca_budget_ai_payer } }
+    else = { primary_title.var:song_judicial_circuit.holder = { save_temporary_scope_as = tca_budget_ai_payer } }
+    if = {
+        limit = { scope:tca_budget_ai_payer = { tca_office_funding_balance_value < 0 treasury < { value = tca_office_funding_base_value multiply = 6 } } }
+        value = 1
+        if = { limit = { scope:tca_budget_ai_payer = { treasury < { value = tca_office_funding_base_value multiply = 2 } } } value = 0 }
+    }
+    else_if = {
+        limit = {
+            scope:tca_budget_ai_payer = { tca_office_funding_base_value > 0 tca_office_funding_balance_value >= 0 treasury >= { value = tca_office_funding_base_value multiply = 24 } }
+            scope:tca_budget_ai_manager = { OR = { has_trait = generous has_relation_friend = scope:tca_budget_ai_subject is_close_family_of = scope:tca_budget_ai_subject } }
+        }
+        value = 3
+        if = { limit = { scope:tca_budget_ai_manager = { has_trait = generous OR = { has_relation_friend = scope:tca_budget_ai_subject is_close_family_of = scope:tca_budget_ai_subject } } } value = 4 }
+    }
+    else_if = { limit = { scope:tca_budget_ai_manager = { OR = { has_trait = greedy has_relation_rival = scope:tca_budget_ai_subject } } } value = 1 }
+}
+# 互动作用域；互斥选项由原生AI枚举，不另造月度全世界扫描。
+tca_office_budget_ai_action_value = {
+    value = 0
+    if = { limit = { scope:tca_budget_0 = yes scope:recipient = { tca_office_budget_adjacent_trigger = { LEVEL = 0 } OR = { AND = { tca_office_budget_current_value < 0 tca_office_budget_ai_target_value >= 0 } AND = { tca_office_budget_current_value > 0 tca_office_budget_ai_target_value <= 0 } } } } value = 100 }
+    if = { limit = { scope:tca_budget_1 = yes scope:recipient = { tca_office_budget_adjacent_trigger = { LEVEL = 1 } OR = { AND = { tca_office_budget_current_value < 1 tca_office_budget_ai_target_value >= 1 } AND = { tca_office_budget_current_value > 1 tca_office_budget_ai_target_value <= 1 } } } } value = 100 }
+    if = { limit = { scope:tca_budget_2 = yes scope:recipient = { tca_office_budget_adjacent_trigger = { LEVEL = 2 } OR = { AND = { tca_office_budget_current_value < 2 tca_office_budget_ai_target_value >= 2 } AND = { tca_office_budget_current_value > 2 tca_office_budget_ai_target_value <= 2 } } } } value = 100 }
+    if = { limit = { scope:tca_budget_3 = yes scope:recipient = { tca_office_budget_adjacent_trigger = { LEVEL = 3 } OR = { AND = { tca_office_budget_current_value < 3 tca_office_budget_ai_target_value >= 3 } AND = { tca_office_budget_current_value > 3 tca_office_budget_ai_target_value <= 3 } } } } value = 100 }
+    if = { limit = { scope:tca_budget_4 = yes scope:recipient = { tca_office_budget_adjacent_trigger = { LEVEL = 4 } OR = { AND = { tca_office_budget_current_value < 4 tca_office_budget_ai_target_value >= 4 } AND = { tca_office_budget_current_value > 4 tca_office_budget_ai_target_value <= 4 } } } } value = 100 }
+    # 上级容忍通判一档待遇偏差，不与实际付款州长官反复互改。
+    if = {
+        limit = {
+            scope:recipient = { tca_is_tongpan_official_trigger = yes NOT = { primary_title.var:tca_tongpan_county.holder = scope:actor }
+                OR = { tca_office_budget_current_value = tca_office_budget_ai_target_value tca_office_budget_current_value = tca_office_budget_ai_target_next_value tca_office_budget_current_value = tca_office_budget_ai_target_previous_value }
+            }
+        }
+        value = 0
+    }
+}
+
+# 官员人物作用域；悬停预览与正式费率配置共用，不立即进行资金操作。
+tca_office_budget_current_amount_value = { value = 0 if = { limit = { tca_is_landless_official_trigger = yes } primary_title = { value = tca_office_funding_amount_value } } }
+tca_office_budget_rate_0_value = { value = tca_circuit_funding_low_rate_value if = { limit = { tca_is_tongpan_official_trigger = yes } value = tca_tongpan_funding_low_rate_value } }
+tca_office_budget_amount_0_value = { value = tca_office_budget_base_value multiply = tca_office_budget_rate_0_value }
+tca_office_budget_rate_1_value = { value = tca_circuit_funding_frugal_rate_value if = { limit = { tca_is_tongpan_official_trigger = yes } value = tca_tongpan_funding_frugal_rate_value } }
+tca_office_budget_amount_1_value = { value = tca_office_budget_base_value multiply = tca_office_budget_rate_1_value }
+tca_office_budget_rate_2_value = { value = tca_circuit_funding_medium_rate_value if = { limit = { tca_is_tongpan_official_trigger = yes } value = tca_tongpan_funding_medium_rate_value } }
+tca_office_budget_amount_2_value = { value = tca_office_budget_base_value multiply = tca_office_budget_rate_2_value }
+tca_office_budget_rate_3_value = { value = tca_circuit_funding_increased_rate_value if = { limit = { tca_is_tongpan_official_trigger = yes } value = tca_tongpan_funding_increased_rate_value } }
+tca_office_budget_amount_3_value = { value = tca_office_budget_base_value multiply = tca_office_budget_rate_3_value }
+tca_office_budget_rate_4_value = { value = tca_circuit_funding_high_rate_value if = { limit = { tca_is_tongpan_official_trigger = yes } value = tca_tongpan_funding_high_rate_value } }
+tca_office_budget_amount_4_value = { value = tca_office_budget_base_value multiply = tca_office_budget_rate_4_value }
+
+# 数值比较使用独立值，避免将算式误解析成作用域链接。
+tca_office_budget_previous_value = { value = tca_office_budget_current_value subtract = 1 }
+tca_office_budget_next_value = { value = tca_office_budget_current_value add = 1 }
+tca_office_budget_ai_target_next_value = { value = tca_office_budget_ai_target_value add = 1 }
+tca_office_budget_ai_target_previous_value = { value = tca_office_budget_ai_target_value subtract = 1 }

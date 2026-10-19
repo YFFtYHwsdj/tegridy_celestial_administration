@@ -1,0 +1,400 @@
+﻿# 官署经费回归；使用开局正式路、州绑定和原生契约，结束时恢复原档位与余额。
+# 五档预期分别独立写明，不在测试工具中复制业务计算。
+namespace = tca_office_funding_test
+tca_office_funding_test.1 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        if = { limit = { has_character_flag = tca_test_delayed_case_active } debug_log = "TCA_TEST CASE_BUSY" }
+        else = {
+            debug_log = "TCA_TEST BEGIN tca_office_funding_test.1 tca_test_office_funding"
+            remove_character_flag = tca_test_case_failed
+            # 本例自行建立正式机构；不假定洪州主官恰为独立州级主官。
+            clear_saved_scope = tca_test_funding_circuit
+            clear_saved_scope = tca_test_funding_county
+            if = {
+                limit = { debug_only = yes title:h_china.holder = root }
+                if = { limit = { NOT = { has_realm_law = tca_tongpan_enabled_law } } add_character_flag = tca_test_funding_restore_disabled add_realm_law_skip_effects = tca_tongpan_enabled_law }
+                tca_refresh_all_judicial_titles_effect = yes
+                tca_refresh_tongpan_realm_effect = yes
+                random_in_global_list = {
+                    variable = tca_judicial_circuits
+                    limit = { exists = var:song_judicial_title.holder holder.top_liege = root holder = { tca_office_funding_base_value > 0 } var:song_judicial_title = { tca_office_can_receive_funding_trigger = yes } }
+                    save_scope_as = tca_test_funding_circuit
+                }
+                random_in_global_list = {
+                    variable = tca_tongpan_counties
+                    limit = { exists = var:tca_tongpan_office.holder holder.top_liege = root holder = { tca_office_funding_base_value > 0 tca_office_funding_balance_value > 0 } var:tca_tongpan_office = { tca_office_can_receive_funding_trigger = yes } }
+                    save_scope_as = tca_test_funding_county
+                }
+            }
+            if = {
+                limit = {
+                    debug_only = yes
+                    title:h_china.holder = root
+                    exists = scope:tca_test_funding_circuit.var:song_judicial_title.holder
+                    exists = scope:tca_test_funding_county.var:tca_tongpan_office.holder
+                }
+                scope:tca_test_funding_circuit.var:song_judicial_title = { save_scope_as = tca_test_funding_circuit_office }
+                scope:tca_test_funding_county.var:tca_tongpan_office = { save_scope_as = tca_test_funding_county_office }
+                scope:tca_test_funding_circuit_office.holder = {
+                    save_scope_as = tca_test_funding_officer
+                    tca_ensure_official_contract_effect = yes
+                    save_scope_value_as = { name = tca_test_funding_old_level value = vassal_contract_obligation_level:tca_circuit_office_budget }
+                }
+                scope:tca_test_funding_county_office.holder = {
+                    save_scope_as = tca_test_funding_tongpan
+                    tca_ensure_official_contract_effect = yes
+                    save_scope_value_as = { name = tca_test_funding_old_county_level value = vassal_contract_obligation_level:tca_tongpan_budget }
+                }
+                # 按正式辖区解析可改约人；州长官与其直属领主是两个独立权限来源。
+                scope:tca_test_funding_county.holder = { save_scope_as = tca_test_funding_contract_governor liege = { save_scope_as = tca_test_funding_contract_superior } }
+                scope:tca_test_funding_officer.liege = { save_scope_as = tca_test_funding_contract_judicial_superior }
+                if = { limit = { scope:tca_test_funding_tongpan = { tca_can_edit_admin_contract_trigger = { EDITOR = scope:tca_test_funding_contract_governor } } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 37" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 37" }
+                if = { limit = { scope:tca_test_funding_tongpan = { tca_can_edit_admin_contract_trigger = { EDITOR = scope:tca_test_funding_contract_superior } } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 38" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 38" }
+                if = { limit = { scope:tca_test_funding_tongpan = { tca_can_edit_admin_contract_trigger = { EDITOR = scope:tca_test_funding_tongpan } } } add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 39" }
+                else = { debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 39" }
+                if = { limit = { scope:tca_test_funding_officer = { tca_can_edit_admin_contract_trigger = { EDITOR = scope:tca_test_funding_contract_judicial_superior } } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 40" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 40" }
+                if = { limit = { scope:tca_test_funding_officer = { tca_can_edit_admin_contract_trigger = { EDITOR = scope:tca_test_funding_tongpan } } } add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 41" }
+                else = { debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 41" }
+                # 暂时破坏州的反向绑定，旧指针不得继续授权；检查后立即恢复，不影响收付场景。
+                scope:tca_test_funding_county = { set_variable = { name = tca_tongpan_office value = scope:tca_test_funding_circuit_office } }
+                if = { limit = { scope:tca_test_funding_tongpan = { tca_can_edit_admin_contract_trigger = { EDITOR = scope:tca_test_funding_contract_governor } } } add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 42" }
+                else = { debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 42" }
+                scope:tca_test_funding_county = { set_variable = { name = tca_tongpan_office value = scope:tca_test_funding_county_office } }
+                # 独立创建无关角色，不假定另一位提刑必定不是该州的合法直属领主。
+                create_character = { age = 30 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_test_funding_contract_outsider }
+                # 没有得到本州授权的人物，即使同属天朝也不能代改通判契约。
+                if = { limit = { scope:tca_test_funding_tongpan = { tca_can_edit_admin_contract_trigger = { EDITOR = scope:tca_test_funding_contract_outsider } } } add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 43" }
+                else = { debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 43" }
+                # 普通互动使用原生互斥选项，真实发送后核对契约、头衔保存和独立冷却。
+                # 不向调用事件伪造 changed_obligations，也不强制执行接受效果。
+                scope:tca_test_funding_contract_governor = {
+                    save_scope_value_as = { name = tca_test_budget_governor_cash value = treasury }
+                    add_treasury = 100000
+                }
+                if = { limit = { scope:tca_test_funding_contract_superior = { has_trait = generous } } add_character_flag = tca_test_budget_superior_was_generous }
+                if = { limit = { scope:tca_test_funding_contract_superior = { has_trait = greedy } } add_character_flag = tca_test_budget_superior_was_greedy }
+                scope:tca_test_funding_contract_superior = { remove_trait = greedy add_trait = generous }
+                scope:tca_test_funding_contract_governor = { save_scope_as = actor }
+                scope:tca_test_funding_tongpan = {
+                    save_scope_as = recipient
+                    add_character_flag = tca_updating_official_contract
+                    vassal_contract_set_obligation_level = { type = tca_tongpan_budget level = 0 }
+                    remove_character_flag = tca_updating_official_contract
+                    tca_record_office_budget_effect = yes
+                    primary_title = { remove_variable = tca_office_budget_local_cooldown remove_variable = tca_office_budget_superior_cooldown }
+                }
+                if = { limit = { scope:recipient = { tca_office_budget_adjacent_trigger = { LEVEL = 1 } NOT = { tca_office_budget_adjacent_trigger = { LEVEL = 0 } } NOT = { tca_office_budget_adjacent_trigger = { LEVEL = 4 } } } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 44" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 44" }
+                tca_apply_office_budget_effect = { LEVEL = 4 }
+                if = { limit = { scope:recipient.primary_title = { var:tca_office_budget_level = 0 NOT = { has_variable = tca_office_budget_local_cooldown } } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 45" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 45" }
+                run_interaction = { interaction = tca_adjust_office_budget_interaction actor = scope:actor recipient = scope:recipient redirect = no send_threshold = decline }
+                if = { limit = { scope:recipient = { vassal_contract_obligation_level:tca_tongpan_budget = 1 primary_title = { var:tca_office_budget_level = 1 has_variable = tca_office_budget_local_cooldown NOT = { has_variable = tca_office_budget_superior_cooldown } } } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 46" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 46" }
+                tca_apply_office_budget_effect = { LEVEL = 2 }
+                if = { limit = { scope:recipient.primary_title = { var:tca_office_budget_level = 1 } NOT = { tca_office_budget_manager_ready_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 47" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 47" }
+                # 单独准备最低档，上级只有一个可发送的相邻选项；地方冷却仍留在原官署。
+                scope:recipient = { add_character_flag = tca_updating_official_contract vassal_contract_set_obligation_level = { type = tca_tongpan_budget level = 0 } remove_character_flag = tca_updating_official_contract tca_record_office_budget_effect = yes }
+                scope:tca_test_funding_contract_superior = { save_scope_as = actor }
+                if = { limit = { tca_office_budget_manager_ready_trigger = yes } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 48" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 48" }
+                run_interaction = { interaction = tca_adjust_office_budget_interaction actor = scope:actor recipient = scope:recipient redirect = no send_threshold = decline }
+                if = { limit = { scope:recipient = { vassal_contract_obligation_level:tca_tongpan_budget = 1 primary_title = { var:tca_office_budget_level = 1 has_variable = tca_office_budget_local_cooldown has_variable = tca_office_budget_superior_cooldown } } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 49" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 49" }
+                scope:recipient = { tca_ensure_official_contract_effect = yes }
+                if = { limit = { scope:recipient.primary_title = { var:tca_office_budget_level = 1 has_variable = tca_office_budget_local_cooldown has_variable = tca_office_budget_superior_cooldown } scope:recipient = { vassal_contract_obligation_level:tca_tongpan_budget = 1 } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 50" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 50" }
+                # 上界只能减一档；未经授权者调用正式接受入口也不能改值或产生冷却。
+                scope:recipient = { add_character_flag = tca_updating_official_contract vassal_contract_set_obligation_level = { type = tca_tongpan_budget level = 4 } remove_character_flag = tca_updating_official_contract tca_record_office_budget_effect = yes primary_title = { remove_variable = tca_office_budget_local_cooldown remove_variable = tca_office_budget_superior_cooldown } }
+                if = { limit = { scope:recipient = { tca_office_budget_adjacent_trigger = { LEVEL = 3 } NOT = { tca_office_budget_adjacent_trigger = { LEVEL = 2 } } NOT = { tca_office_budget_adjacent_trigger = { LEVEL = 4 } } } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 51" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 51" }
+                scope:tca_test_funding_contract_outsider = { save_scope_as = actor }
+                tca_apply_office_budget_effect = { LEVEL = 3 }
+                if = { limit = { scope:recipient.primary_title = { var:tca_office_budget_level = 4 NOT = { has_variable = tca_office_budget_local_cooldown } NOT = { has_variable = tca_office_budget_superior_cooldown } } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 52" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 52" }
+                scope:tca_test_funding_contract_governor = { save_scope_as = actor }
+                run_interaction = { interaction = tca_adjust_office_budget_interaction actor = scope:actor recipient = scope:recipient redirect = no send_threshold = decline }
+                if = { limit = { scope:recipient = { vassal_contract_obligation_level:tca_tongpan_budget = 3 primary_title = { var:tca_office_budget_level = 3 has_variable = tca_office_budget_local_cooldown NOT = { has_variable = tca_office_budget_superior_cooldown } } } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 53" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 53" }
+                # 中间档的两个相邻方向均合法；当前档和跨两档均不合法。
+                scope:recipient = { add_character_flag = tca_updating_official_contract vassal_contract_set_obligation_level = { type = tca_tongpan_budget level = 2 } remove_character_flag = tca_updating_official_contract tca_record_office_budget_effect = yes }
+                if = { limit = { scope:recipient = { tca_office_budget_adjacent_trigger = { LEVEL = 1 } tca_office_budget_adjacent_trigger = { LEVEL = 3 } NOT = { tca_office_budget_adjacent_trigger = { LEVEL = 0 } } NOT = { tca_office_budget_adjacent_trigger = { LEVEL = 2 } } NOT = { tca_office_budget_adjacent_trigger = { LEVEL = 4 } } } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 54" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 54" }
+                # 发起请求的正式官员与实际直属上级，原生AI只能发送最低档的上邻选项。
+                scope:tca_test_funding_tongpan = {
+                    save_scope_as = actor
+                    add_character_flag = tca_updating_official_contract vassal_contract_set_obligation_level = { type = tca_tongpan_budget level = 0 } remove_character_flag = tca_updating_official_contract tca_record_office_budget_effect = yes
+                    primary_title = { remove_variable = tca_office_budget_local_cooldown remove_variable = tca_office_budget_superior_cooldown remove_variable = tca_office_budget_request_cooldown }
+                    save_scope_value_as = { name = tca_test_budget_cash value = treasury }
+                }
+                scope:tca_test_funding_contract_superior = { save_scope_as = recipient }
+                run_interaction = { interaction = tca_request_office_budget_interaction actor = scope:actor recipient = scope:recipient redirect = no send_threshold = accept }
+                # 原生默认回复为3至10日；等待12日避开第10日回复与断言的同日顺序。先检查发送不转账。
+                if = { limit = { scope:tca_test_funding_tongpan = { treasury = scope:tca_test_budget_cash var:tca_office_budget_requested_office = scope:tca_test_funding_county_office } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 61" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 61" }
+                add_character_flag = tca_test_delayed_case_active
+                trigger_event = { id = tca_office_funding_test.1002 days = 12 }
+            }
+            else = { change_variable = { name = tca_test_suite_skipped add = 1 } debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_office_funding" tca_test_continue_delayed_effect = yes }
+        }
+    }
+}
+
+# 与原生请求的异步接受解耦，不直接执行on_accept；本事件继承 .1 的官署和恢复基线。
+tca_office_funding_test.1002 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+                if = { limit = { scope:tca_test_funding_tongpan = { vassal_contract_obligation_level:tca_tongpan_budget = 1 NOT = { has_variable = tca_office_budget_requested_office } primary_title = { var:tca_office_budget_level = 1 has_variable = tca_office_budget_request_cooldown has_variable = tca_office_budget_superior_cooldown NOT = { has_variable = tca_office_budget_local_cooldown } } } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 55" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 55" }
+                # 上级刚接受请求，不妨碍州长官行使自己的调整权；原生俸禄冷却也不阻挡经费。
+                scope:tca_test_funding_contract_governor = { save_scope_as = actor }
+                scope:tca_test_funding_tongpan = { save_scope_as = recipient set_variable = { name = admin_contract_cooldown value = yes years = 5 } }
+                if = { limit = { tca_office_budget_manager_ready_trigger = yes } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 56" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 56" }
+                scope:recipient = { remove_variable = admin_contract_cooldown primary_title = { remove_variable = tca_office_budget_request_cooldown remove_variable = tca_office_budget_superior_cooldown } }
+                # 提刑沿用相同邻档入口，但只有正常直属上级槽位。
+                scope:tca_test_funding_contract_judicial_superior = { save_scope_as = actor }
+                scope:tca_test_funding_officer = { save_scope_as = recipient add_character_flag = tca_updating_official_contract vassal_contract_set_obligation_level = { type = tca_circuit_office_budget level = 0 } remove_character_flag = tca_updating_official_contract tca_record_office_budget_effect = yes primary_title = { remove_variable = tca_office_budget_superior_cooldown } }
+                run_interaction = { interaction = tca_adjust_office_budget_interaction actor = scope:actor recipient = scope:recipient redirect = no send_threshold = decline }
+                if = { limit = { scope:recipient = { vassal_contract_obligation_level:tca_circuit_office_budget = 1 primary_title = { var:tca_office_budget_level = 1 has_variable = tca_office_budget_superior_cooldown NOT = { has_variable = tca_office_budget_local_cooldown } } } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 57" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 57" }
+                scope:recipient.primary_title = { remove_variable = tca_office_budget_superior_cooldown }
+                # 财政宽裕时核对纯政治待遇评分；无关角色只作为独立评分输入，仍无改约权限。
+                scope:tca_test_funding_contract_outsider = { save_scope_as = actor add_trait = greedy }
+                scope:tca_test_funding_tongpan = { save_scope_as = recipient }
+                if = { limit = { scope:recipient = { tca_office_budget_ai_target_value = 1 } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 58" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 58" }
+                scope:actor = { remove_trait = greedy add_trait = generous }
+                if = { limit = { scope:recipient = { tca_office_budget_ai_target_value = 3 } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 59" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 59" }
+                scope:actor = { set_relation_friend = scope:recipient }
+                if = { limit = { scope:recipient = { tca_office_budget_ai_target_value = 4 } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 60" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 60" }
+                # 恢复原档位与本例冷却，避免影响后续月结和其他用例；不保留额外候选人物。
+                scope:tca_test_funding_tongpan.primary_title = { remove_variable = tca_office_budget_local_cooldown remove_variable = tca_office_budget_superior_cooldown }
+                scope:tca_test_funding_tongpan = { add_character_flag = tca_updating_official_contract vassal_contract_set_obligation_level = { type = tca_tongpan_budget level = scope:tca_test_funding_old_county_level } remove_character_flag = tca_updating_official_contract tca_record_office_budget_effect = yes }
+                scope:tca_test_funding_officer = { add_character_flag = tca_updating_official_contract vassal_contract_set_obligation_level = { type = tca_circuit_office_budget level = scope:tca_test_funding_old_level } remove_character_flag = tca_updating_official_contract tca_record_office_budget_effect = yes }
+                scope:tca_test_funding_contract_governor = { remove_treasury = 100000 }
+                if = { limit = { NOT = { has_character_flag = tca_test_budget_superior_was_generous } } scope:tca_test_funding_contract_superior = { remove_trait = generous } }
+                if = { limit = { has_character_flag = tca_test_budget_superior_was_greedy } scope:tca_test_funding_contract_superior = { add_trait = greedy } }
+                remove_character_flag = tca_test_budget_superior_was_generous
+                remove_character_flag = tca_test_budget_superior_was_greedy
+                scope:tca_test_funding_contract_outsider = { remove_relation_friend = scope:tca_test_funding_tongpan death = { death_reason = death_natural_causes } }
+                # 官职基础功绩使用互斥的原生身份档位；提刑为20，通判为10。
+                if = { limit = { scope:tca_test_funding_officer = { vassal_contract_obligation_level:tca_official_obligations = 1 vassal_contract_has_flag = tca_official_judicial_obligation NOT = { vassal_contract_has_flag = tca_official_tongpan_obligation } } scope:tca_test_funding_tongpan = { vassal_contract_obligation_level:tca_official_obligations = 2 vassal_contract_has_flag = tca_official_tongpan_obligation } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 28" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 28" }
+                # 从无义务状态调用正式维护，再重复调用，验证通判身份修复及待遇不被重置。
+                scope:tca_test_funding_tongpan = {
+                    add_character_flag = tca_updating_official_contract
+                    vassal_contract_set_obligation_level = { type = tca_official_obligations level = 0 }
+                    remove_character_flag = tca_updating_official_contract
+                }
+                if = { limit = { scope:tca_test_funding_tongpan = { vassal_contract_obligation_level:tca_official_obligations = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 29" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 29" }
+                scope:tca_test_funding_tongpan = { tca_ensure_official_contract_effect = yes tca_ensure_official_contract_effect = yes }
+                if = { limit = { scope:tca_test_funding_tongpan = { vassal_contract_obligation_level:tca_official_obligations = 2 vassal_contract_has_flag = tca_official_tongpan_obligation vassal_contract_obligation_level:tca_tongpan_budget = scope:tca_test_funding_old_county_level NOT = { has_character_flag = tca_updating_official_contract } } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 30" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 30" }
+                if = { limit = { scope:tca_test_funding_circuit_office = { tca_office_can_receive_funding_trigger = yes } scope:tca_test_funding_county_office = { tca_office_can_receive_funding_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 1" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 1" }
+
+                # 在常额档保存本人对契约领主的实际好感，随后逐档核对原生契约增减。
+                # save_opinion_value_as 沿用原版 pay_homage.0101；不把辖区付款人误当作契约领主。
+                scope:tca_test_funding_officer = {
+                    add_character_flag = tca_updating_official_contract vassal_contract_set_obligation_level = { type = tca_circuit_office_budget level = 2 } remove_character_flag = tca_updating_official_contract
+                    save_opinion_value_as = { name = tca_test_funding_judicial_opinion target = liege }
+                }
+                scope:tca_test_funding_tongpan = {
+                    add_character_flag = tca_updating_official_contract vassal_contract_set_obligation_level = { type = tca_tongpan_budget level = 2 } remove_character_flag = tca_updating_official_contract
+                    save_opinion_value_as = { name = tca_test_funding_tongpan_opinion target = liege }
+                }
+                # 排除初始好感已被上下限截断，否则无法从已截断基值推算实际增量。
+                if = { limit = { scope:tca_test_funding_judicial_opinion > -100 scope:tca_test_funding_judicial_opinion < 100 scope:tca_test_funding_tongpan_opinion > -100 scope:tca_test_funding_tongpan_opinion < 100 } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 36" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 36" }
+                scope:tca_test_funding_officer = { add_character_flag = tca_updating_official_contract vassal_contract_set_obligation_level = { type = tca_circuit_office_budget level = 0 } remove_character_flag = tca_updating_official_contract tca_record_office_budget_effect = yes }
+                scope:tca_test_funding_tongpan = { add_character_flag = tca_updating_official_contract vassal_contract_set_obligation_level = { type = tca_tongpan_budget level = 0 } remove_character_flag = tca_updating_official_contract tca_record_office_budget_effect = yes }
+                if = { limit = { scope:tca_test_funding_circuit_office = { tca_office_funding_rate_value = 0.02 } scope:tca_test_funding_county_office = { tca_office_funding_rate_value = 0.05 } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 2" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 2" }
+                if = { limit = { scope:tca_test_funding_officer = { opinion = { target = liege value = { value = scope:tca_test_funding_judicial_opinion add = -25 min = -100 max = 100 } } } scope:tca_test_funding_tongpan = { opinion = { target = liege value = { value = scope:tca_test_funding_tongpan_opinion add = -25 min = -100 max = 100 } } } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 31" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 31" }
+                # 两类契约的显示资格必须互斥，不按官员身份同时展示。
+                if = { limit = { scope:tca_test_funding_officer = { tca_uses_circuit_budget_trigger = yes tca_uses_tongpan_budget_trigger = no } scope:tca_test_funding_tongpan = { tca_uses_tongpan_budget_trigger = yes tca_uses_circuit_budget_trigger = no } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 23" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 23" }
+                scope:tca_test_funding_officer = { add_character_flag = tca_updating_official_contract vassal_contract_set_obligation_level = { type = tca_circuit_office_budget level = 1 } remove_character_flag = tca_updating_official_contract tca_record_office_budget_effect = yes }
+                scope:tca_test_funding_tongpan = { add_character_flag = tca_updating_official_contract vassal_contract_set_obligation_level = { type = tca_tongpan_budget level = 1 } remove_character_flag = tca_updating_official_contract tca_record_office_budget_effect = yes }
+                if = { limit = { scope:tca_test_funding_circuit_office = { tca_office_funding_rate_value = 0.04 } scope:tca_test_funding_county_office = { tca_office_funding_rate_value = 0.10 } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 3" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 3" }
+                if = { limit = { scope:tca_test_funding_officer = { opinion = { target = liege value = { value = scope:tca_test_funding_judicial_opinion add = -15 min = -100 max = 100 } } } scope:tca_test_funding_tongpan = { opinion = { target = liege value = { value = scope:tca_test_funding_tongpan_opinion add = -15 min = -100 max = 100 } } } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 32" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 32" }
+                scope:tca_test_funding_officer = { add_character_flag = tca_updating_official_contract vassal_contract_set_obligation_level = { type = tca_circuit_office_budget level = 2 } remove_character_flag = tca_updating_official_contract tca_record_office_budget_effect = yes }
+                scope:tca_test_funding_tongpan = { add_character_flag = tca_updating_official_contract vassal_contract_set_obligation_level = { type = tca_tongpan_budget level = 2 } remove_character_flag = tca_updating_official_contract tca_record_office_budget_effect = yes }
+                if = { limit = { scope:tca_test_funding_circuit_office = { tca_office_funding_rate_value = 0.06 } scope:tca_test_funding_county_office = { tca_office_funding_rate_value = 0.15 } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 4" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 4" }
+                if = { limit = { scope:tca_test_funding_officer = { opinion = { target = liege value = { value = scope:tca_test_funding_judicial_opinion add = 0 min = -100 max = 100 } } } scope:tca_test_funding_tongpan = { opinion = { target = liege value = { value = scope:tca_test_funding_tongpan_opinion add = 0 min = -100 max = 100 } } } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 33" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 33" }
+                scope:tca_test_funding_officer = { add_character_flag = tca_updating_official_contract vassal_contract_set_obligation_level = { type = tca_circuit_office_budget level = 3 } remove_character_flag = tca_updating_official_contract tca_record_office_budget_effect = yes }
+                scope:tca_test_funding_tongpan = { add_character_flag = tca_updating_official_contract vassal_contract_set_obligation_level = { type = tca_tongpan_budget level = 3 } remove_character_flag = tca_updating_official_contract tca_record_office_budget_effect = yes }
+                if = { limit = { scope:tca_test_funding_circuit_office = { tca_office_funding_rate_value = 0.08 } scope:tca_test_funding_county_office = { tca_office_funding_rate_value = 0.20 } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 5" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 5" }
+                if = { limit = { scope:tca_test_funding_officer = { opinion = { target = liege value = { value = scope:tca_test_funding_judicial_opinion add = 5 min = -100 max = 100 } } } scope:tca_test_funding_tongpan = { opinion = { target = liege value = { value = scope:tca_test_funding_tongpan_opinion add = 5 min = -100 max = 100 } } } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 34" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 34" }
+                scope:tca_test_funding_officer = { add_character_flag = tca_updating_official_contract vassal_contract_set_obligation_level = { type = tca_circuit_office_budget level = 4 } remove_character_flag = tca_updating_official_contract tca_record_office_budget_effect = yes tca_ensure_official_contract_effect = yes }
+                scope:tca_test_funding_tongpan = { add_character_flag = tca_updating_official_contract vassal_contract_set_obligation_level = { type = tca_tongpan_budget level = 4 } remove_character_flag = tca_updating_official_contract tca_record_office_budget_effect = yes }
+                if = { limit = { scope:tca_test_funding_circuit_office = { tca_office_funding_rate_value = 0.10 } scope:tca_test_funding_county_office = { tca_office_funding_rate_value = 0.25 } scope:tca_test_funding_officer = { vassal_contract_obligation_level:tca_circuit_office_budget = 4 } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 6" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 6" }
+                if = { limit = { scope:tca_test_funding_officer = { opinion = { target = liege value = { value = scope:tca_test_funding_judicial_opinion add = 10 min = -100 max = 100 } } } scope:tca_test_funding_tongpan = { opinion = { target = liege value = { value = scope:tca_test_funding_tongpan_opinion add = 10 min = -100 max = 100 } } } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 35" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 35" }
+
+                # 州、路分别按自己的实际原生基数计算；保存本次结算前余额，排除跨日AI花费。
+                if = { limit = { scope:tca_test_funding_circuit_office = { var:tca_office_budget_level = 4 tca_office_funding_rate_value = 0.10 } scope:tca_test_funding_county_office = { var:tca_office_budget_level = 4 tca_office_funding_rate_value = 0.25 } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 24" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 24" }
+                # 只降低路司档位，通判仍保持最高档，排除两类待遇串读。
+                scope:tca_test_funding_officer = { add_character_flag = tca_updating_official_contract vassal_contract_set_obligation_level = { type = tca_circuit_office_budget level = 0 } remove_character_flag = tca_updating_official_contract tca_record_office_budget_effect = yes }
+                if = { limit = { scope:tca_test_funding_circuit_office = { tca_office_funding_rate_value = 0.02 } scope:tca_test_funding_county_office = { tca_office_funding_rate_value = 0.25 } scope:tca_test_funding_tongpan = { vassal_contract_obligation_level:tca_tongpan_budget = 4 } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 27" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 27" }
+                scope:tca_test_funding_officer = { add_character_flag = tca_updating_official_contract vassal_contract_set_obligation_level = { type = tca_circuit_office_budget level = 4 } remove_character_flag = tca_updating_official_contract tca_record_office_budget_effect = yes }
+                # 无保存档位时使用各自第三档；随后恢复，不改变原有高档实际收付断言。
+                scope:tca_test_funding_circuit_office = { remove_variable = tca_office_budget_level }
+                scope:tca_test_funding_county_office = { remove_variable = tca_office_budget_level }
+                if = { limit = { scope:tca_test_funding_circuit_office = { tca_office_funding_rate_value = 0.06 } scope:tca_test_funding_county_office = { tca_office_funding_rate_value = 0.15 } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 25" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 25" }
+                scope:tca_test_funding_circuit_office = { set_variable = { name = tca_office_budget_level value = 4 } }
+                scope:tca_test_funding_county_office = { set_variable = { name = tca_office_budget_level value = 4 } }
+                scope:tca_test_funding_circuit.holder = {
+                    save_scope_as = tca_test_funding_payer
+                    save_scope_value_as = { name = tca_test_funding_payer_cash value = treasury }
+                    save_scope_value_as = { name = tca_test_funding_base value = tca_office_funding_base_value }
+                }
+                scope:tca_test_funding_officer = { save_scope_value_as = { name = tca_test_funding_recipient_cash value = treasury } }
+                scope:tca_test_funding_circuit_office = { save_scope_value_as = { name = tca_test_funding_amount value = tca_office_funding_amount_value } }
+                save_scope_value_as = { name = tca_test_funding_expected value = { value = scope:tca_test_funding_base multiply = 0.10 } }
+                if = { limit = { scope:tca_test_funding_circuit_office = { tca_office_funding_amount_value = scope:tca_test_funding_expected } scope:tca_test_funding_circuit = { tca_office_funding_judicial_expense_value = scope:tca_test_funding_expected } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 7" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 7" }
+                if = { limit = { scope:tca_test_funding_base > 0 scope:tca_test_funding_amount > 0 } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 8" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 8" }
+                scope:tca_test_funding_circuit_office = { remove_variable = tca_office_funding_paid tca_settle_office_funding_effect = yes }
+                if = { limit = { scope:tca_test_funding_payer = { treasury = { value = scope:tca_test_funding_payer_cash subtract = scope:tca_test_funding_amount } } scope:tca_test_funding_officer = { treasury = { value = scope:tca_test_funding_recipient_cash add = scope:tca_test_funding_amount } } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 9" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 9" }
+                scope:tca_test_funding_circuit_office = { tca_settle_office_funding_effect = yes }
+                if = { limit = { scope:tca_test_funding_payer = { treasury = { value = scope:tca_test_funding_payer_cash subtract = scope:tca_test_funding_amount } } scope:tca_test_funding_officer = { treasury = { value = scope:tca_test_funding_recipient_cash add = scope:tca_test_funding_amount } } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 10" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 10" }
+                if = { limit = { scope:tca_test_funding_payer = { tca_office_funding_base_value = scope:tca_test_funding_base } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 11" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 11" }
+                if = {
+                    limit = { scope:tca_test_funding_amount > 0 }
+                    scope:tca_test_funding_payer = { add_treasury = scope:tca_test_funding_amount }
+                    scope:tca_test_funding_officer = { remove_treasury = scope:tca_test_funding_amount }
+                }
+                # 暂停路制度应清除预计且不付款；恢复正式状态后不得遗留禁用变量。
+                scope:tca_test_funding_circuit = { set_variable = { name = tca_judicial_disabled value = yes } }
+                scope:tca_test_funding_circuit_office = { remove_variable = tca_office_funding_paid tca_settle_office_funding_effect = yes }
+                if = { limit = { scope:tca_test_funding_circuit_office = { tca_office_funding_amount_value = 0 NOT = { has_variable = tca_office_funding_paid } } scope:tca_test_funding_payer = { treasury = scope:tca_test_funding_payer_cash } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 12" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 12" }
+                scope:tca_test_funding_circuit = { remove_variable = tca_judicial_disabled }
+                if = { limit = { root = { tca_office_funding_base_value = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 13" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 13" }
+
+                # 通判直接由州付款；不借由其实际直属上级或皇帝转付。
+                scope:tca_test_funding_county.holder = {
+                    save_scope_as = tca_test_funding_county_payer
+                    save_scope_value_as = { name = tca_test_funding_county_cash value = treasury }
+                    save_scope_value_as = { name = tca_test_funding_county_expected value = { value = tca_office_funding_base_value multiply = 0.25 } }
+                }
+                scope:tca_test_funding_tongpan = { save_scope_value_as = { name = tca_test_funding_tongpan_cash value = treasury } }
+                scope:tca_test_funding_county_office = { remove_variable = tca_office_funding_paid tca_settle_office_funding_effect = yes }
+                if = { limit = { scope:tca_test_funding_county_payer = { treasury = { value = scope:tca_test_funding_county_cash subtract = scope:tca_test_funding_county_expected } } scope:tca_test_funding_tongpan = { treasury = { value = scope:tca_test_funding_tongpan_cash add = scope:tca_test_funding_county_expected } } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 17" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 17" }
+                if = { limit = { scope:tca_test_funding_county_expected > 0 scope:tca_test_funding_tongpan = { tca_office_funding_income_value = scope:tca_test_funding_county_expected } scope:tca_test_funding_county = { tca_office_funding_tongpan_expense_value = scope:tca_test_funding_county_expected } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 18" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 18" }
+                if = {
+                    limit = { scope:tca_test_funding_county_expected > 0 }
+                    scope:tca_test_funding_county_payer = { add_treasury = scope:tca_test_funding_county_expected }
+                    scope:tca_test_funding_tongpan = { remove_treasury = scope:tca_test_funding_county_expected }
+                }
+
+                # 清空付款余额仍应足额形成国库赤字；恢复余额不改变后续基数。
+                scope:tca_test_funding_payer = { if = { limit = { treasury > 0 } remove_treasury = scope:tca_test_funding_payer_cash } }
+                scope:tca_test_funding_circuit_office = { remove_variable = tca_office_funding_paid tca_settle_office_funding_effect = yes }
+                save_scope_value_as = { name = tca_test_funding_debt value = { value = 0 subtract = scope:tca_test_funding_amount } }
+                if = { limit = { scope:tca_test_funding_payer = { treasury = scope:tca_test_funding_debt } scope:tca_test_funding_officer = { treasury = { value = scope:tca_test_funding_recipient_cash add = scope:tca_test_funding_amount } } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 19" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 19" }
+                if = { limit = { scope:tca_test_funding_amount > 0 } scope:tca_test_funding_payer = { add_treasury = scope:tca_test_funding_amount } scope:tca_test_funding_officer = { remove_treasury = scope:tca_test_funding_amount } }
+                scope:tca_test_funding_payer = { if = { limit = { scope:tca_test_funding_payer_cash > 0 } add_treasury = scope:tca_test_funding_payer_cash } }
+
+                # 临时把官署授予路主官，直接验证同人自付排除；归还后恢复正常待遇。
+                scope:tca_test_funding_circuit_office = { set_variable = { name = tca_office_budget_superior_cooldown value = yes years = 5 } }
+                create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_test_funding_self_change }
+                scope:tca_test_funding_circuit_office = { change_title_holder = { holder = scope:tca_test_funding_payer change = scope:tca_test_funding_self_change } }
+                resolve_title_and_vassal_change = scope:tca_test_funding_self_change
+                # 原生授予官职会另行给予初始化国库（本机600→900）；
+                # 自付必须以授予完成后的余额为基线，不能把授予奖励误算为拨款。
+                scope:tca_test_funding_payer = { save_scope_value_as = { name = tca_test_funding_self_cash value = treasury } }
+                scope:tca_test_funding_circuit_office = { remove_variable = tca_office_funding_paid tca_settle_office_funding_effect = yes }
+                if = { limit = { scope:tca_test_funding_circuit_office = { holder = scope:tca_test_funding_payer tca_office_funding_amount_value = 0 NOT = { has_variable = tca_office_funding_paid } tca_office_funding_rate_value = 0.10 } scope:tca_test_funding_payer = { treasury = scope:tca_test_funding_self_cash } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 20" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 20" }
+                if = { limit = { scope:tca_test_funding_officer = { tca_office_funding_income_value = 0 } scope:tca_test_funding_circuit_office = { var:tca_office_budget_level = 4 } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 26" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 26" }
+                create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_test_funding_return_change }
+                scope:tca_test_funding_circuit_office = { change_title_holder = { holder = scope:tca_test_funding_officer change = scope:tca_test_funding_return_change } }
+                resolve_title_and_vassal_change = scope:tca_test_funding_return_change
+                scope:tca_test_funding_officer = { set_primary_title_to = scope:tca_test_funding_circuit_office tca_ensure_official_contract_effect = yes }
+                if = { limit = { scope:tca_test_funding_circuit_office = { holder = scope:tca_test_funding_officer tca_office_funding_rate_value = 0.10 } scope:tca_test_funding_officer = { vassal_contract_obligation_level:tca_circuit_office_budget = 4 } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 21" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 21" }
+                if = { limit = { scope:tca_test_funding_circuit_office = { has_variable = tca_office_budget_superior_cooldown } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 62" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 62" }
+                scope:tca_test_funding_circuit_office = { remove_variable = tca_office_budget_superior_cooldown }
+
+                # 清理两次临时授予带来的原生初始化资金，保持用例对正式世界的余额恢复。
+                scope:tca_test_funding_payer = {
+                    if = { limit = { treasury > scope:tca_test_funding_payer_cash } remove_treasury = { value = treasury subtract = scope:tca_test_funding_payer_cash } }
+                    else_if = { limit = { treasury < scope:tca_test_funding_payer_cash } add_treasury = { value = scope:tca_test_funding_payer_cash subtract = treasury } }
+                }
+                scope:tca_test_funding_officer = {
+                    if = { limit = { treasury > scope:tca_test_funding_recipient_cash } remove_treasury = { value = treasury subtract = scope:tca_test_funding_recipient_cash } }
+                    else_if = { limit = { treasury < scope:tca_test_funding_recipient_cash } add_treasury = { value = scope:tca_test_funding_recipient_cash subtract = treasury } }
+                }
+                scope:tca_test_funding_officer = { add_character_flag = tca_updating_official_contract vassal_contract_set_obligation_level = { type = tca_circuit_office_budget level = scope:tca_test_funding_old_level } remove_character_flag = tca_updating_official_contract tca_record_office_budget_effect = yes }
+                scope:tca_test_funding_tongpan = { add_character_flag = tca_updating_official_contract vassal_contract_set_obligation_level = { type = tca_tongpan_budget level = scope:tca_test_funding_old_county_level } remove_character_flag = tca_updating_official_contract tca_record_office_budget_effect = yes }
+                if = { limit = { scope:tca_test_funding_officer = { vassal_contract_obligation_level:tca_circuit_office_budget = scope:tca_test_funding_old_level } scope:tca_test_funding_tongpan = { vassal_contract_obligation_level:tca_tongpan_budget = scope:tca_test_funding_old_county_level } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 14" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 14" }
+                # 不人工调用月回调；等待原生王朝循环完整一月，核对两个正式官署都实际收到结算。
+                scope:tca_test_funding_circuit_office = { remove_variable = tca_office_funding_paid remove_variable = tca_office_funding_last_amount }
+                scope:tca_test_funding_county_office = { remove_variable = tca_office_funding_paid remove_variable = tca_office_funding_last_amount }
+                save_scope_value_as = { name = tca_test_funding_start value = current_date }
+                add_character_flag = tca_test_delayed_case_active
+                trigger_event = { id = tca_office_funding_test.1001 days = 35 }
+        }
+    }
+}
+
+# 延迟续接只观察真实月调度；保存作用域由 .1 传递，不重建付款结果。
+tca_office_funding_test.1001 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_test_funding_circuit_office = { var:tca_office_funding_paid >= scope:tca_test_funding_start var:tca_office_funding_last_amount > 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 15" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 15" }
+            if = { limit = { scope:tca_test_funding_county_office = { var:tca_office_funding_paid >= scope:tca_test_funding_start var:tca_office_funding_last_amount > 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 16" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 16" }
+            if = { limit = { scope:tca_test_funding_circuit_office.holder = { monthly_character_treasury_income = 0 monthly_character_treasury_variable_income = 0 } scope:tca_test_funding_county_office.holder = { monthly_character_treasury_income = 0 monthly_character_treasury_variable_income = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 22" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 22" }
+            if = { limit = { has_character_flag = tca_test_case_failed } change_variable = { name = tca_test_suite_failed add = 1 } debug_log = "TCA_TEST FAIL tca_test_office_funding" }
+            else = { change_variable = { name = tca_test_suite_passed add = 1 } debug_log = "TCA_TEST PASS tca_test_office_funding" }
+            if = { limit = { has_character_flag = tca_test_funding_restore_disabled } remove_character_flag = tca_test_funding_restore_disabled add_realm_law_skip_effects = tca_tongpan_disabled_law tca_refresh_tongpan_realm_effect = yes }
+            remove_character_flag = tca_test_delayed_case_active
+            tca_test_continue_delayed_effect = yes
+        }
+    }
+}

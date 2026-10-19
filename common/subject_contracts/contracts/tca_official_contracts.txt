@@ -1,6 +1,6 @@
-﻿# 沿用原生部职数值，使用官职专用资格与标记。
-# 官员身份义务；scope:subject 为官员，仅正式同步效果临时设置更新标记时允许修改。
-# 文武类别由共享 trigger 决定，当前军职入口恒否；下方三个等级是同一身份树。
+﻿# 官员身份沿用原生功绩与兵士权限；办公经费改由地方国库按契约比例拨付。
+# 官职身份；scope:subject 为官员，仅正式同步效果临时设置更新标记时允许修改。
+# 提刑、通判按官职互斥显示；只保留实际实现的两类官职。
 tca_official_obligations = {
 	display_mode = tree
 	defaults_to_highest_valid_level = yes
@@ -34,7 +34,7 @@ tca_official_obligations = {
 
 			flag = tca_official_obligation
 		}
-		tca_official_civil = {
+		tca_official_judicial = {
 			position = { 1 0 }
 			icon = "gfx/interface/icons/celestial_administration_types/icon_standard_administration.dds"
 			gui_tags = { civilian }
@@ -45,9 +45,11 @@ tca_official_obligations = {
 			}
 			ai_subject_desire = 0
 
+			# 提刑使用20点任职功绩；与通判档位共用界面位置，显示条件互斥。
+			is_shown = { scope:subject = { primary_title = { has_variable = tca_judicial_title } } }
 			is_valid = {
 				scope:subject = {
-					tca_is_civil_official_trigger = yes
+					tca_is_judicial_official_trigger = yes
 				}
 			}
 
@@ -58,117 +60,130 @@ tca_official_obligations = {
 
 			subject_modifier = {
 				monthly_merit = 20
-				monthly_treasury_from_ministry_budget_base = 1
 			}
 
 			flag = tca_official_obligation
-			flag = tca_official_civil_obligation
+			flag = tca_official_judicial_obligation
 			appointment_trait_flag = civilian_province
 		}
-		tca_official_military = {
-			position = { 2 0 }
-			icon = "gfx/interface/icons/celestial_administration_types/icon_military_administration.dds"
-			gui_tags = { military }
+		# 通判保持兵士限制，基础功绩为10；原生索引为2。
+		tca_official_tongpan = {
+			position = { 1 0 }
+			icon = "gfx/interface/icons/celestial_administration_types/icon_standard_administration.dds"
+			gui_tags = { civilian }
 			parent = tca_official_none
-
-			ai_liege_desire = {
-				value = 3
-			}
+			ai_liege_desire = { value = 2 }
 			ai_subject_desire = 0
-
+			is_shown = { scope:subject = { primary_title = { has_variable = tca_tongpan_title } } }
 			is_valid = {
 				scope:subject = {
-					tca_is_military_official_trigger = yes
+					tca_is_tongpan_official_trigger = yes
 				}
 			}
-
-			score = 3
+			score = 2
 			color = { 0.7 0.7 0.7 1.0 }
-
-			enable_title_maa = yes
-
-			subject_modifier = {
-				monthly_merit = 20
-				men_at_arms_recruitment_cost = -0.5
-				men_at_arms_maintenance = -0.5
-				monthly_treasury_from_military_budget_base = 2.5
-				monthly_treasury_from_ministry_budget_base = 1
-			}
-
+			enable_title_maa = no
+			subject_modifier = { monthly_merit = 10 }
 			flag = tca_official_obligation
-			flag = tca_official_military_obligation
-			appointment_trait_flag = military_province
+			flag = tca_official_tongpan_obligation
+			appointment_trait_flag = civilian_province
 		}
 	}
 }
 
-# 官员预算独立树；低／中／高调整原生部预算基础项，日常身份修复不覆盖玩家预算选择。
-tca_official_budget = {
-	display_mode = tree
-
-	is_shown = {
-		scope:subject = {
-			tca_is_landless_official_trigger = yes
-		}
-	}
-
-	obligation_levels = {
-		tca_official_budget_low = {
-			position = { 0 0 }
-
-			is_valid = {
-				scope:subject = {
-					tca_is_landless_official_trigger = yes
-				}
-			}
-
-			subject_modifier = {
-				monthly_treasury_from_ministry_budget_base = -0.5
-			}
-
-			ai_liege_desire = 0
-			ai_subject_desire = 0
-
-			subject_opinion = -15
-
-			score = -1
-
-		}
-		tca_official_budget_medium = {
-			parent = tca_official_budget_low
-			position = { 1 0 }
-
-			default = yes
-
-			ai_liege_desire = 0
-			ai_subject_desire = 0
-
-			subject_modifier = {
-
-			}
-
-			score = 0
-		}
-		tca_official_budget_high = {
-			parent = tca_official_budget_medium
-			position = { 2 0 }
-
-			is_valid = {
-				scope:subject = {
-					tca_is_landless_official_trigger = yes
-				}
-			}
-
-			subject_modifier = {
-				monthly_treasury_from_ministry_budget_base = 0.5
-			}
-
-			ai_liege_desire = 0
-			ai_subject_desire = 0
-
-			subject_opinion = 0
-
-			score = 1
-		}
-	}
+# 路司经费五档；好感沿用原版五档俸禄梯度，实际转账共用地方经费入口。
+tca_circuit_office_budget = {
+    can_be_changed = { scope:subject = { has_character_flag = tca_updating_official_contract } }
+    display_mode = tree
+    is_shown = { scope:subject = { tca_uses_circuit_budget_trigger = yes } }
+    obligation_levels = {
+        tca_circuit_office_budget_low = {
+            position = { 0 0 }
+            ai_liege_desire = 0
+            ai_subject_desire = 0
+            score = -2
+            subject_opinion = -25
+        }
+        tca_circuit_office_budget_frugal = {
+            parent = tca_circuit_office_budget_low
+            position = { 1 0 }
+            ai_liege_desire = 0
+            ai_subject_desire = 0
+            score = -1
+            subject_opinion = -15
+        }
+        tca_circuit_office_budget_medium = {
+            parent = tca_circuit_office_budget_frugal
+            position = { 2 0 }
+            default = yes
+            ai_liege_desire = 0
+            ai_subject_desire = 0
+            score = 0
+            subject_opinion = 0
+        }
+        tca_circuit_office_budget_increased = {
+            parent = tca_circuit_office_budget_medium
+            position = { 3 0 }
+            ai_liege_desire = 0
+            ai_subject_desire = 0
+            score = 1
+            subject_opinion = 5
+        }
+        tca_circuit_office_budget_high = {
+            parent = tca_circuit_office_budget_increased
+            position = { 4 0 }
+            ai_liege_desire = 0
+            ai_subject_desire = 0
+            score = 2
+            subject_opinion = 10
+        }
+    }
+}
+# 通判经费五档；只向对应官署显示，实际转账共用地方经费入口。
+tca_tongpan_budget = {
+    can_be_changed = { scope:subject = { has_character_flag = tca_updating_official_contract } }
+    display_mode = tree
+    is_shown = { scope:subject = { tca_uses_tongpan_budget_trigger = yes } }
+    obligation_levels = {
+        tca_tongpan_budget_low = {
+            position = { 0 0 }
+            ai_liege_desire = 0
+            ai_subject_desire = 0
+            score = -2
+            subject_opinion = -25
+        }
+        tca_tongpan_budget_frugal = {
+            parent = tca_tongpan_budget_low
+            position = { 1 0 }
+            ai_liege_desire = 0
+            ai_subject_desire = 0
+            score = -1
+            subject_opinion = -15
+        }
+        tca_tongpan_budget_medium = {
+            parent = tca_tongpan_budget_frugal
+            position = { 2 0 }
+            default = yes
+            ai_liege_desire = 0
+            ai_subject_desire = 0
+            score = 0
+            subject_opinion = 0
+        }
+        tca_tongpan_budget_increased = {
+            parent = tca_tongpan_budget_medium
+            position = { 3 0 }
+            ai_liege_desire = 0
+            ai_subject_desire = 0
+            score = 1
+            subject_opinion = 5
+        }
+        tca_tongpan_budget_high = {
+            parent = tca_tongpan_budget_increased
+            position = { 4 0 }
+            ai_liege_desire = 0
+            ai_subject_desire = 0
+            score = 2
+            subject_opinion = 10
+        }
+    }
 }

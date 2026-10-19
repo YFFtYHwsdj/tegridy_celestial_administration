@@ -1,0 +1,20 @@
+﻿# 互动作用域；actor 为管理者、recipient 为官员，LEVEL 为0到4的目标档位。
+# 接受时重验权限、邻档和各自冷却；只修改待遇，不立即付款、不改领属或原生俸禄冷却。
+tca_apply_office_budget_effect = {
+    if = {
+        limit = { tca_office_budget_manager_ready_trigger = yes scope:recipient = { tca_office_budget_adjacent_trigger = { LEVEL = $LEVEL$ } } }
+        if = { limit = { debug_only = yes } debug_log = "TCA_OFFICE_BUDGET APPLIED" }
+        scope:recipient = {
+            add_character_flag = tca_updating_official_contract
+            if = { limit = { tca_is_tongpan_official_trigger = yes } vassal_contract_set_obligation_level = { type = tca_tongpan_budget level = $LEVEL$ } }
+            else = { vassal_contract_set_obligation_level = { type = tca_circuit_office_budget level = $LEVEL$ } }
+            remove_character_flag = tca_updating_official_contract
+            tca_record_office_budget_effect = yes
+            if = {
+                limit = { tca_is_tongpan_official_trigger = yes primary_title.var:tca_tongpan_county.holder = scope:actor }
+                primary_title = { set_variable = { name = tca_office_budget_local_cooldown value = yes years = admin_contract_cooldown_value } }
+            }
+            else = { primary_title = { set_variable = { name = tca_office_budget_superior_cooldown value = yes years = admin_contract_cooldown_value } } }
+        }
+    }
+}

@@ -1,0 +1,45 @@
+﻿# 互动作用域；subject 为官员，actor 为管理者。冷却留在官署，任免不重置。
+# 不读取原生个人改约冷却；通判的地方与上级槽位互不阻塞。
+tca_office_budget_manager_ready_trigger = {
+    scope:actor = { NOT = { is_at_war_with = scope:recipient } }
+    scope:recipient = {
+        tca_is_landless_official_trigger = yes
+        tca_can_edit_admin_contract_trigger = { EDITOR = scope:actor }
+        primary_title = { tca_office_can_receive_funding_trigger = yes }
+        trigger_if = {
+            limit = { tca_is_tongpan_official_trigger = yes primary_title.var:tca_tongpan_county.holder = scope:actor }
+            primary_title = { NOT = { has_variable = tca_office_budget_local_cooldown } }
+        }
+        trigger_else = { primary_title = { NOT = { has_variable = tca_office_budget_superior_cooldown } } }
+    }
+}
+# 请求互动作用域；官员仍向实际直属上级提出请求，独立记录请求冷却。
+tca_office_budget_request_ready_trigger = {
+    scope:actor = {
+        tca_is_landless_official_trigger = yes
+        liege = scope:recipient
+        tca_can_edit_admin_contract_trigger = { EDITOR = scope:recipient }
+        primary_title = {
+            tca_office_can_receive_funding_trigger = yes
+            NOT = { has_variable = tca_office_budget_request_cooldown }
+            NOT = { has_variable = tca_office_budget_superior_cooldown }
+        }
+    }
+}
+# 官员人物作用域，LEVEL 为目标档位。当前档及跨档均不可提交，维护可直接恢复既有待遇。
+tca_office_budget_adjacent_trigger = {
+    OR = {
+        tca_office_budget_previous_value = $LEVEL$
+        tca_office_budget_next_value = $LEVEL$
+    }
+}
+# 互动作用域；双方入口共享选档判定，防止已打开窗口在另一人改约后提交过时目标。
+tca_office_budget_selected_adjacent_trigger = {
+    OR = {
+        AND = { scope:tca_budget_0 = yes scope:recipient = { tca_office_budget_adjacent_trigger = { LEVEL = 0 } } }
+        AND = { scope:tca_budget_1 = yes scope:recipient = { tca_office_budget_adjacent_trigger = { LEVEL = 1 } } }
+        AND = { scope:tca_budget_2 = yes scope:recipient = { tca_office_budget_adjacent_trigger = { LEVEL = 2 } } }
+        AND = { scope:tca_budget_3 = yes scope:recipient = { tca_office_budget_adjacent_trigger = { LEVEL = 3 } } }
+        AND = { scope:tca_budget_4 = yes scope:recipient = { tca_office_budget_adjacent_trigger = { LEVEL = 4 } } }
+    }
+}

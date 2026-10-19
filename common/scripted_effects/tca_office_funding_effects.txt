@@ -1,0 +1,105 @@
+﻿# 官员人物作用域；原生改约成功后，把预算档位保存到当前官署头衔。
+# 仅正式改约调用；维护入口不得用新任人物的默认值覆盖既有头衔待遇。
+tca_record_office_budget_effect = {
+    if = {
+        limit = { tca_is_landless_official_trigger = yes }
+        if = {
+            limit = { tca_uses_tongpan_budget_trigger = yes }
+            save_scope_value_as = { name = tca_office_new_level value = vassal_contract_obligation_level:tca_tongpan_budget }
+        }
+        else = { save_scope_value_as = { name = tca_office_new_level value = vassal_contract_obligation_level:tca_circuit_office_budget } }
+        primary_title = { set_variable = { name = tca_office_budget_level value = scope:tca_office_new_level } }
+    }
+}
+
+# 官员人物作用域；原生改约遍历 changed_obligations 时调用，必需 scope:obligation。
+# 只记录本署经费类型；领主发起与官员请求接受两条路径均调用，不设置或重置其他契约。
+tca_record_changed_office_budget_effect = {
+    if = {
+        limit = {
+            OR = {
+                scope:obligation.vassal_contract_type = vassal_contract:tca_circuit_office_budget
+                scope:obligation.vassal_contract_type = vassal_contract:tca_tongpan_budget
+            }
+        }
+        tca_record_office_budget_effect = yes
+    }
+}
+
+# 官员人物作用域；初始化头衔待遇，或在换任后恢复契约预算；不改变其他契约项。
+tca_ensure_office_budget_effect = {
+    if = {
+        limit = { tca_is_landless_official_trigger = yes }
+        if = {
+            limit = { primary_title = { has_variable = tca_office_budget_level } }
+            if = {
+                limit = { tca_uses_tongpan_budget_trigger = yes }
+                if = {
+                    limit = { vassal_contract_obligation_level:tca_tongpan_budget != primary_title.var:tca_office_budget_level }
+                    vassal_contract_set_obligation_level = { type = tca_tongpan_budget level = primary_title.var:tca_office_budget_level }
+                }
+            }
+            else_if = {
+                limit = { vassal_contract_obligation_level:tca_circuit_office_budget != primary_title.var:tca_office_budget_level }
+                vassal_contract_set_obligation_level = { type = tca_circuit_office_budget level = primary_title.var:tca_office_budget_level }
+            }
+        }
+        else = { tca_record_office_budget_effect = yes }
+    }
+}
+
+# 官署头衔作用域；批量结算先为所有官署锁定金额，避免前一笔赤字引起的原生刷新改变后一笔基数。
+# 临时报价在同一月回调消费；每次准备先清理旧值，不跨事件或跨月保留。
+tca_quote_office_funding_effect = {
+    remove_variable = tca_office_funding_quote
+    if = {
+        limit = { tca_office_funding_age_value >= 30 tca_office_can_receive_funding_trigger = yes }
+        set_variable = { name = tca_office_funding_quote value = tca_office_funding_amount_value }
+    }
+}
+
+# 官署头衔作用域；先解析实际付款人，再以同一金额完成借贷。
+# 正额才调用资金效果；本机引擎拒绝 remove_treasury = 0。
+# 30日防重标记留在官署，任免不会使同一周期重新领款；无欠款或追补。
+tca_settle_office_funding_effect = {
+    if = {
+        limit = { tca_office_funding_age_value >= 30 tca_office_can_receive_funding_trigger = yes }
+        holder = { save_scope_as = tca_funding_recipient }
+        if = { limit = { has_variable = tca_tongpan_title } var:tca_tongpan_county.holder = { save_scope_as = tca_funding_payer } }
+        else = { var:song_judicial_circuit.holder = { save_scope_as = tca_funding_payer } }
+        if = {
+            limit = { has_variable = tca_office_funding_quote }
+            save_scope_value_as = { name = tca_funding_amount value = var:tca_office_funding_quote }
+        }
+        else = { save_scope_value_as = { name = tca_funding_amount value = tca_office_funding_amount_value } }
+        set_variable = { name = tca_office_funding_paid value = current_date }
+        set_variable = { name = tca_office_funding_last_amount value = scope:tca_funding_amount }
+        if = {
+            limit = { scope:tca_funding_amount > 0 }
+            scope:tca_funding_payer = { remove_treasury = scope:tca_funding_amount }
+            scope:tca_funding_recipient = { add_treasury = scope:tca_funding_amount }
+        }
+    }
+    remove_variable = tca_office_funding_quote
+}
+
+# 王朝循环局势月脉冲入口；遍历现有注册表。重复局势回调由各官署30日标记防重。
+# 不假定脉冲发生在人物原生财政缓存刷新之后，也不强制刷新所有AI。
+tca_settle_all_office_funding_effect = {
+    every_in_global_list = {
+        variable = tca_judicial_circuits
+        var:song_judicial_title ?= { tca_quote_office_funding_effect = yes }
+    }
+    every_in_global_list = {
+        variable = tca_tongpan_counties
+        var:tca_tongpan_office ?= { tca_quote_office_funding_effect = yes }
+    }
+    every_in_global_list = {
+        variable = tca_judicial_circuits
+        var:song_judicial_title ?= { tca_settle_office_funding_effect = yes }
+    }
+    every_in_global_list = {
+        variable = tca_tongpan_counties
+        var:tca_tongpan_office ?= { tca_settle_office_funding_effect = yes }
+    }
+}

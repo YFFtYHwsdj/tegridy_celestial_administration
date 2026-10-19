@@ -1,0 +1,184 @@
+﻿# 官署经费由普通互动承载原生选档数据；不调用要求直属关系的契约窗口。
+tca_adjust_office_budget_interaction = {
+    category = interaction_category_vassal
+    common_interaction = yes
+    icon = icon_contract_modification_single
+    desc = tca_adjust_office_budget_interaction_desc
+    send_name = tca_adjust_office_budget_interaction
+    options_heading = tca_office_budget_options_heading
+    auto_accept = yes
+    is_shown = { scope:recipient = { tca_is_landless_official_trigger = yes tca_can_edit_admin_contract_trigger = { EDITOR = scope:actor } } }
+    is_valid_showing_failures_only = { custom_tooltip = { text = tca_office_budget_cooldown_tt tca_office_budget_manager_ready_trigger = yes } }
+    can_send = { custom_tooltip = { text = tca_office_budget_cooldown_tt tca_office_budget_manager_ready_trigger = yes } custom_tooltip = { text = tca_office_budget_adjacent_tt tca_office_budget_selected_adjacent_trigger = yes } }
+    send_options_exclusive = yes
+    send_option = {
+        flag = tca_budget_0
+        localization = tca_office_budget_option_0
+        current_description = tca_office_budget_option_0_desc
+        starts_enabled = { scope:recipient = { tca_office_budget_current_value = 0 } }
+        is_valid = { custom_tooltip = { text = tca_office_budget_adjacent_tt scope:recipient = { tca_office_budget_adjacent_trigger = { LEVEL = 0 } } } }
+        can_invalidate_interaction = yes
+    }
+    send_option = {
+        flag = tca_budget_1
+        localization = tca_office_budget_option_1
+        current_description = tca_office_budget_option_1_desc
+        starts_enabled = { scope:recipient = { tca_office_budget_current_value = 1 } }
+        is_valid = { custom_tooltip = { text = tca_office_budget_adjacent_tt scope:recipient = { tca_office_budget_adjacent_trigger = { LEVEL = 1 } } } }
+        can_invalidate_interaction = yes
+    }
+    send_option = {
+        flag = tca_budget_2
+        localization = tca_office_budget_option_2
+        current_description = tca_office_budget_option_2_desc
+        starts_enabled = { scope:recipient = { tca_office_budget_current_value = 2 } }
+        is_valid = { custom_tooltip = { text = tca_office_budget_adjacent_tt scope:recipient = { tca_office_budget_adjacent_trigger = { LEVEL = 2 } } } }
+        can_invalidate_interaction = yes
+    }
+    send_option = {
+        flag = tca_budget_3
+        localization = tca_office_budget_option_3
+        current_description = tca_office_budget_option_3_desc
+        starts_enabled = { scope:recipient = { tca_office_budget_current_value = 3 } }
+        is_valid = { custom_tooltip = { text = tca_office_budget_adjacent_tt scope:recipient = { tca_office_budget_adjacent_trigger = { LEVEL = 3 } } } }
+        can_invalidate_interaction = yes
+    }
+    send_option = {
+        flag = tca_budget_4
+        localization = tca_office_budget_option_4
+        current_description = tca_office_budget_option_4_desc
+        starts_enabled = { scope:recipient = { tca_office_budget_current_value = 4 } }
+        is_valid = { custom_tooltip = { text = tca_office_budget_adjacent_tt scope:recipient = { tca_office_budget_adjacent_trigger = { LEVEL = 4 } } } }
+        can_invalidate_interaction = yes
+    }
+    on_accept = {
+        custom_tooltip = tca_office_budget_result_tt
+        hidden_effect = {
+            if = { limit = { scope:tca_budget_0 = yes } if = { limit = { debug_only = yes } debug_log = "TCA_OFFICE_BUDGET SELECTED 0" } tca_apply_office_budget_effect = { LEVEL = 0 } }
+            if = { limit = { scope:tca_budget_1 = yes } if = { limit = { debug_only = yes } debug_log = "TCA_OFFICE_BUDGET SELECTED 1" } tca_apply_office_budget_effect = { LEVEL = 1 } }
+            if = { limit = { scope:tca_budget_2 = yes } if = { limit = { debug_only = yes } debug_log = "TCA_OFFICE_BUDGET SELECTED 2" } tca_apply_office_budget_effect = { LEVEL = 2 } }
+            if = { limit = { scope:tca_budget_3 = yes } if = { limit = { debug_only = yes } debug_log = "TCA_OFFICE_BUDGET SELECTED 3" } tca_apply_office_budget_effect = { LEVEL = 3 } }
+            if = { limit = { scope:tca_budget_4 = yes } if = { limit = { debug_only = yes } debug_log = "TCA_OFFICE_BUDGET SELECTED 4" } tca_apply_office_budget_effect = { LEVEL = 4 } }
+        }
+    }
+    ai_frequency = 12
+    ai_targets = { ai_recipients = realm_characters max = 10 }
+    # 只让持有付款辖区或实际统辖官员的人考虑本互动，避免普通天朝人物扫描全政权。
+    is_available = { government_has_flag = government_is_celestial is_ruler = yes OR = { any_held_title = { OR = { has_variable = tca_tongpan_office has_variable = song_judicial_title } } any_vassal = { tca_is_landless_official_trigger = yes } } }
+    ai_target_quick_trigger = { adult = yes }
+    ai_will_do = { base = 0 modifier = { add = tca_office_budget_ai_action_value } }
+}
+
+# 官员请求相邻待遇，面向实际直属管理者；双方经费档位仍只有一份。
+tca_request_office_budget_interaction = {
+    category = interaction_category_vassal
+    common_interaction = yes
+    icon = icon_contract_modification_single
+    desc = tca_request_office_budget_interaction_desc
+    send_name = tca_request_office_budget_interaction
+    options_heading = tca_office_budget_options_heading
+    is_shown = { scope:actor = { tca_is_landless_official_trigger = yes liege = scope:recipient tca_can_edit_admin_contract_trigger = { EDITOR = scope:recipient } } }
+    is_valid_showing_failures_only = { custom_tooltip = { text = tca_office_budget_request_cooldown_tt tca_office_budget_request_ready_trigger = yes } }
+    can_send = {
+        custom_tooltip = { text = tca_office_budget_request_cooldown_tt tca_office_budget_request_ready_trigger = yes }
+        custom_tooltip = { text = tca_office_budget_adjacent_tt OR = {
+            AND = { scope:tca_budget_0 = yes scope:actor = { tca_office_budget_adjacent_trigger = { LEVEL = 0 } } }
+            AND = { scope:tca_budget_1 = yes scope:actor = { tca_office_budget_adjacent_trigger = { LEVEL = 1 } } }
+            AND = { scope:tca_budget_2 = yes scope:actor = { tca_office_budget_adjacent_trigger = { LEVEL = 2 } } }
+            AND = { scope:tca_budget_3 = yes scope:actor = { tca_office_budget_adjacent_trigger = { LEVEL = 3 } } }
+            AND = { scope:tca_budget_4 = yes scope:actor = { tca_office_budget_adjacent_trigger = { LEVEL = 4 } } }
+        } }
+    }
+    send_options_exclusive = yes
+    send_option = {
+        flag = tca_budget_0
+        localization = tca_office_budget_option_0
+        current_description = tca_office_budget_request_option_0_desc
+        starts_enabled = { scope:actor = { tca_office_budget_current_value = 0 } }
+        is_valid = { custom_tooltip = { text = tca_office_budget_adjacent_tt scope:actor = { tca_office_budget_adjacent_trigger = { LEVEL = 0 } } } }
+        can_invalidate_interaction = yes
+    }
+    send_option = {
+        flag = tca_budget_1
+        localization = tca_office_budget_option_1
+        current_description = tca_office_budget_request_option_1_desc
+        starts_enabled = { scope:actor = { tca_office_budget_current_value = 1 } }
+        is_valid = { custom_tooltip = { text = tca_office_budget_adjacent_tt scope:actor = { tca_office_budget_adjacent_trigger = { LEVEL = 1 } } } }
+        can_invalidate_interaction = yes
+    }
+    send_option = {
+        flag = tca_budget_2
+        localization = tca_office_budget_option_2
+        current_description = tca_office_budget_request_option_2_desc
+        starts_enabled = { scope:actor = { tca_office_budget_current_value = 2 } }
+        is_valid = { custom_tooltip = { text = tca_office_budget_adjacent_tt scope:actor = { tca_office_budget_adjacent_trigger = { LEVEL = 2 } } } }
+        can_invalidate_interaction = yes
+    }
+    send_option = {
+        flag = tca_budget_3
+        localization = tca_office_budget_option_3
+        current_description = tca_office_budget_request_option_3_desc
+        starts_enabled = { scope:actor = { tca_office_budget_current_value = 3 } }
+        is_valid = { custom_tooltip = { text = tca_office_budget_adjacent_tt scope:actor = { tca_office_budget_adjacent_trigger = { LEVEL = 3 } } } }
+        can_invalidate_interaction = yes
+    }
+    send_option = {
+        flag = tca_budget_4
+        localization = tca_office_budget_option_4
+        current_description = tca_office_budget_request_option_4_desc
+        starts_enabled = { scope:actor = { tca_office_budget_current_value = 4 } }
+        is_valid = { custom_tooltip = { text = tca_office_budget_adjacent_tt scope:actor = { tca_office_budget_adjacent_trigger = { LEVEL = 4 } } } }
+        can_invalidate_interaction = yes
+    }
+    # 只记录发起时的官署；61日超过原生60日互动过期，接受／拒绝时立即清理。
+    # 不在发送时记请求冷却，否则待回复互动会被自身的发送条件判为失效。
+    on_send = { scope:actor = { set_variable = { name = tca_office_budget_requested_office value = primary_title days = 61 } } }
+    on_decline = {
+        scope:actor = {
+            if = { limit = { has_variable = tca_office_budget_requested_office } var:tca_office_budget_requested_office = { set_variable = { name = tca_office_budget_request_cooldown value = yes years = admin_contract_cooldown_value } } }
+            remove_variable = tca_office_budget_requested_office
+        }
+    }
+    on_accept = {
+        custom_tooltip = tca_office_budget_request_result_tt
+        hidden_effect = {
+            scope:actor = { save_scope_as = tca_budget_requester }
+            # 异步回复期间发生换任时，不能把旧官署请求套到新主头衔。
+            if = {
+                limit = { scope:actor = { has_variable = tca_office_budget_requested_office primary_title = var:tca_office_budget_requested_office } }
+                scope:recipient = { save_scope_as = tca_budget_request_manager }
+                scope:tca_budget_requester = { save_scope_as = recipient }
+                scope:tca_budget_request_manager = { save_scope_as = actor }
+                if = { limit = { scope:tca_budget_0 = yes } if = { limit = { debug_only = yes } debug_log = "TCA_OFFICE_BUDGET SELECTED 0" } tca_apply_office_budget_effect = { LEVEL = 0 } }
+                if = { limit = { scope:tca_budget_1 = yes } if = { limit = { debug_only = yes } debug_log = "TCA_OFFICE_BUDGET SELECTED 1" } tca_apply_office_budget_effect = { LEVEL = 1 } }
+                if = { limit = { scope:tca_budget_2 = yes } if = { limit = { debug_only = yes } debug_log = "TCA_OFFICE_BUDGET SELECTED 2" } tca_apply_office_budget_effect = { LEVEL = 2 } }
+                if = { limit = { scope:tca_budget_3 = yes } if = { limit = { debug_only = yes } debug_log = "TCA_OFFICE_BUDGET SELECTED 3" } tca_apply_office_budget_effect = { LEVEL = 3 } }
+                if = { limit = { scope:tca_budget_4 = yes } if = { limit = { debug_only = yes } debug_log = "TCA_OFFICE_BUDGET SELECTED 4" } tca_apply_office_budget_effect = { LEVEL = 4 } }
+                scope:tca_budget_requester = { save_scope_as = actor }
+                scope:tca_budget_request_manager = { save_scope_as = recipient }
+            }
+            scope:tca_budget_requester = {
+                if = { limit = { has_variable = tca_office_budget_requested_office } var:tca_office_budget_requested_office = { set_variable = { name = tca_office_budget_request_cooldown value = yes years = admin_contract_cooldown_value } } }
+                remove_variable = tca_office_budget_requested_office
+            }
+        }
+    }
+    ai_accept = {
+        base = -25
+        opinion_modifier = { who = scope:recipient opinion_target = scope:actor multiplier = 0.5 desc = AI_OPINION_REASON }
+        modifier = { scope:tca_budget_0 = yes scope:actor = { tca_office_budget_ai_target_value >= 0 } add = 100 desc = tca_office_budget_ai_affordable }
+        modifier = { scope:tca_budget_1 = yes scope:actor = { tca_office_budget_ai_target_value >= 1 } add = 100 desc = tca_office_budget_ai_affordable }
+        modifier = { scope:tca_budget_2 = yes scope:actor = { tca_office_budget_ai_target_value >= 2 } add = 100 desc = tca_office_budget_ai_affordable }
+        modifier = { scope:tca_budget_3 = yes scope:actor = { tca_office_budget_ai_target_value >= 3 } add = 100 desc = tca_office_budget_ai_affordable }
+        modifier = { scope:tca_budget_4 = yes scope:actor = { tca_office_budget_ai_target_value >= 4 } add = 100 desc = tca_office_budget_ai_affordable }
+    }
+    ai_frequency = 24
+    ai_targets = { ai_recipients = liege }
+    ai_will_do = {
+        base = 0
+        modifier = { scope:tca_budget_1 = yes scope:actor = { tca_office_budget_current_value = 0 tca_office_budget_ai_target_value >= 1 } add = 100 }
+        modifier = { scope:tca_budget_2 = yes scope:actor = { tca_office_budget_current_value = 1 tca_office_budget_ai_target_value >= 2 } add = 100 }
+        modifier = { scope:tca_budget_3 = yes scope:actor = { tca_office_budget_current_value = 2 tca_office_budget_ai_target_value >= 3 } add = 100 }
+        modifier = { scope:tca_budget_4 = yes scope:actor = { tca_office_budget_current_value = 3 tca_office_budget_ai_target_value >= 4 } add = 100 }
+    }
+}

@@ -1,0 +1,421 @@
+﻿# 国库顶栏专用明细；保留原生列表，追加当前玩家的官署经费及合计。
+# 提示框只有明确传入的 ValueBreakdown，不依赖未绑定的 Character；人物统一从 GetPlayer 读取。
+types TcaOfficeFunding {
+type tca_office_funding_income_section = vbox {
+		spacing = 5
+		alwaystransparent = no
+
+		vbox = {
+			layoutpolicy_horizontal = expanding
+
+			text_single = {
+				layoutpolicy_horizontal = expanding
+				text = "[ValueBreakdown.GetName]"
+				default_format = "#T"
+
+				block "header_background" {
+					background = {
+						using = Background_Area
+						margin = { 10 5 }
+						margin_bottom = 10
+					}
+				}
+			}
+
+			vbox = {
+				name = "values_grid"
+				datamodel = "[ValueBreakdown.GetSubValues]"
+				layoutpolicy_horizontal = expanding
+				margin_top = 10
+
+				item = {
+					hbox = {
+						name = "value_breakdown"
+						layoutpolicy_horizontal = expanding
+						spacing = 10
+
+						text_single = {
+							name = "name"
+							layoutpolicy_horizontal = expanding
+							text = "[ValueBreakdown.GetName]"
+						}
+
+						text_single = {
+							name = "value_with_tooltip"
+							visible = "[And(ValueBreakdown.HasTooltip, ValueBreakdown.ShouldShowValue)]"
+							text = "[ValueBreakdown.GetValue|L]"
+							align = right
+							default_format = "#high"
+
+							using = tooltip_se
+
+							tooltipwidget = {
+								widget_value_breakdown_tooltip = {}
+							}
+						}
+
+						text_single = {
+							name = "value_with_no_tooltip"
+							visible = "[And( Not(ValueBreakdown.HasTooltip), ValueBreakdown.ShouldShowValue )]"
+							text = "[ValueBreakdown.GetValue]"
+							align = right
+						}
+					}
+				}
+			}
+
+            hbox = {
+                spacing = 10
+                layoutpolicy_horizontal = expanding
+                visible = "[NotEqualTo_CFixedPoint(GetPlayer.MakeScope.ScriptValue('tca_office_funding_income_value'), '(CFixedPoint)0')]"
+                text_single = { layoutpolicy_horizontal = expanding align = left fonttintcolor = "[TooltipInfo.GetTintColor]" text = "tca_office_funding_receipt" }
+                text_single = {
+                    fonttintcolor = "[TooltipInfo.GetTintColor]"
+                    align = right
+                    default_format = "#P"
+                    text = "[GetPlayer.MakeScope.ScriptValue('tca_office_funding_income_value')|+1L]"
+                    tooltipwidget = {
+                        tca_office_funding_income_breakdown = {}
+                    }
+                    using = tooltip_se
+                }
+            }
+
+			text_single = {
+				visible = "[And(Not(DataModelHasItems(ValueBreakdown.GetSubValues)), EqualTo_CFixedPoint(GetPlayer.MakeScope.ScriptValue('tca_office_funding_income_value'), '(CFixedPoint)0'))]"
+				layoutpolicy_horizontal = expanding
+				block "no_values" {
+					text = "VALUE_BREAKDOWN_NO_VALUES"
+				}
+				default_format = "#weak"
+			}
+
+			vbox = {
+				layoutpolicy_horizontal = expanding
+				margin_top = 10
+
+				divider_light = {
+					layoutpolicy_horizontal = expanding
+				}
+
+				hbox = {
+					visible = "[Or(DataModelHasItems(ValueBreakdown.GetSubValues), NotEqualTo_CFixedPoint(GetPlayer.MakeScope.ScriptValue('tca_office_funding_income_value'), '(CFixedPoint)0'))]"
+					layoutpolicy_horizontal = expanding
+
+					text_single = {
+						visible = "[ValueBreakdown.ShouldShowValue]"
+						layoutpolicy_horizontal = expanding
+						text = "VALUE_BREAKDOWN_TOTAL"
+					}
+
+					text_single = {
+						text = "[Add_CFixedPoint(ValueBreakdown.GetFixedPointValue, GetPlayer.MakeScope.ScriptValue('tca_office_funding_income_value'))|+1]"
+						default_format = "#high"
+					}
+				}
+			}
+		}
+	}
+type tca_office_funding_expense_section = vbox {
+		spacing = 5
+		alwaystransparent = no
+
+		vbox = {
+			layoutpolicy_horizontal = expanding
+
+			text_single = {
+				layoutpolicy_horizontal = expanding
+				text = "[ValueBreakdown.GetName]"
+				default_format = "#T"
+
+				block "header_background" {
+					background = {
+						using = Background_Area
+						margin = { 10 5 }
+						margin_bottom = 10
+					}
+				}
+			}
+
+			vbox = {
+				name = "values_grid"
+				datamodel = "[ValueBreakdown.GetSubValues]"
+				layoutpolicy_horizontal = expanding
+				margin_top = 10
+
+				item = {
+					hbox = {
+						name = "value_breakdown"
+						layoutpolicy_horizontal = expanding
+						spacing = 10
+
+						text_single = {
+							name = "name"
+							layoutpolicy_horizontal = expanding
+							text = "[ValueBreakdown.GetName]"
+						}
+
+						text_single = {
+							name = "value_with_tooltip"
+							visible = "[And(ValueBreakdown.HasTooltip, ValueBreakdown.ShouldShowValue)]"
+							text = "[ValueBreakdown.GetValue|L]"
+							align = right
+							default_format = "#high"
+
+							using = tooltip_se
+
+							tooltipwidget = {
+								widget_value_breakdown_tooltip = {}
+							}
+						}
+
+						text_single = {
+							name = "value_with_no_tooltip"
+							visible = "[And( Not(ValueBreakdown.HasTooltip), ValueBreakdown.ShouldShowValue )]"
+							text = "[ValueBreakdown.GetValue]"
+							align = right
+						}
+					}
+				}
+			}
+
+            hbox = {
+                spacing = 10
+                layoutpolicy_horizontal = expanding
+                visible = "[NotEqualTo_CFixedPoint(GetPlayer.MakeScope.ScriptValue('tca_office_funding_expense_value'), '(CFixedPoint)0')]"
+                text_single = { layoutpolicy_horizontal = expanding align = left fonttintcolor = "[TooltipInfo.GetTintColor]" text = "tca_office_funding_payment" }
+                text_single = {
+                    fonttintcolor = "[TooltipInfo.GetTintColor]"
+                    align = right
+                    text = "[Subtract_CFixedPoint('(CFixedPoint)0', GetPlayer.MakeScope.ScriptValue('tca_office_funding_expense_value'))|1L]"
+                    tooltipwidget = {
+                        tca_office_funding_expense_breakdown = {}
+                    }
+                    using = tooltip_se
+                }
+            }
+
+			text_single = {
+				visible = "[And(Not(DataModelHasItems(ValueBreakdown.GetSubValues)), EqualTo_CFixedPoint(GetPlayer.MakeScope.ScriptValue('tca_office_funding_expense_value'), '(CFixedPoint)0'))]"
+				layoutpolicy_horizontal = expanding
+				block "no_values" {
+					text = "VALUE_BREAKDOWN_NO_VALUES"
+				}
+				default_format = "#weak"
+			}
+
+			vbox = {
+				layoutpolicy_horizontal = expanding
+				margin_top = 10
+
+				divider_light = {
+					layoutpolicy_horizontal = expanding
+				}
+
+				hbox = {
+					visible = "[Or(DataModelHasItems(ValueBreakdown.GetSubValues), NotEqualTo_CFixedPoint(GetPlayer.MakeScope.ScriptValue('tca_office_funding_expense_value'), '(CFixedPoint)0'))]"
+					layoutpolicy_horizontal = expanding
+
+					text_single = {
+						visible = "[ValueBreakdown.ShouldShowValue]"
+						layoutpolicy_horizontal = expanding
+						text = "VALUE_BREAKDOWN_TOTAL"
+					}
+
+					text_single = {
+						text = "[Subtract_CFixedPoint(ValueBreakdown.GetFixedPointValue, GetPlayer.MakeScope.ScriptValue('tca_office_funding_expense_value'))|+1]"
+						default_format = "#high"
+					}
+				}
+			}
+		}
+	}
+type tca_office_funding_treasury_tooltip = widget {
+		alwaystransparent = no
+
+		block "background" { ## 保留原版提示框背景插槽。
+			using = DefaultTooltipBackground
+		}
+
+		vbox = {
+			layoutpolicy_horizontal = expanding
+
+			set_parent_size_to_minimum = yes
+
+			block "margins"
+			{
+				margin = { 15 8 }
+				margin_bottom = 20
+				spacing = 15
+			}
+
+			block "my_gold" {}
+
+			tca_office_funding_income_section = {
+				name = "income"
+				layoutpolicy_horizontal = expanding
+				block "income" {}
+			}
+
+			tca_office_funding_expense_section = {
+				name = "expenses"
+				layoutpolicy_horizontal = expanding
+				block "expenses" {}
+			}
+
+			block "gold_income" {}
+
+			block "extra_info" {}
+		}
+	}
+
+# 原生 GetTitles 提供逐头衔 Title 上下文；人物名称可悬停、跳转，数字不带语义颜色或链接。
+# 全宽容器保证标题靠左、金额靠右；文字沿用原版 TooltipInfo 的白／灰焦点着色。
+# 不把脚本值的地区分组当作人物明细，也不建立需要维护的界面名单。
+type tca_office_funding_person_row = hbox {
+    layoutpolicy_horizontal = expanding
+    spacing = 10
+    text_single = {
+        layoutpolicy_horizontal = expanding
+        min_width = 180
+        max_width = 275
+        align = left
+        fonttintcolor = "[TooltipInfo.GetTintColor]"
+        block "funding_person_name" {}
+    }
+    text_single = {
+        layoutpolicy_horizontal = expanding
+        fonttintcolor = "[TooltipInfo.GetTintColor]"
+        align = right
+        block "funding_person_amount" {}
+    }
+}
+
+# 收入列拨款主官；兼任官署各列一行。
+type tca_office_funding_income_breakdown = widget {
+    alwaystransparent = no
+    using = DefaultTooltipBackground
+    vbox = {
+        layoutpolicy_horizontal = expanding
+        set_parent_size_to_minimum = yes
+        margin = { 20 10 }
+        spacing = 5
+        text_single = {
+            layoutpolicy_horizontal = expanding
+            align = left
+            text = "tca_office_funding_receipt"
+            default_format = "#T"
+            fonttintcolor = "[TooltipInfo.GetTintColor]"
+        }
+        vbox = {
+            layoutpolicy_horizontal = expanding
+            block "funding_titles" { datamodel = "[GetPlayer.GetTitles]" }
+            ignoreinvisible = yes
+            spacing = 5
+            item = {
+                # 整项无收支时不占列表间距；类别行隐藏时也不占内部间距。
+                vbox = {
+                    visible = "[GreaterThan_CFixedPoint(Title.MakeScope.ScriptValue('tca_office_funding_amount_value'), '(CFixedPoint)0')]"
+                    ignoreinvisible = yes
+                    layoutpolicy_horizontal = expanding
+                    spacing = 5
+                    tca_office_funding_person_row = {
+                        visible = "[And(Title.MakeScope.HasFlag('tca_judicial_title'), GreaterThan_CFixedPoint(Title.MakeScope.ScriptValue('tca_office_funding_amount_value'), '(CFixedPoint)0'))]"
+                        blockoverride "funding_person_name" { text = "[Title.MakeScope.Var('song_judicial_circuit').Title.GetHolder.GetName]" }
+                        blockoverride "funding_person_amount" { text = "[Title.MakeScope.ScriptValue('tca_office_funding_amount_value')|1]" }
+                    }
+                    tca_office_funding_person_row = {
+                        visible = "[And(Title.MakeScope.HasFlag('tca_tongpan_title'), GreaterThan_CFixedPoint(Title.MakeScope.ScriptValue('tca_office_funding_amount_value'), '(CFixedPoint)0'))]"
+                        blockoverride "funding_person_name" { text = "[Title.MakeScope.Var('tca_tongpan_county').Title.GetHolder.GetName]" }
+                        blockoverride "funding_person_amount" { text = "[Title.MakeScope.ScriptValue('tca_office_funding_amount_value')|1]" }
+                    }
+                }
+            }
+        }
+
+        # 总计与顶栏经费行读取同一预计金额，不在GUI另算分项之和。
+        hbox = {
+            name = "tca_funding_total"
+            layoutpolicy_horizontal = expanding
+            spacing = 10
+            text_single = {
+                layoutpolicy_horizontal = expanding
+                align = left
+                text = "BREAKDOWN_ENTRY_TOTAL_TREASURY"
+                fonttintcolor = "[TooltipInfo.GetTintColor]"
+            }
+            text_single = {
+                layoutpolicy_horizontal = expanding
+                align = right
+                text = "[GetPlayer.MakeScope.ScriptValue('tca_office_funding_income_value')|1]"
+                fonttintcolor = "[TooltipInfo.GetTintColor]"
+            }
+        }
+
+    }
+}
+
+# 支出列收款官员；无有效绑定或零额时隐藏整行。
+type tca_office_funding_expense_breakdown = widget {
+    alwaystransparent = no
+    using = DefaultTooltipBackground
+    vbox = {
+        layoutpolicy_horizontal = expanding
+        set_parent_size_to_minimum = yes
+        margin = { 20 10 }
+        spacing = 5
+        text_single = {
+            layoutpolicy_horizontal = expanding
+            align = left
+            text = "tca_office_funding_payment"
+            default_format = "#T"
+            fonttintcolor = "[TooltipInfo.GetTintColor]"
+        }
+        vbox = {
+            layoutpolicy_horizontal = expanding
+            block "funding_titles" { datamodel = "[GetPlayer.GetTitles]" }
+            ignoreinvisible = yes
+            spacing = 5
+            item = {
+                # 整项无收支时不占列表间距；类别行隐藏时也不占内部间距。
+                vbox = {
+                    visible = "[Or(GreaterThan_CFixedPoint(Title.MakeScope.ScriptValue('tca_office_funding_judicial_expense_value'), '(CFixedPoint)0'), GreaterThan_CFixedPoint(Title.MakeScope.ScriptValue('tca_office_funding_tongpan_expense_value'), '(CFixedPoint)0'))]"
+                    ignoreinvisible = yes
+                    layoutpolicy_horizontal = expanding
+                    spacing = 5
+                    tca_office_funding_person_row = {
+                        visible = "[GreaterThan_CFixedPoint(Title.MakeScope.ScriptValue('tca_office_funding_judicial_expense_value'), '(CFixedPoint)0')]"
+                        blockoverride "funding_person_name" { text = "[Title.MakeScope.Var('song_judicial_title').Title.GetHolder.GetName]" }
+                        blockoverride "funding_person_amount" { text = "[Subtract_CFixedPoint('(CFixedPoint)0', Title.MakeScope.ScriptValue('tca_office_funding_judicial_expense_value'))|1]" }
+                    }
+                    tca_office_funding_person_row = {
+                        visible = "[GreaterThan_CFixedPoint(Title.MakeScope.ScriptValue('tca_office_funding_tongpan_expense_value'), '(CFixedPoint)0')]"
+                        blockoverride "funding_person_name" { text = "[Title.MakeScope.Var('tca_tongpan_office').Title.GetHolder.GetName]" }
+                        blockoverride "funding_person_amount" { text = "[Subtract_CFixedPoint('(CFixedPoint)0', Title.MakeScope.ScriptValue('tca_office_funding_tongpan_expense_value'))|1]" }
+                    }
+                }
+            }
+        }
+
+        # 总计与顶栏经费行读取同一预计金额，不在GUI另算分项之和。
+        hbox = {
+            name = "tca_funding_total"
+            layoutpolicy_horizontal = expanding
+            spacing = 10
+            text_single = {
+                layoutpolicy_horizontal = expanding
+                align = left
+                text = "BREAKDOWN_ENTRY_TOTAL_TREASURY"
+                fonttintcolor = "[TooltipInfo.GetTintColor]"
+            }
+            text_single = {
+                layoutpolicy_horizontal = expanding
+                align = right
+                text = "[Subtract_CFixedPoint('(CFixedPoint)0', GetPlayer.MakeScope.ScriptValue('tca_office_funding_expense_value'))|1]"
+                fonttintcolor = "[TooltipInfo.GetTintColor]"
+            }
+        }
+
+    }
+}
+}

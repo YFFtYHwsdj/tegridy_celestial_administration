@@ -68,8 +68,12 @@ def inspect_engine_errors(errors):
             findings['Judicial modifier compilation failure'] += 1
         elif "There is more than one 'effect' defined" in entry:
             findings['TCA duplicate on_action effect'] += 1
-        elif any(message in entry for message in ('Unexpected token:', 'Unknown trigger:', 'Unknown effect:')):
+        elif any(message in entry for message in ('Unexpected token:', 'Malformed token:', 'Unknown trigger:', 'Unknown effect:')):
             findings['TCA script parsing failure'] += 1
+        elif any(message in entry for message in ('Error setting properties', 'is not a valid widget/type/property')):
+            findings['TCA GUI property failure'] += 1
+        elif 'Invalid actor & recipient' in entry and 'modify_vassal_contract interface' in entry:
+            findings['TCA native contract window rejected participants'] += 1
         elif 'can not be used in event target links' in entry:
             findings['TCA invalid event target scope link'] += 1
         elif 'Value of wrong type' in entry:
@@ -152,7 +156,11 @@ def inspect_run(debug, errors, expected, strict_title_heir=False):
         issues.append(f'Failed assertions: {checks["CHECK_FAIL"]}')
     if not any('TCA_TEST SUITE_ALL_PASSED' in line for line in lines[starts[-1]:]):
         issues.append('No SUITE_ALL_PASSED completion')
-    issues.extend(inspect_engine_errors(errors))
+    # 原生窗口错误可能只写debug日志；保留多行上下文，并与error日志去重。
+    logged_errors = set(re.split(r'(?=\[\d{2}:\d{2}:\d{2}\])', errors))
+    debug_errors = [entry for entry in re.split(r'(?=\[\d{2}:\d{2}:\d{2}\])', debug)
+                    if re.match(r'\[\d{2}:\d{2}:\d{2}\]\[E\]', entry) and entry not in logged_errors]
+    issues.extend(inspect_engine_errors(errors + '\n' + '\n'.join(debug_errors)))
     summary = Counter({kind: sum(count for (k, _), count in results.items() if k == kind)
                        for kind in ['BEGIN', 'PASS', 'FAIL', 'PRECONDITION_FAIL']})
     summary.update(checks)

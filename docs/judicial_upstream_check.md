@@ -18,7 +18,7 @@ python3 tools/check_upstream_overrides.py
 
 `auxiliary_extensions`登记`tools/`下独立、按需加载的辅助模组同名追加对象，要求记录原版、适配文件及已审阅基线。通用上游检查核对其原版基线和追加对象存在性；它们不属于普通模组的`common/`／`events/`加载范围，不计入下述普通查漏扫描的失效登记。当前仅登记CLI测试适配的开局回调，见[CLI测试说明](cli_game_tests.md)。
 
-`file_overrides`登记整文件覆盖，当前为通判入口的`gui/hud.gui`及三关系标签的`gui/window_diarchy.gui`。通用检查逐字节核对完整原版与已审阅基线，并检查模组文件存在；缺文件报错，上游变化要求审阅，不自动刷新基线。独立查漏扫描仍只覆盖下述脚本范围。 file_overrides可用diagnostic_localization_keys显式登记被覆盖GUI引用的原版浮窗键，供check_test_run把无tca_、无文件路径的精确本地化错误归属到模组；目前仅登记DIARCHY_WINDOW_MANDATE_TOOLTIP，不会把所有原版本地化错误都判为模组问题。
+`file_overrides`登记整文件覆盖，当前为通判入口的`gui/hud.gui`、三关系标签的`gui/window_diarchy.gui`及官署经费人物页提示的`gui/window_character.gui`。通用检查逐字节核对完整原版与已审阅基线，并检查模组文件存在；缺文件报错，上游变化要求审阅，不自动刷新基线。独立查漏扫描仍只覆盖下述脚本范围。 file_overrides可用diagnostic_localization_keys显式登记被覆盖GUI引用的原版浮窗键，供check_test_run把无tca_、无文件路径的精确本地化错误归属到模组；目前仅登记DIARCHY_WINDOW_MANDATE_TOOLTIP，不会把所有原版本地化错误都判为模组问题。
 
 ## 独立覆盖查漏
 
@@ -52,6 +52,7 @@ python3 tools/scan_upstream_overrides.py --json
 
 - `admin_liege_modify_vassal_contract_interaction`：增加标记无地官员的互动入口条件。
 - `appointment_title_value`：为标记提刑头衔增加估值分支，保留原版计算分支。
+- `admin_vassal_modify_vassal_contract_interaction`：保留原版请求侧改约流程，接入通判管理者权限及接受后的头衔经费保存；对应完整对象基线新增登记。
 - `celestial_treasury`：对标记无地官员隐藏按税收计算的发展经费选项。
 - `celestial_vassal`：在原版天朝契约组中加入官员义务和预算契约。
 - `imprison_neutral_is_valid_showing_failures_only_triggers_trigger`：保留原版共同拘捕检查，再限制受管官员使用普通拘捕入口。
@@ -101,3 +102,7 @@ python3 -B -m unittest discover -s tools -p 'test_*.py'
 ## 2026-10-14 路级法理维护入口
 
 当前8项覆盖、17项追加on_action、1项辅助扩展检查通过。新增 `minister_justice` 原版职位覆盖保留所有原版逻辑，仅在 `on_get_position` 的原生任职处理之后追加合并维护，保证仍持有刑部头衔的复任也触发皇帝持路提刑的隶属刷新。兼容影响限于同一职位对象；与其他覆盖它的模组需单独验收。三个内阁离任/换任回调是追加定义，提供已审阅基线，检查器遇原版漂移只报告、不更新基线。工具回归包含此只读行为。
+
+官署经费另覆盖 `gui/interaction_confirmation.gui`：仅为管理／请求经费的普通互动替换横向五档面板，其他内容逐token对照原版基线；兼容影响与验收见[经费互动](office_budget_interactions.md)。
+
+2026-10-19新增 `gui/interaction_modify_vassal_window.gui` 整文件覆盖：仅在原生纸面底部添加官署经费调整桥接，保持原有协商内容；原字节基线为`tools/baselines/office_budget_modify_vassal_window.gui`。与其他替换该文件的模组冲突，静态测试移除新增按钮后逐token核对原版。

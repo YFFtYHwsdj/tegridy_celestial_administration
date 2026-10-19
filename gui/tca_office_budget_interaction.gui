@@ -1,0 +1,117 @@
+﻿# 经费双栏窗口；Character为官员，选档与发送仍由原生普通互动提供者管理。
+types tca_office_budget_interaction {
+ type tca_office_budget_window_content = vbox {
+  set_parent_size_to_minimum = yes
+  using = Window_Margins
+  # 仅保存重置按钮的显示状态；待遇与选项仍由原生数据提供者决定。
+  state = { name = _show on_start = "[GetVariableSystem.Clear('tca_office_budget_choice_changed')]" }
+  header_pattern_interaction = {
+   layoutpolicy_horizontal = expanding
+   blockoverride "header_text" { text = "[CharacterInteractionConfirmationWindow.GetSendName]" }
+   blockoverride "button_close" { onclick = "[CharacterInteractionConfirmationWindow.Close]" }
+  }
+  hbox = {
+   margin_top = -5
+   spacing = 10
+   tca_office_budget_contract_panel = {}
+   vbox = {
+    size = { 420 640 }
+    spacing = 15
+    margin = { 10 5 }
+    using = ChineseVassalBackground
+    hbox = {
+     layoutpolicy_horizontal = expanding
+     background = { using = Background_Area }
+     coa_realm_big_crown = {}
+     expand = {}
+     text_multi = { text = "tca_office_budget_office_holder" maximumsize = { 180 -1 } autoresize = yes align = center using = Font_Size_Medium }
+     expand = {}
+     portrait_head = { blockoverride "opinion_box" {} blockoverride "coa" {} }
+    }
+    text_multi = { text = "tca_office_budget_current_summary" maximumsize = { 350 -1 } autoresize = yes margin = { 10 10 } align = center using = Font_Size_Medium }
+    divider = { layoutpolicy_horizontal = expanding }
+    # 展示本次选中待遇，明确金额和比例；不把本地管理者误作原生好感对象。
+    vbox = {
+     layoutpolicy_horizontal = expanding
+     datamodel = "[CharacterInteractionConfirmationWindow.GetOptionItems]"
+     item = { vbox = {
+      visible = "[OptionItem.HasOption]"
+      layoutpolicy_horizontal = expanding
+      spacing = 10
+      text_single = { text = "[OptionItem.GetName]" using = Font_Size_Medium margin = { 10 0 } }
+      text_multi = { text = "[OptionItem.GetTooltip]" maximumsize = { 340 -1 } autoresize = yes margin = { 10 0 } }
+     } }
+    }
+    hbox = {
+     layoutpolicy_horizontal = expanding
+     spacing = 10
+     text_single = { text = "tca_office_budget_liege_opinion" }
+     expand = {}
+     text_single = { text = "[Character.GetOpinionOf(Character.GetLiege)|=]" fonttintcolor = "[Character.GetOpinionOfTint(Character.GetLiege)]" }
+    }
+    hbox_character_interaction_acceptance = { visible = "[CharacterInteractionConfirmationWindow.ShouldShowAnswer]" layoutpolicy_horizontal = expanding }
+    text_multi_on_decline_summary = {}
+    hbox = {
+     visible = "[CharacterInteractionConfirmationWindow.HasCost]"
+     spacing = 5
+     tooltip = "[CharacterInteractionConfirmationWindow.GetCostTooltip]"
+     text_single = { text = "INTERACTION_COST" }
+     text_single = { text = "[CharacterInteractionConfirmationWindow.GetCostDescription]" }
+    }
+    expand = { layoutpolicy_vertical = expanding }
+    text_multi = { text = "tca_office_budget_adjacent_tt" maximumsize = { 340 -1 } autoresize = yes align = center }
+    text_multi = { text = "tca_office_budget_terms" maximumsize = { 340 -1 } autoresize = yes align = center }
+    button_standard = {
+     layoutpolicy_horizontal = expanding
+     text = "[CharacterInteractionConfirmationWindow.GetSendName]"
+     onclick = "[CharacterInteractionConfirmationWindow.Send]"
+     enabled = "[CharacterInteractionConfirmationWindow.CanSend]"
+     tooltip = "[CharacterInteractionConfirmationWindow.GetCanSendDescription]"
+     using = tooltip_above
+    }
+   }
+  }
+ }
+ type tca_office_budget_contract_panel = vbox {
+  size = { 600 640 }
+  spacing = 20
+  using = Background_Letter
+  margin_bottom = 20
+  text_single = { text = "tca_office_budget_options_heading" using = Font_Size_Medium default_format = "#light_background" margin = { 20 35 } }
+  hbox = {
+   spacing = 10
+   margin = { 20 10 }
+   datamodel = "[CharacterInteractionConfirmationWindow.GetOptionItems]"
+   item = { button_letter = {
+    size = { 104 80 }
+    onclick = "[OptionItem.OnClick]"
+    onclick = "[GetVariableSystem.Set('tca_office_budget_choice_changed', 'yes')]"
+    down = "[OptionItem.HasOption]"
+    enabled = "[And(OptionItem.IsValid, And(OptionItem.CanBeChanged, Not(OptionItem.HasOption)))]"
+    tooltip = "[OptionItem.GetTooltip]"
+    using = tooltip_above
+    text_single = { text = "[OptionItem.GetName]" visible = "[Not(OptionItem.HasOption)]" parentanchor = center default_format = "#light_background" }
+    text_single = { text = "[OptionItem.GetName]" visible = "[OptionItem.HasOption]" parentanchor = center default_format = "#high" }
+    background = { using = Background_Area_Dark visible = "[OptionItem.HasOption]" }
+    blockoverride "button_letter_current" { visible = "[Or(And(OptionItem.HasFlag('tca_budget_0'), EqualTo_CFixedPoint(Character.MakeScope.ScriptValue('tca_office_budget_current_value'), '(CFixedPoint)0')), Or(And(OptionItem.HasFlag('tca_budget_1'), EqualTo_CFixedPoint(Character.MakeScope.ScriptValue('tca_office_budget_current_value'), '(CFixedPoint)1')), Or(And(OptionItem.HasFlag('tca_budget_2'), EqualTo_CFixedPoint(Character.MakeScope.ScriptValue('tca_office_budget_current_value'), '(CFixedPoint)2')), Or(And(OptionItem.HasFlag('tca_budget_3'), EqualTo_CFixedPoint(Character.MakeScope.ScriptValue('tca_office_budget_current_value'), '(CFixedPoint)3')), And(OptionItem.HasFlag('tca_budget_4'), EqualTo_CFixedPoint(Character.MakeScope.ScriptValue('tca_office_budget_current_value'), '(CFixedPoint)4'))))))]" }
+   } }
+  }
+  expand = { layoutpolicy_vertical = expanding }
+  hbox = { layoutpolicy_horizontal = expanding margin = { 20 0 } divider = { layoutpolicy_horizontal = expanding } }
+  # 仅当前档位生成重置按钮；通过原生入口重建默认选择，不改待遇。
+  # UI变量只决定重置按钮能否点击，不参与选档、权限、费率或结算。
+  vbox = {
+   datamodel = "[CharacterInteractionConfirmationWindow.GetOptionItems]"
+   item = { button_standard = {
+    visible = "[Or(And(OptionItem.HasFlag('tca_budget_0'), EqualTo_CFixedPoint(Character.MakeScope.ScriptValue('tca_office_budget_current_value'), '(CFixedPoint)0')), Or(And(OptionItem.HasFlag('tca_budget_1'), EqualTo_CFixedPoint(Character.MakeScope.ScriptValue('tca_office_budget_current_value'), '(CFixedPoint)1')), Or(And(OptionItem.HasFlag('tca_budget_2'), EqualTo_CFixedPoint(Character.MakeScope.ScriptValue('tca_office_budget_current_value'), '(CFixedPoint)2')), Or(And(OptionItem.HasFlag('tca_budget_3'), EqualTo_CFixedPoint(Character.MakeScope.ScriptValue('tca_office_budget_current_value'), '(CFixedPoint)3')), And(OptionItem.HasFlag('tca_budget_4'), EqualTo_CFixedPoint(Character.MakeScope.ScriptValue('tca_office_budget_current_value'), '(CFixedPoint)4'))))))]"
+    text = "RESET_CONTRACT_CHANGES"
+    onclick = "[GetScriptedGui('tca_open_office_budget_gui').Execute(GuiScope.SetRoot(Character.MakeScope).AddScope('actor', GetPlayer.MakeScope).End)]"
+    onclick = "[GetVariableSystem.Clear('tca_office_budget_choice_changed')]"
+    onclick = "[CharacterInteractionConfirmationWindow.Close]"
+    enabled = "[GetVariableSystem.Exists('tca_office_budget_choice_changed')]"
+    margin_bottom = 10
+    background = { using = Background_Area_Light alpha = 0.8 }
+   } }
+  }
+ }
+}

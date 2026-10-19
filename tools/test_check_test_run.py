@@ -5,6 +5,23 @@ from check_test_run import inspect_run, expected_cases, selected_case_expectatio
 
 
 class RunEvidenceTests(unittest.TestCase):
+    def test_owned_gui_property_failure_invalidates_pass(self):
+        # 实际经费面板把背景纹理模板挂到vbox时产生此错误，不能因业务断言通过而忽略。
+        error = "[10:20:17][E][pdx_gui_factory.cpp:1557]: gui/tca_office_budget_interaction.gui:37 - Error setting properties for '' (vbox)"
+        issues, _ = inspect_run(self.run_log(), error, {'tca_test_example': 1})
+        self.assertTrue(any('GUI property' in issue for issue in issues))
+
+    def test_owned_gui_malformed_token_invalidates_pass(self):
+        error = '[10:20:17][E]: Error: "Malformed token: expression" in file: "gui/tca_office_budget_interaction.gui"'
+        issues, _ = inspect_run(self.run_log(), error, {'tca_test_example': 1})
+        self.assertTrue(any('parsing failure' in issue for issue in issues))
+
+    def test_debug_only_contract_window_error_invalidates_pass(self):
+        # 原生窗口曾只在debug日志拒绝非直属通判；两份日志必须共同检查。
+        error = "[10:20:17][E][modify_subject_contract_interaction_window.cpp:297]: Invalid actor & recipient 'county / c_tca_tongpan_county' in interaction with modify_vassal_contract interface."
+        issues, _ = inspect_run(self.run_log() + '\n' + error, '', {'tca_test_example': 1})
+        self.assertTrue(any('contract window' in issue for issue in issues))
+
     def test_gui_file_shadow_error_without_custom_identifier_invalidates_pass(self):
         error = "[10:00:00][E]: gui/window_diarchy.gui:123 Could not find data system function 'BrokenNativeName'"
         issues, _ = inspect_run(self.run_log(), error, {'tca_test_example': 1})

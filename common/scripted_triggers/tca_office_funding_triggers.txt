@@ -1,0 +1,33 @@
+﻿# 官署头衔作用域；验证正反辖区绑定、在任人物和制度资格。
+# 经费不以主头衔去重，为后续路司兼任保留逐官署计算；通判仍使用现有专职规则。
+tca_office_can_receive_funding_trigger = {
+    save_temporary_scope_as = tca_funding_checked_office
+    exists = holder
+    holder = { is_alive = yes government_has_flag = government_is_celestial has_treasury = yes }
+    OR = {
+        AND = {
+            has_variable = tca_tongpan_title
+            tca_is_valid_tongpan_holder_trigger = yes
+            exists = var:tca_tongpan_county
+            var:tca_tongpan_county = {
+                tca_is_tongpan_county_trigger = yes
+                var:tca_tongpan_office = scope:tca_funding_checked_office
+                holder = { has_treasury = yes }
+                NOT = { holder = scope:tca_funding_checked_office.holder }
+                holder.top_liege = scope:tca_funding_checked_office.holder.top_liege
+            }
+        }
+        AND = {
+            has_variable = tca_judicial_title
+            exists = var:song_judicial_circuit
+            var:song_judicial_circuit = {
+                tca_is_judicial_circuit_trigger = yes
+                NOT = { has_variable = tca_judicial_disabled }
+                var:song_judicial_title = scope:tca_funding_checked_office
+                holder = { has_treasury = yes }
+                NOT = { holder = scope:tca_funding_checked_office.holder }
+                holder.top_liege = scope:tca_funding_checked_office.holder.top_liege
+            }
+        }
+    }
+}

@@ -1,23 +1,25 @@
-﻿# 角色作用域；只修复身份义务，不覆盖玩家选择的
-# 俸禄／预算档位。在原生政体和领主初始化完成后调用。
+﻿# 角色作用域；修复官员身份并恢复头衔既有预算，不重置个人俸禄。
+# 在原生政体和领主初始化完成后调用。
 tca_ensure_official_contract_effect = {
     if = {
         limit = { tca_is_landless_official_trigger = yes }
         add_character_flag = tca_updating_official_contract
+        # 按实际官职核对身份档位；不保留未实现的军职分支。
         if = {
             limit = {
-                tca_is_civil_official_trigger = yes
-                NOT = { vassal_contract_has_flag = tca_official_civil_obligation }
-            }
-            vassal_contract_set_obligation_level = { type = tca_official_obligations level = 1 }
-        }
-        else_if = {
-            limit = {
-                tca_is_military_official_trigger = yes
-                NOT = { vassal_contract_has_flag = tca_official_military_obligation }
+                tca_is_tongpan_official_trigger = yes
+                NOT = { vassal_contract_obligation_level:tca_official_obligations = 2 }
             }
             vassal_contract_set_obligation_level = { type = tca_official_obligations level = 2 }
         }
+        else_if = {
+            limit = {
+                tca_is_judicial_official_trigger = yes
+                NOT = { vassal_contract_obligation_level:tca_official_obligations = 1 }
+            }
+            vassal_contract_set_obligation_level = { type = tca_official_obligations level = 1 }
+        }
+        tca_ensure_office_budget_effect = yes
         remove_character_flag = tca_updating_official_contract
     }
 }

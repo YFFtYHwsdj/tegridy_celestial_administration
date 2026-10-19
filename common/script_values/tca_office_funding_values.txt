@@ -1,0 +1,118 @@
+﻿# 官署经费比例集中配置；各档独立维护，结算和契约说明共用。
+tca_circuit_funding_low_rate_value = 0.02
+tca_circuit_funding_frugal_rate_value = 0.04
+tca_circuit_funding_medium_rate_value = 0.06
+tca_circuit_funding_increased_rate_value = 0.08
+tca_circuit_funding_high_rate_value = 0.10
+tca_tongpan_funding_low_rate_value = 0.05
+tca_tongpan_funding_frugal_rate_value = 0.10
+tca_tongpan_funding_medium_rate_value = 0.15
+tca_tongpan_funding_increased_rate_value = 0.20
+tca_tongpan_funding_high_rate_value = 0.25
+
+# 官署头衔作用域；待遇保存在头衔，未初始化时使用第三档。
+tca_office_funding_level_value = {
+    value = 2
+    if = { limit = { has_variable = tca_office_budget_level } value = var:tca_office_budget_level }
+}
+
+# 官署头衔作用域；按本署类别与保存档位取比例，不依赖人物修正状态。
+tca_office_funding_rate_value = {
+    value = 0
+    if = {
+        limit = { has_variable = tca_tongpan_title }
+        if = { limit = { tca_office_funding_level_value = 0 } value = tca_tongpan_funding_low_rate_value }
+        if = { limit = { tca_office_funding_level_value = 1 } value = tca_tongpan_funding_frugal_rate_value }
+        if = { limit = { tca_office_funding_level_value = 2 } value = tca_tongpan_funding_medium_rate_value }
+        if = { limit = { tca_office_funding_level_value = 3 } value = tca_tongpan_funding_increased_rate_value }
+        if = { limit = { tca_office_funding_level_value = 4 } value = tca_tongpan_funding_high_rate_value }
+    }
+    else = {
+        if = { limit = { tca_office_funding_level_value = 0 } value = tca_circuit_funding_low_rate_value }
+        if = { limit = { tca_office_funding_level_value = 1 } value = tca_circuit_funding_frugal_rate_value }
+        if = { limit = { tca_office_funding_level_value = 2 } value = tca_circuit_funding_medium_rate_value }
+        if = { limit = { tca_office_funding_level_value = 3 } value = tca_circuit_funding_increased_rate_value }
+        if = { limit = { tca_office_funding_level_value = 4 } value = tca_circuit_funding_high_rate_value }
+    }
+}
+
+# 官署作用域；时间戳不依赖变量到期与月脉冲在同日的执行先后。
+tca_office_funding_age_value = {
+    value = 30
+    if = {
+        limit = { has_variable = tca_office_funding_paid }
+        value = current_date
+        subtract = var:tca_office_funding_paid
+    }
+}
+
+# 付款人物作用域；原生字段为总国库收入减下发发展金。
+# 当前正常地方主官的收入为发展金；独立君主的税收国库不能当作发展金。
+# 其他原生国库收入混入时仍须另行提取分项，见 docs/office_funding.md。
+tca_office_funding_base_value = {
+    value = 0
+    if = {
+        limit = { is_alive = yes is_independent_ruler = no government_has_flag = government_is_celestial }
+        value = monthly_character_treasury_variable_income
+        min = 0
+    }
+}
+
+# 官署作用域；付款头衔由现有辖区绑定解析，不读取官员直属领主。
+tca_office_funding_amount_value = {
+    value = 0
+    if = {
+        limit = { tca_office_can_receive_funding_trigger = yes }
+        if = { limit = { has_variable = tca_tongpan_title } var:tca_tongpan_county.holder = { add = tca_office_funding_base_value } }
+        else = { var:song_judicial_circuit.holder = { add = tca_office_funding_base_value } }
+        multiply = tca_office_funding_rate_value
+    }
+}
+
+# 人物作用域；每个持有官署独立计算。同人付款不制造收入，兼任不按人物去重。
+tca_office_funding_income_value = {
+    value = 0
+    every_held_title = {
+        limit = { OR = { has_variable = tca_judicial_title has_variable = tca_tongpan_title } }
+        add = { save_temporary_scope_as = tca_funding_display_office value = tca_office_funding_amount_value desc = tca_office_funding_office_line }
+    }
+}
+
+# 人物作用域；仅遍历本人所持辖区的绑定官署，不在每帧扫描世界或全局官署表。
+tca_office_funding_expense_value = {
+    value = 0
+    every_held_title = {
+        if = {
+            limit = { exists = var:song_judicial_title }
+            var:song_judicial_title = { add = { save_temporary_scope_as = tca_funding_display_office value = tca_office_funding_amount_value desc = tca_office_funding_office_line } }
+        }
+        if = {
+            limit = { exists = var:tca_tongpan_office }
+            var:tca_tongpan_office = { add = { save_temporary_scope_as = tca_funding_display_office value = tca_office_funding_amount_value desc = tca_office_funding_office_line } }
+        }
+    }
+}
+
+# 人物作用域；显示层并入自定义收支，资金仍由月度效果单独结算。
+tca_office_funding_balance_value = {
+    value = monthly_character_treasury_balance
+    add = tca_office_funding_income_value
+    subtract = tca_office_funding_expense_value
+}
+
+# 辖区头衔作用域；供原生头衔列表逐行读取经费，缺少绑定时返回零。
+# 只解析现有绑定，金额仍使用正式官署入口，不维护另一套费率或显示缓存。
+tca_office_funding_judicial_expense_value = {
+    value = 0
+    if = {
+        limit = { exists = var:song_judicial_title }
+        var:song_judicial_title = { add = tca_office_funding_amount_value }
+    }
+}
+tca_office_funding_tongpan_expense_value = {
+    value = 0
+    if = {
+        limit = { exists = var:tca_tongpan_office }
+        var:tca_tongpan_office = { add = tca_office_funding_amount_value }
+    }
+}
