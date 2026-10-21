@@ -9,7 +9,7 @@
 - 本机上述绝对目录下game/common/on_action/game_start.txt的1066.9.15分支设河北、关内、岭西为军路；河北重复一次，不是第四路。
 - 模组history/titles/tca_judicial_titles.txt有15个固定机构及15处holder = 0，不含三军路。本次未修改；占位不表示史实空缺。
 - 地理和人物ID沿用前次本机game/common/landed_titles/02_china.txt、game/history/titles/e_china.txt、game/history/characters/han.txt等静态核查，本次未再逐县逐人检查。蔡延庆han_7847、程濬han_6513的记录实施前重核；后者另有原版棣州任职冲突。
-- 固定机构及资格行为见[实现说明](../../../docs/judicial_static_titles.md)。研究纳入军路不表示已经开放军路司法办公室。未运行引擎、补位或任命验证。
+- 固定机构及资格行为见[实现说明](../../../docs/judicial/offices.md)。研究纳入军路不表示已经开放军路司法办公室。未运行引擎、补位或任命验证。
 
 ## 历史十九辖区至游戏十八路的主对应
 
