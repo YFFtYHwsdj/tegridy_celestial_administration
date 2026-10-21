@@ -1,0 +1,83 @@
+﻿# 全组入口；模块自行登记，通用派发保留即时组先行、延迟组串行的运行方式。
+# 框架拥有计数、选择、派发及中断标记，业务用例只报告结果与请求续接。
+namespace = tca_tests
+
+tca_tests.1 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        if = {
+            limit = { OR = { has_character_flag = tca_test_suite_aborted title:h_china = { has_variable = tca_test_suite_aborted } } }
+            debug_log = "TCA_TEST SUITE_ENTRY_REJECTED aborted environment; start a fresh test game"
+        }
+        else_if = {
+            limit = { OR = { has_character_flag = tca_test_suite_running has_character_flag = tca_test_delayed_case_active } }
+            debug_log = "TCA_TEST SUITE_BUSY"
+        }
+        else = {
+            save_scope_as = tca_test_reporter
+            if = {
+                limit = { NOT = { has_variable = tca_test_selected_run } }
+                set_variable = { name = tca_test_selected_run value = no }
+            }
+            set_variable = { name = tca_test_suite_expected value = 0 }
+            set_variable = { name = tca_test_suite_passed value = 0 }
+            set_variable = { name = tca_test_suite_failed value = 0 }
+            set_variable = { name = tca_test_suite_skipped value = 0 }
+            set_variable = { name = tca_test_dispatch_phase value = 0 }
+            tca_test_catalog_effect = yes
+            if = {
+                limit = { debug_only = yes }
+                add_character_flag = tca_test_suite_running
+                tca_test_begin_lifecycle_effect = yes
+                tca_test_update_status_effect = { PHASE = 1 REASON = 0 }
+                debug_log = "TCA_TEST SUITE_DISPATCH"
+                set_variable = { name = tca_test_dispatch_phase value = 1 }
+                tca_test_catalog_effect = yes
+                tca_test_notify_waiting_effect = yes
+                trigger_event = tca_tests.3
+            }
+            else = {
+                set_variable = { name = tca_test_suite_skipped value = var:tca_test_suite_expected }
+                debug_log = "TCA_TEST SUITE_PRECONDITION_FAIL debug mode required"
+                tca_test_cleanup_dispatch_effect = yes
+                tca_test_notify_results_effect = yes
+            }
+        }
+    }
+}
+
+# 正常完成统一清理；环境损坏由生命周期入口终止，不发出成功汇总。
+tca_tests.2 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } has_character_flag = tca_test_suite_running }
+            tca_test_cleanup_lifecycle_effect = yes
+            remove_character_flag = tca_test_suite_running
+            tca_test_cleanup_dispatch_effect = yes
+            tca_test_notify_results_effect = yes
+        }
+    }
+}
+
+# 每次续接重新扫描登记；先认领再派发，防止同步前置失败续接导致重复执行。
+tca_tests.3 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } has_character_flag = tca_test_suite_running }
+            set_variable = { name = tca_test_dispatch_phase value = 2 }
+            remove_character_flag = tca_test_dispatch_claimed
+            tca_test_catalog_effect = yes
+            if = {
+                limit = { has_character_flag = tca_test_suite_running NOT = { has_character_flag = tca_test_dispatch_claimed } }
+                trigger_event = tca_tests.2
+            }
+        }
+    }
+}

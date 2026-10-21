@@ -1,0 +1,64 @@
+﻿# 报告者作用域；模块以 EVENT、CASE、DELAYED 登记用例。
+# 阶段 0 计数并重置派发记录，1 执行即时，2 每轮仅认领一个延迟，3 清理。
+# CASE 对应唯一日志标识；选择标记由 CLI 适配设置，原生全组入口不需要选择标记。
+tca_test_visit_case_effect = {
+    # 每个登记拥有显式默认值，既支持单项选择，也满足引擎全脚本引用检查。
+    if = {
+        limit = { var:tca_test_dispatch_phase = 0 NOT = { has_variable = $CASE$_selected } }
+        set_variable = { name = $CASE$_selected value = no }
+    }
+    if = {
+        limit = { var:tca_test_dispatch_phase = 3 }
+        remove_variable = $CASE$_selected
+        remove_character_flag = $CASE$_dispatched
+    }
+    else_if = {
+        limit = {
+            OR = {
+                var:tca_test_selected_run = no
+                var:$CASE$_selected = yes
+            }
+        }
+        if = {
+            limit = { var:tca_test_dispatch_phase = 0 }
+            remove_character_flag = $CASE$_dispatched
+            change_variable = { name = tca_test_suite_expected add = 1 }
+        }
+        else_if = {
+            limit = {
+                has_character_flag = tca_test_suite_running
+                NOT = { has_character_flag = tca_test_suite_aborted }
+                NOT = { has_character_flag = $CASE$_dispatched }
+                NOT = { has_character_flag = tca_test_delayed_case_active }
+                var:tca_test_dispatch_phase = 2
+                always = $DELAYED$
+                NOT = { has_character_flag = tca_test_dispatch_claimed }
+            }
+            add_character_flag = $CASE$_dispatched
+            add_character_flag = tca_test_dispatch_claimed
+            trigger_event = $EVENT$
+        }
+        # 即时与延迟使用相反筛选；避免用例自身负责解释运行选择。
+        else_if = {
+            limit = {
+                var:tca_test_dispatch_phase = 1
+                NOT = { always = $DELAYED$ }
+                has_character_flag = tca_test_suite_running
+                NOT = { has_character_flag = tca_test_suite_aborted }
+                NOT = { has_character_flag = $CASE$_dispatched }
+                NOT = { has_character_flag = tca_test_delayed_case_active }
+            }
+            add_character_flag = $CASE$_dispatched
+            trigger_event = $EVENT$
+        }
+    }
+}
+
+# 完成或环境中止时清理本轮登记状态；统计保留供汇总与诊断读取。
+tca_test_cleanup_dispatch_effect = {
+    set_variable = { name = tca_test_dispatch_phase value = 3 }
+    tca_test_catalog_effect = yes
+    remove_variable = tca_test_selected_run
+    remove_character_flag = tca_test_dispatch_claimed
+    # 保留闲置阶段，避免同步前置失败续接结束后，外层尚未返回的扫描读取空变量。
+}

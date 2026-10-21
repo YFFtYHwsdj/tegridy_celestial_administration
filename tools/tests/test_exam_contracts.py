@@ -9,7 +9,7 @@ import unittest
 
 from check_upstream_overrides import definitions, localization_values
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 
 
 class ExamContractTests(unittest.TestCase):

@@ -4,7 +4,7 @@ import re
 import unittest
 from check_upstream_overrides import definitions, tokens
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 
 
 class JudicialLoadingTests(unittest.TestCase):
@@ -39,55 +39,41 @@ class JudicialLoadingTests(unittest.TestCase):
 
     def test_native_event_cases_are_registered_in_dispatcher(self):
         from check_test_run import expected_cases
+        from testing.catalog import catalog
         expected = expected_cases(ROOT)
-        suite = (ROOT / 'events/tca_tests_events.txt').read_text(encoding='utf-8-sig')
-        total = re.search(r'name = tca_test_suite_expected value = (\d+)', suite)
-        self.assertEqual(int(total.group(1)), len(expected))
-        logged_total = re.search(r'TCA_TEST SUITE_DISPATCH (\d+) cases', suite)
-        self.assertIsNotNone(logged_total)
-        self.assertEqual(int(logged_total.group(1)), len(expected))
-        rejected_total = re.search(r'name = tca_test_suite_skipped value = ([1-9]\d*)', suite)
-        self.assertIsNotNone(rejected_total)
-        self.assertEqual(int(rejected_total.group(1)), len(expected))
-        entries = set()
-        for path in (ROOT / 'events').glob('tca_*test*_events.txt'):
-            entries.update(re.findall(r'TCA_TEST BEGIN (\S+) tca_test_', path.read_text(encoding='utf-8-sig')))
-        for entry in entries:
-            self.assertEqual(len(re.findall(r'trigger_event\s*=\s*'+re.escape(entry)+r'(?![\d.])', suite)), 1, entry)
+        rows = catalog(ROOT)
+        self.assertEqual({row['name']: row['checks'] for row in rows}, expected)
+        suite = (ROOT / 'events/tests/tca_tests_events.txt').read_text(encoding='utf-8-sig')
+        self.assertIn('name = tca_test_suite_expected value = 0', suite)
+        self.assertIn('tca_test_catalog_effect = yes', suite)
+        self.assertNotIn('tca_test_suite_delayed_next', suite)
         self.assertFalse((ROOT / 'tools/build_test_events.py').exists())
         self.assertFalse((ROOT / 'tools/test_sources').exists())
         self.assertFalse(list((ROOT / 'tests').glob('tca_*_tests.txt')))
 
-    def test_serial_dispatch_reaches_all_delayed_cases_before_summary(self):
-        # 仅检查数量登记无法发现等待链提前汇总的问题。
-        suite = definitions((ROOT / 'events/tca_tests_events.txt').read_text(encoding='utf-8-sig'))
-        stages = {}
-        delayed_entries = set()
-        for event, body in suite.items():
-            text = ' '.join(body)
-            stage = re.search(r'name = tca_test_suite_delayed_next value = (\d+)', text)
-            if stage:
-                self.assertNotIn(int(stage[1]), stages)
-                stages[int(stage[1])] = event
-                target = re.search(r'trigger_event = (tca_\w+_test\.\d+)', text)
-                self.assertIsNotNone(target, event)
-                delayed_entries.add(target[1])
-        self.assertEqual(set(stages), set(range(len(stages))))
-        effects = definitions((ROOT / 'common/scripted_effects/tca_test_delayed_dispatch_effects.txt').read_text(encoding='utf-8-sig'))
-        edges = dict((int(n), event) for n, event in re.findall(
-            r'limit = \{ var:tca_test_suite_delayed_next = (\d+) \} trigger_event = (tca_tests\.\d+)',
-            ' '.join(effects['tca_test_continue_delayed_effect'])))
-        self.assertEqual(set(edges), set(stages))
-        for index in range(len(stages) - 1):
-            self.assertEqual(edges[index], stages[index + 1], index)
-        self.assertEqual(edges[len(stages) - 1], 'tca_tests.2')
+    def test_serial_dispatch_claims_before_execution_and_resumes_through_catalog(self):
+        from testing.catalog import catalog
+        rows = catalog(ROOT)
         declared = set()
-        for path in (ROOT / 'events').glob('tca_*test*_events.txt'):
+        for path in (ROOT / 'events').rglob('tca_*test*_events.txt'):
             for event, body in definitions(path.read_text(encoding='utf-8-sig')).items():
                 text = ' '.join(body)
                 if 'TCA_TEST BEGIN' in text and 'add_character_flag = tca_test_delayed_case_active' in text:
                     declared.add(event)
-        self.assertEqual(delayed_entries, declared)
+        self.assertEqual({row['event'] for row in rows if row['delayed']}, declared)
+        dispatcher = definitions((ROOT / 'common/scripted_effects/tests/framework/tca_test_dispatch_effects.txt').read_text(encoding='utf-8-sig'))
+        visit = ' '.join(dispatcher['tca_test_visit_case_effect'])
+        self.assertIn('NOT = { has_character_flag = tca_test_delayed_case_active }', visit)
+        self.assertIn('NOT = { has_character_flag = tca_test_dispatch_claimed }', visit)
+        self.assertLess(visit.index('add_character_flag = $CASE$_dispatched'), visit.index('trigger_event = $EVENT$'))
+        continuation = (ROOT / 'common/scripted_effects/tests/framework/tca_test_delayed_dispatch_effects.txt').read_text(encoding='utf-8-sig')
+        self.assertIn('tca_test_validate_environment_effect = yes', continuation)
+        self.assertIn('trigger_event = tca_tests.3', continuation)
+        self.assertNotIn('tca_test_suite_delayed_next', continuation)
+        suite = definitions((ROOT / 'events/tests/tca_tests_events.txt').read_text(encoding='utf-8-sig'))
+        scan = ' '.join(suite['tca_tests.3'])
+        self.assertLess(scan.index('tca_test_catalog_effect'), scan.index('trigger_event = tca_tests.2'))
+        self.assertIn('NOT = { has_character_flag = tca_test_dispatch_claimed }', scan)
 
     def test_known_circuit_name_keys_resolve_without_transient_scopes(self):
         from check_upstream_overrides import localization_values

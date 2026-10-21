@@ -273,7 +273,7 @@ class UpstreamCheckTests(unittest.TestCase):
 
 
     def test_all_localization_files_have_utf8_bom(self):
-        mod_root = Path(__file__).resolve().parent.parent
+        mod_root = Path(__file__).resolve().parents[2]
         loc_files = list((mod_root / "localization").rglob("*.yml"))
         self.assertGreater(len(loc_files), 0)
         for loc_file in loc_files:

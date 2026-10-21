@@ -223,7 +223,7 @@ python3 -m unittest discover -s tools -p 'test_*.py'
 - 及第奖励补齐原版 AI 绕过乡试分支的非低出身功绩；低出身没有这笔补算。原版依据为 `tgp_imperial_examination_scripted_effects.txt` 的 `imperial_examination_disburse_activity_entrant_rewards`。
 - 原扣费使用负数 `add_treasury`，本次真实代办回归记录了引擎拒绝负数的错误；改用正数 `remove_treasury`。此前只比较费用变量的断言不能证明实际扣费，本轮新增国库余额断言。
 
-原生测试仍直接维护在 `events/tca_exam_test_events.txt`：规则与结算例扩为 38 断言，新延迟例 `.2` 为 5 断言，科举共 2 例／43 断言；总组 122 例／792 断言。延迟例先真实代办，再调用第二次入口，等待三日正式结算；第4日确认 pending 清除，重送结算事件，第5日检查临时候选计数哨兵未被覆盖并恢复原计数，避免把月收入波动当成重复奖励。
+原生测试仍直接维护在 `events/tests/tca_exam_test_events.txt`：规则与结算例扩为 38 断言，新延迟例 `.2` 为 5 断言，科举共 2 例／43 断言；总组 122 例／792 断言。延迟例先真实代办，再调用第二次入口，等待三日正式结算；第4日确认 pending 清除，重送结算事件，第5日检查临时候选计数哨兵未被覆盖并恢复原计数，避免把月收入波动当成重复奖励。
 
 失败复现：`/private/tmp/tca-exam-final-red/run-ze_aqbca`，固定种子 1538798675，旧玩法实现、首次新增测试源，122 BEGIN／119 PASS／3 FAIL，781 CHECK_PASS／8 CHECK_FAIL。考试规则33（计时）、34（补算功绩）及延迟例1、2、4失败。规则35是低出身夹具未使用原版满分阈值，随后修正夹具；规则36的首次夹具未显式加入局势，单凭该失败不能证明额外名额缺陷。另有既有通判生命周期46失败，未删除或放宽其断言。此轮也记录 pending 尚未在旧实现设置及负数 `add_treasury` 错误，整体 NOT VERIFIED。后增的预估去重37、首次实扣5及跨日哨兵续接不属于该失败运行的冻结源码，不能声称它们已完成相同源的失败到通过验证。
 

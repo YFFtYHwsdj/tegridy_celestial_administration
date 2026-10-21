@@ -1,0 +1,45 @@
+﻿# 控制台入口：effect tca_run_observer_tests_effect = yes。
+# 引擎 effect 命令可在无玩家时执行；其兜底角色
+# 绝不能成为报告者，也不能成为测试状态修改目标。
+tca_test_resolve_observer_host_effect = {
+    clear_saved_scope = tca_test_observer_host
+    if = {
+        limit = { tca_test_observer_world_ready_trigger = yes }
+        title:h_china = {
+            holder = { save_scope_as = tca_test_observer_host }
+        }
+    }
+}
+
+tca_run_observer_tests_effect = {
+    if = {
+        limit = { NOT = { debug_only = yes } }
+        debug_log = "TCA_TEST OBSERVER_ENTRY_REJECTED debug mode required"
+    }
+    else_if = {
+        limit = { NOT = { tca_test_observer_world_ready_trigger = yes } }
+        debug_log = "TCA_TEST OBSERVER_ENTRY_REJECTED valid 1066 China host required"
+    }
+    else_if = {
+        limit = { title:h_china = { has_variable = tca_test_suite_aborted } }
+        debug_log = "TCA_TEST OBSERVER_ENTRY_REJECTED aborted environment; start a fresh test game"
+    }
+    else_if = {
+        limit = {
+            any_living_character = {
+                OR = {
+                    has_character_flag = tca_test_suite_running
+                    has_character_flag = tca_test_delayed_case_active
+                }
+            }
+        }
+        debug_log = "TCA_TEST OBSERVER_ENTRY_BUSY"
+    }
+    else = {
+        tca_test_resolve_observer_host_effect = yes
+        scope:tca_test_observer_host = {
+            debug_log = "TCA_TEST OBSERVER_ENTRY_DISPATCH"
+            trigger_event = tca_tests.1
+        }
+    }
+}

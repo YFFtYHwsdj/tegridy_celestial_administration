@@ -69,13 +69,13 @@
 
 ## 测试开发约定
 
-- 游戏行为直接使用`events/tca_*_test_events.txt`中的原生隐藏事件测试，`events/tca_tests_events.txt`是总入口；无Python生成器或中间测试源。直接调用正式 trigger/effect，不在 Python 中重写一套业务规则。框架说明及写法见 [README.md](README.md#测试框架) 和 [统一测试文档](docs/mod_tests.md)。
-- 新增机制、改变已有行为或修复缺陷时，对可自动验证的行为新增或更新回归用例。优先检查有实际意义的结果、正反条件和边界，不为纯文本、格式等低影响修改机械补业务测试。日志核对、覆盖检查等 Python 工具的逻辑用 `tools/test_*.py` 验证。
+- 游戏行为直接使用`events/tests/tca_*_test_events.txt`中的原生隐藏事件测试，`events/tests/tca_tests_events.txt`是统一入口，原生模块登记位于`common/scripted_effects/tests/modules/tca_test_modules_*_effects.txt`；无Python生成器或中间测试源。直接调用正式 trigger/effect，不在 Python 中重写一套业务规则。框架说明及写法见 [README.md](README.md#测试框架) 和 [统一测试文档](docs/mod_tests.md)。
+- 新增机制、改变已有行为或修复缺陷时，对可自动验证的行为新增或更新回归用例。优先检查有实际意义的结果、正反条件和边界，不为纯文本、格式等低影响修改机械补业务测试。日志核对、覆盖检查等 Python 工具的逻辑用 `tools/tests/test_*.py` 验证。
 - 发现问题先记录触发条件、实际与预期结果及日志，构造最小复现场景，尽量先写一个按正确行为断言、能暴露原问题的测试，再修复实现。能运行时确认修复前失败、修复后通过；无法运行时明确记录“待引擎复现/复测”，不得声称已完成失败到通过的验证。
 - 修复后保留该回归用例，运行相关单项及同模块已有测试；涉及共享入口、权限或生命周期时扩展到受影响测试组。不得为得到通过结果而删除失败断言、无理由放宽预期或把真实缺陷改成跳过。
 - 每个用例自行准备必要状态，不依赖其他用例的执行顺序或遗留状态。使用唯一 `tca_test_` 日志名称，按前置检查、场景准备、正式操作和结果断言组织事件；前置不满足是未执行，不是通过。测试不得改写框架保留的统计变量及运行标记。事件、断言日志和延迟续接约定见 `docs/mod_tests.md`。
-- 直接修改测试事件；新增用例同步登记到`events/tca_tests_events.txt`并更新计划数量，延迟用例使用原生延迟事件且串行调度。运行`python3 -m unittest discover -s tools -p 'test_*.py'`检查登记与日志工具；不再执行生成步骤。
-- 引擎回归优先运行 `python3 tools/run_game_tests.py`，自动建立独立1066观察者测试局、启用 debug/develop、推进日期并执行正式全组测试。只加载本模组及 CLI 测试适配模组，不沿用启动器的其他模组；参数、输出目录与限制见 [CLI 测试说明](docs/cli_game_tests.md)。当前需要 macOS 或 Windows 图形会话和可用的 Steam 环境，不是无图形测试。
+- 直接修改测试事件；新增用例同步登记到所属`common/scripted_effects/tests/modules/tca_test_modules_*_effects.txt`，仅新增模块时维护`common/scripted_effects/tests/framework/tca_test_catalog_effects.txt`的模块顺序；框架从登记计数，不再手填总数或全局阶段编号。延迟用例使用原生延迟事件且串行调度。运行`python3 -m unittest discover -s tools -p 'test_*.py'`检查登记与日志工具；不再执行生成步骤。
+- 引擎回归优先运行 `python3 tools/run_game_tests.py`，默认一次启动独立1066观察者测试局、启用 debug/develop、推进日期并执行正式全组测试。`--case`／`--suite`可重复选择，即时和延迟用例均支持；多个选择默认同局，`--isolate suite`才按模块分别开局。任务封存后同机排队，协作引用固定任务ID而非`latest.json`。只加载本模组及 CLI 测试适配模组，不沿用启动器的其他模组；参数、输出目录与限制见 [CLI 测试说明](docs/cli_game_tests.md)。当前需要 macOS 或 Windows 图形会话和可用的 Steam 环境，不是无图形测试。
 - 核对 CLI 本次目录中的 `terminal.json`、`result.txt` 和日志；超时、中断、提前退出、未确认观察者切换或日志核对为 `NOT VERIFIED` 都不能算通过。需要界面、真实交互、保存重载等人工验收，或 CLI 环境不可用时，再使用专用 debug 测试局的“调试：模组一键测试”或 `event tca_tests.1`；观察者入口为 `effect tca_run_observer_tests_effect = yes`。说明未使用 CLI 的原因及实际验证范围。
 - 不要使用本机执行后会卡住、原因尚未确认的 `scripted_tests` 命令。测试会修改世界状态，不能在正常游玩存档上当作只读检查。
 - 核对本次实际执行的用例与数量、`debug.log` 中的 `TCA_TEST` 记录及 `error.log`。全部断言通过仍可能伴随脚本错误；未执行、缺少结果或测试范围不覆盖目标行为时，不得宣布问题已解决。

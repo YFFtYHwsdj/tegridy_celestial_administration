@@ -1,5 +1,7 @@
 # 模组游戏内测试
 
+当前框架支持默认一次启动全组、选择任意即时／延迟用例和多模块同局，以及可选按模块隔离；维护契约见下方“当前结构”“运行和维护”，参数与结果见[CLI说明](cli_game_tests.md)，改造方案及本轮证据见[协作改造](test_framework_collaboration.md)。以下日期段落为各次验收记录，不替代当前契约。
+
 2026-10-21 家族通知修复：原生组仍为122项／792断言，新增通知引用静态检查后工具组156项。独立1066观察者局 `run-zdf4byo4`（CK3 1.20.1.1，种子1538798675，仅冻结主模组与CLI适配）122 BEGIN／122 PASS／792 CHECK_PASS，零失败或未执行；观察者、summary、源码快照与同次日志核对通过，verification_exit和runner_exit均为0，未检出模组相关引擎错误。三类家族通知显式引用实际考生并包含家主，独立复审无新增问题；静态用例已见旧实现失败、修复后通过。此次原生组只证明引擎加载和既有玩法回归，消息送达、多个考生的姓名／头像冻结及中英画面仍待人工验收，步骤与证据见[通知修复记录](examination_automation.md#13-2026-10-21-家族通知修复)。
 
 2026-10-21 科举最终审查修复（家族通知修复前记录）：当时122项／792断言。独立1066中国观察者局 `run-ayz20s4y`（CK3 1.20.1.1，种子1538798675，仅冻结主模组与CLI适配）122 BEGIN／122 PASS／792 CHECK_PASS，零失败或未执行；观察者、summary、源码快照及同次日志核对通过，verification_exit和runner_exit均为0，未检出模组相关引擎错误。科举规则例38断言、串行防重例5断言，覆盖原版计时归零、贵族乡试补算、150普通名额＋优先近亲去重、无召集反例、实际国库扣款及迟到结算拒绝。155项工具测试与覆盖检查通过；中间夹具失败、修订及未验证范围见[知贡举最终修复记录](examination_automation.md#12-2026-10-21-最终审查修复)。悬浮、玩家完整事件链和保存重载仍待人工验收。
@@ -58,7 +60,7 @@
 
 ## 当前数值回归（2026-10-16，通判收益系数0.4）
 
-正式收益提高为每点称职度0.4个百分点、最高40个百分点。`events/tca_tongpan_test_events.txt`第6、32、53及55断言同步预期，保留零值及原生最终效率1.5封顶检查；登记仍为117项／638断言。独立1066中国观察者局`run-bn1h_4wm`（CK3 1.20.1.1、种子1538798675、仅冻结主模组与CLI适配，入口`tca_tongpan_test.1`）1 BEGIN／1 PASS／58 CHECK_PASS，零失败或未执行。terminal确认observer、summary及源码副本无变化，verification_exit与runner_exit均为0，result及同次日志核对通过，未检出模组相关引擎错误。126项工具测试、上游覆盖、BOM及空白检查通过。未重跑全组；严格首位继任、真实界面及结束制度的既有未通过项目仍保留。首次沙箱启动未派发测试，NOT VERIFIED，详见[本轮记录](song_tongpan_implementation.md#2026-10-16-治理收益系数提高至04当前实现)。
+正式收益提高为每点称职度0.4个百分点、最高40个百分点。`events/tests/tca_tongpan_test_events.txt`第6、32、53及55断言同步预期，保留零值及原生最终效率1.5封顶检查；登记仍为117项／638断言。独立1066中国观察者局`run-bn1h_4wm`（CK3 1.20.1.1、种子1538798675、仅冻结主模组与CLI适配，入口`tca_tongpan_test.1`）1 BEGIN／1 PASS／58 CHECK_PASS，零失败或未执行。terminal确认observer、summary及源码副本无变化，verification_exit与runner_exit均为0，result及同次日志核对通过，未检出模组相关引擎错误。126项工具测试、上游覆盖、BOM及空白检查通过。未重跑全组；严格首位继任、真实界面及结束制度的既有未通过项目仍保留。首次沙箱启动未派发测试，NOT VERIFIED，详见[本轮记录](song_tongpan_implementation.md#2026-10-16-治理收益系数提高至04当前实现)。
 
 ## 2026-10-16 测试完整性增强（此前验收）
 
@@ -122,9 +124,9 @@ run-es30arov的只读GUI数据探针复制正式列表并固定测试官职，�
 
 ## 当前结构
 
-测试直接维护为CK3原生隐藏事件，不使用Python生成器，也不保留另一套P脚本中间源。`events/`下的测试文件就是正式测试代码，`common/scripted_effects/tca_judicial_law_test_effects.txt`是共享场景准备，Python仅用于读取日志和静态检查。
+测试直接维护为CK3原生隐藏事件，不使用Python生成器，也不保留另一套P脚本中间源。`events/`下的测试文件就是正式测试代码，`common/scripted_effects/tests/fixtures/tca_judicial_law_test_effects.txt`是共享场景准备，Python仅用于读取日志和静态检查。
 
-当前源码117项／638断言，88项即时、29项串行延迟。通判正式实现、生命周期58断言及本轮验收见[通判实现与验收](song_tongpan_implementation.md)；此前115项的通过不覆盖新增用例。路级法理与真实庄园回归见[司法辖区记录](judicial_de_jure_probe.md)。原生拘捕组直接发送真实审批请求，检查即时收押和第20日的匹配观察证据；世族批准/否决场景核对实际领主与庄园路不同，迁移场景核对旧审批失效。观察证据用例使用真实释放／死亡回调，并包含跨囚犯旧证据反例。测试范围及结果见[原生拘捕文档](judicial_arrest_native_tests.md)。
+当前源码122项／792断言，91项即时、31项串行延迟。模块登记位于`common/scripted_effects/tests/modules/tca_test_modules_*_effects.txt`，模块顺序位于`common/scripted_effects/tests/framework/tca_test_catalog_effects.txt`，通用派发位于`common/scripted_effects/tests/framework/tca_test_dispatch_effects.txt`；`events/tests/tca_tests_events.txt`仅保留入口、续接与汇总。通判正式实现、生命周期58断言及本轮验收见[通判实现与验收](song_tongpan_implementation.md)；此前115项的通过不覆盖新增用例。路级法理与真实庄园回归见[司法辖区记录](judicial_de_jure_probe.md)。原生拘捕组直接发送真实审批请求，检查即时收押和第20日的匹配观察证据；世族批准/否决场景核对实际领主与庄园路不同，迁移场景核对旧审批失效。观察证据用例使用真实释放／死亡回调，并包含跨囚犯旧证据反例。测试范围及结果见[原生拘捕文档](judicial_arrest_native_tests.md)。
 
 ## 前轮回归（2026-10-15，通判治理收益0.2）
 
@@ -150,15 +152,15 @@ macOS 可运行`python3 tools/run_game_tests.py`，自动建立独立1066观察�
 effect tca_run_observer_tests_effect = yes
 ```
 
-无需查找角色ID或临时切换玩家。`tca_run_observer_tests_effect`检查debug、1066开局及有效天朝皇帝，再由`tca_test_resolve_observer_host_effect`固定选择`title:h_china.holder`承载`tca_tests.1`。测试统计、运行标记及二十七项串行延迟继续保存在该角色上；不使用控制台的默认角色。原有玩家决议、`event tca_tests.1`及各组单项入口保持不变。
+无需查找角色ID或临时切换玩家。`tca_run_observer_tests_effect`检查debug、1066开局及有效天朝皇帝，再由`tca_test_resolve_observer_host_effect`固定选择`title:h_china.holder`承载`tca_tests.1`。测试统计、运行标记及串行延迟状态保存在该角色上；不使用控制台的默认角色。原有玩家决议、`event tca_tests.1`及各组单项入口保持不变。
 
-入口发现任一存活角色已有全组或延迟用例运行标记时，只记录`TCA_TEST OBSERVER_ENTRY_BUSY`，不重置统计。前置不满足记录`TCA_TEST OBSERVER_ENTRY_REJECTED`；成功调用记录`TCA_TEST OBSERVER_ENTRY_DISPATCH`，随后必须出现新的`SUITE_DISPATCH 113 cases`。该入口允许玩家模式使用，但也固定选择天朝皇帝，不将玩家当前角色自动作为测试请求者。
+入口发现任一存活角色已有全组或延迟用例运行标记时，只记录`TCA_TEST OBSERVER_ENTRY_BUSY`，不重置统计。前置不满足记录`TCA_TEST OBSERVER_ENTRY_REJECTED`；成功调用记录`TCA_TEST OBSERVER_ENTRY_DISPATCH`，随后必须出现新的`SUITE_DISPATCH`。该入口允许玩家模式使用，但也固定选择天朝皇帝，不将玩家当前角色自动作为测试请求者。
 
 观察者继续正常推进游戏日期，直到日志出现`SUITE_ALL_PASSED`或`SUITE_NOT_ALL_PASSED`，再运行`python3 tools/check_test_run.py`并审阅同次`error.log`。通知面向承载角色，不依赖观察者能看到通知。不得在运行中切换玩家、并发执行另一组测试或使用正常游玩存档。承载者或皇帝死亡、皇位更换时主动中止，详见下节；事件丢失、日期不推进或游戏退出造成缺少终局结果时仍是未完成，不自动换人接续或伪造通过。
 
 依据：本机CK3 1.20.0.4原版`events/_events.info`支持`scope = none`，但Mac arm64程序`SEventConsoleCommand::OnExecuteImpl`先调用`GetCharacterOrPlayerFromIndex`并检查角色有效性，故仅改事件作用域不能解决控制台报错。2026-10-13 13:19:25日志实际记录`event tca_tests.1`→`Player character not valid`，未进入总入口。程序`ReadAndExecuteEffect`在没有有效玩家时使用存活角色作为初始作用域，因此改用`effect`并在正式效果中显式解析天朝皇帝；不依赖引擎选择的初始角色。
 
-原生回归源：`events/tca_test_entry_test_events.txt`，单项`tca_test_entry_test.1`。用例自行创建无地AI调用角色，直接检查正式host trigger和resolver：有效皇帝为正例、无地AI为反例、过时保存作用域被重新解析、调用角色不获得框架运行标记。用例不递归启动全组、不改写框架统计或运行标记来准备场景。加入入口用例时全组曾为105项／441断言；加入生命周期用例后曾为107项／451断言。
+原生回归源：`events/tests/tca_test_entry_test_events.txt`，单项`tca_test_entry_test.1`。用例自行创建无地AI调用角色，直接检查正式host trigger和resolver：有效皇帝为正例、无地AI为反例、过时保存作用域被重新解析、调用角色不获得框架运行标记。用例不递归启动全组、不改写框架统计或运行标记来准备场景。加入入口用例时全组曾为105项／441断言；加入生命周期用例后曾为107项／451断言。
 
 ## 临时保护与死亡检测（2026-10-13）
 
@@ -168,7 +170,7 @@ effect tca_run_observer_tests_effect = yes
 
 `tca_test_environment_intact_trigger`及`tca_test_validate_environment_effect`在全部延迟调度、结果续接及最终汇总前检查：请求者未中止且仍存活、没有死亡记录、原被测皇帝仍存活且仍持有天朝皇位。皇位更换也中止，避免新皇帝与旧准备作用域混用。各调度／续接事件在检查后仅于未中止时执行原有测试体；串行调度辅助同时检查环境。中止在原请求者及`h_china`上留下标记，玩家／观察者全组入口拒绝再次启动；必须新开专用测试局，不能手动清标记后让旧事件混入新一轮。日志工具遇到`SUITE_ABORTED`即返回NOT VERIFIED，即使此前已有完整断言和通过标记也不能宣称通过。
 
-原生回归源`events/tca_test_lifecycle_test_events.txt`：`.1`六断言检查添加、重复保护、恢复、重复恢复、保留原有保护和原版immortal／incapable；`.2`通过正式`death = { death_reason = death_fight }`杀死一个受保护的临时角色，隔日四断言检查死亡、真实on_death记录、保护清理和不误中止真实测试请求者。死亡用例的关联请求者也是独立临时角色，不人为设置真实框架运行／统计标记，不直接调用死亡回调。新增一项即时、一项串行延迟，额外等待一日。
+原生回归源`events/tests/tca_test_lifecycle_test_events.txt`：`.1`六断言检查添加、重复保护、恢复、重复恢复、保留原有保护和原版immortal／incapable；`.2`通过正式`death = { death_reason = death_fight }`杀死一个受保护的临时角色，隔日四断言检查死亡、真实on_death记录、保护清理和不误中止真实测试请求者。死亡用例的关联请求者也是独立临时角色，不人为设置真实框架运行／统计标记，不直接调用死亡回调。新增一项即时、一项串行延迟，额外等待一日。
 
 验收：重启当前1.20.1专用1066中国debug局，玩家或观察者入口运行全组，核对当前117项／624断言和同次error.log；测试期间承载者与原皇帝应有临时保护，完成后只撤掉测试添加的保护。在另一专用局等待阶段通过控制台脚本杀死受监测皇帝，应出现死亡／中止记录，存活承载者的保护被撤掉，原队列不再记录续接断言，日志工具返回NOT VERIFIED；再次启动被拒绝。非死亡皇位更换须在下一续接时中止。强制退出或引擎卡死时无法保证执行清理，测试存档不可转为正常游玩存档；原生自然死亡免疫及保存重载仍需另验。
 
@@ -178,7 +180,7 @@ effect tca_run_observer_tests_effect = yes
 
 计数快照由正式请求角色上的统计派生：已完成=通过+失败+未执行，不修改框架计数。启动、即时组派发后的等待通知、每项延迟结束的串行续接、最终结果及中止时调用`tca_test_update_status_effect`；显示数据保存在`title:h_china`的`tca_test_status_*`变量上，与皇帝本人分离，死亡后GUI不读取死者变量。最终状态来自正式汇总分支；中止快照在清理前保存。窗口显示“全部用例通过”只代表框架断言结果，仍需日志工具核对引擎错误；单项事件不自动改变全组窗口。
 
-实现入口：`common/scripted_effects/tca_test_status_effects.txt`（通用快照写入、正式统计采集、关闭），`gui/tca_test_status.gui`（窗口），`gui/scripted_widgets/tca_test_status_widgets.txt`（自动创建登记）。窗口不依赖GetPlayer、GetHolder或观察者所选角色，不覆盖hud.gui或其他原版窗口。关闭按钮通过原版ExecuteConsoleCommand调用显式头衔作用域的关闭效果，只改变显示变量，不修改结果。运行中的关闭请求会被正式效果拒绝，防止误隐藏进度。
+实现入口：`common/scripted_effects/tests/framework/tca_test_status_effects.txt`（通用快照写入、正式统计采集、关闭），`gui/tca_test_status.gui`（窗口），`gui/scripted_widgets/tca_test_status_widgets.txt`（自动创建登记）。窗口不依赖GetPlayer、GetHolder或观察者所选角色，不覆盖hud.gui或其他原版窗口。关闭按钮通过原版ExecuteConsoleCommand调用显式头衔作用域的关闭效果，只改变显示变量，不修改结果。运行中的关闭请求会被正式效果拒绝，防止误隐藏进度。
 
 原版依据：`gui/scripted_widgets/_scripted_widgets.info`明确支持以文件／widget名称自动创建独立窗口；原版hud.gui及debug_menus.gui使用IsInGame，window_government_administration.gui使用Title.MakeScope.Var；debug_menus.gui使用ExecuteConsoleCommand。窗口样式组合参考本机Daddy Pika's Cheat Menu（Workshop 2986538297）的DI_main.gui及独立widget登记，属本机参考，不证明其全部内容与当前版本兼容。只新增本模组独立对象，没有同名原版覆盖。
 
@@ -190,11 +192,11 @@ effect tca_run_observer_tests_effect = yes
 
 重启专用1066中国debug局，玩家模式用“调试：模组一键测试”或`event tca_tests.1`，观察者模式用`effect tca_run_observer_tests_effect = yes`。取消暂停推进到最终日志汇总；当前拘捕组单独串行增加200个游戏日，不沿用旧版四十八日时长。单项入口沿用各组事件ID；观察者运行角色事件时需附接收者运行时ID。测试会修改世界，不使用正常游玩存档。测试期间不切换玩家或并发启动。
 
-直接编辑`events/tca_*_test_events.txt`。每项自备前置和状态，调用正式trigger/effect，通过if／limit检查结果；日志保留唯一tca_test_名称、连续CHECK编号及BEGIN／PASS／FAIL／PRECONDITION_FAIL。前置不满足计未执行，任何失败保留到用例结束。不要改写统计值来制造通过。
+直接编辑`events/tests/tca_*_test_events.txt`。每项自备前置和状态，调用正式trigger/effect，通过if／limit检查结果；日志保留唯一tca_test_名称、连续CHECK编号及BEGIN／PASS／FAIL／PRECONDITION_FAIL。前置不满足计未执行，任何失败保留到用例结束。不要改写统计值来制造通过。
 
-真实等待写成原生trigger_event的days参数，由后续角色事件检查。续接事件保留上下文，二十七项串行运行，不以直接调用正式worker替代自然触发。请求角色死亡、事件丢失或退出游戏时，无最终结果就是未完成。
+真实等待写成原生trigger_event的days参数，由后续角色事件检查。续接事件保留上下文，所选延迟用例串行运行，不以直接调用正式worker替代自然触发。请求角色死亡、事件丢失或退出游戏时，无最终结果就是未完成。
 
-新增用例在总入口`events/tca_tests_events.txt`登记并同步计划数量；延迟调度在该文件和`tca_test_delayed_dispatch_effects.txt`维护。日志工具从正式事件读取预期用例和编号，工具回归检查登记、连续编号和总数量。没有生成步骤。
+新增用例在所属`tca_test_modules_*_effects.txt`中以`EVENT`、唯一`CASE`日志名称及`DELAYED = yes/no`登记。仅新增模块时调整`common/scripted_effects/tests/framework/tca_test_catalog_effects.txt`的模块顺序；即时顺序和延迟顺序分别维护。不要手工更新总数量或分配全局阶段编号。日志工具交叉检查原生登记、正式用例、连续断言编号和冻结计划；没有生成步骤。即时用例当场完成，延迟用例自行撤销active标记再调用正式续接效果。共享夹具说明前置、修改对象、清理和环境损坏条件。
 
 检查命令：`python3 -m unittest discover -s tools -p 'test_*.py'`；游戏运行后用`python3 tools/check_test_run.py`，并审阅同次error.log。源码及静态通过不能当作引擎结果。
 

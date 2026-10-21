@@ -14,7 +14,7 @@ def expected_cases(root=ROOT):
     """读取直接维护的原生事件，绝不生成或运行游戏脚本。"""
     entries = {}
     checks = {}
-    for path in sorted((root / 'events').glob('tca_*test*_events.txt')):
+    for path in sorted((root / 'events').rglob('tca_*test*_events.txt')):
         for event, body in definitions(path.read_text(encoding='utf-8-sig')).items():
             if '.' in event and not 0 <= int(event.rsplit('.', 1)[1]) < 10000:
                 raise ValueError(f'{path.name}: event ID must be below 10000: {event}')
@@ -44,7 +44,7 @@ def expected_cases(root=ROOT):
 
 def inspect_engine_errors(errors):
     """纳入已审阅的整文件 GUI 覆盖，即使错误中没有 tca_ 标识。"""
-    registry = json.loads((ROOT / 'tools/upstream_overrides.json').read_text())
+    registry = json.loads((ROOT / 'tools/upstream_overrides.json').read_text(encoding='utf-8'))
     owned_paths = {entry['mod'] for section in ('overrides', 'file_overrides')
                    for entry in registry.get(section, [])}
     owned_loc_keys = {key for entry in registry.get('file_overrides', [])
@@ -169,7 +169,7 @@ def inspect_run(debug, errors, expected, strict_title_heir=False):
 
 def selected_case_expectations(entry, root=ROOT):
     all_cases = expected_cases(root)
-    for path in sorted((root / 'events').glob('tca_*test*_events.txt')):
+    for path in sorted((root / 'events').rglob('tca_*test*_events.txt')):
         for event, body in definitions(path.read_text(encoding='utf-8-sig')).items():
             if event == entry:
                 match = re.search(r'TCA_TEST BEGIN ' + re.escape(entry) + r' (tca_test_\S+)', ' '.join(body))
@@ -177,6 +177,28 @@ def selected_case_expectations(entry, root=ROOT):
                     name = match[1].rstrip('"')
                     return {name: all_cases[name]}
     raise ValueError(f'Unknown native test entry: {entry}')
+
+
+def case_outcomes(debug, expected):
+    """只统计最新派发轮；完整断言及唯一结果齐备才显示单项通过。"""
+    starts = list(re.finditer('TCA_TEST SUITE_DISPATCH', debug))
+    latest = debug[starts[-1].start():] if starts else ''
+    states = {}
+    for name, total in expected.items():
+        escaped = re.escape(name)
+        if re.search(r'TCA_TEST PRECONDITION_FAIL ' + escaped + r'(?:\s|$)', latest):
+            state = 'PRECONDITION_FAIL'
+        elif re.search(r'TCA_TEST (?:FAIL|CHECK_FAIL) ' + escaped + r'(?:\s|$)', latest):
+            state = 'FAIL'
+        elif not re.search(r'TCA_TEST BEGIN \S+ ' + escaped + r'(?:\s|$)', latest):
+            state = 'NOT_RUN'
+        else:
+            passed = len(re.findall(r'TCA_TEST PASS ' + escaped + r'(?:\s|$)', latest))
+            begins = len(re.findall(r'TCA_TEST BEGIN \S+ ' + escaped + r'(?:\s|$)', latest))
+            checks = Counter(re.findall(r'TCA_TEST CHECK_PASS ' + escaped + r' (\d+)(?:\s|$)', latest))
+            state = 'PASS' if passed == begins == 1 and checks == Counter({str(i): 1 for i in range(1, total + 1)}) else 'NOT_VERIFIED'
+        states[name] = state
+    return states
 
 
 def main():
@@ -190,9 +212,25 @@ def main():
     if not source.is_dir():
         source = ROOT
         print('WARNING: no source snapshot; checking current case counts only')
-    expected = selected_case_expectations(args.case, source) if args.case else expected_cases(source)
-    issues, counts = inspect_run((args.logs / 'debug.log').read_text(errors='replace'),
-                                (args.logs / 'error.log').read_text(errors='replace'), expected, args.strict_title_heir)
+    plan_path = args.logs.parent / 'selection.json'
+    plan = json.loads(plan_path.read_text(encoding='utf-8')) if plan_path.is_file() else None
+    if plan is not None and 'cases' in plan:
+        from testing.catalog import validate_plan
+        expected = validate_plan(plan, source)
+        if args.case and expected != selected_case_expectations(args.case, source):
+            raise ValueError('--case conflicts with frozen selection plan')
+    elif isinstance(plan, dict) and set(plan) == {'case', 'stage'}:
+        # 旧版单项计划的阶段号不再参与调度，验收仍按原生入口读取冻结断言。
+        expected = selected_case_expectations(plan['case'], source)
+        if args.case and args.case != plan['case']:
+            raise ValueError('--case conflicts with legacy selection')
+    elif plan is None:
+        expected = selected_case_expectations(args.case, source) if args.case else expected_cases(source)
+    else:
+        raise ValueError('Invalid selection plan')
+    debug = (args.logs / 'debug.log').read_text(encoding='utf-8', errors='replace') if (args.logs / 'debug.log').is_file() else ''
+    issues, counts = inspect_run(debug,
+                                (args.logs / 'error.log').read_text(encoding='utf-8', errors='replace') if (args.logs / 'error.log').is_file() else '', expected, args.strict_title_heir)
     if (args.logs.parent / 'source_manifest.json').is_file():
         from run_game_tests import verify_snapshot
         issues.extend(verify_snapshot(args.logs.parent))
@@ -203,7 +241,11 @@ def main():
         print(issue)
     if len(issues) > 30:
         print(f'... {len(issues) - 30} further issues')
-    scope = 'selected case' if args.case else 'all current cases'
+    scope = plan.get('scope', 'legacy selection') if plan else 'selected case' if args.case else 'all current cases'
+    cases = case_outcomes(debug, expected)
+    (args.logs.parent / 'verification.json').write_text(json.dumps(
+        {'scope': scope, 'cases': cases, 'counts': dict(counts), 'issues': issues,
+         'verification_exit': int(bool(issues))}, ensure_ascii=False, indent=2) + '\n')
     print('NOT VERIFIED' if issues else f'OK: {scope} passed; no detected mod-related engine errors')
     return int(bool(issues))
 

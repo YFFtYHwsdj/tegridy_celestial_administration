@@ -47,7 +47,7 @@
 
 ## 本轮验证
 
-原生测试仍直接维护在 `events/tca_confucian_statistics_test_events.txt` 和 `events/tca_confucian_strength_test_events.txt`。统计聚合由18增至28断言：新增局部与全世界参照的总量／逐Rite对照、首次共享读取、跨人物复用快照、手动刷新、关闭保留、89天继续复用及91天过期补算、主要头衔绑定失效及季度维护效果。保留成年、异教、死亡、两种占比差异、贡献、并列、重复归一化和零分母检查。测试通过原生trigger_event的on_action入口验证季度子回调及非独立人物的拒绝条件；人工派发不替代自然季度脉冲的时机验证。
+原生测试仍直接维护在 `events/tests/tca_confucian_statistics_test_events.txt` 和 `events/tests/tca_confucian_strength_test_events.txt`。统计聚合由18增至28断言：新增局部与全世界参照的总量／逐Rite对照、首次共享读取、跨人物复用快照、手动刷新、关闭保留、89天继续复用及91天过期补算、主要头衔绑定失效及季度维护效果。保留成年、异教、死亡、两种占比差异、贡献、并列、重复归一化和零分母检查。测试通过原生trigger_event的on_action入口验证季度子回调及非独立人物的拒绝条件；人工派发不替代自然季度脉冲的时机验证。
 
 首轮 `run-in3e4ljh`：种子1538798675，119 BEGIN／119 PASS／685 CHECK_PASS，零断言失败和未执行；同次error.log出现两条旧兼容标记 `tca_stats_refresh_pending` “使用但未设置”错误，verification_exit和runner_exit均为1，整体 **NOT VERIFIED**，不作为通过。已在兼容事件测试中显式准备旧标记；另补主要头衔绑定及季度子回调拒绝条件，当前计划119项／687断言，复测结果如下。最终复测 `run-vhmi3_hj`：CK3 1.20.1.1，种子1538798675，独立1066中国观察者局，仅主模组与CLI适配副本。入口 `python3 tools/run_game_tests.py --timeout 480 --seed 1538798675`。已核对同次terminal.json、result.txt、debug.log、error.log：119 BEGIN／119 PASS／687 CHECK_PASS，零FAIL／CHECK_FAIL／PRECONDITION_FAIL，统计聚合28断言与权重21断言全部通过；观察者确认，SUITE_ALL_PASSED，verification_exit与runner_exit均为0，源码副本无差异，未检出模组相关引擎错误。旧兼容标记错误已消除。
 

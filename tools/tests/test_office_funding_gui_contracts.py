@@ -3,7 +3,7 @@ from pathlib import Path
 import re
 import unittest
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 GUI_PATH = ROOT / 'gui/tca_office_funding_types.gui'
 
 

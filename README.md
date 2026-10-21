@@ -62,25 +62,29 @@ CK3 天朝行政体系重做 mod。中央、地方官制分别提供因便／宋
 
 ## 测试框架
 
-支持 CLI 自动新开专用观察者测试局：`python3 tools/run_game_tests.py`。当前支持 macOS 与 Windows 带窗口运行（Windows 用法见 CLI 测试说明），无需 computer use；自动启用 debug/develop、推进日期、执行全组并核对独立日志。适配模组仅由工具加载，正常开局不自动运行。参数、退出码与限制见[CLI 测试说明](docs/cli_game_tests.md)。
+支持 CLI 自动新开专用观察者测试局：`python3 tools/run_game_tests.py`。当前支持 macOS 与 Windows 带窗口运行，无需 computer use；自动启用 debug/develop、推进日期、默认一次启动执行全组并核对独立日志。支持`--list`、重复`--case`／`--suite`选择即时／延迟用例及模块；多个选择默认同局，`--isolate suite`才按模块拆局。任务封存输入与验收工具后同机排队，结果按固定任务ID归属。适配模组仅由工具加载，正常开局不自动运行。参数、退出码与限制见[CLI 测试说明](docs/cli_game_tests.md)。
+
+当前工具检查186项通过。目录整理阶段完整回归曾通过122项／792断言；Windows整合后的完整复测为121项通过、通判生命周期第28／56断言失败，不能标为全组通过。官署经费此前选择运行的两条失败记录也继续保留。实现、目录整理和隔离证据见[协作改造验收](docs/test_framework_collaboration.md)，本轮结果及Windows待验证范围见[Windows整合验收](docs/test_framework_windows_integration.md)。
+
+目录组织：原生事件位于`events/tests/`；测试效果位于`common/scripted_effects/tests/`，分为`framework/`、`modules/`和`fixtures/`；Python回归位于`tools/tests/`，内部实现位于`tools/testing/`。常用命令入口保留在`tools/`，原有统一测试命令不变。
 
 测试直接维护为游戏原生的隐藏事件，不再使用Python生成器或中间测试源。Python工具负责启动编排、日志核对、登记及原版覆盖检查，不生成测试，不模拟游戏业务。
 
-- `events/tca_court_test_events.txt`：13项官制测试。
-- `events/tca_judicial_law_test_events.txt`：44项司法法律测试。
-- `events/tca_judicial_loading_test_events.txt`：3项加载／命名测试。
-- `events/tca_custody_review_test_events.txt`：30项详覆羁押测试，25项即时及5项串行延迟，包含直接发送结算、后续结果核对和自然清理保护。
-- `events/tca_judicial_timing_test_events.txt`：4项真实延迟测试，每项等待两日。
-- `events/tca_judicial_arrest_test_events.txt`：路长官对五类无地头衔目标的原生发送、批准／否决与收押回归。
-- `events/tca_tests_events.txt`：总入口和串行延迟调度。
-- `events/tca_confucian_statistics_test_events.txt`：成年儒家人物、人数／强度占比、排行、刷新及清理回归。
-- `events/tca_confucian_strength_test_events.txt`：教育分档、头衔与世族贡献、冒险者排除回归。
-- `events/tca_exam_test_events.txt`：知贡举规则、费用、评分、实际排序、跨届清理、完整结算及空考场主持收益／冷却回归，规则与结算38断言，另有真实延迟防重及实扣5断言。
-- `events/tca_test_entry_test_events.txt`：观察者入口的角色解析回归。
-- `events/tca_test_lifecycle_test_events.txt`：临时死亡保护、恢复及真实死亡回调回归。
-- `events/tca_test_status_test_events.txt`：状态快照及关闭／重新显示回归。
-- `events/tca_tongpan_probe_test_events.txt`：预定义伯爵级无地官职的同僚分权诊断，独立于已失败并归档的动态创建实验。
-- `events/tca_tongpan_test_events.txt`：通判固定绑定、池分配、费用、死亡继任、特殊状态及主管改制的原生回归。
+- `events/tests/tca_court_test_events.txt`：13项官制测试。
+- `events/tests/tca_judicial_law_test_events.txt`：44项司法法律测试。
+- `events/tests/tca_judicial_loading_test_events.txt`：3项加载／命名测试。
+- `events/tests/tca_custody_review_test_events.txt`：30项详覆羁押测试，25项即时及5项串行延迟，包含直接发送结算、后续结果核对和自然清理保护。
+- `events/tests/tca_judicial_timing_test_events.txt`：4项真实延迟测试，每项等待两日。
+- `events/tests/tca_judicial_arrest_test_events.txt`：路长官对五类无地头衔目标的原生发送、批准／否决与收押回归。
+- `events/tests/tca_tests_events.txt`：统一入口、延迟续接和汇总；各模块在`common/scripted_effects/tests/modules/tca_test_modules_*_effects.txt`登记，不再分配全局阶段编号。
+- `events/tests/tca_confucian_statistics_test_events.txt`：成年儒家人物、人数／强度占比、排行、刷新及清理回归。
+- `events/tests/tca_confucian_strength_test_events.txt`：教育分档、头衔与世族贡献、冒险者排除回归。
+- `events/tests/tca_exam_test_events.txt`：知贡举规则、费用、评分、实际排序、跨届清理、完整结算及空考场主持收益／冷却回归，规则与结算38断言，另有真实延迟防重及实扣5断言。
+- `events/tests/tca_test_entry_test_events.txt`：观察者入口的角色解析回归。
+- `events/tests/tca_test_lifecycle_test_events.txt`：临时死亡保护、恢复及真实死亡回调回归。
+- `events/tests/tca_test_status_test_events.txt`：状态快照及关闭／重新显示回归。
+- `events/tests/tca_tongpan_probe_test_events.txt`：预定义伯爵级无地官职的同僚分权诊断，独立于已失败并归档的动态创建实验。
+- `events/tests/tca_tongpan_test_events.txt`：通判固定绑定、池分配、费用、死亡继任、特殊状态及主管改制的原生回归。
 
 ### 游戏内运行
 
@@ -96,7 +100,7 @@ CK3 天朝行政体系重做 mod。中央、地方官制分别提供因便／宋
 
 直接编辑对应测试事件，准备独立场景、调用正式trigger/effect、检查实际结果。保留BEGIN、CHECK_PASS／CHECK_FAIL和PASS／FAIL／PRECONDITION_FAIL日志，以及现有统计与防重逻辑。延迟测试使用原生`trigger_event = { id = ... days = 2 }`和续接事件，不新增wait_days字段。
 
-新增用例在`events/tca_tests_events.txt`登记入口，并同步计划数量；延迟组串行入口也要维护。运行`python3 -m unittest discover -s tools -p 'test_*.py'`检查用例登记、数量及日志读取；覆盖对象改动另运行`python3 tools/check_upstream_overrides.py`。没有生成步骤。
+新增用例在所属`common/scripted_effects/tests/modules/tca_test_modules_*_effects.txt`登记；仅新增模块时维护框架目录中的模块顺序，不手填总数量或全局阶段号。运行`python3 -m unittest discover -s tools -p 'test_*.py'`检查用例登记、数量及日志读取；覆盖对象改动另运行`python3 tools/check_upstream_overrides.py`。没有生成步骤。
 
 ### 验证范围
 

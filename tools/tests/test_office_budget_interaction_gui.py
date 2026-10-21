@@ -5,7 +5,7 @@ import unittest
 
 from check_upstream_overrides import tokens
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 
 
 class OfficeBudgetInteractionGuiTests(unittest.TestCase):

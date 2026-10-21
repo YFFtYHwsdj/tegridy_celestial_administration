@@ -29,7 +29,7 @@ Error: create_dynamic_title effect [ Not executing due to error during read ]
 
 ## 静态头衔诊断
 
-原生源：`events/tca_tongpan_probe_test_events.txt`；用例名：`tca_test_tongpan_static_peer_diarchy`。入口仍为`tca_tongpan_probe_test.1`，名称刻意与动态失败用例区分，不能将新场景通过写成旧动态场景从失败到通过。
+原生源：`events/tests/tca_tongpan_probe_test_events.txt`；用例名：`tca_test_tongpan_static_peer_diarchy`。入口仍为`tca_tongpan_probe_test.1`，名称刻意与动态失败用例区分，不能将新场景通过写成旧动态场景从失败到通过。
 
 - `common/landed_titles/tca_tongpan_probe_titles.txt`：仅一个预定义伯爵级无地测试头衔。
 - `common/diarchies/diarchy_types/tca_tongpan_probe.txt`：仅由debug测试角色标记允许启动的分权类型；没有额外权限或数值。
