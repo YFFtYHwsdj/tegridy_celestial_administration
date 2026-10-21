@@ -53,7 +53,7 @@ class GameRunnerTests(unittest.TestCase):
             self.assertEqual((snapshot / 'events/tca_fixture_events.txt').read_text(), 'original')
             source.write_text('changed after preparation')
             self.assertEqual((snapshot / 'events/tca_fixture_events.txt').read_text(), 'original')
-            self.assertIn(str(snapshot), (run / 'mod/tca_main.mod').read_text())
+            self.assertIn(snapshot.as_posix(), (run / 'mod/tca_main.mod').read_text())
             manifest = json.loads((run / 'source_manifest.json').read_text())
             self.assertIn('events/tca_fixture_events.txt', manifest['files'])
             self.assertEqual(len(manifest['sha256']), 64)
@@ -102,8 +102,8 @@ class GameRunnerTests(unittest.TestCase):
             self.assertEqual(json.loads((root / 'latest.json').read_text())['run_dir'], str(second))
             mods = json.loads((second / 'dlc_load.json').read_text())['enabled_mods']
             self.assertEqual(mods, ['mod/tca_main.mod', 'mod/tca_cli_adapter.mod'])
-            self.assertIn(str(second / 'mod/tca_main'), (second / 'mod/tca_main.mod').read_text())
-            self.assertIn(str(second), (second / 'mod/tca_cli_adapter.mod').read_text())
+            self.assertIn((second / 'mod/tca_main').as_posix(), (second / 'mod/tca_main.mod').read_text())
+            self.assertIn(second.as_posix(), (second / 'mod/tca_cli_adapter.mod').read_text())
             self.assertTrue((second / 'mod/tca_cli_adapter/events/tca_cli_events.txt').is_file())
 
     def test_settings_do_not_copy_account_and_disable_cloud_in_copy(self):
