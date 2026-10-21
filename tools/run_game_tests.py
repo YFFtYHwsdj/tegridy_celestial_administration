@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""启动独立的 CK3 图形观察者测试局，适用于 macOS，不使用界面自动化。"""
+"""启动独立的 CK3 图形观察者测试局，适用于 macOS 与 Windows，不使用界面自动化。"""
 import argparse
 import hashlib
 import json
@@ -13,10 +13,11 @@ import tempfile
 import time
 
 from check_upstream_overrides import definitions
+from platform_paths import default_game_dir, default_settings, game_executable
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_GAME = Path.home() / 'Library/Application Support/Steam/steamapps/common/Crusader Kings III'
-DEFAULT_SETTINGS = Path.home() / 'Documents/Paradox Interactive/Crusader Kings III/pdx_settings.txt'
+DEFAULT_GAME = default_game_dir()
+DEFAULT_SETTINGS = default_settings()
 SUMMARY_MARKERS = ('TCA_TEST SUITE_ALL_PASSED', 'TCA_TEST SUITE_NOT_ALL_PASSED',
                    'TCA_TEST SUITE_ABORTED')
 
@@ -164,10 +165,11 @@ def stop_owned_process(process):
 
 
 def game_command(args, run):
-    executable = args.game_dir / 'binaries/ck3.app/Contents/MacOS/ck3'
+    executable = game_executable(args.game_dir)
     command = [str(executable), '-debug_mode', '-develop', '-skip',
                '-bookmark=bm_1066_china', '-play=h_china', '-suppress_error_log',
-               f'-userdir={run}/']
+               # 统一用正斜杠，Windows 下避免与结尾分隔符混用。
+               f'-userdir={run.as_posix()}/']
     seed = getattr(args, 'seed', None)
     if seed is not None:
         if not 0 <= seed <= 0xFFFFFFFF:
@@ -256,8 +258,8 @@ def main(argv=None):
     if args.timeout <= 0:
         parser.error('--timeout must be positive')
     try:
-        if not args.prepare_only and not (args.game_dir / 'binaries/ck3.app/Contents/MacOS/ck3').is_file():
-            raise ValueError('macOS CK3 executable missing; set --game-dir to the installation root')
+        if not args.prepare_only and not game_executable(args.game_dir).is_file():
+            raise ValueError(f'CK3 executable missing at {game_executable(args.game_dir)}; set --game-dir to the installation root')
         run = prepare_run(ROOT, args.run_root.expanduser().resolve(), args.settings.expanduser(), args.case)
         print(f'Fresh run directory: {run}', flush=True)
         if args.prepare_only:

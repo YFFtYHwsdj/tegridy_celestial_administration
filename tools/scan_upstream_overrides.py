@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 import sys
 
+from platform_paths import default_game_dir
 from check_upstream_overrides import ROOT, discover_collisions, load_registry, script_files
 
 
@@ -65,7 +66,7 @@ def print_report(report):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--game-dir", type=Path,
-                        default=Path.home() / "Library/Application Support/Steam/steamapps/common/Crusader Kings III/game")
+                        default=default_game_dir() / "game")
     parser.add_argument("--mod-dir", type=Path, default=ROOT)
     parser.add_argument("--json", action="store_true", help="print a machine-readable inventory")
     args = parser.parse_args(argv)

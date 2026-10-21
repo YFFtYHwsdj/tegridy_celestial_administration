@@ -11,6 +11,8 @@ from pathlib import Path
 import re
 import sys
 
+from platform_paths import default_game_dir
+
 ROOT = Path(__file__).resolve().parents[1]
 REGISTRY = Path("tools/upstream_overrides.json")
 TOKEN = re.compile(r'"(?:\\.|[^"\\])*"|\#[^\n]*|\s+|\?=|!=|>=|<=|@\[|[{}\[\]=<>]|[^\s{}\[\]=<>!"#?]+')
@@ -307,7 +309,7 @@ def check(game_dir, mod_dir):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--game-dir", type=Path,
-                        default=Path.home() / "Library/Application Support/Steam/steamapps/common/Crusader Kings III/game",
+                        default=default_game_dir() / "game",
                         help="directory containing common/")
     parser.add_argument("--mod-dir", type=Path, default=ROOT,
                         help="mod root containing tools/upstream_overrides.json")

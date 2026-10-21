@@ -20,7 +20,19 @@ python3 tools/run_game_tests.py
 python3 tools/run_game_tests.py --game-dir "/path/to/Crusader Kings III" --timeout 360
 ```
 
-目前仅支持 macOS 的`binaries/ck3.app/Contents/MacOS/ck3`。必须有对应 DLC、图形会话和可用的 Steam 环境；本轮核对的安装与隔离存档版本为1.20.1（Crozier），未验证其他平台；旧文档中的1.20.0.4接口记录不能代替本轮实际版本。总超时默认240秒，包含启动耗时。脚本工作目录设为安装的`binaries/`，给子进程设置`SteamAppId=1158310`。
+支持 macOS 的`binaries/ck3.app/Contents/MacOS/ck3`与 Windows 的`binaries/ck3.exe`（见下文「Windows」）。必须有对应 DLC、图形会话和可用的 Steam 环境；本轮核对的安装与隔离存档版本为1.20.1（Crozier），未验证其他平台；旧文档中的1.20.0.4接口记录不能代替本轮实际版本。总超时默认240秒，包含启动耗时。脚本工作目录设为安装的`binaries/`，给子进程设置`SteamAppId=1158310`。
+
+### Windows
+
+默认路径由`tools/platform_paths.py`按系统给出：Windows 从注册表读取 Steam 位置，在`steamapps/libraryfolders.vdf`登记的各库中查找 CK3（应用1158310）；「文档」目录用系统已知文件夹接口读取，兼容被 OneDrive 重定向的情况。环境变量`CK3_GAME_DIR`可覆盖安装目录，`--game-dir`、`--settings`仍最优先。`check_upstream_overrides.py`、`scan_upstream_overrides.py`的默认游戏目录使用同一函数。
+
+Windows 上用`python`而非`python3`（后者可能是应用商店占位程序），并设置`PYTHONUTF8=1`以免中文输出按系统代码页报错：
+
+```sh
+PYTHONUTF8=1 python tools/run_game_tests.py --timeout 600
+```
+
+先启动 Steam 客户端；未运行时天朝 DLC 可能不生效。2026-10-21 在 Windows 11、CK3 1.20.1 上实际运行默认全组：119项／687断言全部通过，观察者及同次日志核对通过，runner_exit 0；加载约5分钟，全程约7.5分钟，默认240秒超时不够，需加长。游戏进程由工具强制结束（process_exit 1），与 macOS 一致。
 
 定位问题可选择一个已登记的串行延迟用例：
 
