@@ -1,5 +1,5 @@
 ﻿version="0.1.0"
-name="一国三公 / Imperium in Imperio"
+name="国是：东京梦华"
 tags={
     "Gameplay"
 }
