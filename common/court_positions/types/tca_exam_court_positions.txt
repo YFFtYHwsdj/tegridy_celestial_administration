@@ -1,0 +1,185 @@
+﻿# 知贡举：中国天朝皇帝专属的会试／殿试主持官。
+# 只有玩家皇帝会由自动任务触发考试事件链；AI 皇帝仍使用原版会试活动。
+tca_exam_commissioner_court_position = {
+    sort_order = 950
+    max_available_positions = 1
+    minimum_rank = empire
+    skill = learning
+
+    court_position_asset = {
+        animation = holding_scrolls
+        background = "gfx/interface/illustrations/event_scenes/tgp_examination_room.dds"
+    }
+
+    opinion = {
+        value = regular_court_position_opinion
+    }
+
+    aptitude_level_breakpoints = { 20 40 60 80 }
+
+    # 学识为主，管理次之，军事再次；功绩反映其科第与官阶。
+    # 适配度只影响宫廷职位效果，不直接修改考试分数或录取。
+    aptitude = {
+        value = 1
+        add = {
+            value = merit_level
+            multiply = 3
+            max = 30
+            desc = court_position_merit_level
+        }
+        add = {
+            value = learning
+            multiply = 1.5
+            max = 45
+            desc = court_position_skill_learning
+        }
+        add = {
+            value = stewardship
+            multiply = 0.75
+            max = 20
+            desc = court_position_skill_stewardship
+        }
+        add = {
+            value = martial
+            multiply = 0.5
+            max = 15
+            desc = court_position_skill_martial
+        }
+        if = {
+            limit = { has_trait = confucian_education }
+            add = {
+                value = "has_trait_xp(confucian_education)"
+                floor = yes
+                desc = court_position_confucian_education_trait
+            }
+        }
+        if = {
+            limit = { has_trait = erudite }
+            add = { value = 5 desc = court_position_erudite_trait }
+        }
+        if = {
+            limit = { has_trait = diligent }
+            add = { value = 5 desc = court_position_diligent_trait }
+        }
+        if = {
+            limit = { has_trait = patient }
+            add = { value = 5 desc = court_position_patient_trait }
+        }
+        if = {
+            limit = { has_trait = calm }
+            add = { value = 5 desc = court_position_calm_trait }
+        }
+        add = court_position_aptitude_low_penalty_value
+        add = general_aptitude_bonus
+    }
+
+    is_shown = {
+        is_independent_ruler = yes
+        government_has_flag = government_is_celestial
+        has_title = title:h_china
+    }
+
+    valid_position = {
+        is_independent_ruler = yes
+        government_has_flag = government_is_celestial
+        has_title = title:h_china
+    }
+
+    is_shown_character = {
+        scope:employee = {
+            court_position_employee_shown_trigger = yes
+        }
+    }
+
+    # 允许三省六部等无地官员兼任；不限制其他宫廷职位。
+    # 现任知贡举本人只作为考官，在考生池中排除。
+    #
+    # 四条任职资格路径满足其一即可；都保留无地、成年、年龄和非宦官／信徒底线。
+    valid_character = {
+        scope:employee = {
+            is_adult = yes
+            is_landed = no
+            age >= 35
+            NOT = { has_trait = eunuch }
+            NOT = { has_trait = devoted }
+            OR = {
+                AND = {
+                    tgp_passed_metropolitan_examination = yes
+                    merit_level >= 4
+                }
+                AND = {
+                    has_trait = confucian_education
+                    has_trait_xp = {
+                        trait = confucian_education
+                        value >= trait_third_of_five_level_value
+                    }
+                }
+                learning >= 16
+                merit_level >= 7
+            }
+        }
+    }
+
+    # 使用原版同级宫廷职位的薪资公式，保留领地规模、时代和皇帝加成明细。
+    salary = {
+        treasury = { value = major_court_position_salary }
+        prestige = { value = major_court_position_prestige_salary }
+        round = no
+    }
+
+    received_salary = {
+        gold = { value = major_court_position_salary }
+        prestige = { value = major_court_position_prestige_salary }
+        round = no
+    }
+
+    base_employer_modifier = {
+        monthly_influence = 0.2
+    }
+
+    scaling_employer_modifiers = {
+        terrible = { monthly_influence = 0.1 }
+        poor = { monthly_influence = 0.15 }
+        average = { monthly_influence = 0.2 }
+        good = { monthly_influence = 0.25 }
+        excellent = { monthly_influence = 0.3 }
+    }
+
+    ai_position_score = {
+        value = 100
+    }
+
+    ai_candidate_score = {
+        value = 100
+        add = court_position_candidate_score_base_value
+        add = court_position_candidate_aptitude_value
+    }
+
+    on_court_position_received = {
+        scope:employee ?= { set_variable = tca_exam_commissioner }
+    }
+
+    on_court_position_revoked = {
+        scope:employee ?= { remove_variable = tca_exam_commissioner }
+        scope:liege ?= {
+            remove_variable = tca_exam_automation
+            remove_variable = tca_exam_prompt_open
+        }
+    }
+
+    on_court_position_invalidated = {
+        scope:employee ?= { remove_variable = tca_exam_commissioner }
+        scope:liege ?= {
+            remove_variable = tca_exam_automation
+            remove_variable = tca_exam_prompt_open
+        }
+    }
+
+    on_court_position_vacated = {
+        scope:employee ?= { remove_variable = tca_exam_commissioner }
+        scope:liege ?= {
+            remove_variable = tca_exam_automation
+            remove_variable = tca_exam_prompt_open
+        }
+    }
+}

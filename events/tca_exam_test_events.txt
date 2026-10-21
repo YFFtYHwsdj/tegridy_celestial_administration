@@ -1,0 +1,435 @@
+﻿# 知贡举规则与结算的原生回归；不创建活动，只能在独立测试局执行。
+# 覆盖职位规则、排序、跨届状态与完整结算；会修改独立测试局的考试状态和收益。
+namespace = tca_exam_test
+
+tca_exam_test.1 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        if = { limit = { has_character_flag = tca_test_delayed_case_active } debug_log = "TCA_TEST CASE_BUSY" }
+        else = {
+            debug_log = "TCA_TEST BEGIN tca_exam_test.1 tca_test_exam_contract"
+            remove_character_flag = tca_test_case_failed
+            if = {
+                limit = {
+                    debug_only = yes
+                    title:h_china.holder = root
+                    government_has_flag = government_is_celestial
+                }
+                save_scope_as = host
+                create_character = {
+                    age = 40
+                    gender_female_chance = 0
+                    random_traits = no
+                    dynasty = none
+                    employer = root
+                    culture = root.culture
+                    faith = root.faith
+                    rite = root.rite
+                    learning = 20
+                    stewardship = 10
+                    martial = 5
+                    trait = confucian_education
+                    save_scope_as = tca_test_exam_candidate
+                }
+                scope:tca_test_exam_candidate = {
+                    change_merit = 10000
+                    add_character_flag = passed_metropolitan_exam
+                    tca_test_protect_character_effect = yes
+                }
+                if = { limit = { can_employ_court_position_type = tca_exam_commissioner_court_position } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 1" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 1" }
+                if = { limit = { scope:tca_test_exam_candidate = { learning >= 12 } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 10" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 10" }
+                if = { limit = { scope:tca_test_exam_candidate = { has_trait = confucian_education } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 11" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 11" }
+                if = { limit = { scope:tca_test_exam_candidate = { tgp_passed_metropolitan_examination = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 12" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 12" }
+                if = { limit = { scope:tca_test_exam_candidate = { is_landed = no is_adult = yes age >= 35 } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 13" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 13" }
+                if = { limit = { scope:tca_test_exam_candidate = { tca_exam_candidate_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 2" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 2" }
+                scope:tca_test_exam_candidate = { add_character_flag = passed_palace_exam }
+                if = { limit = { scope:tca_test_exam_candidate = { tca_exam_candidate_trigger = no } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 3" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 3" }
+                scope:tca_test_exam_candidate = { remove_character_flag = passed_palace_exam }
+                set_variable = { name = tca_exam_focus value = 0 }
+                save_scope_value_as = { name = tca_test_cost_learning value = tca_exam_cost_value }
+                set_variable = { name = tca_exam_focus value = 1 }
+                save_scope_value_as = { name = tca_test_cost_martial value = tca_exam_cost_value }
+                if = { limit = { scope:tca_test_cost_learning > 0 scope:tca_test_cost_martial > scope:tca_test_cost_learning } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 4" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 4" }
+                # 选项展示的档位费用与实际扣费必须同源。
+                set_variable = { name = tca_exam_cost_small value = tca_exam_cost_exclusive_value }
+                set_variable = { name = tca_exam_breadth value = 0 }
+                if = { limit = { tca_exam_selected_cost_value = var:tca_exam_cost_small } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 18" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 18" }
+                remove_variable = tca_exam_breadth
+                scope:tca_test_exam_candidate = {
+                    save_scope_value_as = { name = tca_test_score_without_provincial value = tca_exam_entry_value }
+                    add_character_flag = passed_provincial_exam
+                    save_scope_value_as = { name = tca_test_score_with_provincial value = tca_exam_entry_value }
+                }
+                if = { limit = { scope:tca_test_score_with_provincial > scope:tca_test_score_without_provincial } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 5" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 5" }
+                set_variable = { name = tca_exam_num_candidates value = 100 }
+                set_variable = { name = tca_exam_grade value = 0 }
+                if = { limit = { tca_exam_failee_count_value = 10 } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 6" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 6" }
+                set_variable = { name = tca_exam_grade value = 1 }
+                if = { limit = { tca_exam_failee_count_value = 15 } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 7" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 7" }
+                set_variable = { name = tca_exam_grade value = 2 }
+                if = { limit = { tca_exam_failee_count_value = 30 } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 8" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 8" }
+                set_variable = { name = tca_exam_grade value = 3 }
+                if = { limit = { tca_exam_failee_count_value = 50 } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 9" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 9" }
+                # 单项奖励夹具：直接指定殿试及第，验证评分和及第奖励入口。
+                set_variable = { name = tca_exam_grade value = 0 }
+                scope:tca_test_exam_candidate = {
+                    tca_exam_prepare_candidate_effect = yes
+                    set_variable = tca_exam_palace
+                }
+                scope:tca_test_exam_candidate = { tca_exam_award_candidate_effect = yes }
+                if = { limit = { scope:tca_test_exam_candidate = { has_character_flag = passed_palace_exam } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 14" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 14" }
+                if = { limit = { scope:tca_test_exam_candidate = { has_character_flag = passed_metropolitan_exam has_character_flag = passed_provincial_exam } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 15" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 15" }
+                if = { limit = { scope:tca_test_exam_candidate = { can_be_employed_as = tca_exam_commissioner_court_position } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 16" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 16" }
+                scope:tca_test_exam_candidate = { tca_exam_select_grade_effect = yes }
+                if = {
+                    limit = {
+                        OR = {
+                            var:tca_exam_grade = 0
+                            var:tca_exam_grade = 1
+                            var:tca_exam_grade = 2
+                            var:tca_exam_grade = 3
+                        }
+                    }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 17"
+                }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 17" }
+                # 三名分数不同的考生：严取应淘汰最低分，最高分为状元。
+                create_character = {
+                    age = 40
+                    gender_female_chance = 0
+                    random_traits = no
+                    dynasty = none
+                    employer = root
+                    culture = root.culture
+                    faith = root.faith
+                    rite = root.rite
+                    save_scope_as = tca_test_exam_middle
+                }
+                create_character = {
+                    age = 40
+                    gender_female_chance = 0
+                    random_traits = no
+                    dynasty = none
+                    employer = root
+                    culture = root.culture
+                    faith = root.faith
+                    rite = root.rite
+                    save_scope_as = tca_test_exam_high
+                }
+                tca_exam_clear_candidate_lists_effect = yes
+                scope:tca_test_exam_candidate = { add_to_list = tca_exam_sampled }
+                scope:tca_test_exam_middle = { add_to_list = tca_exam_sampled }
+                scope:tca_test_exam_high = { add_to_list = tca_exam_sampled }
+                scope:tca_test_exam_candidate = {
+                    remove_variable = tca_exam_palace
+                    set_variable = { name = imperial_examination_score value = 10 }
+                }
+                scope:tca_test_exam_middle = { set_variable = { name = imperial_examination_score value = 50 } }
+                scope:tca_test_exam_high = { set_variable = { name = imperial_examination_score value = 90 } }
+                set_variable = { name = tca_exam_grade value = 2 }
+                set_variable = { name = tca_exam_num_candidates value = 3 }
+                tca_exam_mark_results_effect = yes
+                tca_exam_store_rank_effect = { RANK = 1 POSITION = 0 }
+                tca_exam_store_rank_effect = { RANK = 2 POSITION = 1 }
+                if = { limit = { scope:tca_test_exam_candidate = { has_variable = tca_exam_failed } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 19" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 19" }
+                if = { limit = { scope:tca_test_exam_high = { NOT = { has_variable = tca_exam_failed } has_variable = tca_exam_palace } var:tca_exam_top_1 = scope:tca_test_exam_high } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 20" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 20" }
+                if = { limit = { var:tca_exam_top_2 = scope:tca_test_exam_middle var:tca_exam_failee_count = 1 var:tca_exam_pass_count = 2 } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 21" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 21" }
+                # 次届准备清掉前届临时标记，正式及第记录仍保留。
+                scope:tca_test_exam_candidate = {
+                    set_variable = tca_exam_failed
+                    set_variable = tca_exam_palace
+                    tca_exam_prepare_candidate_effect = yes
+                }
+                if = { limit = { scope:tca_test_exam_candidate = { NOT = { has_variable = tca_exam_failed } NOT = { has_variable = tca_exam_palace } has_character_flag = passed_metropolitan_exam } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 22" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 22" }
+                scope:tca_test_exam_candidate = { set_variable = { name = imperial_examination_score value = 100 } }
+                scope:tca_test_exam_middle = { tca_exam_prepare_candidate_effect = yes set_variable = { name = imperial_examination_score value = 50 } }
+                scope:tca_test_exam_high = { tca_exam_prepare_candidate_effect = yes set_variable = { name = imperial_examination_score value = 90 } }
+                tca_exam_mark_results_effect = yes
+                tca_exam_store_rank_effect = { RANK = 1 POSITION = 0 }
+                if = { limit = { var:tca_exam_top_1 = scope:tca_test_exam_candidate scope:tca_test_exam_candidate = { NOT = { has_variable = tca_exam_failed } has_variable = tca_exam_palace } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 23" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 23" }
+                every_in_list = { list = tca_exam_sampled tca_exam_award_candidate_effect = yes }
+                if = { limit = { scope:tca_test_exam_candidate = { NOT = { has_variable = tca_exam_failed } NOT = { has_variable = tca_exam_palace } has_character_flag = passed_palace_exam } scope:tca_test_exam_middle = { NOT = { has_variable = tca_exam_failed } NOT = { has_variable = tca_exam_palace } } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 24" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 24" }
+                # 走完整收集和结算入口，不能只验证手工设置 grade 后的独立公式。
+                set_variable = { name = tca_exam_grade value = 3 }
+                set_variable = { name = tca_exam_focus value = 0 }
+                set_variable = { name = tca_exam_breadth value = 0 }
+                title:h_china = { set_variable = { name = years_since_imperial_examination value = 10 } }
+                tca_exam_resolve_effect = yes
+                if = { limit = { title:h_china = { var:years_since_imperial_examination = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 33" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 33" }
+                if = { limit = { var:tca_exam_num_candidates > 0 var:tca_exam_num_candidates <= 150 } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 32" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 32" }
+                if = { limit = { has_variable = tca_exam_grade var:tca_exam_grade = 3 } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 25" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 25" }
+                save_scope_value_as = { name = tca_test_exam_expected_failures value = { value = var:tca_exam_num_candidates multiply = 0.5 round = yes } }
+                if = { limit = { var:tca_exam_failee_count = scope:tca_test_exam_expected_failures } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 26" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 26" }
+                if = { limit = { title:h_china = { has_variable = tca_exam_cooldown } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 27" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 27" }
+                tca_exam_clear_candidate_lists_effect = yes
+                title:h_china = { remove_variable = tca_exam_cooldown }
+                # 只临时遮蔽尚未过殿试的合格者，构造真实收集入口的空池；末尾恢复原标记。
+                situation:dynastic_cycle ?= {
+                    every_participant_group = {
+                        limit = { NOT = { participant_group_type = other_rulers } }
+                        every_situation_group_participant = {
+                            limit = { tca_exam_candidate_trigger = yes }
+                            add_to_list = tca_test_exam_hidden_candidates
+                            add_character_flag = passed_palace_exam
+                        }
+                    }
+                }
+                every_close_family_member = {
+                    limit = { tca_exam_candidate_trigger = yes }
+                    add_to_list = tca_test_exam_hidden_candidates
+                    add_character_flag = passed_palace_exam
+                }
+                # 严取、小比：原版主持威望 50×2，影响力 50×1；空池仍正常发放。
+                set_variable = { name = tca_exam_grade value = 2 }
+                save_scope_value_as = { name = tca_test_exam_empty_prestige value = { value = prestige add = 100 } }
+                save_scope_value_as = { name = tca_test_exam_empty_influence value = { value = influence add = 50 } }
+                tca_exam_resolve_effect = yes
+                if = { limit = { var:tca_exam_num_candidates = 0 var:tca_exam_pass_count = 0 var:tca_exam_failee_count = 0 var:tca_exam_palace_count = 0 } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 28" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 28" }
+                if = { limit = { NOT = { exists = var:tca_exam_top_1 } NOT = { exists = var:tca_exam_top_2 } NOT = { exists = var:tca_exam_top_10 } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 29" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 29" }
+                if = { limit = { prestige = scope:tca_test_exam_empty_prestige influence = scope:tca_test_exam_empty_influence } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 30" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 30" }
+                if = { limit = { title:h_china = { has_variable = tca_exam_cooldown } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 31" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 31" }
+                every_in_list = { list = tca_test_exam_hidden_candidates remove_character_flag = passed_palace_exam }
+                tca_exam_clear_candidate_lists_effect = yes
+                title:h_china = { remove_variable = tca_exam_cooldown }
+                # 贵族首次绕过乡试应额外获得原版乡试功绩；低出身没有这笔补算。
+                create_character = {
+                    age = 40
+                    gender_female_chance = 0
+                    random_traits = no
+                    dynasty = root.dynasty
+                    employer = root
+                    culture = root.culture
+                    faith = root.faith
+                    rite = root.rite
+                    save_scope_as = tca_test_exam_noble
+                }
+                scope:tca_test_exam_noble = {
+                    set_variable = { name = imperial_examination_score value = 100 }
+                    set_variable = tca_exam_palace
+                    save_scope_value_as = { name = tca_test_exam_noble_expected value = { value = merit add = tca_exam_entrant_merit_reward_value add = local_examination_merit_base_reward_value } }
+                    tca_exam_award_candidate_effect = yes
+                }
+                if = { limit = { scope:tca_test_exam_noble = { is_lowborn = no merit = scope:tca_test_exam_noble_expected } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 34" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 34" }
+                scope:tca_test_exam_candidate = {
+                    remove_character_modifier = tgp_passed_provincial_exam_modifier
+                    set_variable = { name = imperial_examination_score value = imperial_examination_perfect_score_value }
+                    set_variable = tca_exam_palace
+                    save_scope_value_as = { name = tca_test_exam_lowborn_expected value = { value = merit add = tca_exam_entrant_merit_reward_value } }
+                    tca_exam_award_candidate_effect = yes
+                }
+                if = { limit = { scope:tca_test_exam_candidate = { is_lowborn = yes merit = scope:tca_test_exam_lowborn_expected } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 35" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 35" }
+                scope:tca_test_exam_noble = { death = { death_reason = death_natural_causes } }
+                # 真实局势收集已由32断言覆盖；满池边界直接调用正式共享预估／抽样入口。
+                # 构造150名已过乡试的普通人及1名优先近亲，近亲也放进普通输入池以验证去重。
+                every_close_family_member = {
+                    limit = { tca_exam_candidate_trigger = yes }
+                    add_to_list = tca_test_exam_pool_hidden
+                    add_character_flag = passed_palace_exam
+                }
+                while = {
+                    count = 150
+                    create_character = {
+                        age = 40
+                        gender_female_chance = 0
+                        random_traits = no
+                        dynasty = none
+                        employer = root
+                        culture = root.culture
+                        faith = root.faith
+                        rite = root.rite
+                        after_creation = {
+                            add_character_flag = passed_provincial_exam
+                            add_to_list = tca_test_exam_pool_people
+                        }
+                    }
+                }
+                create_character = {
+                    age = 18
+                    gender_female_chance = 0
+                    random_traits = no
+                    dynasty = root.dynasty
+                    employer = root
+                    culture = root.culture
+                    faith = root.faith
+                    rite = root.rite
+                    save_scope_as = tca_test_exam_priority_kin
+                    after_creation = {
+                        set_father = scope:host
+                        add_character_flag = passed_provincial_exam
+                        add_to_list = tca_test_exam_pool_people
+                    }
+                }
+                if = { limit = { has_character_flag = command_to_attend_flag } set_variable = tca_test_exam_had_command_flag }
+                set_variable = { name = tca_exam_breadth value = 0 }
+                # 没有召集标记时，近亲按普通考生处理，不能凭亲属关系多出一个名额。
+                remove_character_flag = command_to_attend_flag
+                tca_exam_clear_candidate_lists_effect = yes
+                every_in_list = { list = tca_test_exam_pool_people add_to_list = tca_exam_candidates }
+                tca_exam_sample_candidates_effect = yes
+                if = { limit = { var:tca_exam_num_candidates = 150 } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 38" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 38" }
+                add_character_flag = command_to_attend_flag
+                tca_exam_clear_candidate_lists_effect = yes
+                every_in_list = { list = tca_test_exam_pool_people add_to_list = tca_exam_candidates }
+                tca_exam_count_collected_candidates_effect = yes
+                save_scope_value_as = { name = tca_test_exam_pool_estimated value = var:tca_exam_expected_entrants }
+                if = { limit = { var:tca_exam_expected_entrants = 151 } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 37" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 37" debug_log_scopes = yes }
+                set_variable = { name = tca_test_exam_pool_ok value = yes }
+                while = {
+                    count = 5
+                    tca_exam_clear_candidate_lists_effect = yes
+                    every_in_list = { list = tca_test_exam_pool_people add_to_list = tca_exam_candidates }
+                    tca_exam_sample_candidates_effect = yes
+                    if = {
+                        limit = { NOT = { var:tca_exam_num_candidates = 151 } }
+                        set_variable = { name = tca_test_exam_pool_ok value = no }
+                    }
+                }
+                save_scope_value_as = { name = tca_test_exam_pool_sampled value = var:tca_exam_num_candidates }
+                if = { limit = { var:tca_test_exam_pool_ok = yes scope:tca_test_exam_priority_kin = { is_in_list = tca_exam_sampled } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 36" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 36" debug_log_scopes = yes }
+                if = { limit = { NOT = { has_variable = tca_test_exam_had_command_flag } } remove_character_flag = command_to_attend_flag }
+                remove_variable = tca_test_exam_had_command_flag
+                remove_variable = tca_test_exam_pool_ok
+                every_in_list = { list = tca_test_exam_pool_hidden remove_character_flag = passed_palace_exam }
+                tca_exam_clear_candidate_lists_effect = yes
+                every_in_list = { list = tca_test_exam_pool_people death = { death_reason = death_natural_causes } }
+                scope:tca_test_exam_candidate = { tca_test_restore_character_effect = yes death = { death_reason = death_natural_causes } }
+                scope:tca_test_exam_middle = { death = { death_reason = death_natural_causes } }
+                scope:tca_test_exam_high = { death = { death_reason = death_natural_causes } }
+                if = {
+                    limit = { has_character_flag = tca_test_case_failed }
+                    debug_log = "TCA_TEST FAIL tca_test_exam_contract"
+                    if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+                }
+                else = {
+                    debug_log = "TCA_TEST PASS tca_test_exam_contract"
+                    if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } }
+                }
+            }
+            else = {
+                debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_exam_contract"
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+            }
+        }
+    }
+}
+
+# 正式代办入口的延迟回归：重复请求不得重复扣费，迟到的结算不得重发收益。
+tca_exam_test.2 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        if = { limit = { has_character_flag = tca_test_delayed_case_active } debug_log = "TCA_TEST CASE_BUSY" }
+        else = {
+            debug_log = "TCA_TEST BEGIN tca_exam_test.2 tca_test_exam_pending"
+            remove_character_flag = tca_test_case_failed
+            if = {
+                limit = { debug_only = yes title:h_china.holder = root government_has_flag = government_is_celestial }
+                save_scope_as = host
+                clear_saved_scope = commissioner
+                remove_variable = tca_exam_pending
+                title:h_china = { remove_variable = tca_exam_cooldown }
+                set_variable = { name = tca_exam_focus value = 0 }
+                set_variable = { name = tca_exam_cost_small value = 1 }
+                save_scope_value_as = { name = tca_test_exam_first_payment value = { value = treasury subtract = 1 } }
+                tca_exam_delegate_effect = { BREADTH = 0 }
+                if = { limit = { treasury = scope:tca_test_exam_first_payment } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_pending 5" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_pending 5" }
+                if = { limit = { has_variable = tca_exam_pending } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_pending 1" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_pending 1" }
+                save_scope_value_as = { name = tca_test_exam_pending_treasury value = treasury }
+                # 模拟提示标记已被常规任务清理，再次调用正式入口仍必须被pending挡住。
+                remove_variable = tca_exam_prompt_open
+                tca_exam_delegate_effect = { BREADTH = 2 }
+                if = { limit = { treasury = scope:tca_test_exam_pending_treasury var:tca_exam_breadth = 0 } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_pending 2" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_pending 2" }
+                add_character_flag = tca_test_delayed_case_active
+                # 正式结算在第3日；第4日确认完成后重送，第5日检查计数哨兵，避免月收入干扰。
+                debug_log = "TCA_TEST WAIT tca_test_exam_pending 4 days"
+                trigger_event = { id = tca_exam_test.1002 days = 4 }
+            }
+            else = {
+                debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_exam_pending"
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+                tca_test_continue_delayed_effect = yes
+            }
+        }
+    }
+}
+
+# 等待正式结算及故意迟到的重复事件后，检查单次收益与pending生命周期。
+tca_exam_test.1002 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { NOT = { has_variable = tca_exam_pending } title:h_china = { has_variable = tca_exam_cooldown } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_pending 3" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_pending 3" }
+            save_scope_value_as = { name = tca_test_exam_pending_count value = var:tca_exam_num_candidates }
+            # 只在测试局暂置异常计数作为重入哨兵；重复事件若执行结算就会覆盖它，末尾恢复。
+            set_variable = { name = tca_exam_num_candidates value = -1 }
+            trigger_event = { id = tca_exam.4 days = 0 }
+            trigger_event = { id = tca_exam_test.1003 days = 1 }
+        }
+    }
+}
+
+# 跨日确认迟到事件未执行正式结算，再恢复测试哨兵并交还串行调度。
+tca_exam_test.1003 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { var:tca_exam_num_candidates = -1 } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_pending 4" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_pending 4" }
+            set_variable = { name = tca_exam_num_candidates value = scope:tca_test_exam_pending_count }
+            title:h_china = { remove_variable = tca_exam_cooldown }
+            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_exam_pending" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_exam_pending" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            remove_character_flag = tca_test_case_failed
+            remove_character_flag = tca_test_delayed_case_active
+            tca_test_continue_delayed_effect = yes
+        }
+    }
+}

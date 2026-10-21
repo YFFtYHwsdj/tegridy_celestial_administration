@@ -4,6 +4,8 @@ CK3 天朝行政体系重做 mod。中央、地方官制分别提供因便／宋
 
 名称选择、独立司法制度及验收：[朝廷官制](docs/court_system.md)。当前已接入脚本，法律界面及改制行为尚待游戏内验证。
 
+知贡举与自动会试／殿试：玩家中国皇帝可任命知贡举，启用自动任务后由知贡举请开科；可亲自主持原版会试活动，或命知贡举按小比／常科／大开三档规模代为主持，录取尺度由知贡举决定。AI 皇帝不使用事件链。实现与验证边界见[知贡举实现](docs/examination_automation.md)，设计与取舍见[设计稿](docs/examination_automation_design.md)。
+
 首个设计模块：路级提点刑狱公事，包含刑事权限、举刺官吏、领主交互和功绩任命。
 
 独立 debug 原型：[无地官署的路级法理归属](docs/judicial_de_jure_probe.md)。检查一人兼两路时的机构分属，不改变正式司法辖区规则。
@@ -73,6 +75,7 @@ CK3 天朝行政体系重做 mod。中央、地方官制分别提供因便／宋
 - `events/tca_tests_events.txt`：总入口和串行延迟调度。
 - `events/tca_confucian_statistics_test_events.txt`：成年儒家人物、人数／强度占比、排行、刷新及清理回归。
 - `events/tca_confucian_strength_test_events.txt`：教育分档、头衔与世族贡献、冒险者排除回归。
+- `events/tca_exam_test_events.txt`：知贡举规则、费用、评分、实际排序、跨届清理、完整结算及空考场主持收益／冷却回归，规则与结算38断言，另有真实延迟防重及实扣5断言。
 - `events/tca_test_entry_test_events.txt`：观察者入口的角色解析回归。
 - `events/tca_test_lifecycle_test_events.txt`：临时死亡保护、恢复及真实死亡回调回归。
 - `events/tca_test_status_test_events.txt`：状态快照及关闭／重新显示回归。
@@ -81,7 +84,7 @@ CK3 天朝行政体系重做 mod。中央、地方官制分别提供因便／宋
 
 ### 游戏内运行
 
-重启专用1066中国debug测试局，通过“调试：模组一键测试”或`event tca_tests.1`运行；观察者使用`effect tca_run_observer_tests_effect = yes`。macOS优先运行`python3 tools/run_game_tests.py`，自动建立独立观察者局。当前源码120项、749个断言（含62条官署经费断言）；2026-10-19独立1066观察者完整局`run-lesgi_fb`通过。之后的经费入口与双栏GUI修改另行进行真实窗口探针，不把该完整回归当作新版画面已验收；最新结果见[经费互动验收](docs/office_budget_interactions.md)。此前严格首位继任检查仍有未通过记录，本轮未复测该可选模式；界面画面另行验收。运行期间不重复启动、不切换请求角色。测试会修改世界状态，不在正常游玩存档运行。
+重启专用1066中国debug测试局，通过“调试：模组一键测试”或`event tca_tests.1`运行；观察者使用`effect tca_run_observer_tests_effect = yes`。macOS优先运行`python3 tools/run_game_tests.py`，自动建立独立观察者局。当前源码122项、792个断言（含科举2例43断言、官署经费62断言）；2026-10-21独立1066观察者完整局`run-zdf4byo4`全部通过，观察者、源码快照与同次日志核对通过，verification_exit和runner_exit均为0，未检出模组相关引擎错误。科举修复计时、防重、近亲额外名额、乡试补算、实际扣款及家族通知引用，家主改收逐人结果；156项工具测试通过。完整记录与通知画面验收边界见[知贡举实现](docs/examination_automation.md#13-2026-10-21-家族通知修复)。经费入口与双栏GUI另行进行真实窗口探针，不把完整回归当作新版画面已验收；最新结果见[经费互动验收](docs/office_budget_interactions.md)。此前严格首位继任检查仍有未通过记录，本轮未复测该可选模式；界面画面另行验收。运行期间不重复启动、不切换请求角色。测试会修改世界状态，不在正常游玩存档运行。
 
 拘捕流程严格检查即时收押；第20日核对绑定观察标识的释放／死亡证据，未知原因单独记录。通判用例另检查原版处决的实际附费结算；原版赎回、释放的完整交互仍待验收。完成后核对同次日志；当前实现和最新验收见[统一测试文档](docs/mod_tests.md)，此前实验与失败记录见[历史记录](docs/history/mod_tests_history.md)。
 

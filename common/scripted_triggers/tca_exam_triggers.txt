@@ -1,0 +1,72 @@
+﻿# 知贡举与会试自动链的共用条件。
+# 人物作用域：判断是否为不应参加会试的官员。
+# 三省六部、提刑／通判、councillor 排除；无地冒险者和仅有家族头衔者放行。
+tca_exam_is_official_trigger = {
+    OR = {
+        is_councillor = yes
+        tca_is_landless_official_trigger = yes
+        AND = {
+            is_landless_ruler = yes
+            NOT = { government_has_flag = government_is_landless_adventurer }
+            NOT = { primary_title = { is_noble_family_title = yes } }
+        }
+    }
+}
+
+# 人物作用域；考生硬条件。scope:host 必须是本次会试的皇帝。
+# 不要求乡试；未过乡试者仍可入池，分数在 tca_exam_entry_value 中除以 3。
+tca_exam_candidate_trigger = {
+    is_alive = yes
+    is_landed = no
+    is_adult = yes
+    is_available = yes
+    tgp_gender_can_be_exam_entrant_trigger = yes
+    NOT = { this = scope:host }
+    NOT = { has_court_position = tca_exam_commissioner_court_position }
+    NOT = { has_character_flag = passed_palace_exam }
+    NOT = { has_trait = devoted }
+    NOT = { has_trait = eunuch }
+    NOT = { tca_exam_is_official_trigger = yes }
+    trigger_if = {
+        limit = { exists = primary_title }
+        primary_title = {
+            is_mercenary_company = no
+            is_holy_order = no
+        }
+    }
+}
+
+# 人物作用域；玩家近亲的额外入池条件。
+# 本条件也在普通池的排除分支使用，因此必须自行验证与host的亲属关系。
+# 只有已过乡试的近亲才优先入池；未过乡试者仍可能被普通随机抽中。
+tca_exam_close_kin_priority_trigger = {
+    tca_exam_candidate_trigger = yes
+    is_close_family_of = scope:host
+    tgp_passed_provincial_examination = yes
+}
+
+# 皇帝作用域；是否应由自动任务弹出请开科事件。
+tca_exam_can_prompt_trigger = {
+    is_ai = no
+    has_title = title:h_china
+    has_variable = tca_exam_automation
+    NOT = { has_variable = tca_exam_pending }
+    employs_court_position = tca_exam_commissioner_court_position
+    NOT = { is_activity_type_on_cooldown = activity_imperial_examination }
+    NOT = { title:h_china = { has_variable = tca_exam_cooldown } }
+    NOT = { is_in_activity = yes }
+    NOT = { has_variable = tca_exam_prompt_open }
+}
+
+# 皇帝作用域；事件链入口的二次校验。
+# 延迟期间切回常规任务后不能再弹窗；已开启的提示由事件自身检查防重。
+tca_exam_event_trigger = {
+    is_ai = no
+    has_title = title:h_china
+    has_variable = tca_exam_automation
+    NOT = { has_variable = tca_exam_pending }
+    employs_court_position = tca_exam_commissioner_court_position
+    NOT = { is_activity_type_on_cooldown = activity_imperial_examination }
+    NOT = { title:h_china = { has_variable = tca_exam_cooldown } }
+    NOT = { is_in_activity = yes }
+}

@@ -1,0 +1,293 @@
+﻿# 知贡举自动会试／殿试事件链。
+# 仅玩家中国皇帝触发；AI 皇帝继续使用原版会试活动，不进入本文件。
+# 可见事件保存皇帝为 host，选项 custom_tooltip 通过该作用域读取本届变量；
+# 不依赖悬浮效果求值上下文中的 ROOT.Char，避免人数、姓名和侧重显示为空。
+namespace = tca_exam
+
+# tca_exam.1 知贡举请开科
+# 皇帝选择亲自主持（选项打开原版活动窗口）、命知贡举代为主持或暂缓。
+tca_exam.1 = {
+    type = character_event
+    title = tca_exam.1.t
+    theme = imperial_examination
+    override_background = { reference = tgp_examination_room }
+
+    right_portrait = {
+        character = scope:commissioner
+        trigger = { exists = scope:commissioner }
+        animation = holding_scrolls
+    }
+
+    trigger = {
+        tca_exam_event_trigger = yes
+        NOT = { has_variable = tca_exam_prompt_open }
+    }
+
+    immediate = {
+        save_scope_as = host
+        random_court_position_holder = {
+            type = tca_exam_commissioner_court_position
+            save_scope_as = commissioner
+        }
+        tca_exam_clear_results_effect = yes
+        set_variable = { name = tca_exam_grade value = 1 }
+        tca_exam_select_focus_effect = yes
+        # 先把三档费用算成变量，避免选项悬浮里直接求值受保存作用域影响而显示空白。
+        set_variable = { name = tca_exam_cost_small value = tca_exam_cost_exclusive_value }
+        set_variable = { name = tca_exam_cost_standard value = tca_exam_cost_restricted_value }
+        set_variable = { name = tca_exam_cost_grand value = tca_exam_cost_open_value }
+        tca_exam_count_candidates_effect = yes
+        set_variable = tca_exam_prompt_open
+    }
+
+    desc = tca_exam.1.desc
+
+    # 亲自主持用普通选项打开活动窗口；选项被选中后事件自动关闭，
+    # 不再像 widget 那样只切换视图而把事件留在后面。
+    option = {
+        name = tca_exam.host_button
+        custom_tooltip = tca_exam.host_button_tt
+        remove_variable = tca_exam_prompt_open
+        open_view_data = {
+            view = activity_list_detail_host_window
+            data = activity_type:activity_imperial_examination
+            player = root
+        }
+    }
+    option = {
+        name = tca_exam.1.option_small
+        custom_tooltip = tca_exam.1.delegate_tt
+        # 用原生扣款效果生成悬浮，费用显示与游戏其他花费一致，不再手写“抽取人数”说明。
+        show_as_tooltip = {
+            if = {
+                limit = { has_variable = tca_exam_cost_small var:tca_exam_cost_small > 0 }
+                remove_treasury = { value = var:tca_exam_cost_small }
+            }
+        }
+        tca_exam_delegate_effect = { BREADTH = 0 }
+    }
+    option = {
+        name = tca_exam.1.option_standard
+        custom_tooltip = tca_exam.1.delegate_tt
+        # 用原生扣款效果生成悬浮，费用显示与游戏其他花费一致，不再手写“抽取人数”说明。
+        show_as_tooltip = {
+            if = {
+                limit = { has_variable = tca_exam_cost_standard var:tca_exam_cost_standard > 0 }
+                remove_treasury = { value = var:tca_exam_cost_standard }
+            }
+        }
+        tca_exam_delegate_effect = { BREADTH = 1 }
+    }
+    option = {
+        name = tca_exam.1.option_grand
+        custom_tooltip = tca_exam.1.delegate_tt
+        # 用原生扣款效果生成悬浮，费用显示与游戏其他花费一致，不再手写“抽取人数”说明。
+        show_as_tooltip = {
+            if = {
+                limit = { has_variable = tca_exam_cost_grand var:tca_exam_cost_grand > 0 }
+                remove_treasury = { value = var:tca_exam_cost_grand }
+            }
+        }
+        tca_exam_delegate_effect = { BREADTH = 2 }
+    }
+    option = {
+        name = tca_exam.1.option_postpone
+        custom_tooltip = tca_exam.1.postpone_tt
+        remove_variable = tca_exam_prompt_open
+    }
+}
+
+# tca_exam.4 隐藏结算
+# 在独立隐藏事件中执行考试结算，避免奖励列表出现在放榜事件的立即效果提示里。
+tca_exam.4 = {
+    type = character_event
+    hidden = yes
+    # 只消费尚未完成的一届；任务切换不取消已付费的考试，迟到的重复事件直接丢弃。
+    trigger = { has_variable = tca_exam_pending }
+
+    immediate = {
+        save_scope_as = host
+        tca_exam_resolve_effect = yes
+        remove_variable = tca_exam_pending
+        # 无考生也已结算费用、主持收益和冷却，但不再进入放榜／传胪。
+        if = {
+            limit = { var:tca_exam_num_candidates > 0 }
+            trigger_event = { id = tca_exam.2 days = 0 }
+        }
+        else = {
+            trigger_event = { id = tca_exam.5 days = 0 }
+        }
+    }
+}
+
+# tca_exam.2 会试放榜
+# 显示取中人数、前十名和落榜人数；无玩家选择。
+tca_exam.2 = {
+    type = character_event
+    title = tca_exam.2.t
+    theme = imperial_examination
+    override_background = { reference = tgp_examination_room }
+
+    right_portrait = {
+        character = root.var:tca_exam_top_1
+        trigger = { exists = root.var:tca_exam_top_1 }
+        animation = happiness
+    }
+
+    immediate = {
+        save_scope_as = host
+    }
+
+    desc = {
+        desc = tca_exam.2.desc
+        # 正文按既有首名条件分支；不以空榜文案改变后续传胪条件。
+        first_valid = {
+            triggered_desc = {
+                trigger = { exists = var:tca_exam_top_1 }
+                desc = tca_exam.2.passed
+            }
+            desc = tca_exam.2.no_pass
+        }
+        desc = tca_exam.2.count
+        triggered_desc = {
+            trigger = { exists = var:tca_exam_top_1 }
+            desc = tca_exam.2.top_1
+        }
+        triggered_desc = {
+            trigger = { exists = var:tca_exam_top_2 }
+            desc = tca_exam.2.top_2
+        }
+        triggered_desc = {
+            trigger = { exists = var:tca_exam_top_3 }
+            desc = tca_exam.2.top_3
+        }
+        triggered_desc = {
+            trigger = { exists = var:tca_exam_top_4 }
+            desc = tca_exam.2.top_4
+        }
+        triggered_desc = {
+            trigger = { exists = var:tca_exam_top_5 }
+            desc = tca_exam.2.top_5
+        }
+        triggered_desc = {
+            trigger = { exists = var:tca_exam_top_6 }
+            desc = tca_exam.2.top_6
+        }
+        triggered_desc = {
+            trigger = { exists = var:tca_exam_top_7 }
+            desc = tca_exam.2.top_7
+        }
+        triggered_desc = {
+            trigger = { exists = var:tca_exam_top_8 }
+            desc = tca_exam.2.top_8
+        }
+        triggered_desc = {
+            trigger = { exists = var:tca_exam_top_9 }
+            desc = tca_exam.2.top_9
+        }
+        triggered_desc = {
+            trigger = { exists = var:tca_exam_top_10 }
+            desc = tca_exam.2.top_10
+        }
+    }
+
+    option = {
+        name = {
+            text = {
+                first_valid = {
+                    triggered_desc = {
+                        trigger = { exists = var:tca_exam_top_1 }
+                        desc = tca_exam.2.a
+                    }
+                    desc = tca_exam.2.a_no_pass
+                }
+            }
+        }
+        # 极小考场可能无人取中；没有首名时也不举行传胪或发祝贺奖励。
+        if = {
+            limit = { exists = var:tca_exam_top_1 }
+            custom_tooltip = tca_exam.2.a_tt
+            trigger_event = { id = tca_exam.3 days = 3 }
+        }
+        else = { custom_tooltip = tca_exam.2.a_no_pass_tt }
+    }
+}
+
+# tca_exam.3 殿试传胪
+# 显示状元、榜眼、探花；前十名已在会试放榜中出现。
+tca_exam.3 = {
+    type = character_event
+    title = tca_exam.3.t
+    theme = imperial_examination
+    override_background = { reference = tgp_examination_room }
+
+    right_portrait = {
+        character = root.var:tca_exam_top_1
+        trigger = { exists = root.var:tca_exam_top_1 }
+        animation = happiness
+    }
+
+    trigger = { exists = var:tca_exam_top_1 }
+
+    immediate = {
+        save_scope_as = host
+    }
+
+    desc = {
+        desc = tca_exam.3.desc
+        triggered_desc = {
+            trigger = { exists = var:tca_exam_top_1 }
+            desc = tca_exam.3.first
+        }
+        triggered_desc = {
+            trigger = { exists = var:tca_exam_top_2 }
+            desc = tca_exam.3.second
+        }
+        triggered_desc = {
+            trigger = { exists = var:tca_exam_top_3 }
+            desc = tca_exam.3.third
+        }
+    }
+
+    option = {
+        name = tca_exam.3.a
+        custom_tooltip = tca_exam.3.a_tt
+        # 对应原版 imperial_examination.9000 的“祝贺第一名”：
+        # 皇帝获得中等合法性，状元获得 2000 功绩。榜眼／探花原版没有额外奖励。
+        if = {
+            limit = { has_legitimacy = yes }
+            add_legitimacy = medium_legitimacy_gain
+        }
+        if = {
+            limit = { exists = var:tca_exam_top_1 }
+            var:tca_exam_top_1 ?= {
+                if = {
+                    limit = { is_ai = yes }
+                    change_merit = 2000
+                }
+            }
+        }
+    }
+}
+
+# tca_exam.5 本科无人应试
+# 空考场的结果通知；主持收益已在隐藏结算中发放，此事件无额外奖励和续接。
+tca_exam.5 = {
+    type = character_event
+    title = tca_exam.5.t
+    desc = tca_exam.5.desc
+    immediate = { save_scope_as = host }
+    theme = imperial_examination
+    override_background = { reference = tgp_examination_room }
+
+    right_portrait = {
+        character = scope:commissioner
+        trigger = { exists = scope:commissioner }
+        animation = holding_scrolls
+    }
+
+    option = {
+        name = tca_exam.5.a
+        custom_tooltip = tca_exam.5.a_tt
+    }
+}

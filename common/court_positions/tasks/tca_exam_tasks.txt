@@ -1,0 +1,57 @@
+﻿# 知贡举任务：自动开科只对玩家皇帝开放；AI 只使用常规任务。
+# 两个任务不额外收费，薪资与影响力由宫廷职位本身提供。
+
+tca_exam_commissioner_auto_exam = {
+    court_position_types = { tca_exam_commissioner_court_position }
+
+    is_shown = {
+        is_ai = no
+    }
+
+    cost = {
+        round = no
+        treasury = { value = 0 }
+    }
+
+    # 玩家刚启用任务时不必等到年度脉冲，立即安排一次请开科。
+    # 若当下因活动、冷却或已有提示而不能开科，年度脉冲仍会继续检查。
+    on_start = {
+        title:h_china.holder ?= {
+            set_variable = tca_exam_automation
+            if = {
+                limit = { tca_exam_can_prompt_trigger = yes }
+                trigger_event = { id = tca_exam.1 days = 2 }
+            }
+        }
+    }
+
+    on_end = {
+        title:h_china.holder ?= {
+            remove_variable = tca_exam_automation
+        }
+    }
+
+    ai_will_do = {
+        value = 0
+    }
+}
+
+tca_exam_commissioner_manual_exam = {
+    court_position_types = { tca_exam_commissioner_court_position }
+
+    cost = {
+        round = no
+        treasury = { value = 0 }
+    }
+
+    on_start = {
+        title:h_china.holder ?= {
+            remove_variable = tca_exam_automation
+            remove_variable = tca_exam_prompt_open
+        }
+    }
+
+    ai_will_do = {
+        value = 100
+    }
+}

@@ -1,0 +1,500 @@
+﻿# 知贡举自动会试／殿试的结算效果。
+# 入口：tca_exam_delegate_effect（皇帝作用域，BREADTH=0..2）
+# 依赖：tca_exam_values.txt、tca_exam_triggers.txt
+# 结果：在皇帝身上写入人数、名次与放榜变量，并给考生结算及第标记和奖励。
+# 设计上不创建活动；AI 皇帝不调用这些效果。
+
+# 皇帝作用域；自动选择今科侧重。
+# 学识永远可选；军事仅扩张阶段、管理仅推进阶段可选。
+# 可选时 75% 选阶段侧重、25% 选学识；不可选时固定学识。
+tca_exam_select_focus_effect = {
+    set_variable = { name = tca_exam_focus value = 0 }
+    if = {
+        limit = {
+            situation:dynastic_cycle ?= {
+                situation_current_phase = situation_dynastic_cycle_phase_stability_expansion
+            }
+        }
+        random = {
+            chance = 75
+            set_variable = { name = tca_exam_focus value = 1 }
+        }
+    }
+    else_if = {
+        limit = {
+            situation:dynastic_cycle ?= {
+                situation_current_phase = situation_dynastic_cycle_phase_stability_advancement
+            }
+        }
+        random = {
+            chance = 75
+            set_variable = { name = tca_exam_focus value = 2 }
+        }
+    }
+}
+
+# 知贡举作用域；按原版权重与自身属性决定今科取士尺度。
+# 结果写入 scope:host 的 tca_exam_grade：0 宽取、1 依例、2 严取、3 极严。
+tca_exam_select_grade_effect = {
+    scope:host = { remove_variable = tca_exam_grade }
+    random = {
+        chance = tca_exam_grade_low_chance
+        scope:host = { set_variable = { name = tca_exam_grade value = 0 } }
+    }
+    if = {
+        limit = { scope:host = { NOT = { has_variable = tca_exam_grade } } }
+        random = {
+            chance = tca_exam_grade_mediocre_chance
+            scope:host = { set_variable = { name = tca_exam_grade value = 1 } }
+        }
+    }
+    if = {
+        limit = { scope:host = { NOT = { has_variable = tca_exam_grade } } }
+        random = {
+            chance = tca_exam_grade_high_chance
+            scope:host = { set_variable = { name = tca_exam_grade value = 2 } }
+        }
+    }
+    if = {
+        limit = { scope:host = { NOT = { has_variable = tca_exam_grade } } }
+        scope:host = { set_variable = { name = tca_exam_grade value = 3 } }
+    }
+}
+
+# 皇帝作用域；仅清空上届输出，保留本届已选定的尺度、侧重与规模。
+# 请开科和隐藏结算都会调用；不能删除结算随后需要读取的 tca_exam_grade。
+tca_exam_clear_results_effect = {
+    remove_variable = tca_exam_num_candidates
+    remove_variable = tca_exam_failee_count
+    remove_variable = tca_exam_pass_count
+    remove_variable = tca_exam_palace_count
+    remove_variable = tca_exam_top_1
+    remove_variable = tca_exam_top_2
+    remove_variable = tca_exam_top_3
+    remove_variable = tca_exam_top_4
+    remove_variable = tca_exam_top_5
+    remove_variable = tca_exam_top_6
+    remove_variable = tca_exam_top_7
+    remove_variable = tca_exam_top_8
+    remove_variable = tca_exam_top_9
+    remove_variable = tca_exam_top_10
+}
+
+# 皇帝作用域；清空候选名单。名单只在本效果链内使用。
+tca_exam_clear_candidate_lists_effect = {
+    while = {
+        limit = { list_size:tca_exam_candidates > 0 }
+        random_in_list = {
+            list = tca_exam_candidates
+            remove_from_list = tca_exam_candidates
+        }
+    }
+    while = {
+        limit = { list_size:tca_exam_sampled > 0 }
+        random_in_list = {
+            list = tca_exam_sampled
+            remove_from_list = tca_exam_sampled
+        }
+    }
+}
+
+# 皇帝作用域；收集王朝周期中的合格考生，重建本次临时名单。
+# 输出tca_exam_candidates包含普通考生与可能重叠的优先近亲，后续统一去重。
+tca_exam_collect_candidates_effect = {
+    save_scope_as = host
+    tca_exam_clear_candidate_lists_effect = yes
+    situation:dynastic_cycle ?= {
+        every_participant_group = {
+            limit = { NOT = { participant_group_type = other_rulers } }
+            every_situation_group_participant = {
+                limit = { tca_exam_candidate_trigger = yes }
+                add_to_list = tca_exam_candidates
+            }
+        }
+    }
+}
+
+# 皇帝作用域；将优先近亲从已收集的池移出，留给后续额外名额。
+# 调用者提供tca_exam_candidates；本入口保存host并自行检查召集标记与完整近亲资格。
+tca_exam_exclude_priority_candidates_effect = {
+    save_scope_as = host
+    if = {
+        limit = { has_character_flag = command_to_attend_flag }
+        every_in_list = {
+            list = tca_exam_candidates
+            limit = { tca_exam_close_kin_priority_trigger = yes }
+            remove_from_list = tca_exam_candidates
+        }
+    }
+}
+
+# 皇帝作用域；按已收集名单计算显示人数。候选池上限只约束普通名额，近亲另加。
+# 输入tca_exam_candidates；去掉池内优先近亲，输出tca_exam_expected_entrants。
+tca_exam_count_collected_candidates_effect = {
+    tca_exam_exclude_priority_candidates_effect = yes
+    set_variable = { name = tca_exam_expected_entrants value = { value = list_size:tca_exam_candidates max = tca_exam_candidate_pool_cap } }
+    if = {
+        limit = { has_character_flag = command_to_attend_flag }
+        every_close_family_member = {
+            limit = { tca_exam_close_kin_priority_trigger = yes }
+            root = {
+                change_variable = { name = tca_exam_expected_entrants add = 1 }
+            }
+        }
+    }
+}
+
+# 皇帝作用域；请开科的只读人数预估，结束后清空本入口创建的临时名单。
+tca_exam_count_candidates_effect = {
+    tca_exam_collect_candidates_effect = yes
+    tca_exam_count_collected_candidates_effect = yes
+    tca_exam_clear_candidate_lists_effect = yes
+}
+
+# 皇帝作用域；从输入tca_exam_candidates抽普通名额，再追加优先近亲。
+# 保存host；重建tca_exam_sampled，输出tca_exam_num_candidates；调用者保证池内人物已符合硬条件。
+tca_exam_sample_candidates_effect = {
+    tca_exam_exclude_priority_candidates_effect = yes
+    while = {
+        limit = { list_size:tca_exam_sampled > 0 }
+        random_in_list = {
+            list = tca_exam_sampled
+            remove_from_list = tca_exam_sampled
+        }
+    }
+    save_scope_value_as = {
+        name = tca_exam_sample_size
+        value = {
+            value = list_size:tca_exam_candidates
+            max = tca_exam_candidate_sample_value
+        }
+    }
+    while = {
+        count = scope:tca_exam_sample_size
+        random_in_list = {
+            list = tca_exam_candidates
+            limit = { NOT = { is_in_list = tca_exam_sampled } }
+            add_to_list = tca_exam_sampled
+        }
+    }
+    if = {
+        limit = { has_character_flag = command_to_attend_flag }
+        every_close_family_member = {
+            limit = {
+                tca_exam_close_kin_priority_trigger = yes
+                NOT = { is_in_list = tca_exam_sampled }
+            }
+            add_to_list = tca_exam_sampled
+        }
+    }
+    set_variable = { name = tca_exam_num_candidates value = 0 }
+    every_in_list = {
+        list = tca_exam_sampled
+        root = {
+            change_variable = { name = tca_exam_num_candidates add = 1 }
+        }
+    }
+}
+
+# 皇帝作用域；正式结算入口使用真实王朝周期收集，再调用共享抽样流程。
+tca_exam_gather_candidates_effect = {
+    tca_exam_collect_candidates_effect = yes
+    tca_exam_sample_candidates_effect = yes
+}
+
+# 考生作用域；清除上届临时结果，再评分并加 0–10 的临场发挥。
+# 正式 passed_* 标记、修正与记忆跨届保留；临时结果只在本届排名和奖励时读取。
+tca_exam_prepare_candidate_effect = {
+    remove_variable = tca_exam_failed
+    remove_variable = tca_exam_palace
+    set_variable = {
+        name = imperial_examination_score
+        value = tca_exam_score_value
+    }
+    random_list = {
+        1 = { change_variable = { name = imperial_examination_score add = 0 } }
+        1 = { change_variable = { name = imperial_examination_score add = 1 } }
+        1 = { change_variable = { name = imperial_examination_score add = 2 } }
+        1 = { change_variable = { name = imperial_examination_score add = 3 } }
+        1 = { change_variable = { name = imperial_examination_score add = 4 } }
+        1 = { change_variable = { name = imperial_examination_score add = 5 } }
+        1 = { change_variable = { name = imperial_examination_score add = 6 } }
+        1 = { change_variable = { name = imperial_examination_score add = 7 } }
+        1 = { change_variable = { name = imperial_examination_score add = 8 } }
+        1 = { change_variable = { name = imperial_examination_score add = 9 } }
+        1 = { change_variable = { name = imperial_examination_score add = 10 } }
+    }
+}
+
+# 皇帝作用域；按录取标准标记末位落榜者，并标记前 10 名。
+# 落榜比例与原生一致：宽取 10%、依例 15%、严取 30%、极严 50%。
+tca_exam_mark_results_effect = {
+    set_variable = {
+        name = tca_exam_failee_count
+        value = tca_exam_failee_count_value
+    }
+    if = {
+        limit = { var:tca_exam_failee_count > 0 }
+        ordered_in_list = {
+            list = tca_exam_sampled
+            # 原版 tgp_imperial_examination_scripted_effects 的末位淘汰使用负分数。
+            order_by = { value = imperial_examination_score_value multiply = -1 }
+            max = var:tca_exam_failee_count
+            check_range_bounds = no
+            set_variable = tca_exam_failed
+        }
+    }
+    ordered_in_list = {
+        list = tca_exam_sampled
+        limit = { NOT = { has_variable = tca_exam_failed } }
+        order_by = imperial_examination_score_value
+        max = tca_exam_palace_entrant_cap
+        check_range_bounds = no
+        set_variable = tca_exam_palace
+    }
+    set_variable = {
+        name = tca_exam_pass_count
+        value = {
+            value = var:tca_exam_num_candidates
+            subtract = var:tca_exam_failee_count
+            min = 0
+        }
+    }
+    set_variable = {
+        name = tca_exam_palace_count
+        value = {
+            value = var:tca_exam_pass_count
+            max = tca_exam_palace_entrant_cap
+        }
+    }
+}
+
+# 皇帝作用域；按名次保存前十名，供放榜和传胪事件显示。
+# RANK 为 1–10，POSITION 为 0–9；由 tca_exam_resolve_effect 在标记结果后调用。
+tca_exam_store_rank_effect = {
+    ordered_in_list = {
+        list = tca_exam_sampled
+        limit = { NOT = { has_variable = tca_exam_failed } }
+        order_by = imperial_examination_score_value
+        position = $POSITION$
+        check_range_bounds = no
+        save_temporary_scope_as = tca_exam_ranked
+        root = {
+            set_variable = {
+                name = tca_exam_top_$RANK$
+                value = scope:tca_exam_ranked
+            }
+        }
+    }
+}
+
+# 皇帝作用域；发放主考收益。代为主持不降低原版皇帝收益。
+tca_exam_award_host_effect = {
+    change_influence = tca_exam_host_influence_value
+    if = {
+        limit = { has_legitimacy = yes }
+        add_legitimacy = tca_exam_host_legitimacy_value
+    }
+    add_prestige = tca_exam_host_prestige_value
+    if = {
+        limit = { has_personal_tenet_flag = tenet_vows_of_poverty_humble_host }
+        add_piety = pam_vows_of_poverty_host_piety_value
+    }
+}
+
+# 考生作用域；按落榜／会试及第／殿试及第结算。
+# 调用者已完成本届排名；结算后清除失败／殿试临时标记，正式及第状态保留。
+# 当前单机流程的考生均为 AI，且不处理舞弊分支。
+tca_exam_award_candidate_effect = {
+    # 正式入口的 root 是皇帝；通知必须保存当前考生，头像和双语正文均读取此作用域。
+    # 不沿用原版的家主排除：自动链没有原版家主汇总，家主同样接收近亲逐人结果。
+    save_scope_as = tca_exam_result_candidate
+    if = {
+        limit = { has_variable = tca_exam_failed }
+        change_influence = tca_exam_failee_influence_reward_value
+        change_merit = tca_exam_failee_merit_reward_value
+        add_character_flag = failed_imperial_examination
+        create_character_memory = {
+            type = failed_metropolitan_exam_memory
+        }
+        every_close_family_member = {
+            send_interface_message = {
+                type = event_msg_merit_effect_bad
+                title = tca_exam_family_failed_title
+                right_icon = scope:tca_exam_result_candidate
+                desc = tca_exam_family_failed_desc
+            }
+        }
+    }
+    else = {
+        if = {
+            limit = { NOT = { has_character_modifier = tgp_passed_provincial_exam_modifier } }
+            add_character_flag = passed_provincial_exam
+            add_character_modifier = {
+                modifier = tgp_bypassed_provincial_exam_modifier
+            }
+            # 对应原版 AI 及第分支：贵族绕过乡试时另补乡试功绩，低出身不补。
+            if = {
+                limit = { is_lowborn = no }
+                change_merit = local_examination_merit_base_reward_value
+            }
+        }
+        # 与原生 AI 分支相同：非低出身或满分者获得影响力与功绩。
+        if = {
+            limit = {
+                OR = {
+                    is_lowborn = no
+                    has_perfect_score_trigger = { SCORE_VAR = imperial_examination_score }
+                }
+            }
+            change_influence = tca_exam_entrant_influence_reward_value
+            change_merit = tca_exam_entrant_merit_reward_value
+            if = {
+                limit = { has_character_flag = examination_prestige_reward }
+                remove_character_flag = examination_prestige_reward
+                add_prestige = major_prestige_gain
+            }
+        }
+        if = {
+            limit = { has_variable = tca_exam_palace }
+            if = {
+                limit = { NOT = { has_character_flag = passed_metropolitan_exam } }
+                add_character_flag = passed_metropolitan_exam
+                add_character_modifier = {
+                    modifier = tgp_passed_metropolitan_exam_modifier
+                }
+            }
+            add_character_flag = passed_palace_exam
+            add_character_modifier = {
+                modifier = tgp_passed_palace_exam_modifier
+            }
+            create_character_memory = {
+                type = passed_metropolitan_exam_memory
+            }
+            create_character_memory = {
+                type = passed_palace_exam_memory
+            }
+            every_close_family_member = {
+                send_interface_message = {
+                    type = event_msg_merit_effect_good
+                    title = tca_exam_family_palace_title
+                    right_icon = scope:tca_exam_result_candidate
+                    desc = tca_exam_family_palace_desc
+                }
+            }
+        }
+        else = {
+            add_character_flag = passed_metropolitan_exam
+            add_character_modifier = {
+                modifier = tgp_passed_metropolitan_exam_modifier
+            }
+            if = {
+                limit = {
+                    is_ai = yes
+                    is_lowborn = no
+                    NOT = {
+                        any_close_or_extended_family_member = { is_ai = no }
+                    }
+                }
+                random = {
+                    chance = 20
+                    add_character_flag = passed_palace_exam
+                    add_character_modifier = {
+                        modifier = tgp_passed_palace_exam_modifier
+                    }
+                    change_merit = empire_starting_merit_value
+                }
+            }
+            create_character_memory = {
+                type = passed_metropolitan_exam_memory
+            }
+            every_close_family_member = {
+                send_interface_message = {
+                    type = event_msg_merit_effect_good
+                    title = tca_exam_family_metropolitan_title
+                    right_icon = scope:tca_exam_result_candidate
+                    desc = tca_exam_family_metropolitan_desc
+                }
+            }
+        }
+        if = {
+            limit = { has_character_flag = failed_imperial_examination }
+            remove_character_flag = failed_imperial_examination
+        }
+    }
+    remove_variable = tca_exam_failed
+    remove_variable = tca_exam_palace
+}
+
+# 皇帝作用域；执行完整考试结算。
+# 前置：scope:host 已保存，tca_exam_grade、tca_exam_focus 已设置。
+tca_exam_resolve_effect = {
+    save_scope_as = host
+    tca_exam_clear_results_effect = yes
+    tca_exam_gather_candidates_effect = yes
+    every_in_list = {
+        list = tca_exam_sampled
+        tca_exam_prepare_candidate_effect = yes
+    }
+    tca_exam_mark_results_effect = yes
+    if = { limit = { var:tca_exam_pass_count >= 1 } tca_exam_store_rank_effect = { RANK = 1 POSITION = 0 } }
+    if = { limit = { var:tca_exam_pass_count >= 2 } tca_exam_store_rank_effect = { RANK = 2 POSITION = 1 } }
+    if = { limit = { var:tca_exam_pass_count >= 3 } tca_exam_store_rank_effect = { RANK = 3 POSITION = 2 } }
+    if = { limit = { var:tca_exam_pass_count >= 4 } tca_exam_store_rank_effect = { RANK = 4 POSITION = 3 } }
+    if = { limit = { var:tca_exam_pass_count >= 5 } tca_exam_store_rank_effect = { RANK = 5 POSITION = 4 } }
+    if = { limit = { var:tca_exam_pass_count >= 6 } tca_exam_store_rank_effect = { RANK = 6 POSITION = 5 } }
+    if = { limit = { var:tca_exam_pass_count >= 7 } tca_exam_store_rank_effect = { RANK = 7 POSITION = 6 } }
+    if = { limit = { var:tca_exam_pass_count >= 8 } tca_exam_store_rank_effect = { RANK = 8 POSITION = 7 } }
+    if = { limit = { var:tca_exam_pass_count >= 9 } tca_exam_store_rank_effect = { RANK = 9 POSITION = 8 } }
+    if = { limit = { var:tca_exam_pass_count >= 10 } tca_exam_store_rank_effect = { RANK = 10 POSITION = 9 } }
+    every_in_list = {
+        list = tca_exam_sampled
+        tca_exam_award_candidate_effect = yes
+    }
+    tca_exam_award_host_effect = yes
+    title:h_china = {
+        # 对应原版活动 on_start；否则王朝周期仍会累计“多年未开科”催化。
+        set_variable = { name = years_since_imperial_examination value = 0 }
+        set_variable = {
+            name = tca_exam_cooldown
+            value = yes
+            years = tca_exam_cooldown_years
+        }
+    }
+}
+
+# 皇帝作用域；代为主持入口。BREADTH：0 小比、1 常科、2 大开。
+# 规模由玩家选择，取士尺度由知贡举按原版权重自动决定。
+tca_exam_delegate_effect = {
+    # 选项悬浮只显示玩家需要知道的规模与费用；录取尺度是知贡举的随机判定，
+    # 不把内部 random 展开成“X%概率”提示。
+    hidden_effect = {
+        # pending 在排队前设置、由 .4 结算后清理；常规任务不会清除它。
+        # 入口也自行检查，避免重复选项或直接调用绕开提示条件。
+        if = {
+            limit = {
+                NOT = { has_variable = tca_exam_pending }
+                NOT = { title:h_china = { has_variable = tca_exam_cooldown } }
+            }
+            set_variable = tca_exam_pending
+            save_scope_as = host
+            set_variable = { name = tca_exam_breadth value = $BREADTH$ }
+            remove_variable = tca_exam_prompt_open
+            if = { limit = { NOT = { has_variable = tca_exam_focus } } tca_exam_select_focus_effect = yes }
+            if = {
+                limit = { exists = scope:commissioner }
+                scope:commissioner = { tca_exam_select_grade_effect = yes }
+            }
+            else = {
+                set_variable = { name = tca_exam_grade value = 1 }
+            }
+            if = {
+                limit = { tca_exam_selected_cost_value > 0 }
+                remove_treasury = {
+                    value = tca_exam_selected_cost_value
+                }
+            }
+            trigger_event = { id = tca_exam.4 days = 3 }
+        }
+    }
+}
