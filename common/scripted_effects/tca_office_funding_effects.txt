@@ -74,10 +74,22 @@ tca_settle_office_funding_effect = {
         else = { save_scope_value_as = { name = tca_funding_amount value = tca_office_funding_amount_value } }
         set_variable = { name = tca_office_funding_paid value = current_date }
         set_variable = { name = tca_office_funding_last_amount value = scope:tca_funding_amount }
+        # 与同一笔实付共用金额、收款人与30日防重；零额也覆盖旧收据。
+        # 动态政绩不应用月功绩倍率；固定任职月功绩仍由原生独立结算。
+        set_variable = { name = tca_office_funding_last_merit value = 0 }
+        set_variable = { name = tca_office_funding_last_merit_recipient value = scope:tca_funding_recipient }
         if = {
             limit = { scope:tca_funding_amount > 0 }
             scope:tca_funding_payer = { remove_treasury = scope:tca_funding_amount }
             scope:tca_funding_recipient = { add_treasury = scope:tca_funding_amount }
+            save_scope_value_as = { name = tca_funding_merit value = { value = scope:tca_funding_amount multiply = tca_office_funding_merit_rate_value } }
+            # 以人物 merit 前后差值记录实际奖励，不能把输入预期冒充引擎实际到账。
+            scope:tca_funding_recipient = {
+                save_scope_value_as = { name = tca_funding_merit_before value = merit }
+                change_merit = scope:tca_funding_merit
+                save_scope_value_as = { name = tca_funding_merit_awarded value = { value = merit subtract = scope:tca_funding_merit_before } }
+            }
+            set_variable = { name = tca_office_funding_last_merit value = scope:tca_funding_merit_awarded }
         }
     }
     remove_variable = tca_office_funding_quote

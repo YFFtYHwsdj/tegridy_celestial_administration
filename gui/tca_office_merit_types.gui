@@ -1,0 +1,105 @@
+﻿# 官署经费政绩并入原版月收入提示；只改变展示口径，不修改实际原生月功绩或拨款结算。
+# 调用方须同时提供 ValueBreakdown（原生收入项）与 Character（当前查看人物）。
+# 不使用 GetPlayer；其他人物的功绩提示必须读取其本人的官署经费。
+types TcaOfficeMerit {
+    type tca_office_merit_income_breakdown = widget_value_breakdown_list {
+        # 直接复用基础列表，避免 tooltip 派生类的底部留白夹在两项收入之间。
+        blockoverride "background" {
+            using = DefaultTooltipBackground
+        }
+        blockoverride "header" {
+            text_label_left = {
+                layoutpolicy_horizontal = expanding
+                text = "[ValueBreakdown.GetName]"
+                visible = "[Not(StringIsEmpty(ValueBreakdown.GetName))]"
+                default_format = "#T"
+            }
+        }
+        blockoverride "list" {
+            margin_bottom = 0
+        }
+        blockoverride "footer" {
+            # 底边距属于整个列表；没有经费项时也与原版提示一致。
+            vbox = {
+                layoutpolicy_horizontal = expanding
+                ignoreinvisible = yes
+                margin_bottom = 17
+                hbox = {
+                    name = "tca_office_merit_income_row"
+                    visible = "[And(GreaterThan_CFixedPoint(Character.MakeScope.ScriptValue('tca_office_funding_merit_visible_value'), '(CFixedPoint)0'), GreaterThan_CFixedPoint(Character.MakeScope.ScriptValue('tca_office_funding_expected_merit_value'), '(CFixedPoint)0'))]"
+                    layoutpolicy_horizontal = expanding
+                    margin_top = 5
+                    text_single = {
+                        layoutpolicy_horizontal = expanding
+                        min_width = 180
+                        max_width = 275
+                        margin_right = 10
+                        fonttintcolor = "[TooltipInfo.GetTintColor]"
+                        text = "tca_office_merit_income"
+                    }
+                    text_single = {
+                        align = right
+                        fonttintcolor = "[TooltipInfo.GetTintColor]"
+                        raw_text = "@merit_icon! [Character.MakeScope.ScriptValue('tca_office_funding_expected_merit_value')|=+2L]"
+                        using = tooltip_below
+                        tooltipwidget = {
+                            tca_office_merit_payment_breakdown = {
+                                datacontext = "[Character.Self]"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    # 二级明细沿用原版税收政绩的两列样式，只列经费与兑换比例。
+    type tca_office_merit_payment_breakdown = widget {
+        size = { 50 50 }
+        alwaystransparent = no
+        using = DefaultTooltipBackground
+        vbox = {
+            set_parent_size_to_minimum = yes
+            margin = { 20 10 }
+            margin_bottom = 17
+            spacing = 5
+            text_label_left = {
+                layoutpolicy_horizontal = expanding
+                text = "tca_office_merit_income"
+                default_format = "#T"
+            }
+            hbox = {
+                layoutpolicy_horizontal = expanding
+                text_single = {
+                    layoutpolicy_horizontal = expanding
+                    min_width = 180
+                    max_width = 275
+                    margin_right = 10
+                    fonttintcolor = "[TooltipInfo.GetTintColor]"
+                    text = "tca_office_merit_budget"
+                }
+                text_single = {
+                    align = right
+                    fonttintcolor = "[TooltipInfo.GetTintColor]"
+                    raw_text = "@treasury_icon! [Character.MakeScope.ScriptValue('tca_office_funding_income_value')|=+2L]"
+                }
+            }
+            hbox = {
+                layoutpolicy_horizontal = expanding
+                text_single = {
+                    layoutpolicy_horizontal = expanding
+                    min_width = 180
+                    max_width = 275
+                    margin_right = 10
+                    fonttintcolor = "[TooltipInfo.GetTintColor]"
+                    text = "tca_office_merit_rate"
+                }
+                text_single = {
+                    align = right
+                    fonttintcolor = "[TooltipInfo.GetTintColor]"
+                    raw_text = "@merit_icon! [Character.MakeScope.ScriptValue('tca_office_funding_merit_rate_value')|%0+L]"
+                }
+            }
+        }
+    }
+}

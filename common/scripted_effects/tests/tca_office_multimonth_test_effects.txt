@@ -1,0 +1,127 @@
+﻿# 连续实付政绩回归的逐日观察；官署头衔作用域，ROOT 为测试报告者。
+# 首次付款必须由自然月脉冲触发；这里只在观察到新收据后额外重复调用，以核对防重。
+# 收据功绩由正式结算的 merit 前后差值记录；预期独立按实付金额乘0.2计算。
+# 累计项是实付奖励账本，不代表包含原生月功绩、事件奖惩的个人总余额轨迹。
+tca_test_observe_office_month_effect = {
+    if = {
+        limit = { has_variable = tca_office_funding_paid var:tca_office_funding_paid > var:tca_mm_paid }
+        save_scope_value_as = { name = tca_mm_new_paid value = var:tca_office_funding_paid }
+        save_scope_value_as = { name = tca_mm_amount value = var:tca_office_funding_last_amount }
+        save_scope_value_as = { name = tca_mm_expected_award value = { value = scope:tca_mm_amount multiply = 0.2 } }
+        if = {
+            limit = {
+                tca_office_can_receive_funding_trigger = yes
+                var:tca_office_funding_last_amount > 0
+                tca_office_funding_level_value = var:tca_mm_expected_level
+                tca_office_funding_rate_value = var:tca_mm_expected_rate
+                var:tca_office_funding_last_merit = scope:tca_mm_expected_award
+                var:tca_office_funding_last_merit_recipient = holder
+            }
+        }
+        else = { root = { tca_test_office_month_observation_failed_effect = yes } }
+        if = {
+            limit = { var:tca_mm_change_direction != 0 }
+            if = {
+                limit = {
+                    OR = {
+                        AND = { var:tca_mm_change_direction = 1 scope:tca_mm_amount > var:tca_mm_budget_anchor }
+                        AND = { var:tca_mm_change_direction = -1 scope:tca_mm_amount < var:tca_mm_budget_anchor }
+                    }
+                }
+                change_variable = { name = tca_mm_verified_budget_changes add = 1 }
+            }
+            else = { root = { tca_test_office_month_observation_failed_effect = yes } }
+            set_variable = { name = tca_mm_change_direction value = 0 }
+        }
+        if = {
+            limit = { var:tca_mm_payments > 0 }
+            save_scope_value_as = { name = tca_mm_interval value = { value = scope:tca_mm_new_paid subtract = var:tca_mm_paid } }
+            if = { limit = { OR = { scope:tca_mm_interval < 30 scope:tca_mm_interval > 35 } } root = { tca_test_office_month_observation_failed_effect = yes } }
+        }
+        set_variable = { name = tca_mm_paid value = scope:tca_mm_new_paid }
+        change_variable = { name = tca_mm_payments add = 1 }
+        change_variable = { name = tca_mm_total_paid add = scope:tca_mm_amount }
+        change_variable = { name = tca_mm_total_merit add = var:tca_office_funding_last_merit }
+        change_variable = { name = tca_mm_expected_merit add = scope:tca_mm_expected_award }
+        set_variable = { name = tca_mm_last_amount value = scope:tca_mm_amount }
+        # 正式新收据产生后，立即以独立余额快照核对同周期重入；不能再付钱或再给功绩。
+        holder = {
+            save_scope_as = tca_mm_repeat_recipient
+            save_scope_value_as = { name = tca_mm_repeat_merit value = merit }
+            save_scope_value_as = { name = tca_mm_repeat_cash value = treasury }
+        }
+        if = { limit = { has_variable = tca_tongpan_title } var:tca_tongpan_county.holder = { save_scope_as = tca_mm_repeat_payer } }
+        else = { var:song_judicial_circuit.holder = { save_scope_as = tca_mm_repeat_payer } }
+        scope:tca_mm_repeat_payer = { save_scope_value_as = { name = tca_mm_repeat_payer_cash value = treasury } }
+        tca_settle_office_funding_effect = yes
+        if = {
+            limit = {
+                var:tca_office_funding_paid = scope:tca_mm_new_paid
+                var:tca_office_funding_last_merit = scope:tca_mm_expected_award
+                scope:tca_mm_repeat_recipient = { merit = scope:tca_mm_repeat_merit treasury = scope:tca_mm_repeat_cash }
+                scope:tca_mm_repeat_payer = { treasury = scope:tca_mm_repeat_payer_cash }
+            }
+        }
+        else = { root = { tca_test_office_month_observation_failed_effect = yes } }
+    }
+    save_scope_value_as = { name = tca_mm_gap value = { value = current_date subtract = var:tca_mm_paid } }
+    if = { limit = { scope:tca_mm_gap > 35 } root = { tca_test_office_month_observation_failed_effect = yes } }
+    if = { limit = { var:tca_mm_total_merit != var:tca_mm_expected_merit } root = { tca_test_office_month_observation_failed_effect = yes } }
+}
+
+# 报告者作用域；只记录第一次异常的作用域详情，任何后续恢复都不能清掉失败。
+tca_test_office_month_observation_failed_effect = {
+    if = {
+        limit = { NOT = { has_character_flag = tca_mm_detail_logged } }
+        add_character_flag = tca_mm_detail_logged
+        debug_log = "TCA_OFFICE_MULTIMONTH OBSERVATION_FAILED"
+        debug_log_scopes = yes
+    }
+    add_character_flag = tca_test_case_failed
+}
+
+# 官署头衔作用域；初始化独立观察账本，不改正式付款日期或报价。
+tca_test_initialize_office_month_observer_effect = {
+    set_variable = { name = tca_mm_paid value = current_date }
+    set_variable = { name = tca_mm_payments value = 0 }
+    set_variable = { name = tca_mm_total_paid value = 0 }
+    set_variable = { name = tca_mm_total_merit value = 0 }
+    set_variable = { name = tca_mm_expected_merit value = 0 }
+    set_variable = { name = tca_mm_last_amount value = 0 }
+    set_variable = { name = tca_mm_change_direction value = 0 }
+    set_variable = { name = tca_mm_verified_budget_changes value = 0 }
+    set_variable = { name = tca_mm_expected_level value = 0 }
+    if = { limit = { has_variable = tca_tongpan_title } set_variable = { name = tca_mm_expected_rate value = 0.05 } }
+    else = { set_variable = { name = tca_mm_expected_rate value = 0.02 } }
+    set_variable = { name = tca_office_budget_level value = 0 }
+    holder = { add_character_flag = tca_updating_official_contract tca_ensure_office_budget_effect = yes remove_character_flag = tca_updating_official_contract }
+}
+
+# 官署头衔作用域；升／降预算只改测试待遇，实际拨款仍由后续自然月脉冲完成。
+# LEVEL/RATE/DIRECTION 分别为新档位、独立预期费率及实付增减方向。
+tca_test_change_office_month_budget_effect = {
+    set_variable = { name = tca_mm_budget_anchor value = var:tca_mm_last_amount }
+    set_variable = { name = tca_mm_expected_level value = $LEVEL$ }
+    set_variable = { name = tca_mm_expected_rate value = $RATE$ }
+    set_variable = { name = tca_mm_change_direction value = $DIRECTION$ }
+    set_variable = { name = tca_office_budget_level value = $LEVEL$ }
+    holder = { add_character_flag = tca_updating_official_contract tca_ensure_office_budget_effect = yes remove_character_flag = tca_updating_official_contract }
+}
+
+# 官署头衔作用域；恢复测试前预算，保留自然结算及任免状态，不回拨已发经费和功绩。
+tca_test_office_month_cleanup_effect = {
+    set_variable = { name = tca_office_budget_level value = var:tca_mm_original_budget }
+    holder ?= { tca_ensure_official_contract_effect = yes }
+    remove_variable = tca_mm_original_budget
+    remove_variable = tca_mm_paid
+    remove_variable = tca_mm_payments
+    remove_variable = tca_mm_total_paid
+    remove_variable = tca_mm_total_merit
+    remove_variable = tca_mm_expected_merit
+    remove_variable = tca_mm_last_amount
+    remove_variable = tca_mm_change_direction
+    remove_variable = tca_mm_verified_budget_changes
+    remove_variable = tca_mm_expected_level
+    remove_variable = tca_mm_expected_rate
+    remove_variable = tca_mm_budget_anchor
+}

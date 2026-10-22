@@ -1,0 +1,106 @@
+﻿# 正式通判／提刑连续210日实付政绩回归；六个35日窗口分别验收，逐日检查是否漏月。
+# 不建立个人月功绩模型：每次奖励取正式结算的实际 merit 差值，与独立实付×0.2预期比较。
+# 首次付款只能来自自然月调度；观察新收据后重复调用一次正式结算，另验同周期防重。
+namespace = tca_office_multimonth_test
+
+tca_office_multimonth_test.1 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_office_multimonth_test.1 tca_test_office_funding_multimonth"
+        remove_character_flag = tca_test_case_failed
+        remove_character_flag = tca_mm_detail_logged
+        clear_saved_scope = tca_mm_judicial_title
+        clear_saved_scope = tca_mm_tongpan_title
+        if = {
+            limit = { debug_only = yes title:h_china.holder = root }
+            if = { limit = { NOT = { has_realm_law = tca_tongpan_enabled_law } } add_character_flag = tca_mm_restore_disabled add_realm_law_skip_effects = tca_tongpan_enabled_law }
+            tca_refresh_all_judicial_titles_effect = yes
+            tca_refresh_tongpan_realm_effect = yes
+            random_in_global_list = {
+                variable = tca_judicial_circuits
+                limit = { holder.top_liege = root holder = { tca_office_funding_base_value > 0 } var:song_judicial_title ?= { tca_office_can_receive_funding_trigger = yes } }
+                var:song_judicial_title = { save_scope_as = tca_mm_judicial_title }
+            }
+            random_in_global_list = {
+                variable = tca_tongpan_counties
+                limit = { holder.top_liege = root holder = { tca_office_funding_base_value > 0 tca_office_funding_balance_value > 0 } var:tca_tongpan_office ?= { tca_office_can_receive_funding_trigger = yes } }
+                var:tca_tongpan_office = { save_scope_as = tca_mm_tongpan_title }
+            }
+        }
+        if = {
+            limit = { exists = scope:tca_mm_judicial_title exists = scope:tca_mm_tongpan_title }
+            scope:tca_mm_judicial_title = { set_variable = { name = tca_mm_original_budget value = tca_office_funding_level_value } tca_test_initialize_office_month_observer_effect = yes }
+            scope:tca_mm_tongpan_title = { set_variable = { name = tca_mm_original_budget value = tca_office_funding_level_value } tca_test_initialize_office_month_observer_effect = yes }
+            set_variable = { name = tca_mm_days value = 0 }
+            add_character_flag = tca_test_delayed_case_active
+            trigger_event = { id = tca_office_multimonth_test.1001 days = 1 }
+        }
+        else = {
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_office_funding_multimonth"
+            if = { limit = { has_character_flag = tca_mm_restore_disabled } remove_character_flag = tca_mm_restore_disabled add_realm_law_skip_effects = tca_tongpan_disabled_law tca_refresh_tongpan_realm_effect = yes }
+        }
+    }
+}
+
+tca_office_multimonth_test.1001 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            change_variable = { name = tca_mm_days add = 1 }
+            scope:tca_mm_judicial_title = { tca_test_observe_office_month_effect = yes }
+            scope:tca_mm_tongpan_title = { tca_test_observe_office_month_effect = yes }
+            if = {
+                limit = { var:tca_mm_days = 35 }
+                if = { limit = { NOT = { has_character_flag = tca_test_case_failed } scope:tca_mm_judicial_title = { var:tca_mm_payments >= 1 } scope:tca_mm_tongpan_title = { var:tca_mm_payments >= 1 } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding_multimonth 1" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding_multimonth 1" }
+            }
+            else_if = {
+                limit = { var:tca_mm_days = 70 }
+                if = { limit = { NOT = { has_character_flag = tca_test_case_failed } scope:tca_mm_judicial_title = { var:tca_mm_payments >= 2 } scope:tca_mm_tongpan_title = { var:tca_mm_payments >= 2 } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding_multimonth 2" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding_multimonth 2" }
+                scope:tca_mm_judicial_title = { tca_test_change_office_month_budget_effect = { LEVEL = 4 RATE = 0.10 DIRECTION = 1 } }
+                scope:tca_mm_tongpan_title = { tca_test_change_office_month_budget_effect = { LEVEL = 4 RATE = 0.25 DIRECTION = 1 } }
+            }
+            else_if = {
+                limit = { var:tca_mm_days = 105 }
+                if = { limit = { NOT = { has_character_flag = tca_test_case_failed } scope:tca_mm_judicial_title = { var:tca_mm_payments >= 3 } scope:tca_mm_tongpan_title = { var:tca_mm_payments >= 3 } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding_multimonth 3" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding_multimonth 3" }
+            }
+            else_if = {
+                limit = { var:tca_mm_days = 140 }
+                if = { limit = { NOT = { has_character_flag = tca_test_case_failed } scope:tca_mm_judicial_title = { var:tca_mm_payments >= 4 } scope:tca_mm_tongpan_title = { var:tca_mm_payments >= 4 } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding_multimonth 4" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding_multimonth 4" }
+                scope:tca_mm_judicial_title = { tca_test_change_office_month_budget_effect = { LEVEL = 1 RATE = 0.04 DIRECTION = -1 } }
+                scope:tca_mm_tongpan_title = { tca_test_change_office_month_budget_effect = { LEVEL = 1 RATE = 0.10 DIRECTION = -1 } }
+            }
+            else_if = {
+                limit = { var:tca_mm_days = 175 }
+                if = { limit = { NOT = { has_character_flag = tca_test_case_failed } scope:tca_mm_judicial_title = { var:tca_mm_payments >= 5 } scope:tca_mm_tongpan_title = { var:tca_mm_payments >= 5 } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding_multimonth 5" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding_multimonth 5" }
+            }
+            else_if = {
+                limit = { var:tca_mm_days = 210 }
+                if = { limit = { NOT = { has_character_flag = tca_test_case_failed } scope:tca_mm_judicial_title = { var:tca_mm_payments >= 6 } scope:tca_mm_tongpan_title = { var:tca_mm_payments >= 6 } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding_multimonth 6" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding_multimonth 6" }
+                if = { limit = { scope:tca_mm_judicial_title = { var:tca_mm_total_merit = var:tca_mm_expected_merit var:tca_mm_total_merit > 0 var:tca_mm_verified_budget_changes = 2 } scope:tca_mm_tongpan_title = { var:tca_mm_total_merit = var:tca_mm_expected_merit var:tca_mm_total_merit > 0 var:tca_mm_verified_budget_changes = 2 } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding_multimonth 7" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding_multimonth 7" }
+                scope:tca_mm_judicial_title = { save_scope_value_as = { name = tca_mm_judicial_payments value = var:tca_mm_payments } save_scope_value_as = { name = tca_mm_judicial_merit value = var:tca_mm_total_merit } }
+                scope:tca_mm_tongpan_title = { save_scope_value_as = { name = tca_mm_tongpan_payments value = var:tca_mm_payments } save_scope_value_as = { name = tca_mm_tongpan_merit value = var:tca_mm_total_merit } }
+                debug_log = "TCA_OFFICE_MULTIMONTH FINAL_LEDGER"
+                debug_log_scopes = yes
+                if = { limit = { has_character_flag = tca_test_case_failed } change_variable = { name = tca_test_suite_failed add = 1 } debug_log = "TCA_TEST FAIL tca_test_office_funding_multimonth" }
+                else = { change_variable = { name = tca_test_suite_passed add = 1 } debug_log = "TCA_TEST PASS tca_test_office_funding_multimonth" }
+                scope:tca_mm_judicial_title = { tca_test_office_month_cleanup_effect = yes }
+                scope:tca_mm_tongpan_title = { tca_test_office_month_cleanup_effect = yes }
+                if = { limit = { has_character_flag = tca_mm_restore_disabled } remove_character_flag = tca_mm_restore_disabled add_realm_law_skip_effects = tca_tongpan_disabled_law tca_refresh_tongpan_realm_effect = yes }
+                remove_character_flag = tca_test_delayed_case_active
+                tca_test_continue_delayed_effect = yes
+            }
+            if = { limit = { var:tca_mm_days < 210 } trigger_event = { id = tca_office_multimonth_test.1001 days = 1 } }
+        }
+    }
+}

@@ -10,6 +10,50 @@ tca_tongpan_funding_medium_rate_value = 0.15
 tca_tongpan_funding_increased_rate_value = 0.20
 tca_tongpan_funding_high_rate_value = 0.25
 
+# 官署实付经费的功绩兑换系数；不包含个人俸禄，不应用月功绩倍率。
+tca_office_funding_merit_rate_value = 0.2
+
+# 人物作用域；下期预测沿用正式拨款资格、基数与费率，不读取上次实付。
+tca_office_funding_expected_merit_value = {
+    value = tca_office_funding_income_value
+    multiply = tca_office_funding_merit_rate_value
+}
+
+# 人物作用域；汇总当前所持官署中属于本人物、本任期的上次实际功绩奖励。
+# 换任不继承前任所得；离任后的历史奖励不形成持续收益。
+tca_office_funding_last_merit_value = {
+    value = 0
+    save_temporary_scope_as = tca_funding_merit_viewer
+    every_held_title = {
+        limit = {
+            OR = { has_variable = tca_judicial_title has_variable = tca_tongpan_title }
+            has_variable = tca_office_funding_last_merit
+            var:tca_office_funding_last_merit_recipient ?= scope:tca_funding_merit_viewer
+        }
+        add = var:tca_office_funding_last_merit
+    }
+}
+
+# 人物作用域；结算记录存在性与金额分开，零额实付也保留记录，供结算回归核对。
+tca_office_funding_has_merit_receipt_value = {
+    value = 0
+    save_temporary_scope_as = tca_funding_merit_viewer
+    every_held_title = {
+        limit = {
+            OR = { has_variable = tca_judicial_title has_variable = tca_tongpan_title }
+            has_variable = tca_office_funding_last_merit
+            var:tca_office_funding_last_merit_recipient ?= scope:tca_funding_merit_viewer
+        }
+        value = 1
+    }
+}
+
+# 人物作用域；功绩收入明细只为已登记的无地官员追加经费条目。
+tca_office_funding_merit_visible_value = {
+    value = 0
+    if = { limit = { tca_is_landless_official_trigger = yes } value = 1 }
+}
+
 # 官署头衔作用域；待遇保存在头衔，未初始化时使用第三档。
 tca_office_funding_level_value = {
     value = 2

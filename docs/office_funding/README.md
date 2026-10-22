@@ -25,14 +25,14 @@
 - `common/script_values/tca_office_funding_values.txt`：两类契约的比例、基数、逐署金额及人物预计收支。
 - `common/scripted_triggers/tca_office_funding_triggers.txt`：现有制度和辖区双向绑定检查。
 - `common/scripted_effects/tca_office_funding_effects.txt`：头衔待遇记录／恢复与实际资金转移。
-- `common/on_action/tca_office_funding_on_actions.txt`：追加 `dynastic_cycle_monthly_pulse`；复用司法路、通判州的全局登记表，不扫描所有人物。
+- `common/on_action/tca_office_funding_on_actions.txt`：追加 `dynastic_cycle_monthly_pulse`，并在授职时清理前一任期的功绩收据，保留官署付款日期；复用司法路、通判州的全局登记表，不扫描所有人物。
 - `common/subject_contracts/contracts/tca_official_contracts.txt`：两类独立五档原生契约，移除临时借用的中央朝臣预算。官职项仅保留提刑与通判，不再预留武职入口。
 - `common/character_interactions/zz_tca_official_contract_interactions.txt`：原版行政改约成功后记录官署档位。
 - `gui/tca_office_funding_types.gui` 与 `gui/hud.gui`：原生国库明细追加经费行、修正收入／支出合计和顶栏净额。原生项目保持可见。
 
 每个官署在 `tca_office_funding_paid` 记录结算日期，满30日才能再次结算，阻止重复月脉冲和换任后的重复领取；不依赖同日变量到期与回调顺序。王朝循环的月脉冲是原生约30日节奏，并不代表各人物财政缓存已统一刷新。没有活动王朝循环的政权尚无独立补充月调度。
 
-批量结算先为全部官署锁定 `tca_office_funding_quote`，再执行收付，避免前一笔赤字触发原生财政刷新后改变后一笔基数；临时报价在同一回调消费并清理。每笔支付保存实际付款人、收款人，以同一金额扣款、入账。只对正额调用效果；本机 `remove_treasury = 0` 会产生脚本错误。资金转移不进入原生月收入，避免自身经费反馈进下一期基数。
+批量结算先为全部官署锁定 `tca_office_funding_quote`，再执行收付，避免前一笔赤字触发原生财政刷新后改变后一笔基数；临时报价在同一回调消费并清理。每笔支付保存实际付款人、收款人，以同一金额扣款、入账。只对正额调用效果；本机 `remove_treasury = 0` 会产生脚本错误。资金转移不进入原生月收入，避免自身经费反馈进下一期基数。每次正式结算即时发放按实付金额计算的政绩奖励；兑换系数、基础任职功绩、倍率及显示由[官职契约](contracts.md)维护。
 
 ## 原版依据与边界
 
@@ -46,7 +46,7 @@
 
 ## 验证
 
-原生测试入口：`events/tests/tca_office_funding_test_events.txt`，登记于全组 `events/tests/tca_tests_events.txt`。检查正式州／路绑定、五档不同费率、实际州／路国库支付、收支守恒、防重、基数无反馈、制度停用、余额不足足额支付、同人自付、头衔往返授予后档位恢复、两次自然月结及原生预算无重复收入。运行 `python3 tools/run_game_tests.py --seed 1538798675 --timeout 360`，核对本次 `terminal.json`、`result.txt`、源码清单及 `error.log`。
+原生测试入口：`events/tests/tca_office_funding_test_events.txt` 与 `events/tests/tca_office_multimonth_test_events.txt`，登记于全组 `events/tests/tca_tests_events.txt`。检查正式州／路绑定、五档不同费率、实际州／路国库支付、收支守恒、防重、基数无反馈、制度停用、余额不足足额支付、同人自付、头衔往返授予后档位恢复、自然月结及原生预算无重复收入；功绩覆盖实付即时奖励、小数与零额、防重及不应用月功绩倍率的控制对照；连续210日用例的观察与验收范围见[官员契约](contracts.md#验证边界)。运行 `python3 tools/run_game_tests.py --seed 1538798675 --timeout 360`，核对本次 `terminal.json`、`result.txt`、源码清单及 `error.log`。
 
 待补充验收：官员和付款主官死亡／继任、空缺恢复、完整兼任玩法、真实负基数、保存重载、实际悬停布局、各语言、界面缩放、其他财政窗口一致性。直接调用维护或支付效果的通过不能替代这些路径。
 

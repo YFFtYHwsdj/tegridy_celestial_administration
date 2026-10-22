@@ -8,6 +8,33 @@ GUI_PATH = ROOT / 'gui/tca_office_funding_types.gui'
 
 
 class OfficeFundingGuiContracts(unittest.TestCase):
+    def test_merit_funding_is_nested_in_native_detail_for_viewed_character(self):
+        # 外层仅显示月收入数值；经费项进入细节，且不能误取玩家代替当前查看人物。
+        hud = (ROOT / 'gui/hud.gui').read_text(encoding='utf-8-sig')
+        self.assertNotIn('name = "tca_office_funding_merit"', hud)
+        self.assertIn('tca_office_merit_income_breakdown = {', hud)
+        # 即使原生收入无子项，正额经费仍须能展开明细。
+        merit_section = hud.split('### 带提示的功绩明细', 1)[1].split('### 功绩考试', 1)[0]
+        self.assertIn('tooltip_visible = "[Or(ValueBreakdown.HasTooltip, And(', merit_section)
+        self.assertIn("tca_office_funding_expected_merit_value'), '(CFixedPoint)0'", merit_section)
+        merit = (ROOT / 'gui/tca_office_merit_types.gui').read_text(encoding='utf-8-sig')
+        self.assertIn('type tca_office_merit_income_breakdown = widget_value_breakdown_list', merit)
+        self.assertIn('blockoverride "footer"', merit)
+        self.assertIn('tca_office_merit_payment_breakdown = {', merit)
+        self.assertNotRegex(merit, r'GetPlayer(?:\.|\s*[,\)])')
+        self.assertIn('Character.MakeScope', merit)
+        # 截图回归：经费金额须有国库图标、正号、颜色和下划线，比例也保留下划线。
+        self.assertIn("@treasury_icon! [Character.MakeScope.ScriptValue('tca_office_funding_income_value')|=+2L]", merit)
+        self.assertIn("@merit_icon! [Character.MakeScope.ScriptValue('tca_office_funding_merit_rate_value')|%0+L]", merit)
+        self.assertIn('datacontext = "[Character.Self]"', hud)
+        for language in ('english', 'simp_chinese'):
+            text = (ROOT / f'localization/{language}/tca_official_contracts_l_{language}.yml').read_text(encoding='utf-8-sig')
+            balance = next(line for line in text.splitlines() if line.lstrip().startswith('tca_office_merit_balance:'))
+            self.assertIn('Add_CFixedPoint(Character.GetMeritBalance, Character.MakeScope.ScriptValue(', balance)
+            self.assertIn('|=+2L]$COST_PER_MONTH$', balance)
+            native = next(line for line in text.splitlines() if line.lstrip().startswith('tca_office_merit_native_balance:'))
+            self.assertIn('[Character.GetMeritBalanceBreakdown]', native)
+
     def test_detached_tooltip_does_not_require_character_context(self):
         # 顶栏只给明细传入 ValueBreakdown；Character 曾让数值和条件同时失效。
         gui = GUI_PATH.read_text(encoding='utf-8-sig')
