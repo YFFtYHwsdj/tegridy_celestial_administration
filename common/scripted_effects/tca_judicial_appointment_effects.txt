@@ -30,6 +30,11 @@ tca_fill_initial_judicial_holder_effect = {
         scope:tca_expected_judicial_liege = { save_scope_as = tca_appointment_liege }
         var:song_judicial_title = { save_scope_as = tca_appointment_title }
         clear_saved_scope = tca_appointment_candidate
+        # 引擎不允许为空缺官职读取候选分；临时挂靠上级持有，安装本职法后再抽取。
+        create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_judicial_caretaker_change }
+        scope:tca_appointment_title = { change_title_holder = { holder = scope:tca_appointment_liege change = scope:tca_judicial_caretaker_change } }
+        resolve_title_and_vassal_change = scope:tca_judicial_caretaker_change
+        scope:tca_appointment_title = { tca_ensure_official_title_succession_effect = yes }
         every_in_list = {
             list = tca_initial_judicial_candidates
             remove_from_list = tca_initial_judicial_candidates
@@ -41,10 +46,7 @@ tca_fill_initial_judicial_holder_effect = {
         random_in_list = {
             list = tca_initial_judicial_candidates
             limit = { tca_is_initial_judicial_candidate_trigger = yes }
-            weight = {
-                base = 1
-                modifier = { add = learning }
-            }
+            weight = { base = 0 modifier = { add = tca_judicial_candidate_weight_value } }
             save_scope_as = tca_appointment_candidate
         }
         # 仅当现有候选均不合格时，生成原生学者。
@@ -92,7 +94,8 @@ tca_fill_initial_judicial_holder_effect = {
                     create_noble_family_effect = { GOVERNMENT_GIVER = scope:tca_appointment_liege }
                 }
                 create_title_and_vassal_change = {
-                    type = appointment
+                    # 已按本职原生评分选定人选，避免appointment事务再次使用缓存继任人。
+                    type = granted
                     save_scope_as = tca_appointment_change
                     add_claim_on_loss = no
                 }
@@ -104,6 +107,7 @@ tca_fill_initial_judicial_holder_effect = {
                 }
                 resolve_title_and_vassal_change = scope:tca_appointment_change
                 change_government = celestial_government
+                tca_set_official_appointment_cooldown_effect = yes
             }
             scope:tca_appointment_title = {
                 tca_sync_judicial_holder_liege_effect = yes
@@ -261,7 +265,7 @@ tca_refresh_held_judicial_positions_effect = {
 }
 
 # 角色作用域；保留原生文官领地法律作为持有人的默认继承法。
-# 官职继承该原生领地法律，家门头衔保留自身法律。
+# 官职另装本职头衔法以选择评分类型，家门头衔保留自身法律。
 tca_ensure_native_judicial_realm_succession_effect = {
     if = {
         limit = {

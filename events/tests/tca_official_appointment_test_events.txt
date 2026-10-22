@@ -1,0 +1,116 @@
+﻿# 专职任命评分回归；正式官职与同持有人原版文官头衔使用同一候选。
+# 只比较任命类型差值，隔离能力固有变化、家族、年龄和政治因素。
+namespace = tca_official_appointment_test
+
+tca_official_appointment_test.1 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_official_appointment_test.1 tca_test_tongpan_appointment"
+        remove_character_flag = tca_test_case_failed
+        clear_saved_scope = tca_test_appointment_office
+        tca_refresh_tongpan_realm_effect = yes
+        random_vassal_or_below = {
+            limit = { primary_title = { has_variable = tca_tongpan_title tca_is_valid_tongpan_holder_trigger = yes } }
+            primary_title = { save_scope_as = tca_test_appointment_office }
+        }
+        if = {
+            limit = { debug_only = yes exists = scope:tca_test_appointment_office.holder }
+            tca_test_prepare_appointment_score_effect = yes
+            # 原版能力分换为管理为主；各项分别取整，不能先合计再取整。
+            scope:tca_test_appointment_neutral = {
+                save_scope_value_as = { name = tca_test_appointment_skill_delta value = { value = stewardship multiply = 0.5 round = yes subtract = { value = stewardship multiply = 0.25 round = yes } add = { value = learning multiply = 0.25 round = yes } subtract = { value = learning multiply = 0.5 round = yes } } }
+            }
+            tca_test_check_appointment_difference_effect = { CANDIDATE = scope:tca_test_appointment_neutral EXTRA = scope:tca_test_appointment_skill_delta }
+            if = { limit = { var:tca_test_appointment_difference_ok = yes } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_appointment 1" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_appointment 1" }
+            scope:tca_test_appointment_just = { save_scope_value_as = { name = tca_test_appointment_skill_delta value = { value = stewardship multiply = 0.5 round = yes subtract = { value = stewardship multiply = 0.25 round = yes } add = { value = learning multiply = 0.25 round = yes } subtract = { value = learning multiply = 0.5 round = yes } add = 10 } } }
+            tca_test_check_appointment_difference_effect = { CANDIDATE = scope:tca_test_appointment_just EXTRA = scope:tca_test_appointment_skill_delta }
+            if = { limit = { var:tca_test_appointment_difference_ok = yes } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_appointment 2" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_appointment 2" }
+            scope:tca_test_appointment_arbitrary = { save_scope_value_as = { name = tca_test_appointment_skill_delta value = { value = stewardship multiply = 0.5 round = yes subtract = { value = stewardship multiply = 0.25 round = yes } add = { value = learning multiply = 0.25 round = yes } subtract = { value = learning multiply = 0.5 round = yes } subtract = 10 } } }
+            tca_test_check_appointment_difference_effect = { CANDIDATE = scope:tca_test_appointment_arbitrary EXTRA = scope:tca_test_appointment_skill_delta }
+            if = { limit = { var:tca_test_appointment_difference_ok = yes } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_appointment 3" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_appointment 3" }
+            scope:tca_test_appointment_diligent = { save_scope_value_as = { name = tca_test_appointment_skill_delta value = { value = stewardship multiply = 0.5 round = yes subtract = { value = stewardship multiply = 0.25 round = yes } add = { value = learning multiply = 0.25 round = yes } subtract = { value = learning multiply = 0.5 round = yes } add = 10 } } }
+            tca_test_check_appointment_difference_effect = { CANDIDATE = scope:tca_test_appointment_diligent EXTRA = scope:tca_test_appointment_skill_delta }
+            if = { limit = { var:tca_test_appointment_difference_ok = yes } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_appointment 4" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_appointment 4" }
+            scope:tca_test_appointment_lazy = { save_scope_value_as = { name = tca_test_appointment_skill_delta value = { value = stewardship multiply = 0.5 round = yes subtract = { value = stewardship multiply = 0.25 round = yes } add = { value = learning multiply = 0.25 round = yes } subtract = { value = learning multiply = 0.5 round = yes } subtract = 10 } } }
+            tca_test_check_appointment_difference_effect = { CANDIDATE = scope:tca_test_appointment_lazy EXTRA = scope:tca_test_appointment_skill_delta }
+            if = { limit = { var:tca_test_appointment_difference_ok = yes } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_appointment 5" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_appointment 5" }
+            scope:tca_test_appointment_combined = { save_scope_value_as = { name = tca_test_appointment_skill_delta value = { value = stewardship multiply = 0.5 round = yes subtract = { value = stewardship multiply = 0.25 round = yes } add = { value = learning multiply = 0.25 round = yes } subtract = { value = learning multiply = 0.5 round = yes } add = 20 } } }
+            tca_test_check_appointment_difference_effect = { CANDIDATE = scope:tca_test_appointment_combined EXTRA = scope:tca_test_appointment_skill_delta }
+            if = { limit = { var:tca_test_appointment_difference_ok = yes } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_appointment 6" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_appointment 6" }
+            scope:tca_test_appointment_office = { save_scope_as = tca_tp_office tca_ensure_official_title_succession_effect = yes tca_ensure_official_title_succession_effect = yes }
+            if = { limit = { scope:tca_test_appointment_office = { tier = tier_county has_title_law = tca_tongpan_office_succession_law NOT = { has_title_law = tca_judicial_office_succession_law } } scope:tca_test_appointment_reference = { NOT = { has_title_law = tca_tongpan_office_succession_law } holder = { has_realm_law = celestial_appointment_succession_law } } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_appointment 7" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_appointment 7" }
+            if = { limit = { scope:tca_test_appointment_negative = { tca_tongpan_candidate_weight_value = 1 tca_tongpan_title_candidate_score_value < 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_appointment 8" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_appointment 8" }
+            if = { limit = { scope:tca_test_appointment_office.holder = { appointment_timeout_days >= 1800 } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_appointment 9" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_appointment 9" }
+            # 长期拒任超时不能被五年冷却缩短；重复调用也不能改变原值。
+            scope:tca_test_appointment_negative = {
+                set_appointment_timeout = { years = 150 desc = appointment_timeout_desc_refusing }
+                save_scope_value_as = { name = tca_test_appointment_long_timeout value = appointment_timeout_days }
+                tca_set_official_appointment_cooldown_effect = yes
+                tca_set_official_appointment_cooldown_effect = yes
+            }
+            if = { limit = { scope:tca_test_appointment_negative = { appointment_timeout_days = scope:tca_test_appointment_long_timeout } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_appointment 10" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_appointment 10" }
+            tca_test_cleanup_appointment_score_effect = yes
+            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_tongpan_appointment" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_tongpan_appointment" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_tongpan_appointment" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } }
+        remove_character_flag = tca_test_case_failed
+    }
+}
+
+tca_official_appointment_test.2 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_official_appointment_test.2 tca_test_judicial_appointment"
+        remove_character_flag = tca_test_case_failed
+        clear_saved_scope = tca_test_appointment_office
+        tca_test_prepare_judicial_law_realm_effect = yes
+        scope:tca_test_law_position ?= { save_scope_as = tca_test_appointment_office }
+        if = {
+            limit = { debug_only = yes exists = scope:tca_test_appointment_office.holder }
+            tca_test_prepare_appointment_score_effect = yes
+            tca_test_check_appointment_difference_effect = { CANDIDATE = scope:tca_test_appointment_neutral EXTRA = 0 }
+            if = { limit = { var:tca_test_appointment_difference_ok = yes } debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_appointment 1" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_appointment 1" }
+            tca_test_check_appointment_difference_effect = { CANDIDATE = scope:tca_test_appointment_just EXTRA = 20 }
+            if = { limit = { var:tca_test_appointment_difference_ok = yes } debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_appointment 2" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_appointment 2" }
+            tca_test_check_appointment_difference_effect = { CANDIDATE = scope:tca_test_appointment_arbitrary EXTRA = -20 }
+            if = { limit = { var:tca_test_appointment_difference_ok = yes } debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_appointment 3" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_appointment 3" }
+            tca_test_check_appointment_difference_effect = { CANDIDATE = scope:tca_test_appointment_diligent EXTRA = 5 }
+            if = { limit = { var:tca_test_appointment_difference_ok = yes } debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_appointment 4" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_appointment 4" }
+            tca_test_check_appointment_difference_effect = { CANDIDATE = scope:tca_test_appointment_lazy EXTRA = -5 }
+            if = { limit = { var:tca_test_appointment_difference_ok = yes } debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_appointment 5" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_appointment 5" }
+            tca_test_check_appointment_difference_effect = { CANDIDATE = scope:tca_test_appointment_combined EXTRA = 25 }
+            if = { limit = { var:tca_test_appointment_difference_ok = yes } debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_appointment 6" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_appointment 6" }
+            scope:tca_test_appointment_office = { save_scope_as = tca_appointment_title tca_ensure_official_title_succession_effect = yes tca_ensure_official_title_succession_effect = yes }
+            if = { limit = { scope:tca_test_appointment_office = { tier = tier_duchy has_title_law = tca_judicial_office_succession_law NOT = { has_title_law = tca_judicial_appointment_succession_law } NOT = { has_title_law = tca_tongpan_office_succession_law } } scope:tca_test_appointment_reference = { NOT = { has_title_law = tca_judicial_office_succession_law } holder = { has_realm_law = celestial_appointment_succession_law } } } debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_appointment 7" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_appointment 7" }
+            if = { limit = { scope:tca_test_appointment_negative = { tca_judicial_candidate_weight_value = 1 } } debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_appointment 8" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_appointment 8" }
+            if = { limit = { scope:tca_test_appointment_office.holder = { appointment_timeout_days >= 1800 } } debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_appointment 9" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_appointment 9" }
+            tca_test_cleanup_appointment_score_effect = yes
+            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_judicial_appointment" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_judicial_appointment" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_judicial_appointment" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } }
+        remove_character_flag = tca_test_case_failed
+    }
+}

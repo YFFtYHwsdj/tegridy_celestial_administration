@@ -51,6 +51,7 @@
 - common/scripted_effects/tca_court_system_effects.txt、events/tca_court_system_events.txt：迁移、维护及延迟刷新。
 - common/flavorization/tca_song_official_names.txt、common/customizable_localization/tca_song_official_names.txt：名称显示。
 - tools/upstream_overrides.json：登记当前覆盖及已审阅原版基线；不在本页重复维护覆盖数量。
+- [官职任命](../appointment/README.md)：共享原版任命依据及专职官员选官设计；官名法律不决定候选评分。
 
 原版1.20.0.4依据：laws/_laws.info、law_groups/_law_groups.info；flavorization/_flavourization.info的角色flag、titles与only_holder等接口；11_tgp_china_flavorization.txt的契约分类及733行起的中央官职头衔显示规则；council_positions/_council_positions.info 明确 name 的触发作用域为内阁领主；00_council_positions.txt 的两个正式职位；laws_l_*.yml 的首辅名称与静态引号回退；原生imperial_policy GUI分类。
 

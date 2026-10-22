@@ -6,7 +6,7 @@
 
 - `common/script_values/appointment/tca_tongpan_appointment_values.txt`：绑定州的任命重要度；`common/script_values/appointment/zz_tca_appointment_values.txt`在既有原版覆盖内按官署标记分流，保留提刑和其他头衔算法。中英文重要度分项由 `tca_tongpan_prominence_l_*` 提供。
 - `tools/build_tongpan_catalog.py`：3,442个固定官职、128个池官职、固定映射、限定官职的持有人称谓和双语名称；不含测试生成。
-- `common/scripted_effects/tca_tongpan_effects.txt`：绑定、三级挂靠、原版评分补位、destroy与恢复、角色分权同步和皇帝级维护。
+- `common/scripted_effects/tca_tongpan_effects.txt`：绑定、三级挂靠、本职原生评分补位、destroy与恢复、角色分权同步和皇帝级维护。
 - `common/scripted_triggers/tca_tongpan_triggers.txt`：实际政权与伯爵主头衔资格、专职校验、双向绑定与生效条件。
 - `common/laws/tca_tongpan_laws.txt`、`common/law_groups/tca_tongpan_law_groups.txt`：皇帝级开关、费用、冷却和开局默认。
 - `common/diarchies/`、`common/script_values/tca_tongpan_values.txt`：单使命、称职度、0/20/40/60/80档位和数值。
@@ -17,9 +17,9 @@
 
 新增同名原版对象及追加回调已登记 `tools/upstream_overrides.json`；原版主体保存在已审阅基线／原样helper中。影响力需要覆盖整个互动对象，兼容范围大于仅追加数值的威望适配。
 
-原版不允许给无持有者头衔查询任命分数，也不允许将这项realm继承法直接用`add_title_law`加到空头衔。因此首次／纠错时在同一次效果内先由挂靠上级暂持官职，继承其原生任命环境，再按引擎分数抽选并立即授予专职人选。有效在任者不经过暂持步骤。此处的原生头衔回调可能被其他模组观察到，属于需要兼容验收的边界。
+原版不允许给无持有者头衔查询任命分数；原版`celestial_appointment_succession_law`属于realm法，不能直接当作官署title法安装。因此首次／纠错时在同一次效果内先由挂靠上级暂持官职，安装通判官署头衔法，再按本职引擎分数抽选并立即授予专职人选。有效在任者不经过暂持步骤。此处的原生头衔回调可能被其他模组观察到，属于需要兼容验收的边界。
 
-补位使用`granted`事务精确授予已抽中的人，避免`appointment`事务再次使用原版缓存继承人。持有者仍使用原版realm文官继承法，正常死亡交接不走初始加权补位。
+补位使用`granted`事务精确授予已抽中的人，避免`appointment`事务再次使用原版缓存继承人。持有者保留原版realm文官继承法，官署的独立title法决定本职评分；精确补位后只为最终官员补齐原版任命冷却，不缩短更长超时、不冷却临时上级，日常维护不续期。正常死亡交接不走初始加权补位。具体共用入口见[官职任命](../appointment/README.md#实现入口与验收)。
 
 分权资格复用`is_diarch_valid_trigger`，可履职状态复用`is_diarch_able_trigger`，对应原版`scripted_rules/00_rules.txt`。原版资格失效时暂停分权，保留官职；恢复后维护重新连接，不另造特殊状态资源或代理职位。
 

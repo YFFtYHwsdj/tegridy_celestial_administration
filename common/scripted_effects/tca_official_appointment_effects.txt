@@ -1,0 +1,24 @@
+﻿# 官署头衔作用域；需已有持有人，首次补位由挂靠上级临时持有后调用。
+# 幂等安装本职头衔法，保留持有人的领地法及家门法；不创建候选、不转移头衔。
+# 提刑先清理仅供旧存档解析的旧法；新法使用独立标识，不被旧法清理误删。
+tca_ensure_official_title_succession_effect = {
+    if = {
+        limit = { exists = holder has_variable = tca_tongpan_title NOT = { has_title_law = tca_tongpan_office_succession_law } }
+        add_title_law = tca_tongpan_office_succession_law
+    }
+    else_if = {
+        limit = { exists = holder has_variable = tca_judicial_title }
+        if = { limit = { has_title_law = tca_judicial_appointment_succession_law } remove_title_law = tca_judicial_appointment_succession_law }
+        if = { limit = { NOT = { has_title_law = tca_judicial_office_succession_law } } add_title_law = tca_judicial_office_succession_law }
+    }
+}
+
+# 实际获任角色作用域；只在首次／纠错精确授职后调用，日常维护不续期。
+# granted事务不会自动设置原生近期受任超时；补齐原版期限，既有更长的拒任／退休超时不缩短。
+# 不对暂持官署的上级调用，避免给上级附带冷却。
+tca_set_official_appointment_cooldown_effect = {
+    if = {
+        limit = { appointment_timeout_days < tca_official_appointment_cooldown_days }
+        set_appointment_timeout = { days = tca_official_appointment_cooldown_days desc = tca_appointment_recent_office_desc }
+    }
+}

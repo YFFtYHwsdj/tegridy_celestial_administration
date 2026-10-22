@@ -1,0 +1,48 @@
+﻿# 皇帝测试请求者作用域；调用前提供正式官职 tca_test_appointment_office。
+# 临时参考头衔与正式官职同持有人；只在本次同步断言期间增加，结束前销毁。
+tca_test_prepare_appointment_score_effect = {
+    create_dynamic_title = { tier = duchy name = tca_test_arrest_office_name }
+    scope:new_title = { save_scope_as = tca_test_appointment_reference set_capital_county = root.capital_county set_landless_title = yes }
+    create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_test_appointment_change }
+    scope:tca_test_appointment_reference = { change_title_holder = { holder = scope:tca_test_appointment_office.holder change = scope:tca_test_appointment_change } }
+    resolve_title_and_vassal_change = scope:tca_test_appointment_change
+    create_character = { age = 35 random_traits = no gender_female_chance = 0 dynasty = none employer = root faith = root.faith rite = root.rite culture = root.culture stewardship = 19 learning = 7 diplomacy = 11 save_scope_as = tca_test_appointment_neutral }
+    create_character = { age = 35 random_traits = no gender_female_chance = 0 dynasty = none employer = root faith = root.faith rite = root.rite culture = root.culture trait = just stewardship = 19 learning = 7 diplomacy = 11 save_scope_as = tca_test_appointment_just }
+    create_character = { age = 35 random_traits = no gender_female_chance = 0 dynasty = none employer = root faith = root.faith rite = root.rite culture = root.culture trait = arbitrary stewardship = 19 learning = 7 diplomacy = 11 save_scope_as = tca_test_appointment_arbitrary }
+    create_character = { age = 35 random_traits = no gender_female_chance = 0 dynasty = none employer = root faith = root.faith rite = root.rite culture = root.culture trait = diligent stewardship = 19 learning = 7 diplomacy = 11 save_scope_as = tca_test_appointment_diligent }
+    create_character = { age = 35 random_traits = no gender_female_chance = 0 dynasty = none employer = root faith = root.faith rite = root.rite culture = root.culture trait = lazy stewardship = 19 learning = 7 diplomacy = 11 save_scope_as = tca_test_appointment_lazy }
+    # 复合候选让儒学、五星教育、仕途、虔诚等共用分确实参与；仍逐人比较同一原版参考。
+    create_character = { age = 45 random_traits = no gender_female_chance = 0 dynasty = none employer = root faith = root.faith rite = root.rite culture = root.culture trait = just trait = diligent trait = confucian_education trait = education_learning_5 stewardship = 19 learning = 7 diplomacy = 11 save_scope_as = tca_test_appointment_combined }
+    scope:tca_test_appointment_combined = {
+        add_trait_xp = { trait = confucian_education value = 100 }
+        set_variable = { name = merit_civilian_career_score_bonus value = 37 }
+        add_piety_experience = 2000
+        change_influence = 4000
+    }
+    create_character = { age = 35 random_traits = no gender_female_chance = 0 dynasty = none employer = root faith = root.faith rite = root.rite culture = root.culture save_scope_as = tca_test_appointment_negative }
+    scope:tca_test_appointment_negative = { set_variable = { name = merit_civilian_career_score_bonus value = -5000 } }
+}
+
+# 请求者作用域；参数为候选与相对原版头衔的期望增量。
+# 直接查询引擎正式评分；不通过调用被测脚本值重建期望，不修改框架计数。
+tca_test_check_appointment_difference_effect = {
+    $CANDIDATE$ = {
+        save_scope_value_as = { name = tca_test_appointment_actual value = "appointment_candidate_score(scope:tca_test_appointment_office)" }
+        save_scope_value_as = { name = tca_test_appointment_expected value = { value = "appointment_candidate_score(scope:tca_test_appointment_reference)" add = $EXTRA$ } }
+    }
+    set_variable = { name = tca_test_appointment_difference_ok value = no }
+    if = { limit = { scope:tca_test_appointment_actual = scope:tca_test_appointment_expected } set_variable = { name = tca_test_appointment_difference_ok value = yes } }
+}
+
+# 请求者作用域；参考头衔当场销毁，生成角色只清理本例对象。
+tca_test_cleanup_appointment_score_effect = {
+    scope:tca_test_appointment_reference.holder = { destroy_title = scope:tca_test_appointment_reference }
+    scope:tca_test_appointment_neutral = { silent_disappearance_effect = yes }
+    scope:tca_test_appointment_just = { silent_disappearance_effect = yes }
+    scope:tca_test_appointment_arbitrary = { silent_disappearance_effect = yes }
+    scope:tca_test_appointment_diligent = { silent_disappearance_effect = yes }
+    scope:tca_test_appointment_lazy = { silent_disappearance_effect = yes }
+    scope:tca_test_appointment_combined = { silent_disappearance_effect = yes }
+    scope:tca_test_appointment_negative = { silent_disappearance_effect = yes }
+    remove_variable = tca_test_appointment_difference_ok
+}

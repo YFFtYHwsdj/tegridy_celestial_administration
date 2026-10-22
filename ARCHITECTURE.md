@@ -5,6 +5,7 @@
 ## 模块关系
 
 - [官制与名称](docs/court/README.md)：官名选择、默认法律及旧法兼容；司法和通判制度使用独立法律，不由名称选择决定。
+- [官职任命](docs/appointment/README.md)：原版地方／中央文官任命依据，以及通判、提刑选官设计的共同规则；各职专业评分由所属模块维护。
 - [地方司法](docs/judicial/README.md)：提刑机构、路法理辖区、位望、分层拘捕、公职囚犯与详覆。拥有统一司法辖区和身份分档接口。
 - [通判](docs/tongpan/README.md)：州级独立无地官职、绑定与原生任命、常设分权、治理加成和行动附费。复用官署生命周期思路，保持自己的资格、绑定与法律。
 - [官署经费](docs/office_funding/README.md)：复用司法路和通判州的登记表，按辖区绑定付款、按官署保存待遇；[契约](docs/office_funding/contracts.md)拥有身份／功绩／俸禄边界，[调整互动](docs/office_funding/interactions.md)拥有授权与冷却。

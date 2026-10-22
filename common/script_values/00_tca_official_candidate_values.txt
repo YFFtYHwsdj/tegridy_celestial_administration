@@ -1,0 +1,64 @@
+﻿# 原生任命上下文：ROOT为候选人，scope:title为有持有人的目标头衔。
+# 前半段完整调用原版五个评分块，再保留地方文官年龄分支；不自行复制底座业务规则。
+# 共用块可能建立原版临时礼制作用域；后续能力、教育、性格不覆盖这些作用域。
+tca_official_common_candidate_start_value = {
+    add = appointment_score_base
+    add = appointment_score_civic
+    add = appointment_score_celestial
+    add = appointment_score_governor
+    add = appointment_score_non_military
+    if = {
+        limit = { age >= retirement_age_1_value tgp_is_above_retirement_age_trigger = { REALM_OWNER = root } }
+        add = { value = { value = retirement_age_current_value subtract = age divide = 2 round = yes } desc = is_above_retirement_age_desc }
+    }
+    else_if = { limit = { age >= 40 } add = { value = 15 desc = old_age_desc } }
+    else_if = { limit = { age < 30 } add = { value = -10 desc = young_age_desc } }
+}
+
+# 同一候选上下文；能力之后、性格和最终修正之前保留原版五星教育与虔诚。
+tca_official_common_candidate_end_value = {
+    if = {
+        limit = { OR = { has_trait = education_diplomacy_5 has_trait = education_stewardship_5 has_trait = education_learning_5 } }
+        add = { value = 10 desc = has_rank_5_education_desc }
+    }
+    if = {
+        limit = { piety_level != 1 }
+        add = { value = 10 multiply = { value = piety_level subtract = 1 } desc = PIETY_LEVEL_CONCEPT }
+    }
+}
+
+# 同一候选上下文；能力逐项取整，通判偏管理，提刑保持原版学识权重并保留外交。
+tca_tongpan_candidate_skills_value = {
+    add = { value = stewardship multiply = 0.5 round = yes desc = "[stewardship_skill|E]" }
+    add = { value = diplomacy multiply = 0.25 round = yes desc = "[diplomacy_skill|E]" }
+    add = { value = learning multiply = 0.25 round = yes desc = "[learning_skill|E]" }
+}
+tca_judicial_candidate_skills_value = {
+    add = { value = learning multiply = 0.5 round = yes desc = "[learning_skill|E]" }
+    add = { value = diplomacy multiply = 0.25 round = yes desc = "[diplomacy_skill|E]" }
+    add = { value = stewardship multiply = 0.25 round = yes desc = "[stewardship_skill|E]" }
+}
+
+# 同一候选上下文；性格分独立累计，固有能力修正已由上面的角色能力自然计入。
+tca_tongpan_candidate_personality_value = {
+    if = { limit = { has_trait = just } add = { value = 10 desc = tca_appointment_just_score } }
+    if = { limit = { has_trait = arbitrary } add = { value = -10 desc = tca_appointment_arbitrary_score } }
+    if = { limit = { has_trait = diligent } add = { value = 10 desc = tca_appointment_diligent_score } }
+    if = { limit = { has_trait = lazy } add = { value = -10 desc = tca_appointment_lazy_score } }
+}
+tca_judicial_candidate_personality_value = {
+    if = { limit = { has_trait = just } add = { value = 20 desc = tca_appointment_just_score } }
+    if = { limit = { has_trait = arbitrary } add = { value = -20 desc = tca_appointment_arbitrary_score } }
+    if = { limit = { has_trait = diligent } add = { value = 5 desc = tca_appointment_diligent_score } }
+    if = { limit = { has_trait = lazy } add = { value = -5 desc = tca_appointment_lazy_score } }
+}
+
+# 候选角色作用域；首次／纠错补位前由调用者提供有临时持有人的提刑官署。
+# 下限仅用于加权抽取，不改变引擎自然继任或GUI展示的原始候选分。
+tca_judicial_candidate_weight_value = {
+    value = "appointment_candidate_score(scope:tca_appointment_title)"
+    min = 1
+}
+
+# 精确补位的冷却直接读取原版定义，不另设期限或保存资源。
+tca_official_appointment_cooldown_days = { value = define:NAdministrative|RECENT_APPOINTMENT_COOLDOWN }
