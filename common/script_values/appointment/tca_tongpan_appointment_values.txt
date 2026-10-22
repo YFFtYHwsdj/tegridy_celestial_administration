@@ -1,0 +1,30 @@
+﻿# 通判经济项取原版文官权重24的一半，不另加官职基础分。
+tca_tongpan_appointment_income_factor_value = 12
+
+# 当前作用域为通判头衔；绑定州提供经济和距离定位，不依赖调用者的ROOT。
+# 无绑定返回0；无持有人或首都时只计经济项，不依赖持有人的契约分类。
+# 临时作用域仅在本次数值求值内有效，供距离函数从省份上下文定位官职持有人。
+tca_tongpan_appointment_value = {
+    value = 0
+    save_temporary_scope_as = tca_tongpan_valuation_office
+    if = {
+        limit = { exists = var:tca_tongpan_county.title_province }
+        add = {
+            value = var:tca_tongpan_county.title_province.monthly_income
+            multiply = tca_tongpan_appointment_income_factor_value
+            desc = tca_tongpan_prominence_county_income
+        }
+        if = {
+            limit = { exists = holder.top_liege.capital_province }
+            add = {
+                value = 500
+                subtract = {
+                    value = "var:tca_tongpan_county.title_province.squared_distance(scope:tca_tongpan_valuation_office.holder.top_liege.capital_province)"
+                    multiply = 0.0001
+                }
+                min = 0
+                desc = appointment_title_value.distance_to_capital
+            }
+        }
+    }
+}

@@ -170,8 +170,8 @@ effect primary_title = { tca_restore_judicial_title_effect = yes }
 
 ### 实现与作用域
 
-- `common/script_values/tca_judicial_appointment_values.txt`：`tca_` 前缀的基础分、经济权重及完整提刑公式。ROOT 始终为被评估的提刑头衔；收入与距离切换到 `var:song_judicial_circuit`。
-- `common/script_values/zz_tca_judicial_appointment_values.txt`：对象级覆盖原版 `appointment_title_value`。有 `tca_judicial_title` 标记的头衔直接执行提刑公式，不依赖持有者的原版文官契约标记；无标记的头衔执行完整保留的原版算法。
+- `common/script_values/appointment/tca_judicial_appointment_values.txt`：`tca_` 前缀的基础分、经济权重及完整提刑公式。ROOT 始终为被评估的提刑头衔；收入与距离切换到 `var:song_judicial_circuit`。
+- `common/script_values/appointment/zz_tca_appointment_values.txt`：对象级覆盖原版 `appointment_title_value`。有 `tca_judicial_title` 标记的头衔直接执行提刑公式，不依赖持有者的原版文官契约标记；通判标记另走[通判公式](../tongpan/README.md#任命重要度)，其余头衔执行完整保留的原版算法。
 - `localization/english/tca_judicial_prominence_l_english.yml` 与简体中文对应文件：重要性分解中的官职基础分和辖区经济项；距离项复用原版文本。
 
 缺失路绑定时只有基础分；有绑定但无持有者或缺少定位时，只计算基础分与辖区经济项，不读取不存在的距离目标。正常生命周期仍应修复绑定和持有者；这些保护不是头衔状态有效的证明。

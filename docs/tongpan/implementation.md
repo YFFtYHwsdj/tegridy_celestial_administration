@@ -4,6 +4,7 @@
 
 ## 实现入口
 
+- `common/script_values/appointment/tca_tongpan_appointment_values.txt`：绑定州的任命重要度；`common/script_values/appointment/zz_tca_appointment_values.txt`在既有原版覆盖内按官署标记分流，保留提刑和其他头衔算法。中英文重要度分项由 `tca_tongpan_prominence_l_*` 提供。
 - `tools/build_tongpan_catalog.py`：3,442个固定官职、128个池官职、固定映射、限定官职的持有人称谓和双语名称；不含测试生成。
 - `common/scripted_effects/tca_tongpan_effects.txt`：绑定、三级挂靠、原版评分补位、destroy与恢复、角色分权同步和皇帝级维护。
 - `common/scripted_triggers/tca_tongpan_triggers.txt`：实际政权与伯爵主头衔资格、专职校验、双向绑定与生效条件。
@@ -27,6 +28,8 @@
 `tools/build_tongpan_catalog.py` 从安装游戏的 `game/` 目录生成固定官职、预留池、索引和双语名称。不要逐条修改生成文件；扩充池时同步审阅初始化迁移。历史人物快照位于 `common/scripted_effects/tca_historical_character_registry.txt`，用于首次／纠错补位排除，正常原版继任不因此排除合格历史人物。更新名单需重新审阅来源；当前没有重建该快照的工具。
 
 ## 自动验证与尚未解决的问题
+
+任命重要度单项：`python3 tools/run_game_tests.py --case tca_tongpan_prominence_test.1 --timeout 600`。用例自建无地公爵数值夹具，故意使官职定位与绑定州不同，检查首都同址、远距归零、缺绑定、空缺官职、提刑分流及原版回退；该夹具不验证伯爵官职生命周期。完整通判组使用 `--suite tongpan`，其中生命周期场景检验真实伯爵官职。重要度浮窗的双语显示、实际职位调任及保存重载仍需人工验收。
 
 运行 `python3 tools/run_game_tests.py --case tca_tongpan_test.1 --timeout 600`；当前 `tca_tongpan_probe_test` 验证预定义无地伯爵的同僚分权；被拒绝的动态创建源码单独归档，不能把两者视为同一失败到通过场景。登记、结果与计数以该次冻结计划为准，不在本文手填总数。
 

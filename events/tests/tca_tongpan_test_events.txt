@@ -64,6 +64,12 @@ tca_tongpan_test.1 = {
                 title:c_hongzhou = { tca_refresh_tongpan_county_effect = yes }
                 if = { limit = { scope:tca_test_tp2_office.holder = scope:tca_test_tp2_officer } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 5" }
                 else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 5" }
+                # 真实伯爵通判必须通过正式任命入口读取绑定州和最高领主首都，不能只让数值夹具通过。
+                save_scope_value_as = { name = tca_test_tp2_distance_squared value = "title:c_hongzhou.title_province.squared_distance(root.capital_province)" }
+                save_scope_value_as = { name = tca_test_tp2_distance_bonus value = { value = 500 subtract = { value = scope:tca_test_tp2_distance_squared multiply = 0.0001 } min = 0 } }
+                save_scope_value_as = { name = tca_test_tp2_prominence_expected value = { value = title:c_hongzhou.title_province.monthly_income multiply = 12 add = scope:tca_test_tp2_distance_bonus } }
+                if = { limit = { scope:tca_test_tp2_distance_squared > 0 scope:tca_test_tp2_distance_squared < 5000000 scope:tca_test_tp2_office = { tier = tier_county appointment_title_value = scope:tca_test_tp2_prominence_expected } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 59" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 59" }
                 # 独立且确定性的称职度夹具；技能修改效果的
                 # getter 可能在同一引擎时刻仍读取缓存。
                 create_character = { age = 35 gender_female_chance = 0 random_traits = no dynasty = none employer = scope:tca_test_tp2_duke culture = root.culture faith = root.faith rite = root.rite stewardship = 60 diplomacy = 20 learning = 20 save_scope_as = tca_test_tp2_aptitude_fixture }

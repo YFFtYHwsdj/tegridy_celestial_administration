@@ -1,0 +1,68 @@
+﻿# 通判任命重要度回归；独立无地公爵夹具只用于数值分支，不验证伯爵官职生命周期。
+# 当场授予和销毁夹具，不改变历史州、通判绑定或原有持有人。
+namespace = tca_tongpan_prominence_test
+
+tca_tongpan_prominence_test.1 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        if = { limit = { has_character_flag = tca_test_delayed_case_active } debug_log = "TCA_TEST CASE_BUSY" }
+        else = {
+            debug_log = "TCA_TEST BEGIN tca_tongpan_prominence_test.1 tca_test_tongpan_prominence"
+            remove_character_flag = tca_test_case_failed
+            if = {
+                limit = { debug_only = yes title:h_china.holder = root exists = capital_county exists = title:c_vestisland.title_province }
+                # 故意把官职自身定位放在洪州，绑定切换至京城和冰岛；可捕捉误读官职定位的实现。
+                create_dynamic_title = { tier = duchy name = tca_test_arrest_office_name }
+                scope:new_title = {
+                    save_scope_as = tca_test_tp_value_office
+                    set_capital_county = title:c_hongzhou
+                    set_landless_title = yes
+                    set_delete_on_destroy = no
+                    set_variable = { name = tca_tongpan_title value = yes }
+                }
+                create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_test_tp_value_grant }
+                scope:tca_test_tp_value_office = { change_title_holder = { holder = root change = scope:tca_test_tp_value_grant } }
+                resolve_title_and_vassal_change = scope:tca_test_tp_value_grant
+                # 缺绑定不应退回原版官职所在地，也不凭空获得基础分。
+                if = { limit = { scope:tca_test_tp_value_office = { exists = holder appointment_title_value = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_prominence 1" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_prominence 1" }
+                scope:tca_test_tp_value_office = { set_variable = { name = tca_tongpan_county value = root.capital_county } }
+                # 首都同址的距离项必须恰为500，经济预期独立用约定权重12计算。
+                save_scope_value_as = { name = tca_test_tp_value_capital_expected value = { value = capital_province.monthly_income multiply = 12 add = 500 } }
+                if = { limit = { capital_province.monthly_income > 0 scope:tca_test_tp_value_office = { appointment_title_value = scope:tca_test_tp_value_capital_expected } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_prominence 2" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_prominence 2" }
+                # 远端夹具必须落在距离项归零的区间；前置断言失败不能算作边界已覆盖。
+                save_scope_value_as = { name = tca_test_tp_value_distance_squared value = "title:c_vestisland.title_province.squared_distance(root.capital_province)" }
+                if = { limit = { scope:tca_test_tp_value_distance_squared >= 5000000 } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_prominence 3" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_prominence 3" }
+                scope:tca_test_tp_value_office = { set_variable = { name = tca_tongpan_county value = title:c_vestisland } }
+                save_scope_value_as = { name = tca_test_tp_value_remote_expected value = { value = title:c_vestisland.title_province.monthly_income multiply = 12 } }
+                if = { limit = { scope:tca_test_tp_value_office = { appointment_title_value = scope:tca_test_tp_value_remote_expected } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_prominence 4" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_prominence 4" }
+                # 空缺官职仍按绑定州计经济项；没有持有人时不读首都距离。
+                scope:tca_test_tp_value_office = {
+                    set_variable = { name = tca_tongpan_county value = root.capital_county }
+                    holder = { destroy_title = scope:tca_test_tp_value_office }
+                }
+                save_scope_value_as = { name = tca_test_tp_value_vacant_expected value = { value = capital_province.monthly_income multiply = 12 } }
+                if = { limit = { scope:tca_test_tp_value_office = { NOT = { exists = holder } appointment_title_value = scope:tca_test_tp_value_vacant_expected } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_prominence 5" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_prominence 5" }
+                scope:tca_test_tp_value_office = { remove_variable = tca_tongpan_county }
+                if = { limit = { scope:tca_test_tp_value_office = { appointment_title_value = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_prominence 6" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_prominence 6" }
+                # 邻接的提刑分支保持缺绑定时250分的既有行为。
+                scope:tca_test_tp_value_office = { remove_variable = tca_tongpan_title set_variable = { name = tca_judicial_title value = yes } }
+                if = { limit = { scope:tca_test_tp_value_office = { appointment_title_value = 250 } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_prominence 7" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_prominence 7" }
+                scope:tca_test_tp_value_office = { remove_variable = tca_judicial_title }
+                if = { limit = { scope:tca_test_tp_value_office = { appointment_title_value = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_prominence 8" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_prominence 8" }
+                if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_tongpan_prominence" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+                else = { debug_log = "TCA_TEST PASS tca_test_tongpan_prominence" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            }
+            else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_tongpan_prominence" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } }
+            remove_character_flag = tca_test_case_failed
+        }
+    }
+}
