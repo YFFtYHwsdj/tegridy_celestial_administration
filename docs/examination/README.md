@@ -26,7 +26,7 @@
 - `common/on_action/tca_exam_on_actions.txt`：皇帝年度脉冲，复用 `tca_exam_can_prompt_trigger` 执行自动开科检查。
 - `common/customizable_localization/tca_exam_custom_loc.txt`：读取本届侧重，供选项与结果 Tooltip 显示学识／军事／管理名称；不选择或修改侧重。
 - `common/scripted_triggers/tca_exam_triggers.txt`：官员排除、考生资格、近亲优先、事件入口条件。
-- `common/scripted_effects/tca_exam_effects.txt`：侧重选择、候选收集、评分、配额、前十、奖励、冷却和代为主持入口。真实收集、池内近亲去重、已收集池的人数预估与抽样有独立正式入口，由显示和结算流程复用，约定见代码附近注释。
+- `common/scripted_effects/tca_exam_effects.txt`：侧重选择、候选收集、评分、配额、前十、奖励、冷却和代为主持入口；`tca_exam_award_candidate_effect` 在考生作用域直接调用原生 `create_character_memory`，按落榜／会试及第／殿试及第写入原版记忆类型，不依赖活动上下文。真实收集、池内近亲去重、已收集池的人数预估与抽样有独立正式入口，由显示和结算流程复用，约定见代码附近注释。
 - `common/script_values/tca_exam_values.txt`：分数、费用、收益、落榜比例、人数上限。
 - `events/tca_exam_events.txt`：`tca_exam.1` 请开科、`.2` 会试放榜、`.3` 殿试传胪、`.4` 隐藏结算、`.5` 本科无人应试。
 - `common/activities/activity_types/zz_tca_imperial_examination.txt`：原版会试活动整份覆盖；只在 `can_start_showing_failures_only` 增加自定义五年冷却，AI 不受影响。
@@ -36,7 +36,7 @@
 
 - 未过乡试者不禁止入场，分数除以 3。
 - 已过会试可以重考冲殿试；已过殿试不能重考。
-- 及第者获得原版 `passed_*` 标记、修正、记忆、影响力、功绩与家族通知；非低出身及第者绕过乡试时，另补原版乡试功绩。
+- 落榜者写入 `failed_metropolitan_exam_memory`；会试及第者写入 `passed_metropolitan_exam_memory`，前十名另写入 `passed_palace_exam_memory`。及第者同时获得原版 `passed_*` 标记、修正、影响力、功绩与家族通知；非低出身及第者绕过乡试时，另补原版乡试功绩。
 - 落榜、会试及第与前十殿试及第这三类结果向考生近亲逐人通知，家主也接收；头像、标题和正文显式引用考生，避免结算事件的皇帝根作用域被当成考生。自动链不复刻原版家主汇总，因此不沿用其 `is_house_head = no` 排除条件。
 - 会试及第但未进前十的 AI，满足非低出身、无玩家近亲／远亲时，20% 补殿试。
 - 皇帝收益按所选规模与录取标准计算；代为主持不另扣皇帝收益。
