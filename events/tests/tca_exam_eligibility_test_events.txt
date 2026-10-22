@@ -1,0 +1,56 @@
+﻿# 应试任职门槛的原生回归；同步创建、授予及销毁临时无地官职，不创建考试活动。
+# 验证正式共用trigger；真实活动意图、考生子集和AI自然路径另行验收。
+namespace = tca_exam_eligibility_test
+
+tca_exam_eligibility_test.1 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        if = { limit = { has_character_flag = tca_test_delayed_case_active } debug_log = "TCA_TEST CASE_BUSY" }
+        else = {
+            debug_log = "TCA_TEST BEGIN tca_exam_eligibility_test.1 tca_test_exam_eligibility"
+            remove_character_flag = tca_test_case_failed
+            if = {
+                limit = { debug_only = yes title:h_china.holder = root exists = capital_county government_has_flag = government_is_celestial }
+                save_scope_as = host
+                create_character = { age = 40 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_test_exam_officer }
+                scope:tca_test_exam_officer = { tca_test_protect_character_effect = yes }
+                # 普通无职廷臣可以应试。
+                if = { limit = { scope:tca_test_exam_officer = { tca_exam_can_take_exam_trigger = yes tca_exam_candidate_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_eligibility 1" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_eligibility 1" }
+                create_dynamic_title = { tier = duchy name = tca_test_arrest_office_name }
+                scope:new_title = { save_scope_as = tca_test_exam_office set_capital_county = root.capital_county set_landless_title = yes }
+                create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_test_exam_office_grant }
+                scope:tca_test_exam_office = { change_title_holder = { holder = scope:tca_test_exam_officer change = scope:tca_test_exam_office_grant } }
+                resolve_title_and_vassal_change = scope:tca_test_exam_office_grant
+                scope:tca_test_exam_officer = {
+                    change_government = celestial_government
+                    create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_test_exam_office_liege }
+                    change_liege = { liege = root change = scope:tca_test_exam_office_liege }
+                    resolve_title_and_vassal_change = scope:tca_test_exam_office_liege
+                }
+                # 不带模组标记的无地官职，模拟原版官员的一般分支。
+                if = { limit = { scope:tca_test_exam_officer = { is_landless_ruler = yes is_landed = no tca_exam_is_official_trigger = yes tca_exam_can_take_exam_trigger = no tca_exam_candidate_trigger = no } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_eligibility 2" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_eligibility 2" }
+                scope:tca_test_exam_office = { set_variable = { name = tca_tongpan_title value = yes } }
+                if = { limit = { scope:tca_test_exam_officer = { tca_is_tongpan_official_trigger = yes tca_exam_can_take_exam_trigger = no tca_exam_candidate_trigger = no } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_eligibility 3" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_eligibility 3" }
+                scope:tca_test_exam_office = { remove_variable = tca_tongpan_title set_variable = { name = tca_judicial_title value = yes } }
+                if = { limit = { scope:tca_test_exam_officer = { tca_is_judicial_official_trigger = yes tca_exam_can_take_exam_trigger = no tca_exam_candidate_trigger = no } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_eligibility 4" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_eligibility 4" }
+                # 同步卸去临时官职；不清除考试标记来伪造恢复资格。
+                scope:tca_test_exam_office = { remove_variable = tca_judicial_title }
+                scope:tca_test_exam_officer = { destroy_title = scope:tca_test_exam_office }
+                if = { limit = { scope:tca_test_exam_officer = { tca_exam_is_official_trigger = no tca_exam_can_take_exam_trigger = yes tca_exam_candidate_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_eligibility 5" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_eligibility 5" }
+                # 在任实地人物仍被门槛拒绝，不因新增无地官职规则而放行。
+                if = { limit = { is_landed = yes tca_exam_can_take_exam_trigger = no } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_eligibility 6" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_eligibility 6" }
+                if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_exam_eligibility" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+                else = { debug_log = "TCA_TEST PASS tca_test_exam_eligibility" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            }
+            else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_exam_eligibility" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } }
+            remove_character_flag = tca_test_case_failed
+        }
+    }
+}

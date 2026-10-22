@@ -190,7 +190,9 @@ class GameRunnerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             run = prepare_run(ROOT, Path(temp), Path(temp)/'absent', suites=['exam', 'confucian'])
             selection = json.loads((run/'selection.json').read_text())
-            self.assertEqual(len(selection['cases']), 4)
+            from testing.catalog import catalog
+            expected = [row for row in catalog(ROOT) if row['suite'] in ('exam', 'confucian_statistics', 'confucian_strength')]
+            self.assertEqual(selection['cases'], expected)
             self.assertEqual(len(list(Path(temp).glob('run-*'))), 1)
             (run/'selection.json').write_text('{}')
             self.assertTrue(verify_snapshot(run))
@@ -225,8 +227,9 @@ class GameRunnerTests(unittest.TestCase):
             self.assertEqual(verify_snapshot(base), [])
             self.assertEqual(verify_snapshot(child), [])
             text = (child/'mod/tca_cli_adapter/events/tca_cli_events.txt').read_text(encoding='utf-8-sig')
-            self.assertIn('tca_test_exam_contract_selected', text)
-            self.assertNotIn('tca_test_exam_pending_selected', text)
+            self.assertIn(rows[0]['name'] + '_selected', text)
+            for row in rows[1:]:
+                self.assertNotIn(row['name'] + '_selected', text)
 
     def test_run_root_inside_source_is_rejected_before_recursive_copy(self):
         with patch('run_game_tests.source_files', side_effect=AssertionError('must reject before reading')):

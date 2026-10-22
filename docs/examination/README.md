@@ -15,7 +15,7 @@
 - 代为主持扣皇帝国库费用，设置 `title:h_china` 的 `tca_exam_cooldown`（5 年），同时归零原版 `years_since_imperial_examination`；隐藏事件 `tca_exam.4` 结算后，有考生则触发 `.2` 放榜，并在有首名时进入 `.3` 传胪；零考生转入 `.5`「本科无人应试」后结束，保留费用、主持收益和冷却。代为主持的等级随机与扣费均包在 `hidden_effect` 内，避免 CK3 把内部 `random` 渲染成选项悬浮的百分比。
 - 会试分数复刻原版 `imperial_examination_entry_value`；侧重由知贡举自动选择，学识永远可选，军事仅扩张阶段、管理仅推进阶段可选，阶段侧重 75%、学识 25%。
 - 考生来自 `situation:dynastic_cycle` 的非 `other_rulers` 参与者，按规模随机抽 150／300／600 个普通名额；有 `command_to_attend_flag` 时，已过乡试的玩家近亲先从普通抽样池排除，再作为额外名额追加，人数预估也按同样口径去重。未过乡试者不禁止入池，分数除以 3。
-- 考生排除三省六部、提刑／通判、councillor 等官员；无地冒险者与仅有家族头衔者放行；廷臣和其他宫廷职位持有者放行；只排除现任知贡举本人。
+- 代办和原版乡试／会试活动统一排除三省六部、提刑／通判、councillor 等在任官员及现任知贡举，玩家与 AI 使用同一任职门槛。有地人物继续不能应试；无地冒险者、仅有家族头衔者、普通廷臣和其他宫廷职位持有者放行。限制只针对考生，官员仍可按原版规则担任考官、协助或陪同；辞官后重新按当前身份判断资格。
 - 录取标准由知贡举按原版 `imperial_examination_passing_grade` 的加权随机与自身属性决定：宽取 10%、依例 15%、严取 30%、极严 50% 落榜配额；剩余前 10 名进殿试；非前十 AI 按原版条件 20% 补殿试；玩家亲属排除补录。
 - 皇帝收益按所选规模与录取标准发放影响力、合法性、威望：影响力 ×1／×2／×4；代为主持不降低收益。知贡举本人没有额外考试奖励，适配度不影响考试。
 
@@ -26,10 +26,13 @@
 - `common/on_action/tca_exam_on_actions.txt`：皇帝年度脉冲，复用 `tca_exam_can_prompt_trigger` 执行自动开科检查。
 - `common/customizable_localization/tca_exam_custom_loc.txt`：读取本届侧重，供选项与结果 Tooltip 显示学识／军事／管理名称；不选择或修改侧重。
 - `common/scripted_triggers/tca_exam_triggers.txt`：官员排除、考生资格、近亲优先、事件入口条件。
+- `common/activities/intents/zz_tca_exam_intents.txt`：覆盖原版乡试、会试应试意图，增加共用任职门槛与双语原因提示，不限制其他意图。
+- `common/scripted_effects/zz_tca_native_exam_effects.txt`：覆盖原版乡试／会试初始考生收集及随行补入入口，保留原版评分、子集和配额；随行临时名单使用时再次校验，防止旧名单绕过限制。
+- `common/activities/activity_types/zz_tca_local_examination.txt` 与 `events/travel_events/zz_tca_exam_travel_events.txt`：仅给原版乡试到场、乡试／会试出发时自动设置考生意图的分支加入任职门槛，保留辞官应试选项。
 - `common/scripted_effects/tca_exam_effects.txt`：侧重选择、候选收集、评分、配额、前十、奖励、冷却和代为主持入口；`tca_exam_award_candidate_effect` 在考生作用域直接调用原生 `create_character_memory`，按落榜／会试及第／殿试及第写入原版记忆类型，不依赖活动上下文。真实收集、池内近亲去重、已收集池的人数预估与抽样有独立正式入口，由显示和结算流程复用，约定见代码附近注释。
 - `common/script_values/tca_exam_values.txt`：分数、费用、收益、落榜比例、人数上限。
 - `events/tca_exam_events.txt`：`tca_exam.1` 请开科、`.2` 会试放榜、`.3` 殿试传胪、`.4` 隐藏结算、`.5` 本科无人应试。
-- `common/activities/activity_types/zz_tca_imperial_examination.txt`：原版会试活动整份覆盖；只在 `can_start_showing_failures_only` 增加自定义五年冷却，AI 不受影响。
+- `common/activities/activity_types/zz_tca_imperial_examination.txt`：原版会试活动整份覆盖；在 `can_start_showing_failures_only` 增加自定义五年冷却，AI 不受该冷却影响；到场自动设置应试意图前增加共用任职门槛。
 - `tools/baselines/imperial_examination_activity.txt`、`tools/upstream_overrides.json`：覆盖基线与登记。
 
 ## 原版收益与家族通知
@@ -53,6 +56,7 @@
 - 三省六部这类无地 vassal 能否被宫廷职位界面录用，需游戏内确认；若不支持，需要改成无地官职或事件任命方案。
 - 亲自主持选项打开的窗口、事件关闭、开始活动后自动链跳过，需真实界面验收。
 - 整份活动覆盖与其他会试模组冲突；游戏更新后需复核基线。
+- 原版应试限制还覆盖两个意图、三个收集效果、乡试活动及考试出发事件，同名对象与其他科举／旅行模组冲突；已登记原版基线。乡试活动须整对象覆盖，理由是自动写入意图的回调不能由独立效果覆盖。出发事件按原版 `events/_events.info` 的 `id_override_priority = 1` 单事件覆盖，避免同优先级重复定义，不覆盖整个旅行事件文件。不会禁止官员收到活动邀请，邀请到场不等于取得考生身份。现有活动／旧存档已加入的考生子集不作追溯清理，需用新活动验收。
 - 五年自定义冷却在玩家继承、AI 接管、保存重载下的表现需测试。
 - 0 考生的结果界面、国库负数和三档规模完整事件顺序仍需人工验收；空池结算、排序、跨届临时结果和旧名次清理由正式原生回归覆盖。
 

@@ -68,6 +68,8 @@ def inspect_engine_errors(errors):
             findings['Judicial modifier compilation failure'] += 1
         elif "There is more than one 'effect' defined" in entry:
             findings['TCA duplicate on_action effect'] += 1
+        elif 'Duplicated event ID' in entry:
+            findings['TCA duplicate event override priority'] += 1
         elif any(message in entry for message in ('Unexpected token:', 'Malformed token:', 'Unknown trigger:', 'Unknown effect:')):
             findings['TCA script parsing failure'] += 1
         elif any(message in entry for message in ('Error setting properties', 'is not a valid widget/type/property')):

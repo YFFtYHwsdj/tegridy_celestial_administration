@@ -1,0 +1,131 @@
+﻿imperial_examination_gather_stray_entrants_effect = {
+	if = {
+		# Before we add anyone to the activity, we have to make sure it is not already full.
+		limit = {
+			scope:activity = {
+				OR = {
+					AND = {
+						has_activity_option = {
+							category = imperial_examination_breadth
+							option = imperial_examination_breadth_exclusive
+						}
+						any_attending_character = {
+							count < exclusive_exam_guests_full_calc
+						}
+					}
+					AND = {
+						has_activity_option = {
+							category = imperial_examination_breadth
+							option = imperial_examination_breadth_restricted
+						}
+						any_attending_character = {
+							count < restricted_exam_guests_full_calc
+						}
+					}
+					AND = {
+						has_activity_option = {
+							category = imperial_examination_breadth
+							option = imperial_examination_breadth_open
+						}
+						any_attending_character = {
+							count < open_exam_guests_full_calc
+						}
+					}
+				}
+			}
+		}
+		every_courtier = {
+			limit = {
+				involved_activity ?= scope:activity
+				this != root
+				trigger_if = {
+					limit = {
+						scope:activity = {
+							has_activity_type = activity_imperial_examination
+						}
+					}
+					NOT = { has_character_flag = passed_palace_exam}
+				}
+				trigger_else = {
+					has_none_of_variables = {
+						name = passed_provincial_exam
+						name = passed_metropolitan_exam
+					}
+				}
+				# To make sure no characters appear that shouldn't.
+				NOR = {
+					has_trait = devoted
+					has_trait = eunuch
+				}
+				tgp_gender_can_be_exam_entrant_trigger = yes
+			}
+			add_to_list = entourage_entrants
+		}
+		current_travel_plan ?= {
+			every_entourage_character = {
+				limit = {
+					this != root
+					is_landed = no
+					trigger_if = {
+						limit = {
+							scope:activity = {
+								has_activity_type = activity_imperial_examination
+							}
+						}
+						NOT = { has_character_flag = passed_palace_exam }
+					}
+					trigger_else = {
+						has_none_of_variables = {
+							name = passed_provincial_exam
+							name = passed_metropolitan_exam
+						}
+					}
+					# To make sure no characters appear that shouldn't.
+					NOR = {
+						has_trait = devoted
+						has_trait = eunuch
+					}
+					trigger_if = {
+						limit = {
+							exists = primary_title
+						}
+						primary_title = {
+							is_mercenary_company = no
+							is_holy_order = no
+						}
+					}
+					tgp_gender_can_be_exam_entrant_trigger = yes
+				}
+				add_to_list = entourage_entrants
+			}
+		}
+		every_in_list = {
+			list = entourage_entrants
+			if = {
+				limit = {
+					NOT = {
+						involved_activity ?= scope:activity
+					}
+					location = scope:activity.activity_location
+					can_join_activity = scope:activity
+				}
+				add_to_activity_without_travel = scope:activity
+			}
+			if = {
+				limit = {
+					involved_activity ?= scope:activity
+				}
+				scope:activity = {
+					add_to_guest_subset = {
+						name = entrants
+						target = prev
+					}
+				}
+				set_variable = {
+					name = imperial_examination_score
+					value = imperial_examination_score_value
+				}
+			}
+		}
+	}
+}

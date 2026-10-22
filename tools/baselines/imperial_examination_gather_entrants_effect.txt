@@ -1,0 +1,66 @@
+﻿imperial_examination_gather_entrants_effect = {
+	scope:activity = {
+		set_variable = {
+			name = num_initial_entrants
+			value = 0
+		}
+		every_attending_character = {
+			limit = {
+				is_landed = no
+				tgp_gender_can_be_exam_entrant_trigger = yes
+				trigger_if = {
+					limit = {
+						exists = primary_title
+					}
+					primary_title = {
+						is_mercenary_company = no
+						is_holy_order = no
+					}
+				}
+				NOR = {
+					this = scope:host
+					is_in_guest_subset = { name = imperial_examiners }
+					# If you are a player, you should get as many shots at the Palace Exam as you want.
+					has_character_flag = passed_palace_exam
+					has_trait = devoted
+					has_trait = eunuch
+				}
+				is_adult = yes
+			}
+			save_temporary_scope_as = temp_character
+			scope:activity = {
+				add_to_guest_subset = {
+					name = entrants
+					target = scope:temp_character
+				}
+			}
+			set_variable = {
+				name = imperial_examination_score
+				value = imperial_examination_score_value
+			}
+			if = {
+				limit = {
+					is_ai = yes
+				}
+				set_activity_intent = imperial_exam_taker_intent
+			}
+		}
+		#Run seperately to make sure we include characters added to the entrants subset through edge cases.
+		every_guest_subset = {
+			name = entrants
+			#Record the initial amount of entrants
+			scope:activity = {
+				change_variable = {
+					name = num_initial_entrants
+					add = 1
+				}
+			}
+		}
+		#Set the base amount of failees we expect during the entire activity
+		set_variable = {
+			name = failee_quota
+			value = imperial_examination_failee_quota_value
+		}
+		if = { limit = { exists = var:failee_quota } }
+	}
+}

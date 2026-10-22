@@ -1,0 +1,283 @@
+﻿# 原版考试出发事件覆盖；人物作用域，沿用原版旅行与考试活动前置。
+# 仅在自动设置应试意图前检查任职；不拦截有地人物选择辞官后应试。
+# immediate保存activity、host、location和root_scope；其余事件副作用沿用原版。
+namespace = travel_start_event
+
+travel_start_event.1100 = {
+    # 原版events/_events.info规定：异名文件按更高优先级替换同ID事件。
+    id_override_priority = 1
+	type = character_event
+	title = {
+		first_valid = {
+
+			triggered_desc = {
+				trigger = {
+					involved_activity = { has_activity_type = activity_imperial_examination }
+					has_any_debilitating_illness = yes
+				}
+				desc = travel_start_event.1100.t_sick_exam
+			}
+
+			triggered_desc = {
+				trigger = {
+					involved_activity = { has_activity_type = activity_imperial_examination }
+				}
+				desc = travel_start_event.1100.t_exam
+			}
+
+			triggered_desc = {
+				trigger = {
+					involved_activity = { has_activity_type = activity_local_examination }
+					has_any_debilitating_illness = yes
+				}
+				desc = travel_start_event.1100.t_sick_exam_local
+			}
+			desc = travel_start_event.1100.t_exam_local
+		}
+	}
+
+	desc = {
+
+		first_valid = {
+			triggered_desc = {
+				trigger = {
+					this = scope:host
+					involved_activity = {
+						has_activity_type = activity_imperial_examination
+					}
+				}
+				desc = travel_start_event.1100.desc_my_exam_imperial
+			}
+			triggered_desc = {
+				trigger = {
+					this = scope:host
+					involved_activity = {
+						has_activity_type = activity_local_examination
+					}
+				}
+				desc = travel_start_event.1100.desc_my_exam_local
+			}
+			desc = travel_start_event.1100.desc_exam
+		}
+
+
+		first_valid = {
+			triggered_desc = {
+				trigger = {
+					involved_activity = {
+						has_activity_type = activity_imperial_examination
+						has_activity_option = {
+							category = special_type
+							option = imperial_examination_focus_learning
+						}
+					}
+					NOT = {
+						this = scope:host
+					}
+				}
+				desc = travel_start_event.1100.desc_exam_learning
+			}
+			triggered_desc = {
+				trigger = {
+					involved_activity = {
+						has_activity_type = activity_imperial_examination
+						has_activity_option = {
+							category = special_type
+							option = imperial_examination_focus_stewardship
+						}
+					}
+					NOT = {
+						this = scope:host
+					}
+				}
+				desc = travel_start_event.1100.desc_exam_stewardship
+			}
+			triggered_desc = {
+				trigger = {
+					involved_activity = {
+						has_activity_type = activity_imperial_examination
+						has_activity_option = {
+							category = special_type
+							option = imperial_examination_focus_martial
+						}
+					}
+					NOT = {
+						this = scope:host
+					}
+				}
+				desc = travel_start_event.1100.desc_exam_martial
+			}
+			desc = travel_start_event.1100.desc_exam_learning
+		}
+		first_valid = {
+
+			triggered_desc = {
+				trigger = {
+					has_any_debilitating_illness = yes
+				}
+				desc = travel_start_event.1100.desc_sick_exam_outro
+			}
+			triggered_desc = {
+				trigger = { this = scope:host }
+				desc = travel_start_event.1100.desc_my_exam_outro
+			}
+			triggered_desc = {
+				trigger = { is_wrong_examination_gender = yes }
+				desc = travel_start_event.1100.desc_exam_wrong_gender
+			}
+			desc = travel_start_event.1100.desc_exam_outro
+		}
+	}
+	theme = travel
+	left_portrait = {
+		character = root
+
+		triggered_animation = {
+			trigger = { has_any_debilitating_illness = yes }
+			animation = sick
+		}
+		animation = writing
+	}
+
+	right_portrait = {
+		character = current_travel_plan.travel_leader
+	}
+	trigger = {
+		is_available_travelling = yes
+		is_ruler = yes
+		involved_activity ?= {
+			OR = {
+				has_activity_type = activity_imperial_examination
+				has_activity_type = activity_local_examination
+			}
+		}
+	}
+	immediate = {
+		play_music_cue = mx_cue_travel_start
+		involved_activity.activity_location = { save_scope_as = location }
+		involved_activity = { save_scope_as = activity }
+		involved_activity.activity_host = { save_scope_as = host }
+		save_scope_as = root_scope
+		if = {
+			limit = {
+				scope:activity = { has_activity_type = activity_imperial_examination }
+				tca_exam_can_take_exam_trigger = yes
+				is_ai = no
+				has_none_of_variables = {
+					name = passed_palace_exam
+					name = set_activity_intent
+				}
+			}
+			set_activity_intent = imperial_exam_taker_intent
+			add_character_flag = set_activity_intent
+		}
+		if = {
+			limit = {
+				scope:activity = { has_activity_type = activity_local_examination }
+				tca_exam_can_take_exam_trigger = yes
+				is_ai = no
+				has_none_of_variables = {
+					name = passed_provincial_exam
+					name = set_activity_intent
+				}
+			}
+			set_activity_intent = local_exam_taker_intent
+			add_character_flag = set_activity_intent
+		}
+	}
+
+	option = {
+		name = travel_start_event.1000.take_test
+		trigger = {
+			is_landed = yes
+			top_liege ?= involved_activity.activity_host
+			NAND = {
+				tgp_passed_metropolitan_examination = yes
+				tgp_passed_palace_examination = yes
+			}
+			NOR = {
+				has_title = title:h_china
+				this = involved_activity.activity_host
+			}
+
+			trigger_if = {
+				limit = { is_ai = no }
+				any_held_title = {
+					is_noble_family_title = yes
+				}
+			}
+		}
+		flavor = travel_start_event.1000.take_test_tt
+		custom_tooltip = renounce_governorship_decision_effect_tt
+		show_as_tooltip = {
+			if = {
+				limit = {
+					government_allows = merit
+				}
+				change_merit = medium_merit_gain
+				add_character_modifier = {
+					modifier = ep3_renounced_governorship_merit
+					years = 15
+				}
+			}
+			else = {
+				add_gold = massive_gold_value
+				add_character_modifier = {
+					modifier = ep3_renounced_governorship
+					years = 15
+				}
+			}
+		}
+		trigger_event = ep3_decisions_event.4090
+		ai_chance = {
+			base = 0
+		}
+	}
+
+	option = {
+		name = {
+			text = {
+				first_valid = {
+
+					triggered_desc = {
+						trigger = {
+							OR = {
+								has_any_debilitating_illness = yes
+								has_trait = cynical
+							}
+						}
+						desc = travel_start_event.1000.a_cynical
+					}
+
+					triggered_desc = {
+						desc = travel_start_event.1000.a
+					}
+				}
+			}
+		}
+	}
+
+	after = {
+		if = {
+			limit = {
+				is_wrong_examination_gender = yes
+			}
+			play_music_cue = "mx_cue_negative"
+			custom_tooltip = wrong_examination_gender_tt
+			add_prestige = medium_prestige_loss
+			if = {
+				limit = { is_male = yes }
+				add_character_modifier = {
+					modifier = tgp_wrong_examination_gender_male_modifier
+					years = 15
+				}
+			}
+			else = {
+				add_character_modifier = {
+					modifier = tgp_wrong_examination_gender_female_modifier
+					years = 15
+				}
+			}
+		}
+	}
+}

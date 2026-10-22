@@ -7,12 +7,44 @@ from pathlib import Path
 import re
 import unittest
 
-from check_upstream_overrides import definitions, localization_values
+from check_upstream_overrides import definitions, localization_values, tokens
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
 class ExamContractTests(unittest.TestCase):
+    def test_native_exam_entry_points_share_official_gate(self):
+        # 缺少任一入口会让玩家意图、AI收集或随行补入绕过官员排除。
+        registry = json.loads((ROOT / 'tools/upstream_overrides.json').read_text(encoding='utf-8'))
+        entries = {entry['key']: entry for entry in registry['overrides']}
+        expected = {
+            'imperial_exam_taker_intent': 1,
+            'local_exam_taker_intent': 1,
+            'imperial_examination_gather_entrants_effect': 1,
+            'local_examination_gather_entrants_effect': 1,
+            'imperial_examination_gather_stray_entrants_effect': 3,
+            'activity_local_examination': 1,
+            'travel_start_event.1100': 2,
+        }
+        for key, count in expected.items():
+            with self.subTest(key=key):
+                self.assertTrue(key in entries, '原版应试入口必须接入统一官员限制并登记覆盖')
+                entry = entries[key]
+                actual = definitions((ROOT / entry['mod']).read_text(encoding='utf-8-sig'))[key]
+                native = definitions((ROOT / entry['baseline']).read_text(encoding='utf-8-sig'))[key]
+                patched = ' '.join(actual)
+                gate = 'tca_exam_can_take_exam_trigger = yes'
+                if key.endswith('_intent'):
+                    gate = 'custom_tooltip = { text = tca_exam_not_serving_tt ' + gate + ' }'
+                self.assertEqual(patched.count(gate), count)
+                # 只增设资格门槛，保留原版其余效果及非考生身份。
+                if key.endswith('stray_entrants_effect'):
+                    patched = patched.replace('limit = { ' + gate + ' }', '')
+                if key == 'travel_start_event.1100':
+                    self.assertIn('id_override_priority = 1', patched)
+                    patched = patched.replace('id_override_priority = 1', '')
+                self.assertEqual(tokens(patched.replace(gate, '')), native)
+
     def test_family_notification_actor_and_bilingual_keys_are_wired(self):
         # 只检查通知的引用契约，不把静态通过当作头像、姓名或送达已经实机验证。
         effects = definitions((ROOT / 'common/scripted_effects/tca_exam_effects.txt').read_text(encoding='utf-8-sig'))
@@ -56,14 +88,18 @@ class ExamContractTests(unittest.TestCase):
         self.assertNotIn('monthly_prestige', body)
 
     def test_candidate_trigger_matches_design(self):
-        body = ' '.join(definitions((ROOT / 'common/scripted_triggers/tca_exam_triggers.txt').read_text(encoding='utf-8-sig'))['tca_exam_candidate_trigger'])
-        self.assertIn('is_landed = no', body)
-        self.assertIn('tca_exam_is_official_trigger = yes', body)
-        self.assertIn('has_court_position = tca_exam_commissioner_court_position', body)
+        triggers = definitions((ROOT / 'common/scripted_triggers/tca_exam_triggers.txt').read_text(encoding='utf-8-sig'))
+        body = ' '.join(triggers['tca_exam_candidate_trigger'])
+        self.assertIn('tca_exam_can_take_exam_trigger = yes', body)
+        gate = ' '.join(triggers['tca_exam_can_take_exam_trigger'])
+        self.assertIn('is_landed = no', gate)
+        self.assertIn('tca_exam_is_official_trigger = yes', gate)
+        self.assertIn('has_court_position = tca_exam_commissioner_court_position', gate)
         self.assertNotIn('passed_provincial_exam', body)
         self.assertIn('tgp_gender_can_be_exam_entrant_trigger = yes', body)
         official = ' '.join(definitions((ROOT / 'common/scripted_triggers/tca_exam_triggers.txt').read_text(encoding='utf-8-sig'))['tca_exam_is_official_trigger'])
         self.assertIn('is_councillor = yes', official)
+        self.assertIn('tgp_has_minister_title = yes', official)
         self.assertIn('tca_is_landless_official_trigger = yes', official)
         self.assertIn('government_is_landless_adventurer', official)
         self.assertIn('is_noble_family_title = yes', official)
@@ -98,6 +134,8 @@ class ExamContractTests(unittest.TestCase):
         # 冷却检查由 custom_tooltip 自身承担；AI 不受该自定义冷却约束。
         self.assertIn('is_ai = yes', patched)
         self.assertIn('text = tca_exam_cooldown_tt', patched)
+        self.assertEqual(patched.count('tca_exam_can_take_exam_trigger = yes'), 1)
+        self.assertIn('on_enter_passive_state = { imperial_examination_gather_stray_entrants_effect = yes if = { limit = { tca_exam_can_take_exam_trigger = yes is_ai = no', patched)
         registry = json.loads((ROOT / 'tools/upstream_overrides.json').read_text(encoding='utf-8'))
         entry = next(item for item in registry['overrides'] if item['key'] == 'activity_imperial_examination')
         self.assertEqual(entry['mod'], 'common/activities/activity_types/zz_tca_imperial_examination.txt')

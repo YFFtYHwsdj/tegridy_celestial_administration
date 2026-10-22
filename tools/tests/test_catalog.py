@@ -47,7 +47,9 @@ class TestCatalogTests(unittest.TestCase):
     def test_module_and_case_union_is_deduplicated(self):
         api = self.api()
         rows = api.select_cases(ROOT, ['exam'], ['tca_exam_test.1'])
-        self.assertEqual([r['event'] for r in rows], ['tca_exam_test.1', 'tca_exam_test.2'])
+        expected = [row for row in api.catalog(ROOT) if row['suite'] == 'exam']
+        self.assertEqual(rows, expected)
+        self.assertEqual(sum(row['event'] == 'tca_exam_test.1' for row in rows), 1)
 
     def test_judicial_group_includes_related_modules_and_unknown_selection_fails(self):
         api = self.api()

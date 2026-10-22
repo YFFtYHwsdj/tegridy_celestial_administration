@@ -74,6 +74,13 @@ class RunEvidenceTests(unittest.TestCase):
         issues, _ = inspect_run(self.run_log(), error, {'tca_test_example'})
         self.assertTrue(any('duplicate on_action effect' in issue for issue in issues))
 
+    def test_duplicate_event_override_priority_invalidates_pass(self):
+        error = ("[11:43:09][E][jomini_eventmanager.cpp:452]: Duplicated event ID travel_start_event.1100 with the same override priority 0 found:\n"
+                 " Location A: file: events/travel_events/zz_tca_exam_travel_events.txt line: 6 (travel_start_event.1100)\n"
+                 " Location B: file: events/travel_events/travel_start_events.txt line: 3279 (travel_start_event.1100)\n")
+        issues, _ = inspect_run(self.run_log(), error, {'tca_test_example'})
+        self.assertTrue(any('duplicate event' in issue.lower() for issue in issues))
+
     def test_registered_vanilla_named_shadow_error_is_owned(self):
         error = "[14:51:42][E][jomini_onaction.cpp:161]: There is more than one 'effect' defined using most recent:file: common/on_action/diarchy_on_action.txt line: 3 (on_left_diarchy)"
         issues, _ = inspect_run(self.run_log(), error, {'tca_test_example'})

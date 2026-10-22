@@ -1,0 +1,275 @@
+﻿# 原版考生收集覆盖；活动开始及随行补入均检查当前任职状态。
+# 前两项由主办者调用，要求scope:activity、scope:host；第三项由宾客调用，要求scope:activity。
+# 保留原版考生子集、分数、人数与落榜配额副作用；不改变考官和陪同资格。
+imperial_examination_gather_entrants_effect = {
+	scope:activity = {
+		set_variable = {
+			name = num_initial_entrants
+			value = 0
+		}
+		every_attending_character = {
+			limit = {
+				tca_exam_can_take_exam_trigger = yes
+				is_landed = no
+				tgp_gender_can_be_exam_entrant_trigger = yes
+				trigger_if = {
+					limit = {
+						exists = primary_title
+					}
+					primary_title = {
+						is_mercenary_company = no
+						is_holy_order = no
+					}
+				}
+				NOR = {
+					this = scope:host
+					is_in_guest_subset = { name = imperial_examiners }
+					# 已过殿试者不能重考。
+					has_character_flag = passed_palace_exam
+					has_trait = devoted
+					has_trait = eunuch
+				}
+				is_adult = yes
+			}
+			save_temporary_scope_as = temp_character
+			scope:activity = {
+				add_to_guest_subset = {
+					name = entrants
+					target = scope:temp_character
+				}
+			}
+			set_variable = {
+				name = imperial_examination_score
+				value = imperial_examination_score_value
+			}
+			if = {
+				limit = {
+					is_ai = yes
+				}
+				set_activity_intent = imperial_exam_taker_intent
+			}
+		}
+		# 单独统计，包含其他入口已补入的考生。
+		every_guest_subset = {
+			name = entrants
+			# 记录初始考生人数。
+			scope:activity = {
+				change_variable = {
+					name = num_initial_entrants
+					add = 1
+				}
+			}
+		}
+		# 计算本届考试的落榜配额。
+		set_variable = {
+			name = failee_quota
+			value = imperial_examination_failee_quota_value
+		}
+		if = { limit = { exists = var:failee_quota } }
+	}
+}
+
+local_examination_gather_entrants_effect = {
+	scope:activity = {
+		set_variable = {
+			name = num_initial_entrants
+			value = 0
+		}
+		every_attending_character = {
+			limit = {
+				tca_exam_can_take_exam_trigger = yes
+				is_landed = no
+				tgp_gender_can_be_exam_entrant_trigger = yes
+				trigger_if = {
+					limit = {
+						exists = primary_title
+					}
+					primary_title = {
+						is_mercenary_company = no
+						is_holy_order = no
+					}
+				}
+				NOR = {
+					this = scope:host
+					is_in_guest_subset = { name = imperial_examiners }
+					# 已过更高级别考试者不能参加乡试。
+					has_character_flag = passed_metropolitan_exam
+					# 已过乡试者不能重考。
+					has_character_flag = passed_provincial_exam
+					has_trait = devoted
+					has_trait = eunuch
+				}
+				is_adult = yes
+			}
+			save_temporary_scope_as = temp_character
+			scope:activity = {
+				add_to_guest_subset = {
+					name = entrants
+					target = scope:temp_character
+				}
+			}
+			set_variable = {
+				name = imperial_examination_score
+				value = imperial_examination_score_value
+			}
+			if = {
+				limit = {
+					is_ai = yes
+				}
+				set_activity_intent = local_exam_taker_intent
+			}
+		}
+		# 单独统计，包含其他入口已补入的考生。
+		every_guest_subset = {
+			name = entrants
+			scope:activity = {
+				change_variable = {
+					name = num_initial_entrants
+					add = 1
+				}
+			}
+		}
+		# 计算本届考试的落榜配额。
+		set_variable = {
+			name = failee_quota
+			value = imperial_examination_failee_quota_value
+		}
+		if = { limit = { exists = var:failee_quota } }
+	}
+}
+
+imperial_examination_gather_stray_entrants_effect = {
+	if = {
+		# 补入考生前确认活动仍有名额。
+		limit = {
+			scope:activity = {
+				OR = {
+					AND = {
+						has_activity_option = {
+							category = imperial_examination_breadth
+							option = imperial_examination_breadth_exclusive
+						}
+						any_attending_character = {
+							count < exclusive_exam_guests_full_calc
+						}
+					}
+					AND = {
+						has_activity_option = {
+							category = imperial_examination_breadth
+							option = imperial_examination_breadth_restricted
+						}
+						any_attending_character = {
+							count < restricted_exam_guests_full_calc
+						}
+					}
+					AND = {
+						has_activity_option = {
+							category = imperial_examination_breadth
+							option = imperial_examination_breadth_open
+						}
+						any_attending_character = {
+							count < open_exam_guests_full_calc
+						}
+					}
+				}
+			}
+		}
+		every_courtier = {
+			limit = {
+				tca_exam_can_take_exam_trigger = yes
+				involved_activity ?= scope:activity
+				this != root
+				trigger_if = {
+					limit = {
+						scope:activity = {
+							has_activity_type = activity_imperial_examination
+						}
+					}
+					NOT = { has_character_flag = passed_palace_exam}
+				}
+				trigger_else = {
+					has_none_of_variables = {
+						name = passed_provincial_exam
+						name = passed_metropolitan_exam
+					}
+				}
+				# 过滤不能应试的人物。
+				NOR = {
+					has_trait = devoted
+					has_trait = eunuch
+				}
+				tgp_gender_can_be_exam_entrant_trigger = yes
+			}
+			add_to_list = entourage_entrants
+		}
+		current_travel_plan ?= {
+			every_entourage_character = {
+				limit = {
+					tca_exam_can_take_exam_trigger = yes
+					this != root
+					is_landed = no
+					trigger_if = {
+						limit = {
+							scope:activity = {
+								has_activity_type = activity_imperial_examination
+							}
+						}
+						NOT = { has_character_flag = passed_palace_exam }
+					}
+					trigger_else = {
+						has_none_of_variables = {
+							name = passed_provincial_exam
+							name = passed_metropolitan_exam
+						}
+					}
+					# 过滤不能应试的人物。
+					NOR = {
+						has_trait = devoted
+						has_trait = eunuch
+					}
+					trigger_if = {
+						limit = {
+							exists = primary_title
+						}
+						primary_title = {
+							is_mercenary_company = no
+							is_holy_order = no
+						}
+					}
+					tgp_gender_can_be_exam_entrant_trigger = yes
+				}
+				add_to_list = entourage_entrants
+			}
+		}
+		every_in_list = {
+			list = entourage_entrants
+			# 列表可能由此前的宾客回调累积；使用时再次检查任职状态。
+			limit = { tca_exam_can_take_exam_trigger = yes }
+			if = {
+				limit = {
+					NOT = {
+						involved_activity ?= scope:activity
+					}
+					location = scope:activity.activity_location
+					can_join_activity = scope:activity
+				}
+				add_to_activity_without_travel = scope:activity
+			}
+			if = {
+				limit = {
+					involved_activity ?= scope:activity
+				}
+				scope:activity = {
+					add_to_guest_subset = {
+						name = entrants
+						target = prev
+					}
+				}
+				set_variable = {
+					name = imperial_examination_score
+					value = imperial_examination_score_value
+				}
+			}
+		}
+	}
+}

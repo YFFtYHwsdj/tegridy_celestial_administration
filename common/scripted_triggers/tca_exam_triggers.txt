@@ -4,6 +4,7 @@
 tca_exam_is_official_trigger = {
     OR = {
         is_councillor = yes
+        tgp_has_minister_title = yes
         tca_is_landless_official_trigger = yes
         AND = {
             is_landless_ruler = yes
@@ -13,20 +14,28 @@ tca_exam_is_official_trigger = {
     }
 }
 
+# 人物作用域；代办、原版乡试／会试意图及考生收集共用的任职门槛。
+# 不依赖host；只约束应试，不限制考官、协助或陪同。辞官后即时恢复资格。
+tca_exam_can_take_exam_trigger = {
+    is_landed = no
+    NOR = {
+        tca_exam_is_official_trigger = yes
+        has_court_position = tca_exam_commissioner_court_position
+    }
+}
+
 # 人物作用域；考生硬条件。scope:host 必须是本次会试的皇帝。
 # 不要求乡试；未过乡试者仍可入池，分数在 tca_exam_entry_value 中除以 3。
 tca_exam_candidate_trigger = {
+    tca_exam_can_take_exam_trigger = yes
     is_alive = yes
-    is_landed = no
     is_adult = yes
     is_available = yes
     tgp_gender_can_be_exam_entrant_trigger = yes
     NOT = { this = scope:host }
-    NOT = { has_court_position = tca_exam_commissioner_court_position }
     NOT = { has_character_flag = passed_palace_exam }
     NOT = { has_trait = devoted }
     NOT = { has_trait = eunuch }
-    NOT = { tca_exam_is_official_trigger = yes }
     trigger_if = {
         limit = { exists = primary_title }
         primary_title = {
