@@ -254,27 +254,86 @@ def outcome(condition, observer_confirmed, checker_code):
     return checker_code if condition == 'summary' and observer_confirmed else 2
 
 
-def stop_owned_process(process):
-    if process.poll() is None:
+def stop_owned_process(process, require_running=False):
+    before = process.poll()
+    if require_running and before is not None:
+        raise ValueError('Checkpoint process exited before the requested stop')
+    if before is None:
         process.terminate()
         try:
             process.wait(timeout=6)
         except subprocess.TimeoutExpired:
             process.kill()
             process.wait()
+        # POSIX下正常响应本工具信号的退出必须可辨认；自行退出不能被后半段成功掩盖。
+        if require_running and sys.platform != 'win32' and process.returncode not in (-15, -9):
+            raise ValueError('Checkpoint process exit cannot be attributed to the requested stop')
 
 
-def game_command(args, run):
+def game_command(args, run, save_name=None):
     executable = game_executable(args.game_dir)
     command = [str(executable), '-debug_mode', '-develop', '-skip',
-               '-bookmark=bm_1066_china', '-play=h_china', '-suppress_error_log',
+               '-suppress_error_log',
                f'-userdir={run.as_posix()}/']
+    if save_name is not None:
+        if not re.fullmatch(r'[A-Za-z0-9_]+', save_name):
+            raise ValueError('Invalid local checkpoint save name')
+        # 指定存档仍需选择测试君主才自动进入游戏；随后由原有CLI观察者入口接管。
+        # 不重新生成世界、指定书签或重置随机种子。
+        return command + [f'-loadsave={save_name}.ck3', '-play=h_china']
+    command[4:4] = ['-bookmark=bm_1066_china', '-play=h_china']
     seed = getattr(args, 'seed', None)
     if seed is not None:
         if not 0 <= seed <= 0xFFFFFFFF:
             raise ValueError('--seed must be between 0 and 4294967295')
         command.append(f'-random_seed={seed}')
     return command
+
+
+def reload_request(log, run):
+    """只接受原生保存成功后的一次本地检查点请求，不执行日志中的任意命令。"""
+    names = re.findall(r'TCA_CLI RELOAD_SAVE ([^\r\n]+)', log)
+    if not names:
+        return None
+    if len(names) != 1 or not re.fullmatch(r'[A-Za-z0-9_]+', names[0]):
+        raise ValueError('Invalid or repeated checkpoint request')
+    name = names[0]
+    save = run / 'save games' / (name + '.ck3')
+    if ('console_success: Game saved to ' + name) not in log or not save.is_file():
+        raise ValueError('Checkpoint requested without a completed local save')
+    if save.resolve().parent != (run / 'save games').resolve() or save.stat().st_size < 32:
+        raise ValueError('Checkpoint is not a nonempty local save')
+    with save.open('rb') as handle:
+        if not handle.read(3).startswith((b'SAV', b'PK')):
+            raise ValueError('Checkpoint has no native save header')
+    return name
+
+
+def archive_phase_logs(run, phase):
+    """进程退出后移动整份原始日志；续局进程不能覆盖上一阶段证据。"""
+    target = run / 'phases' / str(phase)
+    target.mkdir(parents=True)
+    (run / 'logs').rename(target / 'logs')
+    (run / 'logs').mkdir()
+    if (run / 'process.json').is_file():
+        shutil.copy2(run / 'process.json', target / 'process.json')
+    if (run / 'phase_terminal.json').is_file():
+        shutil.copy2(run / 'phase_terminal.json', target / 'terminal.json')
+
+
+def merge_phase_logs(run, count):
+    """逐字节连接原日志供既有验收器检查；不插入或删改任何断言及错误。"""
+    phases = [run / 'phases' / str(index) / 'logs' for index in range(1, count + 1)]
+    evidence = []
+    for name in ('debug.log', 'error.log'):
+        chunks = []
+        for phase in phases:
+            path = phase / name
+            data = path.read_bytes() if path.is_file() else b''
+            chunks.append(data)
+            evidence.append({'path': str(path.relative_to(run)), 'sha256': hashlib.sha256(data).hexdigest()})
+        (run / 'logs' / name).write_bytes(b''.join(chunks))
+    write_json(run / 'reload_evidence.json', {'phases': count, 'raw_logs': evidence})
 
 
 def game_environment(game_dir):
@@ -302,6 +361,7 @@ def run_game(args, run):
     env['SteamAppId'] = '1158310'
     start = time.monotonic()
     condition, log, last = None, '', None
+    phase, prefix = 1, ''
     with (run / 'stdout.txt').open('w', encoding='utf-8') as stdout:
         process = subprocess.Popen(command, cwd=args.game_dir / 'binaries', env=env,
                                    stdout=stdout, stderr=subprocess.STDOUT)
@@ -312,8 +372,10 @@ def run_game(args, run):
             print(f'Started isolated CK3 PID {process.pid}', flush=True)
             while time.monotonic() - start < args.timeout:
                 debug = run / 'logs/debug.log'
-                log = debug.read_text(encoding='utf-8', errors='replace') if debug.exists() else ''
+                current_log = debug.read_text(encoding='utf-8', errors='replace') if debug.exists() else ''
+                log = prefix + current_log
                 state = progress(log, time.monotonic() - start, process.poll() is None)
+                state['observer_confirmed'] = state['observer_confirmed'] and 'console_success: Going to observe mode' in current_log
                 write_json(run / 'progress.json', state)
                 current = (state['markers'][-1:] or ['Initializing'], state['pass_count'] // 20)
                 if current != last:
@@ -322,16 +384,61 @@ def run_game(args, run):
                 condition = terminal_condition(log, process.poll())
                 if condition:
                     break
+                try:
+                    save_name = reload_request(current_log, run)
+                    if save_name and phase != 1:
+                        raise ValueError('A checkpoint may only reload once per run')
+                except ValueError as error:
+                    print(str(error), flush=True)
+                    condition = 'invalid_reload_request'
+                    break
+                if save_name:
+                    # 只退出本工具拥有的进程；不修改存档、不重派发事件、不修复游戏状态。
+                    try:
+                        stop_owned_process(process, require_running=True)
+                    except ValueError as error:
+                        print(str(error), flush=True)
+                        condition = 'checkpoint_process_exit'
+                        break
+                    write_json(run / 'phase_terminal.json', {'condition': 'requested_checkpoint_stop',
+                               'process_exit': process.returncode})
+                    archive_phase_logs(run, phase)
+                    prefix = (run / 'phases/1/logs/debug.log').read_text(encoding='utf-8', errors='replace')
+                    phase += 1
+                    command = game_command(args, run, save_name=save_name)
+                    try:
+                        process = subprocess.Popen(command, cwd=args.game_dir / 'binaries', env=env,
+                                                   stdout=stdout, stderr=subprocess.STDOUT)
+                    except OSError as error:
+                        condition = 'reload_launch_failed'
+                        write_json(run / 'process.json', {'pid': None, 'args': command, 'owned': False,
+                                   'phase': phase, 'error': str(error)})
+                        break
+                    write_json(run / 'process.json', {'pid': process.pid, 'args': command, 'owned': True,
+                               'environment': game_environment(args.game_dir), 'phase': phase,
+                               'checkpoint_sha256': hashlib.sha256((run / 'save games' / (save_name + '.ck3')).read_bytes()).hexdigest()})
+                    print(f'Reloading native checkpoint in isolated CK3 PID {process.pid}', flush=True)
                 time.sleep(2)
         except KeyboardInterrupt:
             condition = 'interrupted'
         finally:
             stop_owned_process(process)
+    if phase > 1:
+        write_json(run / 'phase_terminal.json', {'condition': condition or 'timeout',
+                   'process_exit': None if condition == 'reload_launch_failed' else process.returncode})
+        archive_phase_logs(run, phase)
+        merge_phase_logs(run, phase)
     condition = condition or 'timeout'
     # 读取最终已刷新的日志，包括退出期间产生的错误。
     debug = run / 'logs/debug.log'
     log = debug.read_text(encoding='utf-8', errors='replace') if debug.exists() else ''
     state = progress(log, time.monotonic() - start, False)
+    # 每个实际游戏进程都必须独立确认观察者；合并日志中的首阶段确认不能覆盖续局。
+    phase_logs = [run / 'phases' / str(index) / 'logs/debug.log' for index in range(1, phase + 1)] if phase > 1 else [debug]
+    phase_observers = [path.is_file() and 'console_success: Going to observe mode' in
+                       path.read_text(encoding='utf-8', errors='replace') for path in phase_logs]
+    state['observer_confirmed'] = all(phase_observers)
+    state['phase_observer_confirmed'] = phase_observers
     write_json(run / 'progress.json', state)
     checker_command = [sys.executable, str(run / 'tools/check_test_run.py'), '--logs', str(run / 'logs'),
                        '--source-root', str(run / 'mod/tca_main')]
@@ -341,6 +448,9 @@ def run_game(args, run):
     (run / 'result.txt').write_text(checker.stdout + checker.stderr, encoding='utf-8')
     snapshot_issues = verify_snapshot(run)
     code = outcome(condition, state['observer_confirmed'], checker.returncode)
+    if not state['observer_confirmed']:
+        with (run / 'result.txt').open('a') as result:
+            result.write('NOT VERIFIED\nObserver not confirmed in every process phase\n')
     if not (run / 'verification.json').is_file():
         code = 2
     if snapshot_issues:
@@ -348,7 +458,8 @@ def run_game(args, run):
         with (run / 'result.txt').open('a') as result:
             result.write('NOT VERIFIED\n' + '\n'.join(snapshot_issues) + '\n')
     write_json(run / 'terminal.json', {**state, 'condition': condition,
-               'process_exit': process.returncode, 'verification_exit': checker.returncode,
+               'process_exit': None if condition == 'reload_launch_failed' else process.returncode,
+               'phases': phase, 'verification_exit': checker.returncode,
                'runner_exit': code, 'snapshot_issues': snapshot_issues,
                'source_sha256': json.loads((run / 'source_manifest.json').read_text(encoding='utf-8'))['sha256'],
                'scope': json.loads((run / 'selection.json').read_text(encoding='utf-8'))['scope']})

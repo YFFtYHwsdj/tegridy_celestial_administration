@@ -38,6 +38,8 @@ tca_test_ensure_arrest_perk_effect = {
 
 # 每例使用独立可丢弃长官，避免继承请求冷却。
 # ROOT 保持为测试报告者，不切换玩家，也不直接关押。
+# IMPERIAL = yes 供帝直属臣属拒捕场景：不把路改授给临时长官，
+# 目标直接归皇帝，避免临时长官接手路时触发官职维护销毁路。
 tca_test_prepare_native_arrest_effect = {
     title:h_china.holder = { tca_test_prepare_judicial_law_realm_effect = yes }
     # 绝不替换此前用例的可丢弃长官；若其仍有封臣，重复任命
@@ -83,15 +85,21 @@ tca_test_prepare_native_arrest_effect = {
         # 使用原生授予准备指定测试统治者；职业任命
         # 可能选中其他原生继任者，而非指定夹具。
         change_merit = kingdom_starting_merit_value
-        create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_test_arrest_governor_change }
-        scope:tca_test_law_circuit = { change_title_holder = { holder = scope:tca_test_arrest_actor change = scope:tca_test_arrest_governor_change } }
-        resolve_title_and_vassal_change = scope:tca_test_arrest_governor_change
+        if = {
+            limit = { NOT = { always = $IMPERIAL$ } }
+            create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_test_arrest_governor_change }
+            scope:tca_test_law_circuit = { change_title_holder = { holder = scope:tca_test_arrest_actor change = scope:tca_test_arrest_governor_change } }
+            resolve_title_and_vassal_change = scope:tca_test_arrest_governor_change
+        }
         tca_test_log_native_arrest_fixture_effect = { STAGE = AFTER_APPOINTMENT }
-        change_government = celestial_government
-        assign_completed_exams_based_on_title_tier_effect = yes
-        create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_test_arrest_liege_change }
-        change_liege = { liege = scope:tca_test_law_sovereign change = scope:tca_test_arrest_liege_change }
-        resolve_title_and_vassal_change = scope:tca_test_arrest_liege_change
+        if = {
+            limit = { NOT = { always = $IMPERIAL$ } }
+            change_government = celestial_government
+            assign_completed_exams_based_on_title_tier_effect = yes
+            create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_test_arrest_liege_change }
+            change_liege = { liege = scope:tca_test_law_sovereign change = scope:tca_test_arrest_liege_change }
+            resolve_title_and_vassal_change = scope:tca_test_arrest_liege_change
+        }
         add_prestige = 2000
         change_influence = 2000
         tca_test_ensure_arrest_perk_effect = yes
@@ -147,7 +155,11 @@ tca_test_prepare_native_arrest_effect = {
         # 即使原生晋升创建了家门，也保持发送时无家门对照的精确条件。
         if = { limit = { NOT = { always = $FAMILY$ } } every_held_title = { limit = { is_noble_family_title = yes } save_scope_as = tca_test_arrest_family_to_remove holder = { destroy_title = scope:tca_test_arrest_family_to_remove } } }
         create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_test_arrest_target_liege_change }
-        change_liege = { liege = scope:tca_test_arrest_actor change = scope:tca_test_arrest_target_liege_change }
+        if = {
+            limit = { always = $IMPERIAL$ }
+            change_liege = { liege = scope:tca_test_law_sovereign change = scope:tca_test_arrest_target_liege_change }
+        }
+        else = { change_liege = { liege = scope:tca_test_arrest_actor change = scope:tca_test_arrest_target_liege_change } }
         resolve_title_and_vassal_change = scope:tca_test_arrest_target_liege_change
         tca_test_normalize_judicial_score_target_effect = yes
         remove_trait = confucian_education

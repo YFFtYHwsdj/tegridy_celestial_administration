@@ -1,0 +1,85 @@
+﻿# 独立 CLI 保存重载探针，只有 debug、CLI ready 和显式 phase=1 同时成立才执行。
+# 原生 save 创建本轮专用存档；重载保存态2先转4，每个保存／破坏动作仍各自检查阶段。
+# GUI 控制台 load 曾触发非任务线程断言；现在保存破坏后暂停，由CLI退出并原生指定存档启动。
+# SaveGameState 可异步落盘：保存后留出真实时间，再尝试原生读取；断言必须证明状态确已回滚。
+# 固定等待不是保存完成信号；若读取失败，本例必须失败并检查同次保存／加载日志。
+widget = {
+    name = "tca_merit_saveload_probe"
+    size = { 1 1 }
+    alwaystransparent = yes
+    alpha = 0
+    visible_at_creation = no
+    datacontext = "[GetTitleByKey('h_china')]"
+    visible = "[And(InDebugMode, And(IsInGame, And(GreaterThan_CFixedPoint(Title.MakeScope.Var('tca_cli_ready').GetValue, '(CFixedPoint)0'), And(GreaterThanOrEqualTo_CFixedPoint(Title.MakeScope.Var('tca_merit_saveload_phase').GetValue, '(CFixedPoint)1'), LessThanOrEqualTo_CFixedPoint(Title.MakeScope.Var('tca_merit_saveload_phase').GetValue, '(CFixedPoint)3')))))]"
+    # 动画不会作为事务随显隐可靠取消，故不能仅依赖隐藏控件阻止重载后的保存／破坏。
+    state = {
+        name = _show
+        # 首帧留出稳定时间，避免同时提交控制台命令而被引擎拒绝。
+        # 首帧即减速，不能等延迟后才减速，否则30日续接可能抢在保存与破坏前执行。
+        on_start = "[SetGameSpeed('(int32)1')]"
+        duration = 1
+        next = "tca_merit_begin"
+    }
+    state = {
+        name = "tca_merit_begin"
+        # 重载可能保留观察者，不能以君主是否人类识别新进程。
+        # UI会话变量不随存档恢复；`tca_merit_saveload_saved`是脚本变量，保存前写入并存进存档。
+        # 因此阶段2且带该存档标记即为续局；首次进程的阶段2此时还没有标记，不跳过保存。
+        on_start = "[ExecuteConsoleCommand(Select_CString(And(EqualTo_CFixedPoint(Title.MakeScope.Var('tca_merit_saveload_phase').GetValue, '(CFixedPoint)2'), EqualTo_CFixedPoint(Title.MakeScope.Var('tca_merit_saveload_saved').GetValue, '(CFixedPoint)1')), 'effect title:h_china = { if = { limit = { var:tca_merit_saveload_phase = 2 } set_variable = { name = tca_merit_saveload_phase value = 4 } } }', 'effect title:h_china = { if = { limit = { var:tca_merit_saveload_phase = 1 } set_variable = { name = tca_merit_saveload_phase value = 2 } } }'))]"
+        duration = 0.1
+        next = "tca_merit_slow"
+    }
+    state = {
+        name = "tca_merit_slow"
+        on_start = "[SetGameSpeed('(int32)1')]"
+        # 在存档命令前写入脚本标记，确保异步快照能保存它；它只用于识别续局，不证明保存成功。
+        on_start = "[ExecuteConsoleCommand('effect title:h_china = { if = { limit = { var:tca_merit_saveload_phase = 2 } set_variable = { name = tca_merit_saveload_saved value = 1 } } }')]"
+        # 阶段2不能与存档同帧提交：原生异步存档可能取到前一tick的状态，加载后仍是阶段1。
+        # 留出数个真实日让阶段2进入下一次快照；是否真正保存仍以原生日志为准。
+        duration = 6
+        next = "tca_merit_save"
+    }
+    state = {
+        name = "tca_merit_save"
+        on_start = "[ExecuteConsoleCommand(Select_CString(And(EqualTo_CFixedPoint(Title.MakeScope.Var('tca_merit_saveload_phase').GetValue, '(CFixedPoint)2'), Not(GetVariableSystem.HasValue('tca_merit_probe_saved', 'yes'))), 'save tca_merit_saveload_probe', ''))]"
+        on_start = "[GetVariableSystem.Set('tca_merit_probe_saved', 'yes')]"
+        # 原版GetVariableSystem的UI会话标记只防重复提交保存，不修补任何游戏状态。
+        # 脚本phase仍是恢复真伪依据；UI标记不参与保存后断言，也不触发续接事件。
+        # 保存成功可能晚于命令数秒；破坏状态必须等保存完成后执行，不能与写入竞争。
+        duration = 8
+        next = "tca_merit_corrupt"
+    }
+    state = {
+        name = "tca_merit_corrupt"
+        on_start = "[ExecuteConsoleCommand('effect title:h_china = { if = { limit = { var:tca_merit_saveload_phase = 2 } set_variable = { name = tca_merit_saveload_phase value = 3 } var:tca_merit_saveload_actor = { set_variable = { name = tca_merit_saveload_sentinel value = 54321 } change_merit_no_experience = { value = 7 subtract = merit } } clear_variable_list = tca_merit_saveload_candidates var:tca_merit_saveload_transaction = { set_variable = { name = tca_mtx_phase value = 99 } set_variable = { name = tca_mtx_target value = 9 } set_variable = { name = tca_merit_saveload_transaction_sentinel value = 54321 } change_merit_no_experience = { value = 7 subtract = merit } } var:tca_merit_saveload_formal_actor = { set_variable = { name = tca_merit_grant_phase value = 99 } set_variable = { name = tca_merit_grant_target value = 9 } set_variable = { name = tca_merit_grant_token value = 99 } set_variable = { name = tca_merit_saveload_formal_sentinel value = 54321 } change_merit_no_experience = { value = 7 subtract = merit } } holder = { trigger_event = tca_merit_saveload_probe_test.9001 } set_variable = { name = tca_cli_ready value = 0 } } }')]"
+    }
+
+}
+
+# 重载验收结束后恢复CLI速度，避免其后的自然年度探针被本例减速。
+widget = {
+    name = "tca_merit_saveload_speedup"
+    size = { 1 1 }
+    alwaystransparent = yes
+    alpha = 0
+    visible_at_creation = no
+    datacontext = "[GetTitleByKey('h_china')]"
+    visible = "[And(InDebugMode, And(IsInGame, And(GreaterThan_CFixedPoint(Title.MakeScope.Var('tca_cli_ready').GetValue, '(CFixedPoint)0'), EqualTo_CFixedPoint(Title.MakeScope.Var('tca_merit_saveload_phase').GetValue, '(CFixedPoint)5'))))]"
+    state = { name = _show on_start = "[SetGameSpeed('(int32)4')]" duration = 0.1 next = "tca_merit_cleanup_phase" }
+    state = { name = "tca_merit_cleanup_phase" on_start = "[ExecuteConsoleCommand('effect title:h_china = { remove_variable = tca_merit_saveload_phase }')]" }
+}
+
+# 检查点停靠：关闭CLI自动取消暂停后，再使用已确认的原生暂停接口。
+# 只有本轮已破坏状态且尚未暂停才执行；暂停后条件立即变假，不循环切换。
+widget = {
+    name = "tca_merit_saveload_manual_pause"
+    size = { 1 1 }
+    alwaystransparent = yes
+    alpha = 0
+    visible_at_creation = no
+    datacontext = "[GetTitleByKey('h_china')]"
+    visible = "[And(InDebugMode, And(IsInGame, And(EqualTo_CFixedPoint(Title.MakeScope.Var('tca_merit_saveload_phase').GetValue, '(CFixedPoint)3'), Not(IsManuallyPaused))))]"
+    state = { name = _show on_start = "[OnPause]" }
+}
+
+

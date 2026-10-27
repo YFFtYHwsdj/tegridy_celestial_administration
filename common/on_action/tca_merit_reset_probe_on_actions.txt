@@ -1,0 +1,30 @@
+﻿# 只观察显式标记的新建夹具：查明原生等级回调判定标记的时点。
+# 原版两项回调没有trigger字段；追加独立探针与正式授品事务保护，不替换原有效果。
+# 原生派发时先检查根trigger；同链解除标记不会重新创建被排除的回调。
+on_merit_level_gain = {
+    trigger = { NOT = { has_character_flag = tca_merit_reset_probe_suppress } NOT = { has_character_flag = tca_merit_grant_suppress } }
+    on_actions = { tca_merit_reset_probe_gain }
+}
+on_merit_level_loss = {
+    trigger = { NOT = { has_character_flag = tca_merit_reset_probe_suppress } NOT = { has_character_flag = tca_merit_grant_suppress } }
+    on_actions = { tca_merit_reset_probe_loss }
+}
+tca_merit_reset_probe_gain = {
+    trigger = { debug_only = yes is_alive = yes has_variable = tca_merit_reset_probe_gain_count }
+    effect = {
+        change_variable = { name = tca_merit_reset_probe_gain_count add = 1 }
+        if = { limit = { has_character_flag = tca_merit_reset_probe_window } change_variable = { name = tca_merit_reset_probe_marked_count add = 1 } }
+        # 中央矩阵在原生gain回调时冻结提交后的余额，证明目标基准精确归一化；
+        # 仅显式带capture变量的夹具记录，不改变其它用例或生产状态。
+        if = { limit = { has_variable = tca_merit_reset_probe_capture_merit } set_variable = { name = tca_merit_reset_probe_gain_merit value = merit } }
+        debug_log = "TCA_MERIT_RESET GAIN_CALLBACK"
+    }
+}
+tca_merit_reset_probe_loss = {
+    trigger = { debug_only = yes is_alive = yes has_variable = tca_merit_reset_probe_loss_count }
+    effect = {
+        change_variable = { name = tca_merit_reset_probe_loss_count add = 1 }
+        if = { limit = { has_character_flag = tca_merit_reset_probe_window } change_variable = { name = tca_merit_reset_probe_marked_count add = 1 } }
+        debug_log = "TCA_MERIT_RESET LOSS_CALLBACK"
+    }
+}

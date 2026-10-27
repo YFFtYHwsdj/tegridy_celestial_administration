@@ -1,0 +1,77 @@
+imperial_examination_determine_exam_outcome_effect = {
+	#Get the people in the last place and fail them
+	scope:activity = {
+		#Account for the cheating AI entrants
+		every_guest_subset = {
+			name = entrants
+			limit = { has_variable = been_caught_cheating }
+			set_variable = failee_to_be_removed
+		}
+		#Otherwise run through the list and trim it from the bottom up
+		if = {
+			limit = { imperial_examination_failee_quota_value > 0 }
+			ordered_guest_subset = {
+				name = entrants
+				limit = {
+					NOT = { has_variable = failee_to_be_removed }
+				}
+				order_by = {
+					value = temporary_exam_score_value
+					multiply = -1
+				}
+				max = imperial_examination_failee_quota_value
+				check_range_bounds = no
+				set_variable = failee_to_be_removed
+			}
+		}
+		# Check how many successful entrants we have with a martial education.
+		if = {
+			limit = {
+				any_guest_subset = {
+					name = entrants
+					count < {
+						value = 20
+						if = {
+							limit = {
+								scope:activity = {
+									has_activity_type = activity_imperial_examination
+								}
+							}
+							add = 20
+						}
+					}
+					has_trait = education_martial
+					NOT = { has_variable = failee_to_be_removed }
+				}
+			}
+			# If we don't have enough, let some of the failees pass.
+			ordered_guest_subset = {
+				name = entrants
+				check_range_bounds = no
+				limit = {
+					has_trait = education_martial
+					has_variable = failee_to_be_removed
+					is_ai = yes
+				}
+				order_by = {
+					value = temporary_exam_score_value
+				}
+				max = {
+					if = {
+						limit = {
+							scope:activity = {
+								has_activity_type = activity_imperial_examination
+							}
+						}
+						value = 20
+					}
+					else = {
+						value = 3
+					}
+				}
+				remove_variable = failee_to_be_removed
+				change_merit = { 100 150 }
+			}
+		}
+	}
+}

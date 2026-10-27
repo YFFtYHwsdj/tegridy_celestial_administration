@@ -24,6 +24,28 @@ tca_exam_can_take_exam_trigger = {
     }
 }
 
+# 人物作用域；乡试受邀者的正式地域判定，scope:host为本次活动主持人。
+# 无输出或副作用。空主持人、已死主持人或缺首府一律拒绝，不能跳过地域限制。
+# 两层分支分别保护host和capital_county；有效主持人沿用原版同帝国／邻接王国规则。
+tca_exam_local_guest_region_trigger = {
+    trigger_if = {
+        limit = { exists = scope:host }
+        trigger_if = {
+            limit = { scope:host = { is_alive = yes exists = capital_county } }
+            default_location.county.empire = {
+                OR = {
+                    this = scope:host.capital_county.empire
+                    any_title_to_title_neighboring_kingdom = {
+                        this = scope:host.capital_county.kingdom
+                    }
+                }
+            }
+        }
+        trigger_else = { always = no }
+    }
+    trigger_else = { always = no }
+}
+
 # 人物作用域；考生硬条件。scope:host 必须是本次会试的皇帝。
 # 不要求乡试；未过乡试者仍可入池，分数在 tca_exam_entry_value 中除以 3。
 tca_exam_candidate_trigger = {

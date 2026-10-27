@@ -1,0 +1,149 @@
+﻿# 原生附庸税转国库归因；自备独立测试状态，不依赖开局暂持缓存时效。
+# 无地官员在缺少暂持税基缓存时，由测试修正补充基础国库收入；
+# 在同一周期内，monthly_treasury_from_liege_mult = -1 可将其即时压到0，移除修正后立即恢复原正值，且不改变契约档位。
+namespace = tca_office_income_probe
+
+tca_office_income_probe.1 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_office_income_probe.1 tca_test_office_native_income"
+        remove_character_flag = tca_test_case_failed
+        add_character_flag = tca_test_delayed_case_active
+        set_variable = { name = tca_income_probe_windows value = 0 }
+        if = {
+            limit = { debug_only = yes title:h_china.holder = root }
+            if = {
+                limit = { NOT = { has_realm_law = tca_tongpan_enabled_law } }
+                add_character_flag = tca_income_probe_restore_disabled
+                add_realm_law_skip_effects = tca_tongpan_enabled_law
+            }
+            tca_refresh_all_judicial_titles_effect = yes
+            tca_refresh_tongpan_realm_effect = yes
+        }
+        # 选择无地官员测试夹具并自备必要正国库收入，不依赖开局暂持缓存留存时效。
+        clear_saved_scope = tca_income_probe_actor
+        clear_saved_scope = tca_income_probe_office
+        random_living_character = {
+            limit = { top_liege = root tca_is_landless_official_trigger = yes appointment_timeout_days > 180 }
+            save_scope_as = tca_income_probe_actor
+            primary_title = { save_scope_as = tca_income_probe_office }
+            save_scope_value_as = { name = tca_income_salary_before value = vassal_contract_obligation_level:celestial_salary }
+            save_scope_value_as = { name = tca_income_development_before value = vassal_contract_obligation_level:celestial_treasury }
+            tca_test_protect_character_effect = yes
+            if = {
+                limit = { monthly_character_treasury_income = 0 }
+                add_character_modifier = tca_office_income_probe_seed_modifier
+            }
+        }
+        trigger_event = { id = tca_office_income_probe.1001 days = 35 }
+    }
+}
+
+tca_office_income_probe.1001 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            change_variable = { name = tca_income_probe_windows add = 1 }
+            if = {
+                limit = { exists = scope:tca_income_probe_actor }
+                scope:tca_income_probe_actor = { trigger_event = tca_office_income_probe.91 }
+                if = { limit = { scope:tca_income_probe_actor = { monthly_character_treasury_income > 0 monthly_character_treasury_variable_income > 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_native_income 1" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_native_income 1" }
+                scope:tca_income_probe_actor = { add_character_modifier = tca_office_income_probe_vassal_zero_modifier }
+                trigger_event = { id = tca_office_income_probe.1002 days = 35 }
+            }
+            else = {
+                debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_office_native_income"
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+                if = {
+                    limit = { exists = scope:tca_income_probe_actor scope:tca_income_probe_actor = { has_character_modifier = tca_office_income_probe_seed_modifier } }
+                    scope:tca_income_probe_actor = { remove_character_modifier = tca_office_income_probe_seed_modifier }
+                }
+                if = {
+                    limit = { exists = scope:tca_income_probe_actor }
+                    scope:tca_income_probe_actor = { tca_test_restore_character_effect = yes }
+                }
+                if = {
+                    limit = { has_character_flag = tca_income_probe_restore_disabled }
+                    remove_character_flag = tca_income_probe_restore_disabled
+                    add_realm_law_skip_effects = tca_tongpan_disabled_law
+                    tca_refresh_tongpan_realm_effect = yes
+                }
+                remove_character_flag = tca_test_delayed_case_active
+                remove_variable = tca_income_probe_windows
+                tca_test_continue_delayed_effect = yes
+            }
+        }
+    }
+}
+
+tca_office_income_probe.1002 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_income_probe_office.holder = scope:tca_income_probe_actor scope:tca_income_probe_actor = { is_alive = yes tca_is_landless_official_trigger = yes monthly_character_treasury_income = 0 monthly_character_treasury_variable_income = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_native_income 2" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_native_income 2" }
+            scope:tca_income_probe_actor = { trigger_event = tca_office_income_probe.91 remove_character_modifier = tca_office_income_probe_vassal_zero_modifier }
+            trigger_event = { id = tca_office_income_probe.1003 days = 35 }
+        }
+    }
+}
+
+tca_office_income_probe.1003 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            # 组合断言失败时分开记录每个条件；只读，不改变工资契约或收入。
+            if = { limit = { scope:tca_income_probe_office.holder = scope:tca_income_probe_actor } debug_log = "TCA_INCOME HOLDER_YES" }
+            else = { debug_log = "TCA_INCOME HOLDER_NO" }
+            scope:tca_income_probe_actor = {
+                if = { limit = { is_alive = yes } debug_log = "TCA_INCOME ALIVE" } else = { debug_log = "TCA_INCOME DEAD" }
+                if = { limit = { tca_is_landless_official_trigger = yes } debug_log = "TCA_INCOME LANDLESS" } else = { debug_log = "TCA_INCOME LANDED" }
+                if = { limit = { has_any_court_position = no } debug_log = "TCA_INCOME NO_COURT" } else = { debug_log = "TCA_INCOME COURT" }
+                if = { limit = { top_liege = root } debug_log = "TCA_INCOME LIEGE_ROOT" } else = { debug_log = "TCA_INCOME LIEGE_OTHER" }
+                if = { limit = { monthly_character_treasury_income > 0 } debug_log = "TCA_INCOME TOTAL_POS" } else = { debug_log = "TCA_INCOME TOTAL_ZERO" }
+                if = { limit = { monthly_character_treasury_variable_income > 0 } debug_log = "TCA_INCOME VARIABLE_POS" } else = { debug_log = "TCA_INCOME VARIABLE_ZERO" }
+                trigger_event = tca_office_income_probe.91
+            }
+            if = { limit = { scope:tca_income_probe_office.holder = scope:tca_income_probe_actor scope:tca_income_probe_actor = { is_alive = yes tca_is_landless_official_trigger = yes monthly_character_treasury_income > 0 monthly_character_treasury_variable_income > 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_native_income 3" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_native_income 3" }
+            scope:tca_income_probe_actor = { trigger_event = tca_office_income_probe.91 tca_ensure_official_contract_effect = yes }
+            if = { limit = { scope:tca_income_probe_actor = { vassal_contract_obligation_level:celestial_salary = scope:tca_income_salary_before vassal_contract_obligation_level:celestial_treasury = scope:tca_income_development_before } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_native_income 4" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_native_income 4" }
+            if = { limit = { scope:tca_income_probe_actor = { NOT = { has_character_modifier = tca_office_income_probe_vassal_zero_modifier } } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_native_income 5" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_native_income 5" }
+            scope:tca_income_probe_actor = {
+                if = { limit = { has_character_modifier = tca_office_income_probe_seed_modifier } remove_character_modifier = tca_office_income_probe_seed_modifier }
+                tca_test_restore_character_effect = yes
+            }
+            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_office_native_income" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_office_native_income" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            if = {
+                limit = { has_character_flag = tca_income_probe_restore_disabled }
+                remove_character_flag = tca_income_probe_restore_disabled
+                add_realm_law_skip_effects = tca_tongpan_disabled_law
+                tca_refresh_tongpan_realm_effect = yes
+            }
+            remove_character_flag = tca_test_case_failed
+            remove_character_flag = tca_test_delayed_case_active
+            remove_variable = tca_income_probe_windows
+            tca_test_continue_delayed_effect = yes
+        }
+    }
+}
+
+# 同链只读诊断，不重派发延迟事件。
+tca_office_income_probe.91 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = tca_merit_income_character_diagnostic
+        if = { limit = { any_vassal = { always = yes } } debug_log = "TCA_OFFICE_INCOME HAS_VASSALS" }
+        else = { debug_log = "TCA_OFFICE_INCOME NO_VASSALS" }
+    }
+}

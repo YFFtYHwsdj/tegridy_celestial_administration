@@ -1,0 +1,181 @@
+change_career_path_for_family_member_interaction = {
+	category = interaction_category_friendly
+	icon = tgp_send_to_childrens_examination_interaction
+	interface_priority = 8
+
+	desc = change_career_path_for_family_member_interaction_desc
+
+	common_interaction = yes
+
+	override_background = { reference = tgp_examination_room }
+
+	is_available = {
+		is_ai = no
+		dynasty ?= {
+			has_dynasty_perk = tgp_chinese_legacy_2
+		}
+		government_allows = merit
+	}
+
+	is_shown = {
+		has_tgp_dlc_trigger = yes
+		scope:recipient.dynasty ?= scope:actor.dynasty
+		scope:actor != scope:recipient
+		scope:recipient = {
+			OR = {
+				is_ai = yes
+				is_child_of = scope:actor
+				is_grandchild_of = scope:actor
+				is_great_grandchild_of = scope:actor
+			}
+			scope:actor.rite = { rite_has_dominant_ruling_gender = prev }
+		}
+	}
+
+	is_valid_showing_failures_only = {
+		scope:actor = {
+			is_at_war = no
+		}
+		scope:recipient = {
+			is_landed = no
+			is_adult = yes
+			custom_tooltip = {
+				text = cant_be_another_player_tt
+				is_ai = yes
+			}
+			custom_tooltip = {
+				text = favorite_child_must_be_in_good_health_tt
+				NOR = {
+					has_trait = incapable
+					health <= 2.5
+				}
+			}
+			custom_tooltip = {
+				text = cant_be_hostage_tt
+				is_hostage = no
+			}
+		}
+	}
+
+	send_options_exclusive = yes
+	options_heading = change_career_path_for_family_member_header
+	## Civilian
+	send_option = {
+		#icon = "gfx/interface/icons/character_interactions/icon_dispute_border.dds"
+		flag = civilian
+		is_valid = {
+			custom_tooltip = {
+				text = they_have_a_military_career_desc
+				trigger_if = {
+					limit = {
+						scope:recipient = { has_variable = appointment_trait_override }
+					}
+					scope:recipient = { var:appointment_trait_override != trait:education_stewardship_1 }
+				}
+				trigger_else = {
+					scope:recipient = { NOT = { has_trait_with_flag = civilian_province } }
+				}
+			}
+		}
+		localization = tgp_choose_career_path_civilian_name
+		current_description = {
+			# Triggered desc so that we don't get a weird double tooltip.
+			triggered_desc = {
+				trigger = {
+					trigger_if = {
+						limit = {
+							scope:recipient = { has_variable = appointment_trait_override }
+						}
+						scope:recipient = { var:appointment_trait_override != trait:education_stewardship_1 }
+					}
+					trigger_else = {
+						scope:recipient = { NOT = { has_trait_with_flag = civilian_province } }
+					}
+				}
+				desc = they_have_a_military_career_desc
+			}
+		}
+	}
+	## Military
+	send_option = {
+		#icon = "gfx/interface/icons/character_interactions/icon_dispute_border.dds"
+		flag = military
+		is_valid = {
+			custom_tooltip = {
+				text = they_have_a_civilian_career_desc
+				trigger_if = {
+					limit = {
+						scope:recipient = { has_variable = appointment_trait_override }
+					}
+					scope:recipient = { var:appointment_trait_override != trait:education_martial_1 }
+				}
+				trigger_else = {
+					scope:recipient = { NOT = { has_trait_with_flag = military_province } }
+				}
+			}
+		}
+		localization = tgp_choose_career_path_military_name
+		current_description = {
+			# Triggered desc so that we don't get a weird double tooltip.
+			triggered_desc = {
+				trigger = {
+					trigger_if = {
+						limit = {
+							scope:recipient = { has_variable = appointment_trait_override }
+						}
+						scope:recipient = { var:appointment_trait_override != trait:education_martial_1 }
+					}
+					trigger_else = {
+						scope:recipient = { NOT = { has_trait_with_flag = military_province } }
+					}
+				}
+				desc = they_have_a_civilian_career_desc
+			}
+		}
+	}
+
+	cost = {
+		influence = {
+			value = 60
+		}
+	}
+
+	on_auto_accept = {
+
+	}
+
+	on_accept = {
+		if = {
+			limit = {
+				always = scope:military
+			}
+			scope:recipient = {
+				custom_tooltip = {
+					text = they_change_to_military_career_desc
+					set_variable = {
+						name = appointment_trait_override
+						value = trait:education_martial_1
+					}
+				}
+			}
+		}
+		else = {
+			scope:recipient = {
+				custom_tooltip = {
+					text = they_change_to_civilian_career_desc
+					set_variable = {
+						name = appointment_trait_override
+						value = trait:education_stewardship_1
+					}
+				}
+			}
+		}
+	}
+
+	auto_accept = yes
+
+	# Do not set AI frequency manually (it's determined by code)
+	ai_will_do = {
+		base = 0
+	}
+}

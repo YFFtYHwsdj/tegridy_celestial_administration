@@ -1,0 +1,38 @@
+﻿# 人物作用域：激活后核定等级是同链真值；其余人物保留原版读取。
+tca_merit_level_value = {
+    value = merit_level
+    if = { limit = { has_character_flag = tca_merit_active has_variable = tca_merit_approved_level } value = var:tca_merit_approved_level }
+}
+
+# 原版天朝基础2；五项资格按实际持有的修正贡献相加。不得读取已锁定的实际cap。
+# 本机10_tgp_modifiers的乡试／绕试／荫补／会试各+2，殿试+3；原版最大等级9。
+tca_merit_theoretical_cap_value = {
+    value = 2
+    if = { limit = { has_character_modifier = tgp_passed_provincial_exam_modifier } add = 2 }
+    if = { limit = { has_character_modifier = tgp_bypassed_provincial_exam_modifier } add = 2 }
+    if = { limit = { has_character_modifier = tgp_nepotism_bypass_exams_modifier } add = 2 }
+    if = { limit = { has_character_modifier = tgp_passed_metropolitan_exam_modifier } add = 2 }
+    if = { limit = { has_character_modifier = tgp_passed_palace_exam_modifier } add = 3 }
+    max = 9
+}
+
+tca_merit_next_threshold_value = {
+    value = 100000000
+    if = { limit = { tca_merit_level_value = 0 } value = merit_level_1_value }
+    else_if = { limit = { tca_merit_level_value = 1 } value = merit_level_2_value }
+    else_if = { limit = { tca_merit_level_value = 2 } value = merit_level_3_value }
+    else_if = { limit = { tca_merit_level_value = 3 } value = merit_level_4_value }
+    else_if = { limit = { tca_merit_level_value = 4 } value = merit_level_5_value }
+    else_if = { limit = { tca_merit_level_value = 5 } value = merit_level_6_value }
+    else_if = { limit = { tca_merit_level_value = 6 } value = merit_level_7_value }
+    else_if = { limit = { tca_merit_level_value = 7 } value = merit_level_8_value }
+    else_if = { limit = { tca_merit_level_value = 8 } value = merit_level_9_value }
+}
+
+# 原生scale只在添加时求值，初始化与离境必须刷新实际持有的考试修正。
+# 未激活人物保留原版，允许0→1自然入品；贤能制始终保持原版贡献。
+tca_merit_exam_scale_value = {
+    value = 1
+    if = { limit = { has_character_flag = tca_merit_active exists = top_liege top_liege ?= { government_has_flag = government_is_celestial } government_has_flag = government_is_celestial } value = 0 }
+}
+tca_merit_approved_reduction_value = { value = 9 subtract = var:tca_merit_approved_level }

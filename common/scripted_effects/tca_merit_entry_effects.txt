@@ -1,0 +1,166 @@
+﻿# 无根作用域；仅由原版after_lobby原effect末尾调用，确保原版考试/功绩初始化已执行。
+# 不重跑任何原版考试奖励，不由延迟若干日猜测接管时点；已有等级和余额原样采纳。
+tca_merit_finish_native_startup_effect = {
+    if = {
+        limit = { NOT = { has_global_variable = tca_merit_startup_ready } }
+        set_global_variable = { name = tca_merit_startup_ready value = 1 }
+        every_living_character = {
+            limit = { government_has_flag = government_is_celestial exists = top_liege top_liege ?= { government_has_flag = government_is_celestial } is_independent_ruler = no merit_level >= 1 }
+            set_variable = { name = tca_merit_initial_level value = merit_level }
+            tca_merit_initialize_character_effect = yes
+        }
+    }
+}
+
+# 人物作用域；改制/迁移后按真实制度重新同步。不把旧核定值带出后再压回新合法等级。
+tca_merit_sync_membership_effect = {
+    if = {
+        limit = { NOT = { tca_merit_interface_probe_trigger = yes } }
+        if = {
+            limit = { government_has_flag = government_is_celestial exists = top_liege top_liege ?= { government_has_flag = government_is_celestial } is_independent_ruler = no }
+            tca_merit_initialize_character_effect = yes
+        }
+        else_if = { limit = { has_character_flag = tca_merit_active } tca_merit_leave_celestial_effect = yes }
+    }
+}
+
+# 人物作用域；原版任命现场先结算低Merit后果，次日重新核对真实持职再提交。
+# 请求年和提交年分开；正在审计时仅保留pending，审计完成调用process续接。
+tca_merit_queue_central_effect = {
+    if = {
+        limit = { has_global_variable = tca_merit_startup_ready tca_merit_central_target_value > 0 government_has_flag = government_is_celestial NOT = { tca_merit_interface_probe_trigger = yes } }
+        tca_merit_initialize_character_effect = yes
+        # 零级请求先标记等待入品；只有这类被清理的请求才允许以后的补授兜底。
+        if = { limit = { merit_level = 0 } add_character_flag = tca_merit_central_await_entry }
+        if = {
+            limit = { tca_merit_central_zero_source_trigger = yes NOT = { has_character_flag = tca_merit_active } }
+            # 等候期间只借九品上限准备，不发奖励/强设等级；pending不进入普通人口。
+            tca_merit_prepare_entry_effect = yes
+            if = { limit = { has_character_flag = tca_merit_entry_pending } add_character_flag = tca_merit_central_zero_prep_owned tca_merit_ensure_central_zero_route_effect = yes }
+        }
+        # 同一请求只排一件；重复授职只由次日事件读取最终真实职位，审计中仍由完成回调续接。
+        if = {
+            limit = { NOT = { has_character_flag = tca_merit_central_pending } }
+            add_character_flag = tca_merit_central_pending
+            set_variable = { name = tca_merit_central_request_year value = current_year }
+            trigger_event = { id = tca_merit_entry.2 days = 1 }
+        }
+    }
+}
+# 人物作用域；入品后的中央补授兜底。零级任命请求若在次日因来源不成立被清理，
+# 人物以后自然入品并仍实际持有中央职位时，按当前职位重排一次；不补已失职、退休或辞谢者。
+# 仅接在真实入品/奖励结算之后调用，不替代任命现场入口，也不越过已有pending或事务。
+tca_merit_maybe_queue_central_catchup_effect = {
+    if = {
+        limit = {
+            has_global_variable = tca_merit_startup_ready
+            NOT = { tca_merit_interface_probe_trigger = yes }
+            is_alive = yes
+            government_has_flag = government_is_celestial
+            exists = top_liege top_liege ?= { government_has_flag = government_is_celestial }
+            is_independent_ruler = no
+            tca_merit_population_trigger = yes
+            has_variable = tca_merit_route
+            has_character_flag = tca_merit_central_await_entry
+            tca_merit_central_target_value > tca_merit_level_value
+            NOT = { has_character_flag = tca_merit_central_pending }
+            NOT = { has_variable = tca_merit_grant_phase }
+            # 路线必须在入品时仍与原生分类一致；分类异常不靠兜底放宽。
+            OR = {
+                AND = { var:tca_merit_route = 1 is_civilian_candidate_trigger = yes is_military_candidate_trigger = no }
+                AND = { var:tca_merit_route = 2 is_military_candidate_trigger = yes is_civilian_candidate_trigger = no }
+            }
+        }
+        # 复用任命现场入口，重新冻结请求年、目标与实际持职，次日再复核。
+        tca_merit_queue_central_effect = yes
+    }
+}
+
+tca_merit_process_central_pending_effect = {
+    if = {
+        limit = { has_character_flag = tca_merit_central_pending NOT = { has_variable = tca_merit_grant_phase } }
+        if = {
+            limit = { tca_merit_central_zero_source_trigger = yes }
+            set_variable = { name = tca_merit_central_live_target value = tca_merit_central_target_value }
+            tca_merit_begin_grant_effect = { SOURCE = 0 TARGET = var:tca_merit_central_live_target MODE = 2 YEAR = current_year }
+            remove_variable = tca_merit_central_live_target
+        }
+        else_if = {
+            limit = { tca_merit_population_trigger = yes tca_merit_central_target_value > tca_merit_level_value }
+            set_variable = { name = tca_merit_central_live_target value = tca_merit_central_target_value }
+            tca_merit_begin_grant_effect = { SOURCE = var:tca_merit_approved_level TARGET = var:tca_merit_central_live_target MODE = 2 YEAR = current_year }
+            remove_variable = tca_merit_central_live_target
+        }
+        remove_character_flag = tca_merit_central_pending
+        if = {
+            limit = { NOT = { has_variable = tca_merit_grant_phase } }
+            tca_merit_cancel_central_zero_prep_effect = yes
+            tca_merit_cancel_central_zero_source_effect = yes
+        }
+        # 已失职、退休、辞谢或死亡时不再等待入品；仍持中央职者保留标记供以后补授。
+        if = {
+            limit = { OR = { tca_merit_central_target_value = 0 has_character_flag = tca_merit_retired has_character_flag = tca_merit_refused is_alive = no } }
+            remove_character_flag = tca_merit_central_await_entry
+        }
+        # 已不再低于职位目标时无需补授；清掉陈旧的等待标记。
+        if = {
+            limit = { tca_merit_central_target_value <= tca_merit_level_value }
+            remove_character_flag = tca_merit_central_await_entry
+        }
+    }
+}
+
+# 变动分支的人物作用域；只访问本人、封臣及他们的宫廷／囚犯，不扫描世界。
+# 囚犯／宾客列表可含外国人，只处理属于分支的政治人口；临时名单在同链去重后清空。
+# 真实退出仍走leave清理；待提交／审计人物由initialize的事务保护拒绝重装。
+tca_merit_sync_realm_membership_effect = {
+    if = {
+        limit = { tca_merit_realm_change_relevant_trigger = yes }
+        save_scope_as = tca_merit_changed_liege
+        tca_merit_sync_branch_court_effect = yes
+        every_vassal_or_below = { tca_merit_sync_branch_court_effect = yes }
+        # 整支完成后统一更新所有已访问领主的分支快照；祖先迁国也会改变子领主的归属。
+        # 个人initialize不写此字段，避免提前跳过尚未同步的下属。
+        every_in_list = {
+            list = tca_merit_membership_seen
+            if = { limit = { OR = { is_ruler = yes has_variable = tca_merit_branch_anchor } } tca_merit_record_branch_anchor_effect = yes }
+            remove_from_list = tca_merit_membership_seen
+        }
+    }
+}
+
+# 宫廷主人作用域；调用者已建立变动分支scope，同链名单由外层清理。
+tca_merit_sync_branch_court_effect = {
+    tca_merit_sync_branch_member_effect = yes
+    every_courtier_or_guest = { tca_merit_sync_branch_member_effect = yes }
+    every_prisoner = { tca_merit_sync_branch_member_effect = yes }
+}
+
+# 人物作用域；任意两条访问路径只同步一次；领主链排除不属本分支的囚犯和客居者。
+tca_merit_sync_branch_member_effect = {
+    if = {
+        limit = {
+            NOT = { is_in_list = tca_merit_membership_seen }
+            exists = top_liege exists = scope:tca_merit_changed_liege.top_liege
+            top_liege ?= scope:tca_merit_changed_liege.top_liege
+            OR = {
+                this = scope:tca_merit_changed_liege
+                is_vassal_or_below_of = scope:tca_merit_changed_liege
+                # 无地廷臣不满足封臣关系trigger，必须沿实际雇主补访；
+                # 外层最高领主过滤防止把外国囚犯的囚禁地点当作政治归属。
+                AND = {
+                    exists = employer
+                    employer ?= { OR = { this = scope:tca_merit_changed_liege is_vassal_or_below_of = scope:tca_merit_changed_liege } }
+                }
+            }
+        }
+        add_to_list = tca_merit_membership_seen
+        tca_merit_sync_membership_effect = yes
+    }
+}
+
+# 人物作用域；仅在整支遍历或年度全人物校验完成后写入，标识该分支上次完成同步的国家。
+tca_merit_record_branch_anchor_effect = {
+    if = { limit = { exists = top_liege } set_variable = { name = tca_merit_branch_anchor value = top_liege } }
+    else = { remove_variable = tca_merit_branch_anchor }
+}

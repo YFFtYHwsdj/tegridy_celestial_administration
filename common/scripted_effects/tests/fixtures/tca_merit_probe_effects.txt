@@ -1,0 +1,122 @@
+﻿# 功绩接口探针夹具；不属于正式升品规则，也不自动迁移任何历史人物。
+# 报告者作用域；参数 CHARACTER 为输出 saved scope，GOVERNMENT 为原版政体键。
+# 新建独立夹具家门并建立真实附庸关系；保留人物自己的政体，避免漂入人物池失真。
+tca_test_create_merit_probe_character_effect = {
+    tca_test_create_merit_probe_character_with_age_effect = { CHARACTER = $CHARACTER$ GOVERNMENT = $GOVERNMENT$ AGE = 40 }
+}
+
+# 仅供旧原生接口探针：显式隔离正式自动接管，保留原生奖励/回调及原有断言。
+# 正式state/grant/annual/central/lifecycle测试和保存重载formal actor不得调用此包装。
+# 标记保留至丢弃测试局结束，避免清理后被下一次自动入品或年度扫描接管。
+tca_test_create_merit_interface_character_effect = {
+    tca_test_create_merit_interface_character_with_age_effect = { CHARACTER = $CHARACTER$ GOVERNMENT = $GOVERNMENT$ AGE = 40 }
+}
+tca_test_create_merit_interface_character_with_age_effect = {
+    tca_test_create_merit_probe_character_with_age_effect = { CHARACTER = $CHARACTER$ GOVERNMENT = $GOVERNMENT$ AGE = $AGE$ }
+    scope:$CHARACTER$ = { add_character_flag = tca_merit_interface_probe }
+}
+
+# 同一夹具契约，额外参数AGE为创建年龄；亲属探针必须保证父母年龄大于子女。
+# 所有家门、领属、保护及清理前置仍只由此共享入口准备。
+tca_test_create_merit_probe_character_with_age_effect = {
+    create_character = {
+        age = $AGE$
+        gender_female_chance = 0
+        random_traits = no
+        dynasty = none
+        employer = root
+        culture = root.culture
+        faith = root.faith
+        rite = root.rite
+        save_scope_as = $CHARACTER$
+    }
+    scope:$CHARACTER$ = {
+        create_dynasty = { spread_to_descendants = yes }
+        give_noble_family_title = {
+            name = noble_family_name
+            tier = county
+            article = DEFAULT_TITLE_NAME_ARTICLE
+            government = $GOVERNMENT$
+            save_scope_as = tca_merit_probe_new_family
+        }
+        # 孤立家门会被原生维护移入人物池，失去自己的政体；必须具有真实领主关系。
+        create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_merit_probe_fealty }
+        change_liege = { liege = root change = scope:tca_merit_probe_fealty }
+        resolve_title_and_vassal_change = scope:tca_merit_probe_fealty
+        change_government = $GOVERNMENT$
+        # 余额／经验接口用例跨日精确比较注入值；统一隔离跨月自然收入，不放宽门槛断言。
+        # 所有主动change_merit和经验写入仍走正式原生接口；本夹具不验证自然月度收入。
+        add_character_modifier = { modifier = tca_merit_probe_stasis_modifier }
+        # 阻止高Merit夹具在等待期间被自然继任选走；需要超时接口的用例自行清除。
+        set_appointment_timeout = { years = 150 desc = appointment_timeout_desc_refusing }
+        tca_test_protect_character_effect = yes
+        # 独立家门仍可能进入人物池；不朽不防原版脚本以事故清理人物。
+        # 原版 pool_character_is_pruneable_trigger 明确排除此标记；仅用于新建夹具。
+        add_character_flag = ai_will_not_convert
+    }
+}
+
+# 人物作用域；保留真实及第标记，添加独立修正副本，不发考试奖励、不调用活动链。
+tca_test_add_scaled_merit_probe_exams_effect = {
+    add_character_flag = passed_provincial_exam
+    add_character_flag = passed_metropolitan_exam
+    add_character_flag = passed_palace_exam
+    add_character_modifier = { modifier = tca_merit_probe_provincial_modifier }
+    add_character_modifier = { modifier = tca_merit_probe_metropolitan_modifier }
+    add_character_modifier = { modifier = tca_merit_probe_palace_modifier }
+}
+
+# 人物作用域；只刷新探针副本，强制重新计算添加时的 scale，不重发奖励。
+tca_test_refresh_scaled_merit_probe_exams_effect = {
+    remove_character_modifier = tca_merit_probe_provincial_modifier
+    remove_character_modifier = tca_merit_probe_metropolitan_modifier
+    remove_character_modifier = tca_merit_probe_palace_modifier
+    tca_test_add_scaled_merit_probe_exams_effect = yes
+}
+
+# 人物作用域；原版 +2/+2/+3 修正对照，不修改其定义。
+tca_test_add_native_merit_probe_exams_effect = {
+    add_character_flag = passed_provincial_exam
+    add_character_flag = passed_metropolitan_exam
+    add_character_flag = passed_palace_exam
+    add_character_modifier = { modifier = tgp_passed_provincial_exam_modifier }
+    add_character_modifier = { modifier = tgp_passed_metropolitan_exam_modifier }
+    add_character_modifier = { modifier = tgp_passed_palace_exam_modifier }
+}
+
+# 人物作用域；清除本探针添加的考试与上限状态，再恢复保护；人物留在可丢弃测试局。
+tca_test_cleanup_merit_probe_character_effect = {
+    remove_character_modifier = tca_merit_probe_provincial_modifier
+    remove_character_modifier = tca_merit_probe_metropolitan_modifier
+    remove_character_modifier = tca_merit_probe_palace_modifier
+    remove_character_modifier = tca_merit_probe_lock_modifier
+    remove_character_modifier = tca_merit_probe_stasis_modifier
+    remove_character_modifier = tca_merit_probe_bypass_modifier
+    remove_character_modifier = tca_merit_probe_nepotism_modifier
+    remove_character_modifier = tgp_bypassed_provincial_exam_modifier
+    remove_character_modifier = tgp_nepotism_bypass_exams_modifier
+    remove_character_modifier = tca_merit_probe_unlock_modifier
+    remove_character_modifier = tgp_passed_provincial_exam_modifier
+    remove_character_modifier = tgp_passed_metropolitan_exam_modifier
+    remove_character_modifier = tgp_passed_palace_exam_modifier
+    remove_character_flag = passed_provincial_exam
+    remove_character_flag = passed_metropolitan_exam
+    remove_character_flag = passed_palace_exam
+    remove_variable = tca_merit_probe_before
+    remove_character_modifier = tca_merit_probe_approved_reduction_modifier
+    remove_character_modifier = tca_merit_probe_approved_base_modifier
+    remove_variable = tca_merit_probe_approved
+    remove_variable = tca_merit_reset_probe_capture_merit
+    remove_variable = tca_merit_reset_probe_gain_merit
+    remove_character_flag = ai_will_not_convert
+    # 只用于本文件及探针新建的临时人物。任命超时不阻止通判初始补位或普通议会招聘。
+    # 原生分权排除标记与议会屏蔽变量共同封闭这两条入口，不修改正式候选规则。
+    add_character_flag = cannot_be_diarch
+    if = { limit = { exists = liege } set_variable = { name = block_hire_councillor value = liege } }
+    set_appointment_timeout = { years = 150 desc = appointment_timeout_desc_refusing }
+    tca_test_restore_character_effect = yes
+    # 调用者均为本组/压力池明确新建的临时人物，不得用于真实原任或开局人物。
+    # 正式回归在全部断言之后才清理；完成后隔离，防止其它真实迁国入口的全域同步
+    # 将已卸掉教育/考试夹具的遗留人物重新接管，污染之后的自然年度人口与U诊断。
+    if = { limit = { debug_only = yes } add_character_flag = tca_merit_interface_probe }
+}

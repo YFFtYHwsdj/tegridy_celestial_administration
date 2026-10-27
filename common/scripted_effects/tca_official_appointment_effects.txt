@@ -1,13 +1,19 @@
 ﻿# 官署头衔作用域；需已有持有人，首次补位由挂靠上级临时持有后调用。
 # 幂等安装本职头衔法，保留持有人的领地法及家门法；不创建候选、不转移头衔。
+# 头衔法只允许天朝政体；非天朝暂持者不调用add_title_law，避免安装失败后继续评分。
 # 提刑先清理仅供旧存档解析的旧法；新法使用独立标识，不被旧法清理误删。
 tca_ensure_official_title_succession_effect = {
     if = {
-        limit = { exists = holder has_variable = tca_tongpan_title NOT = { has_title_law = tca_tongpan_office_succession_law } }
+        limit = {
+            exists = holder
+            holder = { government_has_flag = government_is_celestial }
+            has_variable = tca_tongpan_title
+            NOT = { has_title_law = tca_tongpan_office_succession_law }
+        }
         add_title_law = tca_tongpan_office_succession_law
     }
     else_if = {
-        limit = { exists = holder has_variable = tca_judicial_title }
+        limit = { exists = holder holder = { government_has_flag = government_is_celestial } has_variable = tca_judicial_title }
         if = { limit = { has_title_law = tca_judicial_appointment_succession_law } remove_title_law = tca_judicial_appointment_succession_law }
         if = { limit = { NOT = { has_title_law = tca_judicial_office_succession_law } } add_title_law = tca_judicial_office_succession_law }
     }

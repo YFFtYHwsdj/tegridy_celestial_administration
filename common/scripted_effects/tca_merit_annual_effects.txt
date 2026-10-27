@@ -1,0 +1,410 @@
+﻿# 全国年度升品：先全世界一次冻结，再算所有国家十二关配额，最后逐国高到低结算。
+# 人物冻结名单是同链临时list；国家由实际top_liege.primary_title锚定，绝不按法理归属。
+# 所有tca_ma_*人物/title字段均为本轮工作数据，末尾清理；幂等年份与诊断计数保留。
+
+# 任意可存变量作用域。输入tca_ma_B/S/E，输出实数q和相邻整数Q。
+# 每次调用仅消耗一次取整随机；提交取消只补抽名单，不再次计算或重抽Q。
+tca_merit_annual_compute_quota_effect = {
+    set_variable = { name = tca_ma_q value = tca_merit_annual_raw_quota_value }
+    set_variable = { name = tca_ma_Q value = { value = var:tca_ma_q floor = yes } }
+    random = {
+        chance = { value = var:tca_ma_q subtract = var:tca_ma_Q multiply = 100 }
+        change_variable = { name = tca_ma_Q add = 1 }
+    }
+}
+
+# 国家title作用域；只在本轮首次登记国家时清零。冻结账与提交后的工作账分离。
+tca_merit_annual_initialize_statistics_effect = {
+    tca_merit_annual_initialize_statistics_route_effect = { ROUTE = 1 }
+    tca_merit_annual_initialize_statistics_route_effect = { ROUTE = 2 }
+}
+tca_merit_annual_initialize_statistics_route_effect = {
+    set_variable = { name = tca_ma_frozen_n_$ROUTE$_1 value = 0 }
+    set_variable = { name = tca_ma_frozen_e_$ROUTE$_1 value = 0 }
+    set_variable = { name = tca_ma_frozen_n_$ROUTE$_2 value = 0 }
+    set_variable = { name = tca_ma_frozen_e_$ROUTE$_2 value = 0 }
+    set_variable = { name = tca_ma_frozen_n_$ROUTE$_3 value = 0 }
+    set_variable = { name = tca_ma_frozen_e_$ROUTE$_3 value = 0 }
+    set_variable = { name = tca_ma_frozen_n_$ROUTE$_4 value = 0 }
+    set_variable = { name = tca_ma_frozen_e_$ROUTE$_4 value = 0 }
+    set_variable = { name = tca_ma_frozen_n_$ROUTE$_5 value = 0 }
+    set_variable = { name = tca_ma_frozen_e_$ROUTE$_5 value = 0 }
+    set_variable = { name = tca_ma_frozen_n_$ROUTE$_6 value = 0 }
+    set_variable = { name = tca_ma_frozen_e_$ROUTE$_6 value = 0 }
+    set_variable = { name = tca_ma_frozen_n_$ROUTE$_7 value = 0 }
+    set_variable = { name = tca_ma_frozen_e_$ROUTE$_7 value = 0 }
+    set_variable = { name = tca_ma_frozen_n_$ROUTE$_8 value = 0 }
+    set_variable = { name = tca_ma_frozen_e_$ROUTE$_8 value = 0 }
+    set_variable = { name = tca_ma_frozen_n_$ROUTE$_9 value = 0 }
+    set_variable = { name = tca_ma_frozen_e_$ROUTE$_9 value = 0 }
+    set_variable = { name = tca_ma_frozen_j_$ROUTE$_1 value = 0 }
+    set_variable = { name = tca_ma_frozen_j_$ROUTE$_2 value = 0 }
+    set_variable = { name = tca_ma_frozen_j_$ROUTE$_3 value = 0 }
+    set_variable = { name = tca_ma_frozen_j_$ROUTE$_4 value = 0 }
+}
+
+# 冻结人物作用域；参数CANDIDATE为本次正式资格判定的yes/no，不再次搜索候选名单。
+# 按冻结路线/等级向所属国家累计一次，人口与候选必须使用同一次冻结判断。
+# 调用方保证每人物只登记一次；路线异常0仍留在人口名单与U诊断，不计入文武九级。
+tca_merit_annual_count_population_effect = {
+    if = { limit = { var:tca_ma_frozen_route = 1 } tca_merit_annual_count_population_route_effect = { ROUTE = 1 CANDIDATE = $CANDIDATE$ } }
+    else_if = { limit = { var:tca_ma_frozen_route = 2 } tca_merit_annual_count_population_route_effect = { ROUTE = 2 CANDIDATE = $CANDIDATE$ } }
+}
+tca_merit_annual_count_population_route_effect = {
+    tca_merit_annual_count_population_level_effect = { ROUTE = $ROUTE$ LEVEL = 1 CANDIDATE = $CANDIDATE$ }
+    tca_merit_annual_count_population_level_effect = { ROUTE = $ROUTE$ LEVEL = 2 CANDIDATE = $CANDIDATE$ }
+    tca_merit_annual_count_population_level_effect = { ROUTE = $ROUTE$ LEVEL = 3 CANDIDATE = $CANDIDATE$ }
+    tca_merit_annual_count_population_level_effect = { ROUTE = $ROUTE$ LEVEL = 4 CANDIDATE = $CANDIDATE$ }
+    tca_merit_annual_count_population_level_effect = { ROUTE = $ROUTE$ LEVEL = 5 CANDIDATE = $CANDIDATE$ }
+    tca_merit_annual_count_population_level_effect = { ROUTE = $ROUTE$ LEVEL = 6 CANDIDATE = $CANDIDATE$ }
+    tca_merit_annual_count_population_level_effect = { ROUTE = $ROUTE$ LEVEL = 7 CANDIDATE = $CANDIDATE$ }
+    tca_merit_annual_count_population_level_effect = { ROUTE = $ROUTE$ LEVEL = 8 CANDIDATE = $CANDIDATE$ }
+    tca_merit_annual_count_population_level_effect = { ROUTE = $ROUTE$ LEVEL = 9 CANDIDATE = $CANDIDATE$ }
+}
+tca_merit_annual_count_population_level_effect = {
+    if = {
+        limit = { var:tca_ma_frozen_level = $LEVEL$ }
+        var:tca_ma_frozen_anchor = {
+            change_variable = { name = tca_ma_frozen_n_$ROUTE$_$LEVEL$ add = 1 }
+            if = {
+                limit = { always = $CANDIDATE$ }
+                change_variable = { name = tca_ma_frozen_e_$ROUTE$_$LEVEL$ add = 1 }
+            }
+        }
+    }
+}
+
+# 去重登记后的需求title作用域；只把该头衔归入唯一国家/路线/带一次。
+tca_merit_annual_count_demand_effect = {
+    if = { limit = { var:tca_ma_demand_route = 1 } tca_merit_annual_count_demand_route_effect = { ROUTE = 1 } }
+    else_if = { limit = { var:tca_ma_demand_route = 2 } tca_merit_annual_count_demand_route_effect = { ROUTE = 2 } }
+}
+tca_merit_annual_count_demand_route_effect = {
+    if = { limit = { var:tca_ma_demand_band = 1 } var:tca_ma_demand_anchor = { change_variable = { name = tca_ma_frozen_j_$ROUTE$_1 add = 1 } } }
+    if = { limit = { var:tca_ma_demand_band = 2 } var:tca_ma_demand_anchor = { change_variable = { name = tca_ma_frozen_j_$ROUTE$_2 add = 1 } } }
+    if = { limit = { var:tca_ma_demand_band = 3 } var:tca_ma_demand_anchor = { change_variable = { name = tca_ma_frozen_j_$ROUTE$_3 add = 1 } } }
+    if = { limit = { var:tca_ma_demand_band = 4 } var:tca_ma_demand_anchor = { change_variable = { name = tca_ma_frozen_j_$ROUTE$_4 add = 1 } } }
+}
+
+# title作用域；scope:tca_ma_ruler为国家最高领主。统一去重名单，每头衔只登记一次。
+# 官署来自正式注册表，中央来自真实议会职位与头衔同步关系，普通行政来自任命继承法。
+tca_merit_annual_register_demand_effect = {
+    if = {
+        limit = { NOT = { is_in_list = tca_ma_demand } tier >= tier_county tier <= tier_empire }
+        add_to_list = tca_ma_demand
+        set_variable = { name = tca_ma_demand_anchor value = scope:tca_ma_anchor }
+        set_variable = { name = tca_ma_demand_route value = 1 }
+        if = {
+            limit = {
+                OR = {
+                    this = title:e_minister_grand_marshal
+                    AND = {
+                        exists = holder
+                        NOT = { has_variable = tca_tongpan_title }
+                        NOT = { has_variable = tca_judicial_title }
+                        NOT = { is_in_list = tca_ma_central }
+                        holder = { OR = { vassal_contract_has_flag = celestial_province_military vassal_contract_has_flag = celestial_province_protectorate } }
+                    }
+                }
+            }
+            set_variable = { name = tca_ma_demand_route value = 2 }
+        }
+        set_variable = { name = tca_ma_demand_band value = 4 }
+        if = { limit = { tier = tier_county } set_variable = { name = tca_ma_demand_band value = 1 } }
+        else_if = { limit = { tier = tier_duchy } set_variable = { name = tca_ma_demand_band value = 2 } }
+        else_if = { limit = { tier = tier_kingdom } set_variable = { name = tca_ma_demand_band value = 3 } }
+        tca_merit_annual_count_demand_effect = yes
+    }
+}
+# 国家title作用域，CENTRAL与POSITION必须来自原生中央职务映射。
+tca_merit_annual_register_central_effect = {
+    scope:tca_ma_ruler = {
+        if = {
+            limit = { exists = cp:$POSITION$ title:$CENTRAL$.holder = cp:$POSITION$ exists = cp:$POSITION$.top_liege cp:$POSITION$.top_liege ?= scope:tca_ma_ruler }
+            title:$CENTRAL$ = { add_to_list = tca_ma_central tca_merit_annual_register_demand_effect = yes }
+        }
+    }
+}
+tca_merit_annual_scan_demand_effect = {
+    save_scope_as = tca_ma_anchor
+    holder = { save_scope_as = tca_ma_ruler }
+    scope:tca_ma_ruler = {
+        every_sub_realm_title = {
+            limit = {
+                tier >= tier_county tier <= tier_empire
+                is_noble_family_title = no is_landless_type_title = no exists = holder
+                holder = { government_has_flag = government_is_celestial exists = top_liege top_liege ?= scope:tca_ma_ruler }
+                OR = {
+                    has_title_law = celestial_appointment_succession_law
+                    has_title_law = celestial_military_appointment_succession_law
+                    holder = { OR = { has_realm_law = celestial_appointment_succession_law has_realm_law = celestial_military_appointment_succession_law } }
+                }
+            }
+            tca_merit_annual_register_demand_effect = yes
+        }
+    }
+    every_in_global_list = {
+        variable = tca_judicial_circuits
+        limit = { tca_is_judicial_circuit_trigger = yes NOT = { has_variable = tca_judicial_disabled } exists = holder.top_liege holder.top_liege ?= scope:tca_ma_ruler }
+        save_scope_as = tca_ma_demand_parent
+        var:song_judicial_title ?= {
+            if = { limit = { tca_is_valid_judicial_holder_trigger = yes var:song_judicial_circuit = scope:tca_ma_demand_parent exists = holder.top_liege holder.top_liege ?= scope:tca_ma_ruler } tca_merit_annual_register_demand_effect = yes }
+        }
+    }
+    every_in_global_list = {
+        variable = tca_tongpan_counties
+        limit = { tca_is_tongpan_county_trigger = yes exists = holder.top_liege holder.top_liege ?= scope:tca_ma_ruler }
+        save_scope_as = tca_ma_demand_parent
+        var:tca_tongpan_office ?= {
+            if = { limit = { tca_is_valid_tongpan_holder_trigger = yes var:tca_tongpan_county = scope:tca_ma_demand_parent exists = holder.top_liege holder.top_liege ?= scope:tca_ma_ruler } tca_merit_annual_register_demand_effect = yes }
+        }
+    }
+    tca_merit_annual_register_central_effect = { CENTRAL = e_minister_chancellor POSITION = councillor_chancellor }
+    tca_merit_annual_register_central_effect = { CENTRAL = e_minister_censor POSITION = councillor_spymaster }
+    tca_merit_annual_register_central_effect = { CENTRAL = e_minister_grand_marshal POSITION = minister_grand_marshal }
+    tca_merit_annual_register_central_effect = { CENTRAL = e_minister_of_personnel POSITION = minister_personnel }
+    tca_merit_annual_register_central_effect = { CENTRAL = e_minister_of_revenue POSITION = councillor_steward }
+    tca_merit_annual_register_central_effect = { CENTRAL = e_minister_of_rites POSITION = councillor_court_chaplain }
+    tca_merit_annual_register_central_effect = { CENTRAL = e_minister_of_war POSITION = councillor_marshal }
+    tca_merit_annual_register_central_effect = { CENTRAL = e_minister_of_justice POSITION = minister_justice }
+    tca_merit_annual_register_central_effect = { CENTRAL = e_minister_of_works POSITION = minister_works }
+}
+
+# title作用域，指定ROUTE/SOURCE。六关S/B/E与Q全部在任何国家授品前计算并保存。
+tca_merit_annual_freeze_quota_effect = {
+    set_variable = { name = tca_ma_route value = $ROUTE$ }
+    set_variable = { name = tca_ma_source value = $SOURCE$ }
+    set_variable = { name = tca_ma_B value = tca_merit_annual_target_tail_value }
+    set_variable = { name = tca_ma_S value = tca_merit_annual_tail_value }
+    set_variable = { name = tca_ma_E value = tca_merit_annual_candidates_value }
+    tca_merit_annual_compute_quota_effect = yes
+    set_variable = { name = tca_ma_quota_$ROUTE$_$SOURCE$ value = var:tca_ma_Q }
+    # 工作账只在提交成功时变化；冻结尾人数与原始配额仍保留本轮原值。
+    set_variable = { name = tca_ma_success_$ROUTE$_$SOURCE$ value = 0 }
+}
+tca_merit_annual_freeze_route_effect = {
+    tca_merit_annual_freeze_quota_effect = { ROUTE = $ROUTE$ SOURCE = 6 }
+    tca_merit_annual_freeze_quota_effect = { ROUTE = $ROUTE$ SOURCE = 5 }
+    tca_merit_annual_freeze_quota_effect = { ROUTE = $ROUTE$ SOURCE = 4 }
+    tca_merit_annual_freeze_quota_effect = { ROUTE = $ROUTE$ SOURCE = 3 }
+    tca_merit_annual_freeze_quota_effect = { ROUTE = $ROUTE$ SOURCE = 2 }
+    tca_merit_annual_freeze_quota_effect = { ROUTE = $ROUTE$ SOURCE = 1 }
+}
+
+# 国家title作用域；共享冻结名单中按国家/路线/来源筛选，故两国同名list不串池。
+# 一次尝试即移除，最多E次；失效候选不消费成功额度，只从剩余冻结池补抽。
+tca_merit_annual_draw_pool_effect = {
+    save_scope_as = tca_ma_anchor
+    set_variable = { name = tca_ma_route value = $ROUTE$ }
+    set_variable = { name = tca_ma_source value = $SOURCE$ }
+    set_variable = { name = tca_ma_target value = { value = $SOURCE$ add = 1 } }
+    set_variable = { name = tca_ma_half_gap value = tca_merit_annual_half_gap_value }
+    every_in_list = {
+        list = tca_ma_candidates
+        limit = { var:tca_ma_frozen_anchor = scope:tca_ma_anchor var:tca_ma_frozen_route = $ROUTE$ var:tca_ma_frozen_level = $SOURCE$ }
+        add_to_list = tca_ma_remaining
+    }
+    set_variable = { name = tca_ma_attempt_limit value = tca_merit_annual_remaining_count_value }
+    set_variable = { name = tca_ma_attempts value = 0 }
+    while = {
+        limit = {
+            var:tca_ma_attempts < var:tca_ma_attempt_limit
+            var:tca_ma_success_$ROUTE$_$SOURCE$ < var:tca_ma_quota_$ROUTE$_$SOURCE$
+            tca_merit_annual_remaining_count_value > 0
+        }
+        set_variable = { name = tca_ma_max value = tca_merit_annual_max_value }
+        random_in_list = {
+            list = tca_ma_remaining
+            weight = { base = 0 modifier = { add = tca_merit_annual_weight_value } }
+            remove_from_list = tca_ma_remaining
+            scope:tca_ma_anchor = { change_variable = { name = tca_ma_attempts add = 1 } }
+            # 本次被抽中即留下“已尝试”标记；结算后只有未被抽中者才是正常落选。
+            # 仅为真实人类保存，AI不建立展示账；尝试成功/失效都在年度反馈末尾清理。
+            if = { limit = { is_ai = no } set_variable = { name = tca_merit_feedback_attempted_year value = current_year } }
+            if = {
+                limit = {
+                    tca_merit_ordinary_hard_candidate_trigger = yes
+                    var:tca_merit_approved_level = $SOURCE$
+                    var:tca_merit_route = $ROUTE$
+                    exists = top_liege.primary_title top_liege.primary_title ?= scope:tca_ma_anchor
+                }
+                tca_merit_begin_grant_effect = { SOURCE = $SOURCE$ TARGET = scope:tca_ma_anchor.var:tca_ma_target MODE = 1 YEAR = current_year }
+                if = {
+                    limit = { var:tca_merit_grant_result = 1 }
+                    scope:tca_ma_anchor = {
+                        change_variable = { name = tca_ma_success_$ROUTE$_$SOURCE$ add = 1 }
+                        change_variable = { name = tca_ma_work_n_$ROUTE$_$SOURCE$ subtract = 1 }
+                        change_variable = { name = tca_ma_work_n_$ROUTE$_$TARGET$ add = 1 }
+                    }
+                }
+            }
+        }
+    }
+    every_in_list = { list = tca_ma_remaining remove_from_list = tca_ma_remaining }
+}
+tca_merit_annual_draw_route_effect = {
+    tca_merit_annual_draw_pool_effect = { ROUTE = $ROUTE$ SOURCE = 6 TARGET = 7 }
+    tca_merit_annual_draw_pool_effect = { ROUTE = $ROUTE$ SOURCE = 5 TARGET = 6 }
+    tca_merit_annual_draw_pool_effect = { ROUTE = $ROUTE$ SOURCE = 4 TARGET = 5 }
+    tca_merit_annual_draw_pool_effect = { ROUTE = $ROUTE$ SOURCE = 3 TARGET = 4 }
+    tca_merit_annual_draw_pool_effect = { ROUTE = $ROUTE$ SOURCE = 2 TARGET = 3 }
+    tca_merit_annual_draw_pool_effect = { ROUTE = $ROUTE$ SOURCE = 1 TARGET = 2 }
+}
+tca_merit_annual_country_effect = {
+    save_scope_as = tca_ma_anchor
+    tca_merit_annual_draw_route_effect = { ROUTE = 1 }
+    tca_merit_annual_draw_route_effect = { ROUTE = 2 }
+}
+# title作用域；工作人口账与冻结人口分开，成功后的变动不反过来重算六Q。
+tca_merit_annual_initialize_work_level_effect = {
+    set_variable = { name = tca_ma_route value = $ROUTE$ }
+    set_variable = { name = tca_ma_source value = $LEVEL$ }
+    set_variable = { name = tca_ma_work_n_$ROUTE$_$LEVEL$ value = tca_merit_annual_population_level_value }
+}
+tca_merit_annual_initialize_work_route_effect = {
+    tca_merit_annual_initialize_work_level_effect = { ROUTE = $ROUTE$ LEVEL = 1 }
+    tca_merit_annual_initialize_work_level_effect = { ROUTE = $ROUTE$ LEVEL = 2 }
+    tca_merit_annual_initialize_work_level_effect = { ROUTE = $ROUTE$ LEVEL = 3 }
+    tca_merit_annual_initialize_work_level_effect = { ROUTE = $ROUTE$ LEVEL = 4 }
+    tca_merit_annual_initialize_work_level_effect = { ROUTE = $ROUTE$ LEVEL = 5 }
+    tca_merit_annual_initialize_work_level_effect = { ROUTE = $ROUTE$ LEVEL = 6 }
+    tca_merit_annual_initialize_work_level_effect = { ROUTE = $ROUTE$ LEVEL = 7 }
+    tca_merit_annual_initialize_work_level_effect = { ROUTE = $ROUTE$ LEVEL = 8 }
+    tca_merit_annual_initialize_work_level_effect = { ROUTE = $ROUTE$ LEVEL = 9 }
+}
+tca_merit_annual_clean_level_effect = {
+    remove_variable = tca_ma_work_n_$ROUTE$_$LEVEL$
+    remove_variable = tca_ma_quota_$ROUTE$_$LEVEL$
+    remove_variable = tca_ma_success_$ROUTE$_$LEVEL$
+}
+tca_merit_annual_clean_route_effect = {
+    remove_variable = tca_ma_frozen_n_$ROUTE$_1
+    remove_variable = tca_ma_frozen_e_$ROUTE$_1
+    remove_variable = tca_ma_frozen_n_$ROUTE$_2
+    remove_variable = tca_ma_frozen_e_$ROUTE$_2
+    remove_variable = tca_ma_frozen_n_$ROUTE$_3
+    remove_variable = tca_ma_frozen_e_$ROUTE$_3
+    remove_variable = tca_ma_frozen_n_$ROUTE$_4
+    remove_variable = tca_ma_frozen_e_$ROUTE$_4
+    remove_variable = tca_ma_frozen_n_$ROUTE$_5
+    remove_variable = tca_ma_frozen_e_$ROUTE$_5
+    remove_variable = tca_ma_frozen_n_$ROUTE$_6
+    remove_variable = tca_ma_frozen_e_$ROUTE$_6
+    remove_variable = tca_ma_frozen_n_$ROUTE$_7
+    remove_variable = tca_ma_frozen_e_$ROUTE$_7
+    remove_variable = tca_ma_frozen_n_$ROUTE$_8
+    remove_variable = tca_ma_frozen_e_$ROUTE$_8
+    remove_variable = tca_ma_frozen_n_$ROUTE$_9
+    remove_variable = tca_ma_frozen_e_$ROUTE$_9
+    remove_variable = tca_ma_frozen_j_$ROUTE$_1
+    remove_variable = tca_ma_frozen_j_$ROUTE$_2
+    remove_variable = tca_ma_frozen_j_$ROUTE$_3
+    remove_variable = tca_ma_frozen_j_$ROUTE$_4
+    tca_merit_annual_clean_level_effect = { ROUTE = $ROUTE$ LEVEL = 1 }
+    tca_merit_annual_clean_level_effect = { ROUTE = $ROUTE$ LEVEL = 2 }
+    tca_merit_annual_clean_level_effect = { ROUTE = $ROUTE$ LEVEL = 3 }
+    tca_merit_annual_clean_level_effect = { ROUTE = $ROUTE$ LEVEL = 4 }
+    tca_merit_annual_clean_level_effect = { ROUTE = $ROUTE$ LEVEL = 5 }
+    tca_merit_annual_clean_level_effect = { ROUTE = $ROUTE$ LEVEL = 6 }
+    remove_variable = tca_ma_work_n_$ROUTE$_7
+    remove_variable = tca_ma_work_n_$ROUTE$_8
+    remove_variable = tca_ma_work_n_$ROUTE$_9
+}
+
+# 无根入口。年份先锁再冻结，阻止同链回调/不同国家重复入口形成第二轮随机。
+# 唯一全世界遍历先校验身份，再冻结；初始化按需刷新且跳过合法事务，绝不归一化余额。
+tca_merit_run_annual_effect = {
+    if = {
+        limit = { NOT = { global_var:tca_merit_annual_processed_year ?= current_year } }
+        set_global_variable = { name = tca_merit_annual_processed_year value = current_year }
+        if = { limit = { NOT = { has_global_variable = tca_merit_annual_run_count } } set_global_variable = { name = tca_merit_annual_run_count value = 0 } }
+        change_global_variable = { name = tca_merit_annual_run_count add = 1 }
+        # 国家名单先按实际独立天朝建档：即使全体属员未入品或退出，也要刷新本年零结果。
+        # 人口遍历仍保留反推与去重，不能把国家是否有仕途人口当作是否存在的条件。
+        every_independent_ruler = {
+            limit = { is_alive = yes government_has_flag = government_is_celestial exists = primary_title }
+            primary_title = {
+                if = {
+                    limit = { NOT = { is_in_list = tca_ma_countries } }
+                    add_to_list = tca_ma_countries
+                    tca_merit_annual_initialize_statistics_effect = yes
+                    set_variable = { name = tca_merit_annual_unclassified_count value = 0 }
+                    set_variable = { name = tca_merit_annual_route_anomaly_count value = 0 }
+                }
+            }
+        }
+        every_living_character = {
+            tca_merit_sync_membership_effect = yes
+            if = { limit = { has_variable = tca_merit_branch_anchor } add_to_list = tca_ma_membership_anchors }
+            if = {
+                limit = { tca_merit_population_trigger = yes exists = top_liege top_liege ?= { government_has_flag = government_is_celestial exists = primary_title } }
+                set_variable = { name = tca_ma_frozen_anchor value = top_liege.primary_title }
+                set_variable = { name = tca_ma_frozen_level value = var:tca_merit_approved_level }
+                set_variable = { name = tca_ma_frozen_merit value = merit }
+                set_variable = { name = tca_ma_frozen_route value = 0 }
+                set_variable = { name = tca_ma_frozen_year value = current_year }
+                # 歧义时沿用最后一次唯一合法路线占额；从未有路线者进入U诊断，不凭空消失。
+                if = { limit = { has_variable = tca_merit_route } set_variable = { name = tca_ma_frozen_route value = var:tca_merit_route } }
+                add_to_list = tca_ma_population
+                top_liege.primary_title ?= {
+                    if = {
+                        limit = { NOT = { is_in_list = tca_ma_countries } }
+                        add_to_list = tca_ma_countries
+                        tca_merit_annual_initialize_statistics_effect = yes
+                        set_variable = { name = tca_merit_annual_unclassified_count value = 0 }
+                        set_variable = { name = tca_merit_annual_route_anomaly_count value = 0 }
+                    }
+                }
+                if = {
+                    limit = { NOT = { var:tca_ma_frozen_route = 1 } NOT = { var:tca_ma_frozen_route = 2 } }
+                    var:tca_ma_frozen_anchor = { change_variable = { name = tca_merit_annual_unclassified_count add = 1 } }
+                }
+                if = {
+                    limit = { OR = { AND = { is_civilian_candidate_trigger = yes is_military_candidate_trigger = yes } AND = { is_civilian_candidate_trigger = no is_military_candidate_trigger = no } } }
+                    var:tca_ma_frozen_anchor = { change_variable = { name = tca_merit_annual_route_anomaly_count add = 1 } }
+                    debug_log = "TCA_MERIT_ANNUAL ROUTE_ANOMALY"
+                }
+                if = {
+                    limit = { tca_merit_ordinary_candidate_trigger = yes }
+                    add_to_list = tca_ma_candidates
+                    tca_merit_annual_count_population_effect = { CANDIDATE = yes }
+                }
+                else = { tca_merit_annual_count_population_effect = { CANDIDATE = no } }
+            }
+        }
+        # 全人物校验完成后再确认已有分支快照；只访问本轮收集的旧快照持有人，不二次扫描世界。
+        every_in_list = { list = tca_ma_membership_anchors tca_merit_record_branch_anchor_effect = yes remove_from_list = tca_ma_membership_anchors }
+        # 全国候选及人口已冻结；先完成全部国家需求与配额，再允许任何授品回调。
+        every_in_list = { list = tca_ma_countries tca_merit_annual_scan_demand_effect = yes }
+        every_in_list = {
+            list = tca_ma_countries
+            save_scope_as = tca_ma_anchor
+            tca_merit_annual_initialize_work_route_effect = { ROUTE = 1 }
+            tca_merit_annual_initialize_work_route_effect = { ROUTE = 2 }
+            tca_merit_annual_freeze_route_effect = { ROUTE = 1 }
+            tca_merit_annual_freeze_route_effect = { ROUTE = 2 }
+        }
+        every_in_list = { list = tca_ma_countries tca_merit_annual_country_effect = yes }
+        # 所有国家授品完成后，先从同一批冻结名单/工作账复制反馈快照，再清理。
+        # 不重算额度、不重跑抽选；消息接收者按本国锚点与实际持有人确定。
+        every_in_list = { list = tca_ma_countries tca_merit_feedback_capture_country_effect = { YEAR = current_year } }
+        every_in_list = {
+            list = tca_ma_population
+            remove_variable = tca_ma_frozen_anchor remove_variable = tca_ma_frozen_level
+            remove_variable = tca_ma_frozen_merit remove_variable = tca_ma_frozen_route remove_variable = tca_ma_frozen_year
+            remove_from_list = tca_ma_population
+        }
+        every_in_list = { list = tca_ma_candidates remove_from_list = tca_ma_candidates }
+        every_in_list = { list = tca_ma_demand remove_variable = tca_ma_demand_anchor remove_variable = tca_ma_demand_route remove_variable = tca_ma_demand_band remove_from_list = tca_ma_demand }
+        every_in_list = { list = tca_ma_central remove_from_list = tca_ma_central }
+        every_in_list = {
+            list = tca_ma_countries
+            tca_merit_annual_clean_route_effect = { ROUTE = 1 }
+            tca_merit_annual_clean_route_effect = { ROUTE = 2 }
+            remove_variable = tca_ma_route remove_variable = tca_ma_source remove_variable = tca_ma_target
+            remove_variable = tca_ma_B remove_variable = tca_ma_S remove_variable = tca_ma_E remove_variable = tca_ma_q remove_variable = tca_ma_Q
+            remove_variable = tca_ma_half_gap remove_variable = tca_ma_max remove_variable = tca_ma_attempt_limit remove_variable = tca_ma_attempts
+            remove_from_list = tca_ma_countries
+        }
+    }
+}

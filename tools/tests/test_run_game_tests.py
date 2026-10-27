@@ -14,6 +14,137 @@ from check_upstream_overrides import definitions
 
 
 class GameRunnerTests(unittest.TestCase):
+    def test_checkpoint_stop_rejects_already_exited_or_unexpected_exit(self):
+        process = Mock()
+        process.poll.return_value = 0
+        with self.assertRaises(ValueError):
+            stop_owned_process(process, require_running=True)
+        process.terminate.assert_not_called()
+        if sys.platform != 'win32':
+            process.poll.return_value = None
+            process.returncode = 42
+            with self.assertRaises(ValueError):
+                stop_owned_process(process, require_running=True)
+
+    def test_reload_launch_failure_keeps_raw_evidence_and_terminal(self):
+        from run_game_tests import run_game
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root/'binaries').mkdir()
+            run = prepare_run(ROOT, root/'runs', root/'absent', 'tca_exam_test.1')
+            (run/'logs').mkdir()
+            (run/'logs/debug.log').write_text('console_success: Going to observe mode\n'
+                'console_success: Game saved to probe\nTCA_CLI RELOAD_SAVE probe\n')
+            (run/'save games').mkdir()
+            (run/'save games/probe.ck3').write_bytes(b'SAV' + b'x'*100)
+            args = SimpleNamespace(game_dir=root, seed=None, timeout=30, strict_title_heir=False)
+            def command(_args, target, save_name=None):
+                return [str(root/'missing-executable')] if save_name else [sys.executable, '-c', 'import time; time.sleep(20)']
+            with patch('run_game_tests.game_command', side_effect=command):
+                self.assertEqual(run_game(args, run), 2)
+            terminal = json.loads((run/'terminal.json').read_text())
+            self.assertEqual(terminal['condition'], 'reload_launch_failed')
+            self.assertIsNone(terminal['process_exit'])
+            self.assertTrue((run/'phases/1/logs/debug.log').is_file())
+            self.assertIn('RELOAD_SAVE probe', (run/'logs/debug.log').read_text())
+
+    def test_resume_command_loads_named_save_with_same_test_ruler_without_new_world_or_seed(self):
+        args = SimpleNamespace(game_dir=Path('/tmp/game'), seed=123)
+        command = game_command(args, Path('/tmp/run'), save_name='probe')
+        self.assertIn('-loadsave=probe.ck3', command)
+        self.assertIn('-play=h_china', command)
+        self.assertFalse(any(arg.startswith(('-bookmark=', '-random_seed=')) for arg in command))
+        with self.assertRaises(ValueError):
+            game_command(args, Path('/tmp/run'), save_name='../outside')
+
+    def test_reload_request_requires_successful_save_and_existing_local_file(self):
+        from run_game_tests import reload_request
+        with tempfile.TemporaryDirectory() as temp:
+            run = Path(temp)
+            log = 'TCA_CLI RELOAD_SAVE probe'
+            with self.assertRaises(ValueError):
+                reload_request(log, run)
+            log = 'console_success: Game saved to probe\n' + log
+            with self.assertRaises(ValueError):
+                reload_request(log, run)
+            (run/'save games').mkdir()
+            (run/'save games/probe.ck3').write_bytes(b'SAV' + b'x'*100)
+            self.assertEqual(reload_request(log, run), 'probe')
+            self.assertIsNone(reload_request('ordinary output', run))
+            with self.assertRaises(ValueError):
+                reload_request(log + '\nTCA_CLI RELOAD_SAVE probe', run)
+            with self.assertRaises(ValueError):
+                reload_request('TCA_CLI RELOAD_SAVE ../outside', run)
+
+    def test_phase_archive_and_merge_preserve_every_raw_error_and_assertion(self):
+        from run_game_tests import archive_phase_logs, merge_phase_logs
+        with tempfile.TemporaryDirectory() as temp:
+            run = Path(temp)
+            (run/'logs').mkdir()
+            first = {'debug.log': b'BEGIN\nCHECK_PASS 1\n', 'error.log': b'first error\n'}
+            second = {'debug.log': b'CHECK_FAIL 2\n', 'error.log': b'second error\n'}
+            for name, data in first.items():
+                (run/'logs'/name).write_bytes(data)
+            archive_phase_logs(run, 1)
+            for name, data in second.items():
+                (run/'logs'/name).write_bytes(data)
+            archive_phase_logs(run, 2)
+            merge_phase_logs(run, 2)
+            for name in first:
+                self.assertEqual((run/'logs'/name).read_bytes(), first[name] + second[name])
+                self.assertEqual((run/'phases/1/logs'/name).read_bytes(), first[name])
+                self.assertEqual((run/'phases/2/logs'/name).read_bytes(), second[name])
+
+    def test_two_real_processes_resume_log_protocol_without_redispatch(self):
+        self._check_two_process_resume(True)
+
+    def test_resume_cannot_reuse_first_process_observer_confirmation(self):
+        self._check_two_process_resume(False)
+
+    def _check_two_process_resume(self, resume_observer):
+        """用短命子进程验证续局控制器与冻结验收器，不模拟任何游戏规则。"""
+        from run_game_tests import run_game
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root/'binaries').mkdir()
+            emitter = root/'emit.py'
+            emitter.write_text('''from pathlib import Path
+import sys, time
+run = Path(sys.argv[1])
+resume = sys.argv[2] == 'resume'
+(run/'logs').mkdir(exist_ok=True)
+name = 'tca_test_exam_contract'
+lines = []
+if not resume:
+    (run/'save games').mkdir()
+    (run/'save games/probe.ck3').write_bytes(b'SAV' + b'x'*100)
+    lines += ['TCA_TEST SUITE_DISPATCH',
+              'TCA_TEST BEGIN tca_exam_test.1 ' + name]
+if not resume or sys.argv[3] == 'yes':
+    lines += ['console_success: Going to observe mode']
+lines += [f'TCA_TEST CHECK_PASS {name} {i}' for i in (range(20,39) if resume else range(1,20))]
+lines += ([f'TCA_TEST PASS {name}', 'TCA_TEST SUITE_ALL_PASSED'] if resume else
+          ['console_success: Game saved to probe', 'TCA_CLI RELOAD_SAVE probe'])
+(run/'logs/debug.log').write_text('\\n'.join(lines) + '\\n')
+(run/'logs/error.log').write_text('')
+time.sleep(20)
+''', encoding='utf-8')
+            run = prepare_run(ROOT, root/'runs', root/'absent', 'tca_exam_test.1')
+            args = SimpleNamespace(game_dir=root, seed=None, timeout=30, strict_title_heir=False)
+            def command(_args, target, save_name=None):
+                return [sys.executable, str(emitter), str(target), 'resume' if save_name else 'start',
+                        'yes' if resume_observer else 'no']
+            with patch('run_game_tests.game_command', side_effect=command):
+                self.assertEqual(run_game(args, run), 0 if resume_observer else 2)
+            self.assertEqual(json.loads((run/'terminal.json').read_text())['observer_confirmed'], resume_observer)
+            log = (run/'logs/debug.log').read_text()
+            self.assertEqual(log.count('TCA_TEST SUITE_DISPATCH'), 1)
+            self.assertEqual(log.count('TCA_TEST BEGIN'), 1)
+            self.assertEqual(log.count('TCA_TEST CHECK_PASS'), 38)
+            self.assertEqual(json.loads((run/'terminal.json').read_text())['phases'], 2)
+            evidence = json.loads((run/'reload_evidence.json').read_text())
+            self.assertEqual(len(evidence['raw_logs']), 4)
+
     def test_frozen_checker_imports_nested_helpers_without_source_checkout(self):
         # 在源码目录之外执行封存验收器，防止导入意外回退到工作目录。
         with tempfile.TemporaryDirectory() as temp:

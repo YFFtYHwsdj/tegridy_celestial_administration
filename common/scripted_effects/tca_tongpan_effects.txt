@@ -30,13 +30,14 @@ tca_bind_tongpan_office_effect = {
 
 # 县作用域；依次解析所属公国、所属路、政事堂。
 # 不以皇帝兜底；政事堂空缺时本委任也空缺。
+# 暂持上级必须同属天朝：官职头衔法只允许天朝政体，非天朝上级无法安装继承法。
 tca_resolve_tongpan_liege_effect = {
     clear_saved_scope = tca_tp_liege
     holder.top_liege = { save_scope_as = tca_tp_sovereign }
     de_jure_liege ?= {
         holder ?= {
             if = {
-                limit = { is_alive = yes NOT = { this = scope:tca_tp_sovereign } top_liege = scope:tca_tp_sovereign highest_held_title_tier > tier_county }
+                limit = { is_alive = yes NOT = { this = scope:tca_tp_sovereign } top_liege = scope:tca_tp_sovereign highest_held_title_tier > tier_county government_has_flag = government_is_celestial }
                 save_scope_as = tca_tp_liege
             }
         }
@@ -45,7 +46,7 @@ tca_resolve_tongpan_liege_effect = {
             de_jure_liege ?= {
                 holder ?= {
                     if = {
-                        limit = { is_alive = yes NOT = { this = scope:tca_tp_sovereign } top_liege = scope:tca_tp_sovereign highest_held_title_tier > tier_county }
+                        limit = { is_alive = yes NOT = { this = scope:tca_tp_sovereign } top_liege = scope:tca_tp_sovereign highest_held_title_tier > tier_county government_has_flag = government_is_celestial }
                         save_scope_as = tca_tp_liege
                     }
                 }
@@ -56,7 +57,7 @@ tca_resolve_tongpan_liege_effect = {
         limit = { NOT = { exists = scope:tca_tp_liege } }
         title:e_minister_chancellor.holder ?= {
             if = {
-                limit = { is_alive = yes NOT = { this = scope:tca_tp_sovereign } top_liege = scope:tca_tp_sovereign highest_held_title_tier > tier_county }
+                limit = { is_alive = yes NOT = { this = scope:tca_tp_sovereign } top_liege = scope:tca_tp_sovereign highest_held_title_tier > tier_county government_has_flag = government_is_celestial }
                 save_scope_as = tca_tp_liege
             }
         }
@@ -81,50 +82,54 @@ tca_fill_tongpan_office_effect = {
         change_title_holder = { holder = scope:tca_tp_liege change = scope:tca_tp_caretaker_change }
         resolve_title_and_vassal_change = scope:tca_tp_caretaker_change
         tca_ensure_official_title_succession_effect = yes
-        every_in_list = { list = tca_tp_candidates remove_from_list = tca_tp_candidates }
-        scope:tca_tp_sovereign = {
-            tca_collect_tongpan_candidates_effect = yes
-            every_vassal_or_below = { tca_collect_tongpan_candidates_effect = yes }
-        }
-        random_in_list = {
-            list = tca_tp_candidates
-            limit = { tca_is_initial_tongpan_candidate_trigger = yes }
-            weight = { base = 0 modifier = { add = tca_tongpan_candidate_weight_value } }
-            save_scope_as = tca_tp_candidate
-        }
+        # 头衔法安装失败时不能查询任命评分；保留暂持状态，交给次日维护重试。
         if = {
-            limit = { NOT = { exists = scope:tca_tp_candidate } }
-            scope:tca_tp_liege = {
-                create_character = {
-                    template = tgp_minister_scholar_template
-                    employer = scope:tca_tp_liege
-                    faith = scope:tca_tp_liege.faith
-                    rite = scope:tca_tp_liege.rite
-                    culture = scope:tca_tp_liege.culture
-                    gender_female_chance = { value = 0 if = { limit = { scope:tca_tp_liege = { OR = { has_realm_law = female_only_law has_realm_law = female_preference_law } } } add = 100 } }
-                    save_scope_as = tca_tp_candidate
-                }
+            limit = { has_title_law = tca_tongpan_office_succession_law }
+            every_in_list = { list = tca_tp_candidates remove_from_list = tca_tp_candidates }
+            scope:tca_tp_sovereign = {
+                tca_collect_tongpan_candidates_effect = yes
+                every_vassal_or_below = { tca_collect_tongpan_candidates_effect = yes }
             }
-            scope:tca_tp_candidate = { change_merit = county_starting_merit_value assign_completed_exams_based_on_merit_effect = yes }
-        }
-        scope:tca_tp_candidate = {
+            random_in_list = {
+                list = tca_tp_candidates
+                limit = { tca_is_initial_tongpan_candidate_trigger = yes }
+                weight = { base = 0 modifier = { add = tca_tongpan_candidate_weight_value } }
+                save_scope_as = tca_tp_candidate
+            }
             if = {
-                limit = { is_ruler = no }
-                if = { limit = { is_lowborn = yes } create_dynasty = { spread_to_descendants = yes } }
-                create_noble_family_effect = { GOVERNMENT_GIVER = scope:tca_tp_liege }
+                limit = { NOT = { exists = scope:tca_tp_candidate } }
+                scope:tca_tp_liege = {
+                    create_character = {
+                        template = tgp_minister_scholar_template
+                        employer = scope:tca_tp_liege
+                        faith = scope:tca_tp_liege.faith
+                        rite = scope:tca_tp_liege.rite
+                        culture = scope:tca_tp_liege.culture
+                        gender_female_chance = { value = 0 if = { limit = { scope:tca_tp_liege = { OR = { has_realm_law = female_only_law has_realm_law = female_preference_law } } } add = 100 } }
+                        save_scope_as = tca_tp_candidate
+                    }
+                }
+                scope:tca_tp_candidate = { change_merit = county_starting_merit_value assign_completed_exams_based_on_merit_effect = yes }
             }
-            # 加权抽取已选定该人；原生任命
-            # 事务可能替换为缓存继任者，因此先授予官职
-            # 给选定官员，再保留正常任命继承。
-            create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_tp_appointment }
-            scope:tca_tp_office = { change_title_holder = { holder = scope:tca_tp_candidate change = scope:tca_tp_appointment } }
-            resolve_title_and_vassal_change = scope:tca_tp_appointment
-            change_government = celestial_government
-            set_primary_title_to = scope:tca_tp_office
-            tca_set_official_appointment_cooldown_effect = yes
+            scope:tca_tp_candidate = {
+                if = {
+                    limit = { is_ruler = no }
+                    if = { limit = { is_lowborn = yes } create_dynasty = { spread_to_descendants = yes } }
+                    create_noble_family_effect = { GOVERNMENT_GIVER = scope:tca_tp_liege }
+                }
+                # 加权抽取已选定该人；原生任命
+                # 事务可能替换为缓存继任者，因此先授予官职
+                # 给选定官员，再保留正常任命继承。
+                create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_tp_appointment }
+                scope:tca_tp_office = { change_title_holder = { holder = scope:tca_tp_candidate change = scope:tca_tp_appointment } }
+                resolve_title_and_vassal_change = scope:tca_tp_appointment
+                change_government = celestial_government
+                set_primary_title_to = scope:tca_tp_office
+                tca_set_official_appointment_cooldown_effect = yes
+            }
+            every_in_list = { list = tca_tp_candidates remove_from_list = tca_tp_candidates }
+            clear_saved_scope = tca_tp_candidate
         }
-        every_in_list = { list = tca_tp_candidates remove_from_list = tca_tp_candidates }
-        clear_saved_scope = tca_tp_candidate
     }
 }
 

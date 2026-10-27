@@ -1,0 +1,54 @@
+﻿# 自然年度脉冲探针；等待真实游戏时间，不直接调用年度回调。
+# 只验证统一触发和可读取年份，不代表年度员额、候选抽选或结算已实现。
+namespace = tca_merit_annual_probe_test
+tca_merit_annual_probe_test.1 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { has_character_flag = tca_test_delayed_case_active } debug_log = "TCA_TEST CASE_BUSY" }
+        else = {
+            debug_log = "TCA_TEST BEGIN tca_merit_annual_probe_test.1 tca_test_merit_annual_pulse"
+            remove_character_flag = tca_test_case_failed
+            if = {
+                limit = { debug_only = yes is_alive = yes title:h_china.holder = root title:h_china = { NOT = { has_variable = tca_merit_annual_probe_reporter } } }
+                title:h_china = { set_variable = { name = tca_merit_annual_probe_reporter value = root } }
+                set_variable = { name = tca_merit_annual_probe_count value = 0 }
+                set_variable = { name = tca_merit_annual_probe_start_year value = current_year }
+                set_variable = { name = tca_merit_annual_probe_last_year value = 0 }
+                add_character_flag = tca_test_delayed_case_active
+                debug_log = "TCA_TEST WAIT tca_test_merit_annual_pulse 370 days"
+                trigger_event = { id = tca_merit_annual_probe_test.1001 days = 370 }
+            }
+            else = {
+                debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_merit_annual_pulse"
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+                tca_test_continue_delayed_effect = yes
+            }
+        }
+    }
+}
+tca_merit_annual_probe_test.1001 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            set_variable = { name = tca_merit_annual_probe_expected value = { value = current_year subtract = var:tca_merit_annual_probe_start_year } }
+            if = { limit = { var:tca_merit_annual_probe_expected >= 1 var:tca_merit_annual_probe_expected <= 2 } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_annual_pulse 1" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_annual_pulse 1" }
+            if = { limit = { var:tca_merit_annual_probe_count = var:tca_merit_annual_probe_expected } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_annual_pulse 2" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_annual_pulse 2" }
+            if = { limit = { var:tca_merit_annual_probe_last_year = current_year } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_annual_pulse 3" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_annual_pulse 3" }
+            title:h_china = { remove_variable = tca_merit_annual_probe_reporter }
+            remove_variable = tca_merit_annual_probe_count
+            remove_variable = tca_merit_annual_probe_start_year
+            remove_variable = tca_merit_annual_probe_last_year
+            remove_variable = tca_merit_annual_probe_expected
+            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_merit_annual_pulse" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_merit_annual_pulse" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            remove_character_flag = tca_test_case_failed
+            remove_character_flag = tca_test_delayed_case_active
+            tca_test_continue_delayed_effect = yes
+        }
+    }
+}

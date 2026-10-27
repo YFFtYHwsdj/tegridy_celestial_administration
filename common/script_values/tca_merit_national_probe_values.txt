@@ -1,0 +1,41 @@
+﻿# 全国规模测量专用值；只读取独立探针名单，不接入年度规则。
+# 人物作用域：原生等级1为九品；返回下一品原版Merit门槛，最高档不再竞争。
+tca_merit_national_probe_next_threshold = {
+    value = 999999999
+    if = { limit = { merit_level = 1 } value = merit_level_2_value }
+    else_if = { limit = { merit_level = 2 } value = merit_level_3_value }
+    else_if = { limit = { merit_level = 3 } value = merit_level_4_value }
+    else_if = { limit = { merit_level = 4 } value = merit_level_5_value }
+    else_if = { limit = { merit_level = 5 } value = merit_level_6_value }
+    else_if = { limit = { merit_level = 6 } value = merit_level_7_value }
+    else_if = { limit = { merit_level = 7 } value = merit_level_8_value }
+    else_if = { limit = { merit_level = 8 } value = merit_level_9_value }
+}
+tca_merit_national_probe_population_count = { value = 0 every_in_list = { list = tca_mnp_population add = 1 } }
+tca_merit_national_probe_candidate_count = { value = 0 every_in_list = { list = tca_mnp_candidates add = 1 } }
+tca_merit_national_probe_remaining_count = { value = 0 every_in_list = { list = tca_mnp_remaining add = 1 } }
+tca_merit_national_probe_selected_count = { value = 0 every_in_list = { list = tca_mnp_selected add = 1 } }
+tca_merit_national_probe_stress_count = { value = 0 every_in_list = { list = tca_mnp_stress add = 1 } }
+# 报告者提供文武序号和原生等级；从冻结身份读取，不回看本次抽选可能修改的余额。
+tca_merit_national_probe_band_population = {
+    value = 0
+    every_in_list = { list = tca_mnp_population limit = { var:tca_mnp_route = scope:tca_mnp_reporter.var:tca_mnp_route var:tca_mnp_level = scope:tca_mnp_reporter.var:tca_mnp_level } add = 1 }
+}
+tca_merit_national_probe_band_candidates = {
+    value = 0
+    every_in_list = { list = tca_mnp_candidates limit = { var:tca_mnp_route = scope:tca_mnp_reporter.var:tca_mnp_route var:tca_mnp_level = scope:tca_mnp_reporter.var:tca_mnp_level } add = 1 }
+}
+# 原生min设置数值下界，因此逐项读取得到最大冻结Merit；与既有weight探针相同。
+tca_merit_national_probe_max = { value = 0 every_in_list = { list = tca_mnp_remaining min = var:tca_mnp_frozen } }
+tca_merit_national_probe_gap = { value = scope:tca_mnp_reporter.var:tca_mnp_max subtract = var:tca_mnp_frozen divide = 1000 min = 0 }
+tca_merit_national_probe_weight = {
+    value = 0
+    if = {
+        limit = { tca_merit_national_probe_gap <= 30 }
+        value = 2
+        pow = tca_merit_national_probe_gap
+        save_temporary_value_as = tca_mnp_denominator
+        value = 1024
+        divide = scope:tca_mnp_denominator
+    }
+}

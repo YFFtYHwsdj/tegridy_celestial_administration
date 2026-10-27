@@ -1,0 +1,204 @@
+﻿# 全国扫描、冻结和反复归一化抽选的独立技术探针；不授品、不结算年度员额。
+# 仅可丢弃1066中国观察者局。真实人口在扩大夹具池前读取，结束清除全部临时字段。
+# 标记配对供外部单调时钟和日志墙钟读取；游戏日期从不作为耗时。
+namespace = tca_merit_national_probe
+
+tca_merit_national_probe.1 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_merit_national_probe.1 tca_test_merit_national_scale"
+        remove_character_flag = tca_test_case_failed
+        if = {
+            limit = { debug_only = yes is_alive = yes title:h_china.holder = root }
+            save_scope_as = tca_mnp_reporter
+            set_variable = { name = tca_mnp_scan value = 0 }
+            debug_log = "TCA_MNP START scan32"
+            # 重复32次放大极短扫描；仅第一次收集名单，计数验证每轮覆盖一致。
+            while = {
+                count = 32
+                every_living_character = {
+                    limit = { this != scope:tca_mnp_reporter top_liege = scope:tca_mnp_reporter merit_level >= 1 OR = { is_civilian_candidate_trigger = yes is_military_candidate_trigger = yes } }
+                    scope:tca_mnp_reporter = { change_variable = { name = tca_mnp_scan add = 1 } }
+                    add_to_list = tca_mnp_population
+                }
+            }
+            debug_log = "TCA_MNP END scan32"
+            set_variable = { name = tca_mnp_population_total value = tca_merit_national_probe_population_count }
+            set_variable = { name = tca_mnp_expected_scan value = { value = var:tca_mnp_population_total multiply = 32 } }
+            if = { limit = { var:tca_mnp_population_total > 0 var:tca_mnp_scan = var:tca_mnp_expected_scan } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_national_scale 1" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_national_scale 1" }
+            debug_log = "TCA_MNP START freeze32"
+            while = {
+                count = 32
+                every_in_list = {
+                    list = tca_mnp_population
+                    set_variable = { name = tca_mnp_frozen value = merit }
+                    set_variable = { name = tca_mnp_level value = merit_level }
+                    set_variable = { name = tca_mnp_route value = 1 }
+                    if = { limit = { is_military_candidate_trigger = yes } set_variable = { name = tca_mnp_route value = 2 } }
+                }
+            }
+            debug_log = "TCA_MNP END freeze32"
+            # 正式退出标记和出生上限尚未接入：此处明确为Merit门槛预候选上界。
+            # 保留普通任命冷却者，不用最终继承名单缩小全国扫描量。
+            every_in_list = {
+                list = tca_mnp_population
+                limit = { is_adult = yes merit_level < 9 merit >= tca_merit_national_probe_next_threshold }
+                add_to_list = tca_mnp_candidates
+            }
+            set_variable = { name = tca_mnp_candidate_total value = tca_merit_national_probe_candidate_count }
+            # debug_log仅保证当前THIS上下文，不假定同链新saved角色已导出给本地化。
+            # 使用已有中央探针验证过的原生命名数值dump；报告值只用于日志，末尾清除。
+            save_scope_value_as = { name = tca_mnp_report_population value = var:tca_mnp_population_total }
+            save_scope_value_as = { name = tca_mnp_report_candidates value = var:tca_mnp_candidate_total }
+            debug_log = "TCA_MNP TOTAL"
+            debug_log_scopes = yes
+            set_variable = { name = tca_mnp_route value = 1 }
+            while = {
+                count = 2
+                set_variable = { name = tca_mnp_level value = 1 }
+                while = {
+                    count = 9
+                    set_variable = { name = tca_mnp_band_population value = tca_merit_national_probe_band_population }
+                    set_variable = { name = tca_mnp_band_candidates value = tca_merit_national_probe_band_candidates }
+                    save_scope_value_as = { name = tca_mnp_report_population value = var:tca_mnp_band_population }
+                    save_scope_value_as = { name = tca_mnp_report_candidates value = var:tca_mnp_band_candidates }
+                    save_scope_value_as = { name = tca_mnp_report_route value = var:tca_mnp_route }
+                    save_scope_value_as = { name = tca_mnp_report_level value = var:tca_mnp_level }
+                    debug_log = "TCA_MNP BAND"
+                    debug_log_scopes = yes
+                    change_variable = { name = tca_mnp_level add = 1 }
+                }
+                change_variable = { name = tca_mnp_route add = 1 }
+            }
+            # 行政需求按真实最高领主与非家门行政头衔读取；文武采用正式契约旗标。
+            # 官署使用正式登记、有效性和正反指针校验，加入统一名单避免重复需求。
+            debug_log = "TCA_MNP START demand"
+            every_sub_realm_title = {
+                limit = { tier >= tier_county tier <= tier_empire is_noble_family_title = no is_landless_type_title = no exists = holder holder = { government_has_flag = government_is_celestial top_liege = scope:tca_mnp_reporter } }
+                add_to_list = tca_mnp_demand
+            }
+            every_in_global_list = { variable = tca_judicial_circuits var:song_judicial_title ?= { if = { limit = { tca_office_can_receive_funding_trigger = yes tca_is_valid_judicial_holder_trigger = yes holder.top_liege = scope:tca_mnp_reporter } add_to_list = tca_mnp_demand } } }
+            every_in_global_list = { variable = tca_tongpan_counties var:tca_tongpan_office ?= { if = { limit = { tca_office_can_receive_funding_trigger = yes holder.top_liege = scope:tca_mnp_reporter } add_to_list = tca_mnp_demand } } }
+            # 原版02_china与00_council_positions／01_ministry_positions的九组映射。
+            # 无地中央头衔同样不会进入sub_realm遍历；只计议会与头衔真实同步的在任职位。
+            if = { limit = { exists = cp:councillor_chancellor title:e_minister_chancellor.holder = cp:councillor_chancellor cp:councillor_chancellor.top_liege = root } title:e_minister_chancellor = { add_to_list = tca_mnp_central add_to_list = tca_mnp_demand } }
+            if = { limit = { exists = cp:councillor_spymaster title:e_minister_censor.holder = cp:councillor_spymaster cp:councillor_spymaster.top_liege = root } title:e_minister_censor = { add_to_list = tca_mnp_central add_to_list = tca_mnp_demand } }
+            if = { limit = { exists = cp:minister_grand_marshal title:e_minister_grand_marshal.holder = cp:minister_grand_marshal cp:minister_grand_marshal.top_liege = root } title:e_minister_grand_marshal = { add_to_list = tca_mnp_central add_to_list = tca_mnp_demand } }
+            if = { limit = { exists = cp:minister_personnel title:e_minister_of_personnel.holder = cp:minister_personnel cp:minister_personnel.top_liege = root } title:e_minister_of_personnel = { add_to_list = tca_mnp_central add_to_list = tca_mnp_demand } }
+            if = { limit = { exists = cp:councillor_steward title:e_minister_of_revenue.holder = cp:councillor_steward cp:councillor_steward.top_liege = root } title:e_minister_of_revenue = { add_to_list = tca_mnp_central add_to_list = tca_mnp_demand } }
+            if = { limit = { exists = cp:councillor_court_chaplain title:e_minister_of_rites.holder = cp:councillor_court_chaplain cp:councillor_court_chaplain.top_liege = root } title:e_minister_of_rites = { add_to_list = tca_mnp_central add_to_list = tca_mnp_demand } }
+            if = { limit = { exists = cp:councillor_marshal title:e_minister_of_war.holder = cp:councillor_marshal cp:councillor_marshal.top_liege = root } title:e_minister_of_war = { add_to_list = tca_mnp_central add_to_list = tca_mnp_demand } }
+            if = { limit = { exists = cp:minister_justice title:e_minister_of_justice.holder = cp:minister_justice cp:minister_justice.top_liege = root } title:e_minister_of_justice = { add_to_list = tca_mnp_central add_to_list = tca_mnp_demand } }
+            if = { limit = { exists = cp:minister_works title:e_minister_of_works.holder = cp:minister_works cp:minister_works.top_liege = root } title:e_minister_of_works = { add_to_list = tca_mnp_central add_to_list = tca_mnp_demand } }
+            set_variable = { name = tca_mnp_demand_total value = 0 }
+            every_in_list = {
+                list = tca_mnp_demand
+                scope:tca_mnp_reporter = { change_variable = { name = tca_mnp_demand_total add = 1 } }
+                # 单项记录供测量工具按层级与契约汇总；不在Python复制有效性规则。
+                debug_log = "TCA_MNP DEMAND title=[THIS.Title.GetKey]"
+                if = { limit = { is_in_list = tca_mnp_central } debug_log = "TCA_MNP DEMAND_KIND central" }
+                else_if = { limit = { has_variable = tca_tongpan_title } debug_log = "TCA_MNP DEMAND_KIND tongpan" }
+                else_if = { limit = { has_variable = tca_judicial_title } debug_log = "TCA_MNP DEMAND_KIND judicial" }
+                else = { debug_log = "TCA_MNP DEMAND_KIND administrative" }
+                # 中央职务按原生大元帅／文官部司划分；六部中的兵部仍属文官。
+                if = { limit = { this = title:e_minister_grand_marshal } debug_log = "TCA_MNP DEMAND_ROUTE military" }
+                else_if = { limit = { is_in_list = tca_mnp_central } debug_log = "TCA_MNP DEMAND_ROUTE civil" }
+                else_if = { limit = { holder = { OR = { vassal_contract_has_flag = celestial_province_military vassal_contract_has_flag = celestial_province_protectorate } } } debug_log = "TCA_MNP DEMAND_ROUTE military" }
+                else = { debug_log = "TCA_MNP DEMAND_ROUTE civil" }
+                if = { limit = { tier = tier_county } debug_log = "TCA_MNP DEMAND_BAND 98" }
+                else_if = { limit = { tier = tier_duchy } debug_log = "TCA_MNP DEMAND_BAND 76" }
+                else_if = { limit = { tier = tier_kingdom } debug_log = "TCA_MNP DEMAND_BAND 54" }
+                else = { debug_log = "TCA_MNP DEMAND_BAND 321" }
+            }
+            debug_log = "TCA_MNP END demand"
+            if = { limit = { var:tca_mnp_demand_total > 0 } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_national_scale 2" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_national_scale 2" }
+            # 全国预候选合并池是开销测量上界，正式业务仍须按文武及来源品级分别抽选。
+            every_in_list = { list = tca_mnp_candidates add_to_list = tca_mnp_remaining }
+            set_variable = { name = tca_mnp_draws value = 0 }
+            set_variable = { name = tca_mnp_expected value = var:tca_mnp_candidate_total }
+            if = { limit = { var:tca_mnp_expected > 128 } set_variable = { name = tca_mnp_expected value = 128 } }
+            debug_log = "TCA_MNP START national_draw128"
+            while = {
+                count = 128
+                limit = { tca_merit_national_probe_remaining_count > 0 var:tca_mnp_draws < 128 }
+                set_variable = { name = tca_mnp_max value = tca_merit_national_probe_max }
+                random_in_list = {
+                    list = tca_mnp_remaining
+                    weight = { base = 0 modifier = { add = tca_merit_national_probe_weight } }
+                    add_to_list = tca_mnp_selected
+                    remove_from_list = tca_mnp_remaining
+                    scope:tca_mnp_reporter = { change_variable = { name = tca_mnp_draws add = 1 } }
+                }
+            }
+            debug_log = "TCA_MNP END national_draw128"
+            set_variable = { name = tca_mnp_expected_remaining value = { value = var:tca_mnp_candidate_total subtract = var:tca_mnp_draws } }
+            if = { limit = { var:tca_mnp_draws = var:tca_mnp_expected tca_merit_national_probe_selected_count = var:tca_mnp_draws tca_merit_national_probe_remaining_count = var:tca_mnp_expected_remaining } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_national_scale 3" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_national_scale 3" }
+            every_in_list = { list = tca_mnp_remaining remove_from_list = tca_mnp_remaining }
+            every_in_list = { list = tca_mnp_selected remove_from_list = tca_mnp_selected }
+            debug_log = "TCA_MNP START create2048"
+            while = {
+                count = 2048
+                create_character = {
+                    age = 40 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite
+                    after_creation = {
+                        # 连续差距覆盖多个半衰期；不建立2048个家门，不污染前述真实全国快照。
+                        set_variable = { name = tca_mnp_frozen value = scope:tca_mnp_reporter.var:tca_mnp_scan }
+                        scope:tca_mnp_reporter = { change_variable = { name = tca_mnp_scan add = 100 } }
+                        add_to_list = tca_mnp_stress
+                        add_to_list = tca_mnp_remaining
+                    }
+                }
+            }
+            debug_log = "TCA_MNP END create2048"
+            if = { limit = { tca_merit_national_probe_stress_count = 2048 tca_merit_national_probe_remaining_count = 2048 } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_national_scale 4" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_national_scale 4" }
+            set_variable = { name = tca_mnp_draws value = 0 }
+            debug_log = "TCA_MNP START stress_draw512"
+            while = {
+                count = 512
+                set_variable = { name = tca_mnp_max value = tca_merit_national_probe_max }
+                random_in_list = {
+                    list = tca_mnp_remaining
+                    weight = { base = 0 modifier = { add = tca_merit_national_probe_weight } }
+                    add_to_list = tca_mnp_selected
+                    remove_from_list = tca_mnp_remaining
+                    scope:tca_mnp_reporter = { change_variable = { name = tca_mnp_draws add = 1 } }
+                }
+            }
+            debug_log = "TCA_MNP END stress_draw512"
+            if = { limit = { var:tca_mnp_draws = 512 tca_merit_national_probe_selected_count = 512 tca_merit_national_probe_remaining_count = 1536 } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_national_scale 5" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_national_scale 5" }
+            # 反例边界：领先者依次移走后继续耗尽，检查每轮重算不会让剩余全池下溢。
+            debug_log = "TCA_MNP START stress_exhaust1536"
+            while = {
+                count = 1536
+                set_variable = { name = tca_mnp_max value = tca_merit_national_probe_max }
+                random_in_list = {
+                    list = tca_mnp_remaining
+                    weight = { base = 0 modifier = { add = tca_merit_national_probe_weight } }
+                    add_to_list = tca_mnp_selected
+                    remove_from_list = tca_mnp_remaining
+                    scope:tca_mnp_reporter = { change_variable = { name = tca_mnp_draws add = 1 } }
+                }
+            }
+            debug_log = "TCA_MNP END stress_exhaust1536"
+            if = { limit = { var:tca_mnp_draws = 2048 tca_merit_national_probe_selected_count = 2048 tca_merit_national_probe_remaining_count = 0 } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_national_scale 6" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_national_scale 6" }
+            every_in_list = { list = tca_mnp_population remove_variable = tca_mnp_frozen remove_variable = tca_mnp_level remove_variable = tca_mnp_route }
+            every_in_list = { list = tca_mnp_stress remove_variable = tca_mnp_frozen tca_test_cleanup_merit_probe_character_effect = yes }
+            clear_saved_scope = tca_mnp_report_population
+            clear_saved_scope = tca_mnp_report_candidates
+            clear_saved_scope = tca_mnp_report_route
+            clear_saved_scope = tca_mnp_report_level
+            remove_variable = tca_mnp_scan remove_variable = tca_mnp_expected_scan remove_variable = tca_mnp_expected_remaining remove_variable = tca_mnp_population_total remove_variable = tca_mnp_candidate_total remove_variable = tca_mnp_route remove_variable = tca_mnp_level remove_variable = tca_mnp_band_population remove_variable = tca_mnp_band_candidates remove_variable = tca_mnp_demand_total remove_variable = tca_mnp_draws remove_variable = tca_mnp_expected remove_variable = tca_mnp_max
+            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_merit_national_scale" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_merit_national_scale" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_merit_national_scale" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } }
+        remove_character_flag = tca_test_case_failed
+    }
+}

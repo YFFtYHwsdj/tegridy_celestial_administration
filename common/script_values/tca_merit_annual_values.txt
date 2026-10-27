@@ -1,0 +1,155 @@
+﻿# 年度控制器：国家title作用域，以scope:tca_ma_anchor和临时名单读取同次冻结。
+# 配额输入B为累计目标、S为累计实际人口、E为合格来源人数；不读取收入或冷却。
+tca_merit_annual_raw_quota_value = {
+    value = 0
+    if = {
+        limit = { var:tca_ma_B > 0 }
+        value = var:tca_ma_B
+        multiply = 0.06
+        save_temporary_value_as = tca_ma_base
+        if = {
+            limit = { var:tca_ma_S <= var:tca_ma_B }
+            value = var:tca_ma_B
+            subtract = var:tca_ma_S
+            multiply = 0.9
+            add = scope:tca_ma_base
+        }
+        else = {
+            value = var:tca_ma_S
+            subtract = var:tca_ma_B
+            multiply = 0.9
+            divide = scope:tca_ma_base
+            add = 1
+            save_temporary_value_as = tca_ma_divisor
+            value = scope:tca_ma_base
+            divide = scope:tca_ma_divisor
+        }
+        # 原生max设置上界，min设置下界。
+        max = var:tca_ma_E
+        min = 0
+    }
+}
+# 国家title作用域；只读本轮冻结计数，零人口/零候选也必须由统计初始化显式置0。
+tca_merit_annual_tail_value = {
+    value = 0
+    if = {
+        limit = { var:tca_ma_route = 1 }
+        if = { limit = { var:tca_ma_source < 2 } add = var:tca_ma_frozen_n_1_2 }
+        if = { limit = { var:tca_ma_source < 3 } add = var:tca_ma_frozen_n_1_3 }
+        if = { limit = { var:tca_ma_source < 4 } add = var:tca_ma_frozen_n_1_4 }
+        if = { limit = { var:tca_ma_source < 5 } add = var:tca_ma_frozen_n_1_5 }
+        if = { limit = { var:tca_ma_source < 6 } add = var:tca_ma_frozen_n_1_6 }
+        if = { limit = { var:tca_ma_source < 7 } add = var:tca_ma_frozen_n_1_7 }
+        if = { limit = { var:tca_ma_source < 8 } add = var:tca_ma_frozen_n_1_8 }
+        if = { limit = { var:tca_ma_source < 9 } add = var:tca_ma_frozen_n_1_9 }
+    }
+    if = {
+        limit = { var:tca_ma_route = 2 }
+        if = { limit = { var:tca_ma_source < 2 } add = var:tca_ma_frozen_n_2_2 }
+        if = { limit = { var:tca_ma_source < 3 } add = var:tca_ma_frozen_n_2_3 }
+        if = { limit = { var:tca_ma_source < 4 } add = var:tca_ma_frozen_n_2_4 }
+        if = { limit = { var:tca_ma_source < 5 } add = var:tca_ma_frozen_n_2_5 }
+        if = { limit = { var:tca_ma_source < 6 } add = var:tca_ma_frozen_n_2_6 }
+        if = { limit = { var:tca_ma_source < 7 } add = var:tca_ma_frozen_n_2_7 }
+        if = { limit = { var:tca_ma_source < 8 } add = var:tca_ma_frozen_n_2_8 }
+        if = { limit = { var:tca_ma_source < 9 } add = var:tca_ma_frozen_n_2_9 }
+    }
+}
+tca_merit_annual_candidates_value = {
+    value = 0
+    if = {
+        limit = { var:tca_ma_route = 1 }
+        if = { limit = { var:tca_ma_source = 1 } add = var:tca_ma_frozen_e_1_1 }
+        if = { limit = { var:tca_ma_source = 2 } add = var:tca_ma_frozen_e_1_2 }
+        if = { limit = { var:tca_ma_source = 3 } add = var:tca_ma_frozen_e_1_3 }
+        if = { limit = { var:tca_ma_source = 4 } add = var:tca_ma_frozen_e_1_4 }
+        if = { limit = { var:tca_ma_source = 5 } add = var:tca_ma_frozen_e_1_5 }
+        if = { limit = { var:tca_ma_source = 6 } add = var:tca_ma_frozen_e_1_6 }
+        if = { limit = { var:tca_ma_source = 7 } add = var:tca_ma_frozen_e_1_7 }
+        if = { limit = { var:tca_ma_source = 8 } add = var:tca_ma_frozen_e_1_8 }
+        if = { limit = { var:tca_ma_source = 9 } add = var:tca_ma_frozen_e_1_9 }
+    }
+    if = {
+        limit = { var:tca_ma_route = 2 }
+        if = { limit = { var:tca_ma_source = 1 } add = var:tca_ma_frozen_e_2_1 }
+        if = { limit = { var:tca_ma_source = 2 } add = var:tca_ma_frozen_e_2_2 }
+        if = { limit = { var:tca_ma_source = 3 } add = var:tca_ma_frozen_e_2_3 }
+        if = { limit = { var:tca_ma_source = 4 } add = var:tca_ma_frozen_e_2_4 }
+        if = { limit = { var:tca_ma_source = 5 } add = var:tca_ma_frozen_e_2_5 }
+        if = { limit = { var:tca_ma_source = 6 } add = var:tca_ma_frozen_e_2_6 }
+        if = { limit = { var:tca_ma_source = 7 } add = var:tca_ma_frozen_e_2_7 }
+        if = { limit = { var:tca_ma_source = 8 } add = var:tca_ma_frozen_e_2_8 }
+        if = { limit = { var:tca_ma_source = 9 } add = var:tca_ma_frozen_e_2_9 }
+    }
+}
+# J按唯一头衔计数；沿用各带1.65与较高品0.99的累计目标，不改变配额公式。
+tca_merit_annual_target_tail_value = {
+    value = 0
+    if = {
+        limit = { var:tca_ma_route = 1 }
+        add = { value = var:tca_ma_frozen_j_1_4 multiply = 1.65 }
+        if = { limit = { var:tca_ma_source < 5 } add = { value = var:tca_ma_frozen_j_1_3 multiply = 1.65 } }
+        if = { limit = { var:tca_ma_source = 5 } add = { value = var:tca_ma_frozen_j_1_3 multiply = 0.99 } }
+        if = { limit = { var:tca_ma_source < 3 } add = { value = var:tca_ma_frozen_j_1_2 multiply = 1.65 } }
+        if = { limit = { var:tca_ma_source = 3 } add = { value = var:tca_ma_frozen_j_1_2 multiply = 0.99 } }
+        if = { limit = { var:tca_ma_source = 1 } add = { value = var:tca_ma_frozen_j_1_1 multiply = 0.99 } }
+    }
+    if = {
+        limit = { var:tca_ma_route = 2 }
+        add = { value = var:tca_ma_frozen_j_2_4 multiply = 1.65 }
+        if = { limit = { var:tca_ma_source < 5 } add = { value = var:tca_ma_frozen_j_2_3 multiply = 1.65 } }
+        if = { limit = { var:tca_ma_source = 5 } add = { value = var:tca_ma_frozen_j_2_3 multiply = 0.99 } }
+        if = { limit = { var:tca_ma_source < 3 } add = { value = var:tca_ma_frozen_j_2_2 multiply = 1.65 } }
+        if = { limit = { var:tca_ma_source = 3 } add = { value = var:tca_ma_frozen_j_2_2 multiply = 0.99 } }
+        if = { limit = { var:tca_ma_source = 1 } add = { value = var:tca_ma_frozen_j_2_1 multiply = 0.99 } }
+    }
+}
+tca_merit_annual_remaining_count_value = { value = 0 every_in_list = { list = tca_ma_remaining add = 1 } }
+tca_merit_annual_max_value = { value = 0 every_in_list = { list = tca_ma_remaining min = var:tca_ma_frozen_merit } }
+# 每关半衰差为原版相邻基准差×tau(.5)；输入source由国家冻结，不随授品改变。
+tca_merit_annual_half_gap_value = {
+    value = merit_level_2_value subtract = merit_level_1_value
+    if = { limit = { var:tca_ma_source = 2 } value = merit_level_3_value subtract = merit_level_2_value }
+    else_if = { limit = { var:tca_ma_source = 3 } value = merit_level_4_value subtract = merit_level_3_value }
+    else_if = { limit = { var:tca_ma_source = 4 } value = merit_level_5_value subtract = merit_level_4_value }
+    else_if = { limit = { var:tca_ma_source = 5 } value = merit_level_6_value subtract = merit_level_5_value }
+    else_if = { limit = { var:tca_ma_source = 6 } value = merit_level_7_value subtract = merit_level_6_value }
+    multiply = 0.5
+}
+tca_merit_annual_weight_gap_value = { value = scope:tca_ma_anchor.var:tca_ma_max subtract = var:tca_ma_frozen_merit divide = scope:tca_ma_anchor.var:tca_ma_half_gap min = 0 }
+tca_merit_annual_weight_value = {
+    value = 0
+    if = {
+        limit = { tca_merit_annual_weight_gap_value <= 30 }
+        value = 2 pow = tca_merit_annual_weight_gap_value
+        save_temporary_value_as = tca_ma_denominator
+        value = 1024 divide = scope:tca_ma_denominator
+    }
+}
+tca_merit_annual_population_level_value = {
+    value = 0
+    if = {
+        limit = { var:tca_ma_route = 1 }
+        if = { limit = { var:tca_ma_source = 1 } value = var:tca_ma_frozen_n_1_1 }
+        if = { limit = { var:tca_ma_source = 2 } value = var:tca_ma_frozen_n_1_2 }
+        if = { limit = { var:tca_ma_source = 3 } value = var:tca_ma_frozen_n_1_3 }
+        if = { limit = { var:tca_ma_source = 4 } value = var:tca_ma_frozen_n_1_4 }
+        if = { limit = { var:tca_ma_source = 5 } value = var:tca_ma_frozen_n_1_5 }
+        if = { limit = { var:tca_ma_source = 6 } value = var:tca_ma_frozen_n_1_6 }
+        if = { limit = { var:tca_ma_source = 7 } value = var:tca_ma_frozen_n_1_7 }
+        if = { limit = { var:tca_ma_source = 8 } value = var:tca_ma_frozen_n_1_8 }
+        if = { limit = { var:tca_ma_source = 9 } value = var:tca_ma_frozen_n_1_9 }
+    }
+    if = {
+        limit = { var:tca_ma_route = 2 }
+        if = { limit = { var:tca_ma_source = 1 } value = var:tca_ma_frozen_n_2_1 }
+        if = { limit = { var:tca_ma_source = 2 } value = var:tca_ma_frozen_n_2_2 }
+        if = { limit = { var:tca_ma_source = 3 } value = var:tca_ma_frozen_n_2_3 }
+        if = { limit = { var:tca_ma_source = 4 } value = var:tca_ma_frozen_n_2_4 }
+        if = { limit = { var:tca_ma_source = 5 } value = var:tca_ma_frozen_n_2_5 }
+        if = { limit = { var:tca_ma_source = 6 } value = var:tca_ma_frozen_n_2_6 }
+        if = { limit = { var:tca_ma_source = 7 } value = var:tca_ma_frozen_n_2_7 }
+        if = { limit = { var:tca_ma_source = 8 } value = var:tca_ma_frozen_n_2_8 }
+        if = { limit = { var:tca_ma_source = 9 } value = var:tca_ma_frozen_n_2_9 }
+    }
+}

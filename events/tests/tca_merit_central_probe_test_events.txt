@@ -1,0 +1,334 @@
+﻿# 中央授品独立技术探针；短暂替换真实刑部，必须仅在可丢弃 debug 测试局运行。
+# 使用原生 assign_councillor_type → on_get_position → 正式授头衔 → on_title_gain。
+# 不代表玩家点击、自然继任或三省映射已验收；局势催化剂不回滚。
+namespace = tca_merit_central_probe
+
+tca_merit_central_probe.1 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        if = { limit = { has_character_flag = tca_test_delayed_case_active } debug_log = "TCA_TEST CASE_BUSY" }
+        else = {
+            debug_log = "TCA_TEST BEGIN tca_merit_central_probe.1 tca_test_merit_central_appointment"
+            remove_character_flag = tca_test_case_failed
+            if = {
+                limit = {
+                    debug_only = yes is_alive = yes title:h_china.holder = root
+                    tgp_has_access_to_ministry_trigger = yes
+                    exists = cp:minister_justice
+                    cp:minister_justice = title:e_minister_of_justice.holder
+                    situation:dynastic_cycle = {
+                        situation_current_phase = situation_dynastic_cycle_phase_stability_advancement
+                        situation_top_has_catalyst = catalyst_hegemon_appointing_low_merit_councillor
+                        situation_top_sub_region = { phase_takeover_points:situation_dynastic_cycle_phase_instability < 900 }
+                    }
+                }
+                cp:minister_justice = { save_scope_as = tca_merit_central_original }
+                # 正式锁品后全国可能暂时没有二品候选；本项必须自备合法候选，不能依赖旧缓存。
+                # 只准备普通家门/考试/原生九级（一品）功绩资格并清冷却，不写候选分、不指定继承人。
+                # 接口隔离标记使其不进入正式年度人口与授品，保留原生任命筛选。
+                tca_test_create_merit_interface_character_effect = { CHARACTER = tca_merit_central_control GOVERNMENT = celestial_government }
+                scope:tca_merit_central_control = {
+                    tca_test_add_native_merit_probe_exams_effect = yes
+                    add_trait = education_stewardship_1
+                    change_merit = 24000
+                    clear_appointment_timeout = yes
+                }
+                add_character_flag = tca_test_delayed_case_active
+                debug_log = "TCA_TEST WAIT tca_test_merit_central_appointment 2 days"
+                trigger_event = { id = tca_merit_central_probe.1011 days = 2 }
+            }
+            else = {
+                debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_merit_central_appointment"
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+                tca_test_continue_delayed_effect = yes
+            }
+        }
+    }
+}
+
+# 先等待独立候选的原生Merit等级刷新，再比较任命前后相同的原生继承重算。
+tca_merit_central_probe.1011 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+                scope:tca_merit_central_control = {
+                    save_scope_value_as = { name = tca_merit_central_control_level value = merit_level }
+                    save_scope_value_as = { name = tca_merit_central_control_merit value = merit }
+                    save_scope_value_as = { name = tca_merit_central_control_timeout value = appointment_timeout_days }
+                }
+                if = { limit = { scope:tca_merit_central_control = { has_appointment_level_for_title = title:e_minister_of_justice tgp_can_be_a_minister_trigger = { COURT_OWNER = root } appointment_timeout_days = 0 } } debug_log = "TCA_MERIT_CENTRAL CONTROL_CANDIDATE_READY" }
+                else = { debug_log = "TCA_MERIT_CENTRAL CONTROL_CANDIDATE_NOT_READY" }
+                if = {
+                    limit = { exists = title:e_minister_of_justice.current_heir }
+                    title:e_minister_of_justice.current_heir = { save_scope_as = tca_merit_central_raw_heir }
+                }
+                # 原版自带的单人物继承重算效果；只刷新测试快照，不指定继承人或调整评分。
+                # 完整同局中前序用例／自然授职可能使原名单已过时，先记录原值再核对原生重算。
+                scope:tca_merit_central_original = { scriptedtests_recalculate_succession = yes }
+                if = { limit = { exists = scope:tca_merit_central_raw_heir title:e_minister_of_justice.current_heir ?= scope:tca_merit_central_raw_heir } debug_log = "TCA_MERIT_CENTRAL NATIVE_REFRESH_UNCHANGED" }
+                else = { debug_log = "TCA_MERIT_CENTRAL NATIVE_REFRESH_CHANGED" }
+                title:e_minister_of_justice.current_heir = { save_scope_as = tca_merit_central_heir }
+                title:e_minister_of_justice.current_heir = { save_scope_as = tca_merit_central_current }
+                debug_log_scopes = yes
+                # 先做不任命任何人的两日对照，区分名单自身刷新与后续任命副作用。
+                trigger_event = { id = tca_merit_central_probe.1010 days = 2 }
+        }
+    }
+}
+
+# 原生刷新控制：已有独立合法候选，但此时尚未任命任何中央夹具。
+tca_merit_central_probe.1010 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            title:e_minister_of_justice.current_heir = { save_scope_as = tca_merit_central_current }
+            debug_log = tca_merit_central_diagnostic
+            scope:tca_merit_central_original = { scriptedtests_recalculate_succession = yes }
+            if = { limit = { title:e_minister_of_justice.current_heir = scope:tca_merit_central_heir } debug_log = "TCA_MERIT_CENTRAL NO_APPOINTMENT_CONTROL_UNCHANGED" }
+            else = { debug_log = "TCA_MERIT_CENTRAL NO_APPOINTMENT_CONTROL_CHANGED" }
+            # 真正任命前的快照采用完成原生刷新控制后的当前状态。
+            title:e_minister_of_justice.current_heir = { save_scope_as = tca_merit_central_heir }
+                tca_test_create_merit_interface_character_effect = { CHARACTER = tca_merit_central_low GOVERNMENT = celestial_government }
+                tca_test_create_merit_interface_character_effect = { CHARACTER = tca_merit_central_high GOVERNMENT = celestial_government }
+                tca_test_create_merit_interface_character_effect = { CHARACTER = tca_merit_central_transient GOVERNMENT = celestial_government }
+                scope:tca_merit_central_transient = {
+                    tca_test_add_native_merit_probe_exams_effect = yes
+                    add_trait = education_stewardship_1
+                    change_merit = 100
+                    set_variable = { name = tca_merit_central_probe_reporter value = root }
+                    set_variable = { name = tca_merit_central_probe_gains value = 0 }
+                    set_variable = { name = tca_merit_central_probe_settlements value = 0 }
+                }
+                scope:tca_merit_central_low = {
+                    tca_test_add_native_merit_probe_exams_effect = yes
+                    add_trait = education_stewardship_1
+                    change_merit = 100
+                    set_variable = { name = tca_merit_central_probe_reporter value = root }
+                    set_variable = { name = tca_merit_central_probe_gains value = 0 }
+                    set_variable = { name = tca_merit_central_probe_settlements value = 0 }
+                    set_variable = { name = tca_merit_central_probe_worker_stable value = 0 }
+                }
+                scope:tca_merit_central_high = {
+                    tca_test_add_native_merit_probe_exams_effect = yes
+                    add_trait = education_stewardship_1
+                    change_merit = 24000
+                    set_variable = { name = tca_merit_central_probe_reporter value = root }
+                    set_variable = { name = tca_merit_central_probe_gains value = 0 }
+                    set_variable = { name = tca_merit_central_probe_settlements value = 0 }
+                    set_variable = { name = tca_merit_central_probe_worker_stable value = 0 }
+                }
+                add_character_flag = tca_test_delayed_case_active
+                debug_log = "TCA_TEST WAIT tca_test_merit_central_appointment 1 day"
+                trigger_event = { id = tca_merit_central_probe.1001 days = 1 }
+        }
+    }
+}
+
+# 先等待原版考试上限刷新。以下快照在真实任命前后同链读取，不以跨日总量猜催化剂。
+tca_merit_central_probe.1001 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_merit_central_low = { NOT = { has_appointment_level_for_title = title:e_minister_of_justice } } scope:tca_merit_central_high = { merit_level = 9 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_central_appointment 1" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_central_appointment 1" }
+            title:e_minister_of_justice.current_heir = { save_scope_as = tca_merit_central_current }
+            debug_log = tca_merit_central_diagnostic
+            situation:dynastic_cycle.situation_top_sub_region = { set_variable = { name = tca_merit_central_before value = phase_takeover_points:situation_dynastic_cycle_phase_instability } set_variable = { name = tca_merit_central_expected value = { value = var:tca_merit_central_before add = minor_situation_catalyst_gain } } }
+            # 原任的真实超时只取快照，不清除、不补资源；末尾按实际经过六日核对隔离。
+            scope:tca_merit_central_original = {
+                save_scope_value_as = { name = tca_merit_central_original_timeout value = appointment_timeout_days }
+            }
+            assign_councillor_type = { type = minister_justice target = scope:tca_merit_central_low fire_on_actions = yes remove_existing_councillor = yes }
+            if = { limit = { cp:minister_justice = scope:tca_merit_central_low title:e_minister_of_justice.holder = scope:tca_merit_central_low scope:tca_merit_central_low = { merit = 100 var:tca_merit_central_probe_gains = 1 var:tca_merit_central_probe_seen_merit = 100 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_central_appointment 2" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_central_appointment 2" }
+            if = { limit = { situation:dynastic_cycle.situation_top_sub_region = { phase_takeover_points:situation_dynastic_cycle_phase_instability = var:tca_merit_central_expected } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_central_appointment 3" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_central_appointment 3" }
+            debug_log = "TCA_TEST WAIT tca_test_merit_central_appointment 2 days"
+            trigger_event = { id = tca_merit_central_probe.1002 days = 2 }
+        }
+    }
+}
+
+# 仅此探针的次日授品 worker：仍须实际持有刑部；只对不足二品者结算一次。
+# 17000 来自原版 LEVELS_MERIT 第八档。直接设置是接口探针，不是正式双账结算方案。
+tca_merit_central_probe.9001 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = {
+                limit = {
+                    has_variable = tca_merit_central_probe_reporter
+                    has_title = title:e_minister_of_justice is_alive = yes
+                    var:tca_merit_central_probe_reporter = {
+                        is_alive = yes title:h_china.holder = this
+                        NOT = { has_character_flag = tca_test_suite_aborted }
+                    }
+                }
+                situation:dynastic_cycle.situation_top_sub_region = { set_variable = { name = tca_merit_central_worker_before value = phase_takeover_points:situation_dynastic_cycle_phase_instability } }
+                if = {
+                    limit = { merit_level < 8 }
+                    set_merit_level = 8
+                    change_merit_no_experience = { value = 17000 subtract = merit }
+                    change_variable = { name = tca_merit_central_probe_settlements add = 1 }
+                }
+                if = { limit = { situation:dynastic_cycle.situation_top_sub_region = { phase_takeover_points:situation_dynastic_cycle_phase_instability = var:tca_merit_central_worker_before } } set_variable = { name = tca_merit_central_probe_worker_stable value = 1 } }
+                else = { set_variable = { name = tca_merit_central_probe_worker_stable value = 0 } var:tca_merit_central_probe_reporter = { add_character_flag = tca_test_case_failed } }
+            }
+        }
+    }
+}
+
+tca_merit_central_probe.1002 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_merit_central_low = { has_title = title:e_minister_of_justice merit_level = 8 merit = 17000 var:tca_merit_central_probe_settlements = 1 var:tca_merit_central_probe_worker_stable = 1 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_central_appointment 4" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_central_appointment 4" }
+            # 重复 worker 是幂等接口检查，不称为第二次真实任命。
+            scope:tca_merit_central_low = { change_merit_no_experience = 123 trigger_event = tca_merit_central_probe.9001 }
+            if = { limit = { scope:tca_merit_central_low = { merit = 17123 merit_level = 8 var:tca_merit_central_probe_settlements = 1 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_central_appointment 5" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_central_appointment 5" }
+            situation:dynastic_cycle.situation_top_sub_region = { set_variable = { name = tca_merit_central_before_high value = phase_takeover_points:situation_dynastic_cycle_phase_instability } }
+            assign_councillor_type = { type = minister_justice target = scope:tca_merit_central_high fire_on_actions = yes remove_existing_councillor = yes }
+            if = { limit = { title:e_minister_of_justice.holder = scope:tca_merit_central_high scope:tca_merit_central_high = { var:tca_merit_central_probe_gains = 1 } situation:dynastic_cycle.situation_top_sub_region = { phase_takeover_points:situation_dynastic_cycle_phase_instability = var:tca_merit_central_before_high } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_central_appointment 6" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_central_appointment 6" }
+            debug_log = "TCA_TEST WAIT tca_test_merit_central_appointment 2 days"
+            trigger_event = { id = tca_merit_central_probe.1003 days = 2 }
+        }
+    }
+}
+
+tca_merit_central_probe.1003 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            scope:tca_merit_central_high = {
+                save_scope_value_as = { name = tca_merit_central_diag_high_merit value = merit }
+                save_scope_value_as = { name = tca_merit_central_diag_high_level value = merit_level }
+                save_scope_value_as = { name = tca_merit_central_diag_high_settlements value = var:tca_merit_central_probe_settlements }
+                save_scope_value_as = { name = tca_merit_central_diag_high_stable value = var:tca_merit_central_probe_worker_stable }
+            }
+            debug_log_scopes = yes
+            if = { limit = { scope:tca_merit_central_high = { merit_level = 9 merit = 24000 var:tca_merit_central_probe_settlements = 0 var:tca_merit_central_probe_worker_stable = 1 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_central_appointment 7" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_central_appointment 7" }
+            # 先令两个临时人物退出候选，再恢复原任，避免其 Merit 干扰原继承名单。
+            scope:tca_merit_central_low = { remove_variable = tca_merit_central_probe_reporter tca_test_cleanup_merit_probe_character_effect = yes }
+            scope:tca_merit_central_high = { remove_variable = tca_merit_central_probe_reporter tca_test_cleanup_merit_probe_character_effect = yes }
+            # 真实获任后在同链失职；已排队的授品必须重新核对持有关系，不能只凭获任记录兑现。
+            assign_councillor_type = { type = minister_justice target = scope:tca_merit_central_transient fire_on_actions = yes remove_existing_councillor = yes }
+            # 原版AI也可任命低品大臣，原任不保证足二品；恢复须保留其原状并核对实际惩罚。
+            # 只比较恢复前后同链点数，不以跨日总量猜测催化剂。
+            situation:dynastic_cycle.situation_top_sub_region = { set_variable = { name = tca_merit_central_restore_expected value = phase_takeover_points:situation_dynastic_cycle_phase_instability } }
+            scope:tca_merit_central_original = {
+                if = {
+                    limit = { NOT = { has_appointment_level_for_title = title:e_minister_of_justice } }
+                    situation:dynastic_cycle.situation_top_sub_region = { change_variable = { name = tca_merit_central_restore_expected add = minor_situation_catalyst_gain } }
+                }
+            }
+            # 资源只比较恢复前后同链，避免将自然跨月收入误作探针污染。
+            scope:tca_merit_central_original = {
+                save_scope_value_as = { name = tca_merit_central_restore_merit value = merit }
+                save_scope_value_as = { name = tca_merit_central_restore_level value = merit_level }
+            }
+            # 恢复真实原任是探针复原，不新建正式中央授品；只临时排除此人本次入口。
+            # 保留其已有核定/余额/pending；专用所有权标记避免删除原本已有的隔离标记。
+            scope:tca_merit_central_original = {
+                if = {
+                    limit = { NOT = { has_character_flag = tca_merit_interface_probe } }
+                    add_character_flag = tca_merit_interface_probe
+                    add_character_flag = tca_merit_central_restore_owns_isolation
+                }
+            }
+            if = { limit = { NOT = { cp:minister_justice = scope:tca_merit_central_original } } assign_councillor_type = { type = minister_justice target = scope:tca_merit_central_original fire_on_actions = yes remove_existing_councillor = yes } }
+            scope:tca_merit_central_original = {
+                if = {
+                    limit = { has_character_flag = tca_merit_central_restore_owns_isolation }
+                    remove_character_flag = tca_merit_interface_probe
+                    remove_character_flag = tca_merit_central_restore_owns_isolation
+                }
+            }
+            # 恢复后立即按最终议会/头衔重算继承并核对原首位；不再等两日让AI自然改选。
+            scope:tca_merit_central_original = { scriptedtests_recalculate_succession = yes }
+            if = { limit = { cp:minister_justice = scope:tca_merit_central_original title:e_minister_of_justice.holder = scope:tca_merit_central_original title:e_minister_of_justice.current_heir = scope:tca_merit_central_heir } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_central_appointment 9" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_central_appointment 9" }
+            # 原生重新授职会刷新五年任命冷却；这是探针副作用，不能带入后续用例。
+            # 在正式回调完成后恢复事前剩余日数；不改获任资格、候选分或局势催化剂。
+            # 快照取于 .1001，至本链确实经过四日；.1004 再等两日验证自然流逝。
+            scope:tca_merit_central_original = {
+                clear_appointment_timeout = yes
+                if = {
+                    limit = { scope:tca_merit_central_original_timeout > 4 }
+                    set_variable = { name = tca_merit_central_remaining_timeout value = { value = scope:tca_merit_central_original_timeout subtract = 4 } }
+                    set_appointment_timeout = { days = tca_merit_central_remaining_timeout_days }
+                    remove_variable = tca_merit_central_remaining_timeout
+                }
+            }
+            if = { limit = { situation:dynastic_cycle.situation_top_sub_region = { phase_takeover_points:situation_dynastic_cycle_phase_instability = var:tca_merit_central_restore_expected } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_central_appointment 8" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_central_appointment 8" }
+            if = { limit = { scope:tca_merit_central_original = { merit = scope:tca_merit_central_restore_merit merit_level = scope:tca_merit_central_restore_level NOT = { has_variable = tca_merit_central_probe_reporter } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_central_appointment 11" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_central_appointment 11" }
+            debug_log = "TCA_TEST WAIT tca_test_merit_central_appointment 2 days"
+            trigger_event = { id = tca_merit_central_probe.1004 days = 2 }
+        }
+    }
+}
+
+tca_merit_central_probe.1004 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            title:e_minister_of_justice.current_heir = { save_scope_as = tca_merit_central_current }
+            debug_log_scopes = yes
+            debug_log = tca_merit_central_diagnostic
+            if = { limit = { title:e_minister_of_justice.current_heir = scope:tca_merit_central_heir } debug_log = "TCA_MERIT_CENTRAL HEIR_RESTORED" }
+            else = { debug_log = "TCA_MERIT_CENTRAL HEIR_DIFFERENT" }
+            # 只记录失败归因数据，不改动继承名单、评分或既有断言。
+            if = { limit = { cp:minister_justice = scope:tca_merit_central_original } debug_log = "TCA_MERIT_CENTRAL CP_RESTORED" }
+            else = { debug_log = "TCA_MERIT_CENTRAL CP_DIFFERENT" }
+            if = { limit = { title:e_minister_of_justice.holder = scope:tca_merit_central_original } debug_log = "TCA_MERIT_CENTRAL HOLDER_RESTORED" }
+            else = { debug_log = "TCA_MERIT_CENTRAL HOLDER_DIFFERENT" }
+            if = { limit = { scope:tca_merit_central_transient = { NOT = { has_title = title:e_minister_of_justice } merit = 100 merit_level = 1 var:tca_merit_central_probe_gains = 1 var:tca_merit_central_probe_settlements = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_central_appointment 10" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_central_appointment 10" }
+            scope:tca_merit_central_original = {
+                save_scope_value_as = { name = tca_merit_central_final_timeout value = appointment_timeout_days }
+            }
+            # 只容许自然流逝；真实任命若新增超时也必须留下失败，不能称为恢复隔离通过。
+            if = { limit = { scope:tca_merit_central_original = { appointment_timeout_days = { value = scope:tca_merit_central_original_timeout subtract = 6 min = 0 } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_central_appointment 12" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_central_appointment 12" }
+            debug_log_scopes = yes
+            scope:tca_merit_central_transient = { remove_variable = tca_merit_central_probe_reporter tca_test_cleanup_merit_probe_character_effect = yes }
+            if = { limit = {
+                scope:tca_merit_central_low = { appointment_timeout_days > 36500 NOT = { has_variable = tca_merit_central_probe_reporter } NOT = { has_title = title:e_minister_of_justice } }
+                scope:tca_merit_central_high = { appointment_timeout_days > 36500 NOT = { has_variable = tca_merit_central_probe_reporter } NOT = { has_title = title:e_minister_of_justice } }
+                scope:tca_merit_central_transient = { appointment_timeout_days > 36500 NOT = { has_variable = tca_merit_central_probe_reporter } NOT = { has_title = title:e_minister_of_justice } }
+            } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_central_appointment 13" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_central_appointment 13" }
+            # 继任对照人物只在本项暂时开放候选；恢复长冷却与保护，不留给后续用例。
+            scope:tca_merit_central_control = { tca_test_cleanup_merit_probe_character_effect = yes }
+            if = { limit = { scope:tca_merit_central_control = { appointment_timeout_days > 36500 tca_merit_interface_probe_trigger = yes tca_merit_population_trigger = no NOT = { has_character_flag = tca_merit_active } NOT = { has_variable = tca_merit_grant_phase } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_central_appointment 14" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_central_appointment 14" }
+            situation:dynastic_cycle.situation_top_sub_region = { remove_variable = tca_merit_central_before remove_variable = tca_merit_central_expected remove_variable = tca_merit_central_before_high remove_variable = tca_merit_central_worker_before remove_variable = tca_merit_central_restore_expected }
+            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_merit_central_appointment" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_merit_central_appointment" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            remove_character_flag = tca_test_case_failed
+            remove_character_flag = tca_test_delayed_case_active
+            tca_test_continue_delayed_effect = yes
+        }
+    }
+}
+

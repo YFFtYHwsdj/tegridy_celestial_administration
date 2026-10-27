@@ -33,6 +33,12 @@ class ExamContractTests(unittest.TestCase):
                 actual = definitions((ROOT / entry['mod']).read_text(encoding='utf-8-sig'))[key]
                 native = definitions((ROOT / entry['baseline']).read_text(encoding='utf-8-sig'))[key]
                 patched = ' '.join(actual)
+                # 乡试地域判定已抽成带host/首府防御的共用trigger；先还原为原版地域块，
+                # 再按“只增设资格门槛、其余效果不变”比较。防御分支本身由原生用例覆盖。
+                if key == 'activity_local_examination':
+                    region_call = 'tca_exam_local_guest_region_trigger = yes'
+                    self.assertEqual(patched.count(region_call), 1)
+                    patched = patched.replace(region_call, 'default_location.county.empire = { OR = { this = scope:host.capital_county.empire any_title_to_title_neighboring_kingdom = { this = scope:host.capital_county.kingdom } } }')
                 gate = 'tca_exam_can_take_exam_trigger = yes'
                 if key.endswith('_intent'):
                     gate = 'custom_tooltip = { text = tca_exam_not_serving_tt ' + gate + ' }'

@@ -1,0 +1,191 @@
+﻿# 核准上限与余额结算的可丢弃接口探针；不派发正式年度竞争，不覆盖原版对象。
+# 三位独立人物分别覆盖经验盈余、经验不足及贤能制对照；改制尾段故意暴露残留边界。
+namespace = tca_merit_cap_probe
+
+tca_merit_cap_probe.1 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        if = { limit = { has_character_flag = tca_test_delayed_case_active } debug_log = "TCA_TEST CASE_BUSY" }
+        else = {
+            debug_log = "TCA_TEST BEGIN tca_merit_cap_probe.1 tca_test_merit_cap_contract"
+            remove_character_flag = tca_test_case_failed
+            if = {
+                limit = { debug_only = yes is_alive = yes title:h_china.holder = root }
+                tca_test_create_merit_interface_character_effect = { CHARACTER = tca_merit_cap_overflow GOVERNMENT = celestial_government }
+                tca_test_create_merit_interface_character_effect = { CHARACTER = tca_merit_cap_deficit GOVERNMENT = celestial_government }
+                tca_test_create_merit_interface_character_effect = { CHARACTER = tca_merit_cap_control GOVERNMENT = meritocratic_government }
+                scope:tca_merit_cap_overflow = {
+                    add_character_modifier = { modifier = tca_merit_probe_lock_modifier }
+                    tca_test_add_scaled_merit_probe_exams_effect = yes
+                    change_merit = 30000
+                    set_variable = { name = tca_merit_probe_approved value = 1 }
+                }
+                scope:tca_merit_cap_deficit = {
+                    add_character_modifier = { modifier = tca_merit_probe_lock_modifier }
+                    tca_test_add_scaled_merit_probe_exams_effect = yes
+                    # 单独注入余额与经验，得到高余额、刚入 Level 1 的相反差额。
+                    change_merit_no_experience = 30000
+                    change_merit_experience = 100
+                    set_variable = { name = tca_merit_probe_approved value = 1 }
+                }
+                scope:tca_merit_cap_control = { tca_test_add_native_merit_probe_exams_effect = yes change_merit = 30000 }
+                if = { limit = { scope:tca_merit_cap_overflow = { merit = 30000 merit_level = 1 } scope:tca_merit_cap_deficit = { merit = 30000 merit_level = 1 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_cap_contract 1" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_cap_contract 1" }
+                # 仅模拟核准两人的 Level 2，直接结算余额；变量不是正式品级状态入口。
+                scope:tca_merit_cap_overflow = {
+                    change_merit_no_experience = { value = 1000 subtract = merit }
+                    set_variable = { name = tca_merit_probe_approved value = 2 }
+                    remove_character_modifier = tca_merit_probe_lock_modifier
+                }
+                scope:tca_merit_cap_deficit = {
+                    change_merit_no_experience = { value = 1000 subtract = merit }
+                    set_variable = { name = tca_merit_probe_approved value = 2 }
+                    remove_character_modifier = tca_merit_probe_lock_modifier
+                }
+                if = { limit = { scope:tca_merit_cap_overflow = { merit = 1000 var:tca_merit_probe_approved = 2 } scope:tca_merit_cap_deficit = { merit = 1000 var:tca_merit_probe_approved = 2 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_cap_contract 2" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_cap_contract 2" }
+                add_character_flag = tca_test_delayed_case_active
+                debug_log = "TCA_TEST WAIT tca_test_merit_cap_contract 1 day"
+                trigger_event = { id = tca_merit_cap_probe.1001 days = 1 }
+            }
+            else = {
+                debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_merit_cap_contract"
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+                tca_test_continue_delayed_effect = yes
+            }
+        }
+    }
+}
+
+# 高经验自行达到核准上限；低经验者需在上限刷新后补到核准等级，不能同链提前设置。
+tca_merit_cap_probe.1001 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_merit_cap_control = { government_has_flag = government_is_meritocratic merit_level = 5 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_cap_contract 3" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_cap_contract 3" }
+            if = { limit = { scope:tca_merit_cap_overflow = { merit_level = 2 merit = 1000 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_cap_contract 4" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_cap_contract 4" }
+            if = { limit = { scope:tca_merit_cap_deficit = { merit_level = 1 merit = 1000 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_cap_contract 5" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_cap_contract 5" }
+            scope:tca_merit_cap_deficit = { set_merit_level = 2 }
+            if = { limit = { scope:tca_merit_cap_deficit = { merit_level = 2 merit = 1000 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_cap_contract 6" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_cap_contract 6" }
+            debug_log = "TCA_TEST WAIT tca_test_merit_cap_contract 1 day"
+            trigger_event = { id = tca_merit_cap_probe.1002 days = 1 }
+        }
+    }
+}
+
+tca_merit_cap_probe.1002 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_merit_cap_overflow = { merit_level = 2 merit < 2000 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_cap_contract 7" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_cap_contract 7" }
+            scope:tca_merit_cap_overflow = { change_merit = 999 }
+            if = { limit = { scope:tca_merit_cap_overflow = { merit = 1999 merit < 2000 merit_level = 2 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_cap_contract 8" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_cap_contract 8" }
+            if = { limit = { scope:tca_merit_cap_deficit = { merit_level = 2 merit = 1000 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_cap_contract 9" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_cap_contract 9" }
+            debug_log = "TCA_TEST WAIT tca_test_merit_cap_contract 1 day"
+            trigger_event = { id = tca_merit_cap_probe.1003 days = 1 }
+        }
+    }
+}
+
+# 再核准一次，说明下一档所需余额仍须重新积累；不把本段当作年度候选或名额验收。
+tca_merit_cap_probe.1003 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_merit_cap_overflow = { merit_level = 2 merit = 1999 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_cap_contract 10" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_cap_contract 10" }
+            scope:tca_merit_cap_overflow = {
+                change_merit = 1
+                if = {
+                    limit = { merit >= 2000 }
+                    change_merit_no_experience = { value = 2000 subtract = merit }
+                    set_variable = { name = tca_merit_probe_approved value = 3 }
+                    add_character_modifier = { modifier = tca_merit_probe_unlock_modifier }
+                }
+            }
+            if = { limit = { scope:tca_merit_cap_overflow = { merit = 2000 var:tca_merit_probe_approved = 3 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_cap_contract 11" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_cap_contract 11" }
+            debug_log = "TCA_TEST WAIT tca_test_merit_cap_contract 1 day"
+            trigger_event = { id = tca_merit_cap_probe.1004 days = 1 }
+        }
+    }
+}
+
+tca_merit_cap_probe.1004 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_merit_cap_overflow = { merit_level = 3 merit = 2000 merit < 3500 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_cap_contract 12" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_cap_contract 12" }
+            if = { limit = { scope:tca_merit_cap_deficit = { merit_level = 2 merit = 1000 var:tca_merit_probe_approved = 2 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_cap_contract 13" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_cap_contract 13" }
+            scope:tca_merit_cap_overflow = { change_merit_experience = 50000 }
+            debug_log = "TCA_TEST WAIT tca_test_merit_cap_contract 1 day"
+            trigger_event = { id = tca_merit_cap_probe.1005 days = 1 }
+        }
+    }
+}
+
+# 残留经验受核准上限阻挡，但退出天朝并刷新考试倍率会重新兑现；这是待处理边界。
+tca_merit_cap_probe.1005 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_merit_cap_overflow = { merit_level = 3 merit = 2000 var:tca_merit_probe_approved = 3 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_cap_contract 14" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_cap_contract 14" }
+            scope:tca_merit_cap_overflow = {
+                remove_character_modifier = tca_merit_probe_unlock_modifier
+                change_government = meritocratic_government
+                tca_test_refresh_scaled_merit_probe_exams_effect = yes
+            }
+            debug_log = "TCA_TEST WAIT tca_test_merit_cap_contract 1 day"
+            trigger_event = { id = tca_merit_cap_probe.1006 days = 1 }
+        }
+    }
+}
+
+tca_merit_cap_probe.1006 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_merit_cap_overflow = { government_has_flag = government_is_meritocratic merit_level = 5 merit = 2000 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_cap_contract 15" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_cap_contract 15" }
+            if = { limit = { scope:tca_merit_cap_control = { government_has_flag = government_is_meritocratic merit_level = 5 merit = 30000 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_cap_contract 16" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_cap_contract 16" }
+            scope:tca_merit_cap_overflow = { tca_test_cleanup_merit_probe_character_effect = yes }
+            scope:tca_merit_cap_deficit = { tca_test_cleanup_merit_probe_character_effect = yes }
+            scope:tca_merit_cap_control = { tca_test_cleanup_merit_probe_character_effect = yes }
+            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_merit_cap_contract" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_merit_cap_contract" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            remove_character_flag = tca_test_case_failed
+            remove_character_flag = tca_test_delayed_case_active
+            tca_test_continue_delayed_effect = yes
+        }
+    }
+}

@@ -1,0 +1,178 @@
+﻿# 人物作用域，无参数或输出scope。首次接管只采纳当前1..9等级，绝不发gain、改余额或经验。
+# 0级不激活，以保留原版首入九品路径；调用方在初始化屏障及合法gain后调用。
+# 已激活时仅刷新唯一路线与变化的上限；准备、审计及隔离事务由事务入口独占维护，
+# 初始化不读取异步旧等级覆盖核定值，也不重装其修正。
+tca_merit_initialize_character_effect = {
+    if = { limit = { NOT = { has_variable = tca_merit_grant_phase } } tca_merit_initialize_character_state_effect = yes }
+}
+
+# 人物作用域；仅真实原生gain可以在SOURCE=0准备期间接管已自然入品者。
+# 不提交/取消事务，不改TOKEN/phase；原SOURCE=0提交随后会因真实入品而正常失效。
+# 年度与普通维护仍只走上方受保护入口，不可越过准备/审计/隔离状态。
+tca_merit_accept_native_gain_effect = {
+    if = {
+        limit = { var:tca_merit_grant_phase ?= 1 var:tca_merit_grant_source ?= 0 merit_level >= 1 NOT = { has_character_flag = tca_merit_active } }
+        tca_merit_initialize_character_state_effect = yes
+    }
+    else = { tca_merit_initialize_character_effect = yes }
+}
+
+# 内部状态建立入口；调用方已取得普通维护权限或确认真实零级来源gain，保留全部制度准入。
+tca_merit_initialize_character_state_effect = {
+    if = {
+        limit = { is_alive = yes exists = top_liege top_liege ?= { government_has_flag = government_is_celestial } is_independent_ruler = no government_has_flag = government_is_celestial }
+        if = {
+            limit = { NOT = { has_character_flag = tca_merit_active } merit_level >= 1 }
+            set_variable = { name = tca_merit_approved_level value = merit_level }
+            add_character_flag = tca_merit_active
+        }
+        if = {
+            limit = { has_character_flag = tca_merit_active }
+            if = {
+                # 直接prepare零级事务也可能在提交前自然入品，未必持有entry_pending。
+                limit = { merit_level >= 1 }
+                remove_character_flag = tca_merit_entry_pending
+                remove_character_flag = tca_merit_central_zero_prep_owned
+                remove_character_flag = tca_merit_zero_route_owned
+                remove_variable = tca_merit_zero_previous_route
+            }
+            if = { limit = { is_civilian_candidate_trigger = yes is_military_candidate_trigger = no } set_variable = { name = tca_merit_route value = 1 } }
+            else_if = { limit = { is_military_candidate_trigger = yes is_civilian_candidate_trigger = no } set_variable = { name = tca_merit_route value = 2 } }
+            tca_merit_refresh_cap_effect = yes
+        }
+    }
+}
+
+# 人物作用域；真实入品奖励之前调用。0级先装九品上限，首笔大额奖励也只能自然入九品。
+# pending不计仕途人口；合法原生gain后的initialize解除pending，不发奖励或强设原生等级。
+tca_merit_prepare_entry_effect = {
+    if = {
+        limit = { is_alive = yes exists = top_liege top_liege ?= { government_has_flag = government_is_celestial } is_independent_ruler = no government_has_flag = government_is_celestial NOT = { has_character_flag = tca_merit_active } merit_level = 0 }
+        set_variable = { name = tca_merit_approved_level value = 1 }
+        add_character_flag = tca_merit_active
+        add_character_flag = tca_merit_entry_pending
+        tca_merit_refresh_cap_effect = yes
+    }
+}
+
+# 人物作用域；零级中央持职者在等候次日事务期间借用入品准备时标记所有权。
+# 若在授品前失职／退休／辞谢／迁国，取消本事务建立的准备并恢复未接管；
+# 若已合法进入九品，只清所有权标记，不撤真实等级或已生效的入品准备。
+tca_merit_cancel_central_zero_prep_effect = {
+    if = {
+        limit = { has_character_flag = tca_merit_central_zero_prep_owned }
+        if = {
+            limit = { merit_level = 0 has_character_flag = tca_merit_entry_pending }
+            # 复用受保护退出，连同两项cap快照和考试倍率一起恢复；不能只删身份变量。
+            tca_merit_leave_celestial_effect = yes
+        }
+        else = {
+            # 已有真实入品时保留当前路线，仅释放借用记录。
+            remove_character_flag = tca_merit_zero_route_owned
+            remove_variable = tca_merit_zero_previous_route
+        }
+        remove_character_flag = tca_merit_central_zero_prep_owned
+    }
+}
+
+# 真实奖励边界的人物作用域。全局开局屏障前保留原版历史人物生成，不提前截断。
+# 已有品级先同级接管；未入品只准备九品上限，原版奖励保留全部余额与经验。
+tca_merit_before_reward_effect = {
+    if = {
+        limit = { has_global_variable = tca_merit_startup_ready NOT = { tca_merit_interface_probe_trigger = yes } }
+        # 真实奖励已接管准备，即使尚未涨到九品也不能再由中央取消它。
+        remove_character_flag = tca_merit_central_zero_prep_owned
+        remove_character_flag = tca_merit_zero_route_owned
+        remove_variable = tca_merit_zero_previous_route
+        tca_merit_initialize_character_effect = yes
+        tca_merit_prepare_entry_effect = yes
+    }
+}
+
+# 奖励／资格撤销／生成之后同级维护；已激活人物不重新采用异步旧等级或发考试奖励。
+tca_merit_after_reward_effect = {
+    if = {
+        limit = { has_global_variable = tca_merit_startup_ready NOT = { tca_merit_interface_probe_trigger = yes } }
+        tca_merit_initialize_character_effect = yes
+        # 奖励结算后才可能真正入品；若此前零级中央请求已被清理，这里补排一次。
+        tca_merit_maybe_queue_central_catchup_effect = yes
+    }
+}
+
+# 仅重加实际持有对象，不根据考试flag凭空补资格、不重发奖励；供进出天朝及状态刷新复用。
+tca_merit_refresh_exam_modifiers_effect = {
+    if = { limit = { has_character_modifier = tgp_passed_provincial_exam_modifier } remove_character_modifier = tgp_passed_provincial_exam_modifier add_character_modifier = { modifier = tgp_passed_provincial_exam_modifier } }
+    if = { limit = { has_character_modifier = tgp_bypassed_provincial_exam_modifier } remove_character_modifier = tgp_bypassed_provincial_exam_modifier add_character_modifier = { modifier = tgp_bypassed_provincial_exam_modifier } }
+    if = { limit = { has_character_modifier = tgp_nepotism_bypass_exams_modifier } remove_character_modifier = tgp_nepotism_bypass_exams_modifier add_character_modifier = { modifier = tgp_nepotism_bypass_exams_modifier } }
+    if = { limit = { has_character_modifier = tgp_passed_metropolitan_exam_modifier } remove_character_modifier = tgp_passed_metropolitan_exam_modifier add_character_modifier = { modifier = tgp_passed_metropolitan_exam_modifier } }
+    if = { limit = { has_character_modifier = tgp_passed_palace_exam_modifier } remove_character_modifier = tgp_passed_palace_exam_modifier add_character_modifier = { modifier = tgp_passed_palace_exam_modifier } }
+}
+
+# 动态scale为添加时快照；重加上限与考试时根回调必须被抑制。
+# 调用者可能已在授品事务内，只有本接口自己取得的保护才由本接口释放。
+tca_merit_refresh_cap_effect = {
+    if = {
+        limit = {
+            has_character_flag = tca_merit_active has_variable = tca_merit_approved_level
+            OR = {
+                NOT = { var:tca_merit_applied_exam_scale ?= 0 }
+                NOT = { var:tca_merit_applied_level ?= var:tca_merit_approved_level }
+                NOT = { has_character_modifier = tca_merit_approved_base_modifier }
+                NOT = { has_character_modifier = tca_merit_approved_reduction_modifier }
+            }
+        }
+        if = { limit = { NOT = { has_character_flag = tca_merit_grant_suppress } } add_character_flag = tca_merit_grant_suppress add_character_flag = tca_merit_state_owns_suppress }
+        # scale是添加时快照；只有制度倍率改变才重加考试修正。
+        # 新取得的考试修正由原版添加时直接读取当前scale，无需因品级变化再次拆装。
+        if = {
+            limit = { NOT = { var:tca_merit_applied_exam_scale ?= 0 } }
+            tca_merit_refresh_exam_modifiers_effect = yes
+            set_variable = { name = tca_merit_applied_exam_scale value = 0 }
+        }
+        if = {
+            limit = {
+                OR = {
+                    NOT = { var:tca_merit_applied_level ?= var:tca_merit_approved_level }
+                    NOT = { has_character_modifier = tca_merit_approved_base_modifier }
+                    NOT = { has_character_modifier = tca_merit_approved_reduction_modifier }
+                }
+            }
+            remove_character_modifier = tca_merit_approved_reduction_modifier
+            remove_character_modifier = tca_merit_approved_base_modifier
+            add_character_modifier = { modifier = tca_merit_approved_base_modifier }
+            add_character_modifier = { modifier = tca_merit_approved_reduction_modifier }
+            set_variable = { name = tca_merit_applied_level value = var:tca_merit_approved_level }
+        }
+        if = { limit = { has_character_flag = tca_merit_state_owns_suppress } remove_character_flag = tca_merit_grant_suppress remove_character_flag = tca_merit_state_owns_suppress }
+    }
+}
+
+# 人物作用域，调用方已确认真实离境／改制。去除锁定后恢复原版考试scale，保留Merit与资格。
+# 清除旧核定值使返境按当时真实等级接管；退休／辞谢与本年成功状态继续保留。
+tca_merit_leave_celestial_effect = {
+    if = { limit = { NOT = { has_character_flag = tca_merit_grant_suppress } } add_character_flag = tca_merit_grant_suppress add_character_flag = tca_merit_state_owns_suppress }
+    tca_merit_cancel_central_zero_source_effect = yes
+    remove_character_flag = tca_merit_central_zero_prep_owned
+    remove_character_flag = tca_merit_active
+    remove_character_flag = tca_merit_entry_pending
+    remove_character_flag = tca_merit_central_await_entry
+    # 真实退出终结待核验事务（含隔离态），保留递增token使旧事件不能碰到后续事务。
+    remove_variable = tca_merit_grant_phase
+    remove_character_flag = tca_merit_central_pending
+    remove_character_modifier = tca_merit_approved_reduction_modifier
+    remove_character_modifier = tca_merit_approved_base_modifier
+    remove_variable = tca_merit_approved_level
+    remove_variable = tca_merit_applied_level
+    remove_variable = tca_merit_applied_exam_scale
+    tca_merit_refresh_exam_modifiers_effect = yes
+    if = { limit = { has_character_flag = tca_merit_state_owns_suppress } remove_character_flag = tca_merit_grant_suppress remove_character_flag = tca_merit_state_owns_suppress }
+}
+
+# 以下离散接口只在真实行为入口调用；不从appointment_timeout_days猜测原因。
+tca_merit_mark_retired_effect = { remove_character_flag = tca_merit_central_await_entry add_character_flag = { flag = tca_merit_retired years = 3 } }
+tca_merit_mark_refused_effect = { remove_character_flag = tca_merit_central_await_entry add_character_flag = tca_merit_refused }
+tca_merit_restore_participation_effect = {
+    remove_character_flag = tca_merit_retired
+    remove_character_flag = tca_merit_refused
+    if = { limit = { NOT = { tca_merit_interface_probe_trigger = yes } } tca_merit_initialize_character_effect = yes }
+}

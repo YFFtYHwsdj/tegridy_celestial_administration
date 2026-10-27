@@ -1,0 +1,119 @@
+﻿# 可变核定上限接口探针；只使用独立修正，不改变原版考试和正常人物。
+# 基础上限2 + 固定7 - (9 - 核定等级)，缩放始终非负；必须显式刷新快照。
+namespace = tca_merit_dynamic_cap_probe
+tca_merit_dynamic_cap_probe.1 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { has_character_flag = tca_test_delayed_case_active } debug_log = "TCA_TEST CASE_BUSY" }
+        else = {
+            debug_log = "TCA_TEST BEGIN tca_merit_dynamic_cap_probe.1 tca_test_merit_dynamic_cap"
+            remove_character_flag = tca_test_case_failed
+            if = {
+                limit = { debug_only = yes is_alive = yes title:h_china.holder = root }
+                tca_test_create_merit_interface_character_effect = { CHARACTER = tca_merit_dynamic_actor GOVERNMENT = celestial_government }
+                scope:tca_merit_dynamic_actor = {
+                    set_variable = { name = tca_merit_probe_approved value = 1 }
+                    tca_test_add_scaled_merit_probe_exams_effect = yes
+                    add_character_modifier = { modifier = tca_merit_probe_bypass_modifier }
+                    add_character_modifier = { modifier = tca_merit_probe_nepotism_modifier }
+                    add_character_modifier = { modifier = tca_merit_probe_approved_base_modifier }
+                    add_character_modifier = { modifier = tca_merit_probe_approved_reduction_modifier }
+                    change_merit = 30000
+                }
+                # 贤能制只加绕试／荫补，独立副本与原版对照必须达到相同实际等级。
+                tca_test_create_merit_interface_character_effect = { CHARACTER = tca_merit_dynamic_meritocratic GOVERNMENT = meritocratic_government }
+                scope:tca_merit_dynamic_meritocratic = {
+                    add_character_modifier = { modifier = tca_merit_probe_bypass_modifier }
+                    add_character_modifier = { modifier = tca_merit_probe_nepotism_modifier }
+                    change_merit = 30000
+                }
+                tca_test_create_merit_interface_character_effect = { CHARACTER = tca_merit_dynamic_native GOVERNMENT = meritocratic_government }
+                scope:tca_merit_dynamic_native = {
+                    add_character_modifier = { modifier = tgp_bypassed_provincial_exam_modifier }
+                    add_character_modifier = { modifier = tgp_nepotism_bypass_exams_modifier }
+                    change_merit = 30000
+                }
+                add_character_flag = tca_test_delayed_case_active
+                debug_log = "TCA_TEST WAIT tca_test_merit_dynamic_cap 1 day"
+                trigger_event = { id = tca_merit_dynamic_cap_probe.1001 days = 1 }
+            }
+            else = {
+                debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_merit_dynamic_cap"
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+                tca_test_continue_delayed_effect = yes
+            }
+        }
+    }
+}
+tca_merit_dynamic_cap_probe.1001 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_merit_dynamic_actor = { merit_level = 1 merit = 30000 var:tca_merit_probe_approved = 1 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_dynamic_cap 1" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_dynamic_cap 1" }
+            scope:tca_merit_dynamic_actor = { set_variable = { name = tca_merit_probe_approved value = 3 } }
+            debug_log = "TCA_TEST WAIT tca_test_merit_dynamic_cap 1 day"
+            trigger_event = { id = tca_merit_dynamic_cap_probe.1002 days = 1 }
+        }
+    }
+}
+tca_merit_dynamic_cap_probe.1002 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_merit_dynamic_actor = { merit_level = 1 merit = 30000 var:tca_merit_probe_approved = 3 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_dynamic_cap 2" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_dynamic_cap 2" }
+            scope:tca_merit_dynamic_actor = {
+                remove_character_modifier = tca_merit_probe_approved_reduction_modifier
+                add_character_modifier = { modifier = tca_merit_probe_approved_reduction_modifier }
+            }
+            debug_log = "TCA_TEST WAIT tca_test_merit_dynamic_cap 1 day"
+            trigger_event = { id = tca_merit_dynamic_cap_probe.1003 days = 1 }
+        }
+    }
+}
+tca_merit_dynamic_cap_probe.1003 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_merit_dynamic_actor = { merit_level = 3 merit = 30000 var:tca_merit_probe_approved = 3 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_dynamic_cap 3" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_dynamic_cap 3" }
+            scope:tca_merit_dynamic_actor = {
+                set_variable = { name = tca_merit_probe_approved value = 9 }
+                remove_character_modifier = tca_merit_probe_approved_reduction_modifier
+                add_character_modifier = { modifier = tca_merit_probe_approved_reduction_modifier }
+            }
+            debug_log = "TCA_TEST WAIT tca_test_merit_dynamic_cap 1 day"
+            trigger_event = { id = tca_merit_dynamic_cap_probe.1004 days = 1 }
+        }
+    }
+}
+tca_merit_dynamic_cap_probe.1004 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_merit_dynamic_actor = { merit_level = 9 merit = 30000 var:tca_merit_probe_approved = 9 has_character_modifier = tca_merit_probe_approved_reduction_modifier } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_dynamic_cap 4" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_dynamic_cap 4" }
+            if = { limit = { scope:tca_merit_dynamic_actor = { has_character_modifier = tca_merit_probe_bypass_modifier has_character_modifier = tca_merit_probe_nepotism_modifier } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_dynamic_cap 5" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_dynamic_cap 5" }
+            if = { limit = { scope:tca_merit_dynamic_meritocratic = { merit_level = 5 has_character_modifier = tca_merit_probe_bypass_modifier has_character_modifier = tca_merit_probe_nepotism_modifier } scope:tca_merit_dynamic_native = { merit_level = 5 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_dynamic_cap 6" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_dynamic_cap 6" }
+            scope:tca_merit_dynamic_actor = { tca_test_cleanup_merit_probe_character_effect = yes }
+            scope:tca_merit_dynamic_meritocratic = { tca_test_cleanup_merit_probe_character_effect = yes }
+            scope:tca_merit_dynamic_native = { tca_test_cleanup_merit_probe_character_effect = yes }
+            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_merit_dynamic_cap" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_merit_dynamic_cap" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            remove_character_flag = tca_test_case_failed
+            remove_character_flag = tca_test_delayed_case_active
+            tca_test_continue_delayed_effect = yes
+        }
+    }
+}

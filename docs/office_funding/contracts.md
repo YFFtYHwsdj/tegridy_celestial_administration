@@ -41,3 +41,9 @@
 连续账本只统计拨款和当次实际政绩奖励，不将人物总功绩中原生月收入、生活方式或事件奖惩混作经费奖励；不宣称已验证连续国库资金守恒或全部自然AI任免路径。即时收支守恒由主用例检查；任期收据、防重与真实任免分别按对应路径验收。
 
 界面实际布局、真实换任后的显示、功绩等级上限边界及保存重载仍需按实际路径验收；身份树锁定与费用调整分别维护。
+
+### 未解决的同局金库收入检查
+
+`tca_test_office_funding` 的断言22要求路司与通判当前持有人各自的 `monthly_character_treasury_income`、`monthly_character_treasury_variable_income` 均为零。最新完整同局中两组持有人四项均为零并通过，但该条件不是通用不变量：无地官员可以合法获得正的月国库收入，来源是原生 liege salary。原生收入归因探针已观测到 total 与 variable 同为 0.3325；测试修正 `monthly_treasury_from_liege_mult = -1` 可将其压到零。
+
+目前 `tca_test_office_native_income`（`events/tests/tca_office_income_probe_test_events.txt`）已完成自备状态重构与验证闭环。此前在全模组同局回归中出现 PRECONDITION_FAIL 的根因已查明：同局前面的延迟测试推移了真实游戏时间，使得开局初始 caretaker 税基缓存窗口自然过期，导致进入该探针时无地官员的月国库收入回落为零。根据开发规范“每项自备必要状态，不依赖其他用例顺序或遗留状态”，测试夹具在检测到底层月收入为零时通过 `tca_office_income_probe_seed_modifier` 注入确定性的正向国库收入，真实检验了在不改变薪俸契约等级的前提下，原生修正 `monthly_treasury_from_liege_mult = -1` 能够即时将正收入压为零并在移除后恢复，断言 1–5 在独立运行及全模组同局中均稳定全部通过，无前置失败且无模组相关引擎错误。

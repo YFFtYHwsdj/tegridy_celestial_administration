@@ -1,0 +1,58 @@
+﻿# 真实制度/归属/原生入品与中央授职入口；不覆写原版效果，不手动派发合法gain。
+on_government_change = { on_actions = { tca_merit_government_changed } }
+on_vassal_change = { on_actions = { tca_merit_liege_changed } }
+on_join_court = { on_actions = { tca_merit_court_joined } }
+on_leave_court = { on_actions = { tca_merit_court_left } }
+on_merit_level_gain = { on_actions = { tca_merit_native_gain } }
+on_title_gain = { on_actions = { tca_merit_central_title_gain } }
+
+tca_merit_government_changed = {
+    trigger = { has_global_variable = tca_merit_startup_ready tca_merit_realm_change_relevant_trigger = yes }
+    effect = { tca_merit_sync_realm_membership_effect = yes }
+}
+tca_merit_liege_changed = {
+    trigger = { has_global_variable = tca_merit_startup_ready tca_merit_realm_change_relevant_trigger = yes }
+    effect = {
+        # 用本分支最后一次完成同步的国家判断；祖先移动也会改变旧领主的当前国家。
+        # 首次无快照时安全访问一次；NOT内显式AND，避免把多个条件逐项否定。
+        top_liege ?= { save_temporary_scope_as = tca_merit_current_realm }
+        if = {
+            limit = { NOT = { AND = { has_variable = tca_merit_branch_anchor exists = scope:tca_merit_current_realm var:tca_merit_branch_anchor ?= scope:tca_merit_current_realm } } }
+            tca_merit_sync_realm_membership_effect = yes
+        }
+    }
+}
+# 原版on_join_court/on_leave_court的root是移动人物；新雇主已在scope:new_employer，
+# 离场时旧雇主在scope:old_employer。这里只按移动后的真实top_liege/政体同步一次，
+# 不补发考试奖励，也不把宫廷客居当成封臣迁国。
+tca_merit_court_joined = {
+    trigger = { has_global_variable = tca_merit_startup_ready tca_merit_court_change_relevant_trigger = yes }
+    effect = {
+        if = {
+            limit = { NOT = { has_character_flag = tca_merit_court_sync_pending } }
+            add_character_flag = tca_merit_court_sync_pending
+            trigger_event = { id = tca_merit_entry.5 days = 1 }
+        }
+    }
+}
+tca_merit_court_left = {
+    trigger = { has_global_variable = tca_merit_startup_ready tca_merit_court_change_relevant_trigger = yes }
+    effect = {
+        if = {
+            limit = { NOT = { has_character_flag = tca_merit_court_sync_pending } }
+            add_character_flag = tca_merit_court_sync_pending
+            trigger_event = { id = tca_merit_entry.5 days = 1 }
+        }
+    }
+}
+tca_merit_native_gain = {
+    trigger = { has_global_variable = tca_merit_startup_ready government_has_flag = government_is_celestial NOT = { has_character_flag = tca_merit_grant_suppress } NOT = { tca_merit_interface_probe_trigger = yes } }
+    effect = { tca_merit_accept_native_gain_effect = yes tca_merit_maybe_queue_central_catchup_effect = yes }
+}
+tca_merit_central_title_gain = {
+    trigger = {
+        has_global_variable = tca_merit_startup_ready
+        OR = { scope:title = title:e_minister_chancellor scope:title = title:e_minister_censor scope:title = title:e_minister_grand_marshal scope:title = title:e_minister_of_personnel scope:title = title:e_minister_of_revenue scope:title = title:e_minister_of_rites scope:title = title:e_minister_of_war scope:title = title:e_minister_of_justice scope:title = title:e_minister_of_works }
+    }
+    effect = { tca_merit_queue_central_effect = yes }
+}

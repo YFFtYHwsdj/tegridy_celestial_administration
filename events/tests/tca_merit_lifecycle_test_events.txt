@@ -1,0 +1,454 @@
+﻿# 正式生命周期入口回归。仅创建独立夹具；迁移后不调用状态维护worker。
+namespace = tca_merit_lifecycle_test
+
+# 检查真实新开局after_lobby留下的原生品级快照，不重新执行初始化屏障。
+tca_merit_lifecycle_test.1 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_merit_lifecycle_test.1 tca_test_merit_native_startup"
+        remove_character_flag = tca_test_case_failed
+        if = {
+            limit = { debug_only = yes is_alive = yes title:h_china.holder = root }
+            set_variable = { name = tca_ml_startup_high_count value = 0 }
+            set_variable = { name = tca_ml_startup_regression_count value = 0 }
+            set_variable = { name = tca_ml_startup_initial_captured_total value = 0 }
+            set_variable = { name = tca_ml_startup_current_high_count value = 0 }
+            set_variable = { name = tca_ml_startup_unclassified_count value = 0 }
+            # 本模块在任何新建夹具之前执行；不能用后续测试人物的U诊断推断真实开局。
+            every_living_character = {
+                limit = {
+                    has_character_flag = tca_merit_active
+                    NOT = { has_variable = tca_merit_route }
+                    NOT = { tca_merit_interface_probe_trigger = yes }
+                }
+                root = { change_variable = { name = tca_ml_startup_unclassified_count add = 1 } }
+                save_scope_as = tca_ml_unclassified_actor
+                save_scope_value_as = { name = tca_ml_unclassified_age value = age }
+                debug_log = "TCA_ML STARTUP_UNCLASSIFIED_ACTOR"
+                debug_log_scopes = yes
+            }
+            every_living_character = {
+                limit = { top_liege = root government_has_flag = government_is_celestial is_independent_ruler = no }
+                if = { limit = { has_variable = tca_merit_initial_level } root = { change_variable = { name = tca_ml_startup_initial_captured_total add = 1 } } }
+                if = { limit = { merit_level >= 3 } root = { change_variable = { name = tca_ml_startup_current_high_count add = 1 } } }
+            }
+            every_living_character = {
+                limit = { has_variable = tca_merit_initial_level has_character_flag = tca_merit_active top_liege = root government_has_flag = government_is_celestial }
+                if = { limit = { var:tca_merit_initial_level >= 3 } root = { change_variable = { name = tca_ml_startup_high_count add = 1 } } }
+                if = { limit = { var:tca_merit_approved_level < var:tca_merit_initial_level } root = { change_variable = { name = tca_ml_startup_regression_count add = 1 } } }
+            }
+            # 用原生scope数值快照输出，不让本地化延迟求值读取已删除的即时变量。
+            save_scope_value_as = { name = tca_ml_diag_high_count value = var:tca_ml_startup_high_count }
+            save_scope_value_as = { name = tca_ml_diag_regression_count value = var:tca_ml_startup_regression_count }
+            save_scope_value_as = { name = tca_ml_diag_initial_captured_total value = var:tca_ml_startup_initial_captured_total }
+            save_scope_value_as = { name = tca_ml_diag_current_high_count value = var:tca_ml_startup_current_high_count }
+            save_scope_value_as = { name = tca_ml_diag_unclassified_count value = var:tca_ml_startup_unclassified_count }
+            debug_log = "TCA_ML STARTUP_SNAPSHOT"
+            debug_log_scopes = yes
+            if = { limit = { has_global_variable = tca_merit_startup_ready } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_native_startup 1" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_native_startup 1" }
+            if = { limit = { var:tca_ml_startup_high_count > 0 var:tca_ml_startup_regression_count = 0 } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_native_startup 2" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_native_startup 2" }
+            if = { limit = { var:tca_ml_startup_unclassified_count = 0 } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_native_startup 3" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_native_startup 3" }
+            remove_variable = tca_ml_startup_high_count
+            remove_variable = tca_ml_startup_regression_count
+            remove_variable = tca_ml_startup_initial_captured_total
+            remove_variable = tca_ml_startup_current_high_count
+            remove_variable = tca_ml_startup_unclassified_count
+            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_merit_native_startup" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_merit_native_startup" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_merit_native_startup" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } }
+        remove_character_flag = tca_test_case_failed
+    }
+}
+
+# A借用测试报告者首都所在的真实县建立公爵领，C为其家门附庸，D为C的普通廷臣。
+# 原版禁止无地领主拥有附庸，因此不能用纯无地官署拼造这条子树。
+# A整支迁到封建外国君主再返朝；末尾归还原县及其原持有人首都。
+tca_merit_lifecycle_test.2 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { has_character_flag = tca_test_delayed_case_active } debug_log = "TCA_TEST CASE_BUSY" }
+        else = {
+            debug_log = "TCA_TEST BEGIN tca_merit_lifecycle_test.2 tca_test_merit_subrealm_membership"
+            remove_character_flag = tca_test_case_failed
+            if = {
+                limit = { debug_only = yes is_alive = yes title:h_china.holder = root exists = capital_county.holder exists = title:e_hre.holder title:e_hre.holder.top_liege != root title:e_hre.holder = { has_government = feudal_government } }
+                tca_test_create_merit_probe_character_effect = { CHARACTER = tca_ml_a GOVERNMENT = celestial_government }
+                tca_test_create_merit_probe_character_effect = { CHARACTER = tca_ml_c GOVERNMENT = celestial_government }
+                capital_county = {
+                    save_scope_as = tca_ml_landed_county
+                    holder = {
+                        save_scope_as = tca_ml_county_original_holder
+                        capital_county = { save_scope_as = tca_ml_county_original_capital }
+                        if = {
+                            limit = { NOT = { has_trait = tca_test_death_protection } }
+                            add_character_flag = tca_ml_holder_protection_owned
+                            tca_test_protect_character_effect = yes
+                        }
+                    }
+                }
+                create_dynamic_title = { tier = duchy name = tca_test_arrest_office_name }
+                scope:new_title = { save_scope_as = tca_ml_office set_capital_county = scope:tca_ml_landed_county }
+                create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_ml_grant }
+                scope:tca_ml_office = { change_title_holder = { holder = scope:tca_ml_a change = scope:tca_ml_grant } }
+                scope:tca_ml_landed_county = { change_title_holder = { holder = scope:tca_ml_a change = scope:tca_ml_grant } }
+                resolve_title_and_vassal_change = scope:tca_ml_grant
+                scope:tca_ml_a = {
+                    change_government = celestial_government
+                    create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_ml_parent_fealty }
+                    change_liege = { liege = root change = scope:tca_ml_parent_fealty }
+                    resolve_title_and_vassal_change = scope:tca_ml_parent_fealty
+                }
+                scope:tca_ml_c = {
+                    create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_ml_child_fealty }
+                    change_liege = { liege = scope:tca_ml_a change = scope:tca_ml_child_fealty }
+                    resolve_title_and_vassal_change = scope:tca_ml_child_fealty
+                }
+                create_character = { age = 35 gender_female_chance = 0 random_traits = no dynasty = none employer = scope:tca_ml_c culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_ml_d }
+                scope:tca_ml_d = { add_character_flag = ai_will_not_convert tca_test_protect_character_effect = yes }
+                # E是已入品普通廷臣；D保留未入品负例，检查分支遍历确实执行了无地人物维护。
+                create_character = { age = 35 gender_female_chance = 0 random_traits = no dynasty = none employer = scope:tca_ml_c culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_ml_e }
+                scope:tca_ml_e = {
+                    add_character_flag = ai_will_not_convert tca_test_protect_character_effect = yes
+                    add_character_flag = cannot_be_diarch
+                    set_variable = { name = block_hire_councillor value = scope:tca_ml_c }
+                    set_appointment_timeout = { years = 150 desc = appointment_timeout_desc_refusing }
+                    add_character_modifier = { modifier = tca_merit_probe_stasis_modifier }
+                    add_trait = education_stewardship_1 set_merit_level = 1
+                }
+
+                scope:tca_ml_a = { add_trait = education_stewardship_1 set_merit_level = 1 change_merit_no_experience = { value = 12345 subtract = merit } }
+                scope:tca_ml_c = { add_trait = education_stewardship_1 set_merit_level = 1 change_merit_no_experience = { value = 12345 subtract = merit } }
+                add_character_flag = tca_test_delayed_case_active
+                debug_log = "TCA_TEST WAIT tca_test_merit_subrealm_membership 2 days"
+                trigger_event = { id = tca_merit_lifecycle_test.2001 days = 2 }
+            }
+            else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_merit_subrealm_membership" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_continue_delayed_effect = yes }
+        }
+    }
+}
+
+tca_merit_lifecycle_test.2001 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            # 准备已进入核定制度的人物；此后迁移断言不再直接刷新正式状态。
+            scope:tca_ml_e = { tca_merit_initialize_character_effect = yes tca_test_add_native_merit_probe_exams_effect = yes }
+            scope:tca_ml_a = { tca_merit_initialize_character_effect = yes tca_test_add_native_merit_probe_exams_effect = yes set_variable = { name = tca_merit_last_ordinary_year value = current_year } }
+            scope:tca_ml_c = { tca_merit_initialize_character_effect = yes tca_test_add_native_merit_probe_exams_effect = yes set_variable = { name = tca_merit_last_ordinary_year value = current_year } }
+            scope:tca_ml_a = {
+                save_scope_value_as = { name = tca_ml_diag_a_native value = merit_level }
+                save_scope_value_as = { name = tca_ml_diag_a_balance value = merit }
+                save_scope_value_as = { name = tca_ml_diag_a_approved value = { value = -1 if = { limit = { has_variable = tca_merit_approved_level } value = var:tca_merit_approved_level } } }
+                save_scope_value_as = { name = tca_ml_diag_a_active value = { value = 0 if = { limit = { has_character_flag = tca_merit_active } value = 1 } } }
+                save_scope_value_as = { name = tca_ml_diag_a_celestial value = { value = 0 if = { limit = { government_has_flag = government_is_celestial } value = 1 } } }
+                save_scope_value_as = { name = tca_ml_diag_a_year value = { value = -1 if = { limit = { has_variable = tca_merit_last_ordinary_year } value = var:tca_merit_last_ordinary_year } } }
+                top_liege = { save_scope_as = tca_ml_diag_a_top }
+                liege ?= { save_scope_as = tca_ml_diag_a_liege }
+            }
+            scope:tca_ml_c = {
+                save_scope_value_as = { name = tca_ml_diag_c_native value = merit_level }
+                save_scope_value_as = { name = tca_ml_diag_c_balance value = merit }
+                save_scope_value_as = { name = tca_ml_diag_c_approved value = { value = -1 if = { limit = { has_variable = tca_merit_approved_level } value = var:tca_merit_approved_level } } }
+                save_scope_value_as = { name = tca_ml_diag_c_active value = { value = 0 if = { limit = { has_character_flag = tca_merit_active } value = 1 } } }
+                save_scope_value_as = { name = tca_ml_diag_c_celestial value = { value = 0 if = { limit = { government_has_flag = government_is_celestial } value = 1 } } }
+                save_scope_value_as = { name = tca_ml_diag_c_year value = { value = -1 if = { limit = { has_variable = tca_merit_last_ordinary_year } value = var:tca_merit_last_ordinary_year } } }
+                top_liege = { save_scope_as = tca_ml_diag_c_top }
+                liege ?= { save_scope_as = tca_ml_diag_c_liege }
+            }
+            scope:tca_ml_d = {
+                save_scope_value_as = { name = tca_ml_diag_d_active value = { value = 0 if = { limit = { has_character_flag = tca_merit_active } value = 1 } } }
+                save_scope_value_as = { name = tca_ml_diag_d_celestial value = { value = 0 if = { limit = { government_has_flag = government_is_celestial } value = 1 } } }
+                top_liege = { save_scope_as = tca_ml_diag_d_top }
+                employer ?= { save_scope_as = tca_ml_diag_d_employer }
+            }
+            debug_log = "TCA_ML MEMBERSHIP_STAGE_1"
+            debug_log_scopes = yes
+            if = { limit = { scope:tca_ml_a = { has_character_flag = tca_merit_active var:tca_merit_approved_level = 1 top_liege = root } scope:tca_ml_c = { has_character_flag = tca_merit_active var:tca_merit_approved_level = 1 liege = scope:tca_ml_a top_liege = root } scope:tca_ml_d = { employer = scope:tca_ml_c top_liege = root NOT = { has_character_flag = tca_merit_active } } scope:tca_ml_e = { employer = scope:tca_ml_c has_character_flag = tca_merit_active var:tca_merit_approved_level = 1 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_subrealm_membership 1" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_subrealm_membership 1" }
+            scope:tca_ml_a = {
+                # A是持有真实县的测试领主，2日等待中可能出现自然功绩收入，不能要求余额仍精确等于注入值；
+                # 保存迁出前余额，改验离境不截断（余额不得下降），避免把自然收入误判为丢账。
+                set_variable = { name = tca_ml_balance_before_leave value = merit }
+                create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_ml_foreign_fealty }
+                change_liege = { liege = title:e_hre.holder change = scope:tca_ml_foreign_fealty }
+                resolve_title_and_vassal_change = scope:tca_ml_foreign_fealty
+            }
+            debug_log = "TCA_TEST WAIT tca_test_merit_subrealm_membership 2 days"
+            trigger_event = { id = tca_merit_lifecycle_test.2002 days = 2 }
+        }
+    }
+}
+
+tca_merit_lifecycle_test.2002 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            scope:tca_ml_a = {
+                save_scope_value_as = { name = tca_ml_diag_a_native value = merit_level }
+                save_scope_value_as = { name = tca_ml_diag_a_balance value = merit }
+                save_scope_value_as = { name = tca_ml_diag_a_approved value = { value = -1 if = { limit = { has_variable = tca_merit_approved_level } value = var:tca_merit_approved_level } } }
+                save_scope_value_as = { name = tca_ml_diag_a_active value = { value = 0 if = { limit = { has_character_flag = tca_merit_active } value = 1 } } }
+                save_scope_value_as = { name = tca_ml_diag_a_celestial value = { value = 0 if = { limit = { government_has_flag = government_is_celestial } value = 1 } } }
+                save_scope_value_as = { name = tca_ml_diag_a_year value = { value = -1 if = { limit = { has_variable = tca_merit_last_ordinary_year } value = var:tca_merit_last_ordinary_year } } }
+                top_liege = { save_scope_as = tca_ml_diag_a_top }
+                liege ?= { save_scope_as = tca_ml_diag_a_liege }
+            }
+            scope:tca_ml_c = {
+                save_scope_value_as = { name = tca_ml_diag_c_native value = merit_level }
+                save_scope_value_as = { name = tca_ml_diag_c_balance value = merit }
+                save_scope_value_as = { name = tca_ml_diag_c_approved value = { value = -1 if = { limit = { has_variable = tca_merit_approved_level } value = var:tca_merit_approved_level } } }
+                save_scope_value_as = { name = tca_ml_diag_c_active value = { value = 0 if = { limit = { has_character_flag = tca_merit_active } value = 1 } } }
+                save_scope_value_as = { name = tca_ml_diag_c_celestial value = { value = 0 if = { limit = { government_has_flag = government_is_celestial } value = 1 } } }
+                save_scope_value_as = { name = tca_ml_diag_c_year value = { value = -1 if = { limit = { has_variable = tca_merit_last_ordinary_year } value = var:tca_merit_last_ordinary_year } } }
+                top_liege = { save_scope_as = tca_ml_diag_c_top }
+                liege ?= { save_scope_as = tca_ml_diag_c_liege }
+            }
+            scope:tca_ml_d = {
+                save_scope_value_as = { name = tca_ml_diag_d_active value = { value = 0 if = { limit = { has_character_flag = tca_merit_active } value = 1 } } }
+                save_scope_value_as = { name = tca_ml_diag_d_celestial value = { value = 0 if = { limit = { government_has_flag = government_is_celestial } value = 1 } } }
+                top_liege = { save_scope_as = tca_ml_diag_d_top }
+                employer ?= { save_scope_as = tca_ml_diag_d_employer }
+            }
+            debug_log = "TCA_ML MEMBERSHIP_STAGE_2"
+            debug_log_scopes = yes
+            if = { limit = { scope:tca_ml_a = { top_liege = title:e_hre.holder NOT = { has_character_flag = tca_merit_active } NOT = { has_character_modifier = tca_merit_approved_base_modifier } merit >= var:tca_ml_balance_before_leave var:tca_merit_last_ordinary_year = current_year tca_merit_exam_scale_value = 1 } scope:tca_ml_c = { liege = scope:tca_ml_a top_liege = title:e_hre.holder NOT = { has_character_flag = tca_merit_active } NOT = { has_character_modifier = tca_merit_approved_base_modifier } merit = 12345 var:tca_merit_last_ordinary_year = current_year tca_merit_exam_scale_value = 1 } scope:tca_ml_d = { employer = scope:tca_ml_c top_liege = title:e_hre.holder NOT = { has_character_flag = tca_merit_active } } scope:tca_ml_e = { employer = scope:tca_ml_c NOT = { has_character_flag = tca_merit_active } NOT = { has_character_modifier = tca_merit_approved_base_modifier } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_subrealm_membership 2" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_subrealm_membership 2" }
+            scope:tca_ml_a = { set_merit_level = 4 change_merit_no_experience = { value = 12345 subtract = merit } set_variable = { name = tca_ml_balance_after_reset value = merit } }
+            scope:tca_ml_c = { set_merit_level = 4 change_merit_no_experience = { value = 12345 subtract = merit } }
+            scope:tca_ml_e = { set_merit_level = 4 }
+            debug_log = "TCA_TEST WAIT tca_test_merit_subrealm_membership 2 days"
+            trigger_event = { id = tca_merit_lifecycle_test.2003 days = 2 }
+        }
+    }
+}
+
+tca_merit_lifecycle_test.2003 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            scope:tca_ml_a = {
+                save_scope_value_as = { name = tca_ml_diag_a_native value = merit_level }
+                save_scope_value_as = { name = tca_ml_diag_a_balance value = merit }
+                save_scope_value_as = { name = tca_ml_diag_a_approved value = { value = -1 if = { limit = { has_variable = tca_merit_approved_level } value = var:tca_merit_approved_level } } }
+                save_scope_value_as = { name = tca_ml_diag_a_active value = { value = 0 if = { limit = { has_character_flag = tca_merit_active } value = 1 } } }
+                save_scope_value_as = { name = tca_ml_diag_a_celestial value = { value = 0 if = { limit = { government_has_flag = government_is_celestial } value = 1 } } }
+                save_scope_value_as = { name = tca_ml_diag_a_year value = { value = -1 if = { limit = { has_variable = tca_merit_last_ordinary_year } value = var:tca_merit_last_ordinary_year } } }
+                top_liege = { save_scope_as = tca_ml_diag_a_top }
+                liege ?= { save_scope_as = tca_ml_diag_a_liege }
+            }
+            scope:tca_ml_c = {
+                save_scope_value_as = { name = tca_ml_diag_c_native value = merit_level }
+                save_scope_value_as = { name = tca_ml_diag_c_balance value = merit }
+                save_scope_value_as = { name = tca_ml_diag_c_approved value = { value = -1 if = { limit = { has_variable = tca_merit_approved_level } value = var:tca_merit_approved_level } } }
+                save_scope_value_as = { name = tca_ml_diag_c_active value = { value = 0 if = { limit = { has_character_flag = tca_merit_active } value = 1 } } }
+                save_scope_value_as = { name = tca_ml_diag_c_celestial value = { value = 0 if = { limit = { government_has_flag = government_is_celestial } value = 1 } } }
+                save_scope_value_as = { name = tca_ml_diag_c_year value = { value = -1 if = { limit = { has_variable = tca_merit_last_ordinary_year } value = var:tca_merit_last_ordinary_year } } }
+                top_liege = { save_scope_as = tca_ml_diag_c_top }
+                liege ?= { save_scope_as = tca_ml_diag_c_liege }
+            }
+            scope:tca_ml_d = {
+                save_scope_value_as = { name = tca_ml_diag_d_active value = { value = 0 if = { limit = { has_character_flag = tca_merit_active } value = 1 } } }
+                save_scope_value_as = { name = tca_ml_diag_d_celestial value = { value = 0 if = { limit = { government_has_flag = government_is_celestial } value = 1 } } }
+                top_liege = { save_scope_as = tca_ml_diag_d_top }
+                employer ?= { save_scope_as = tca_ml_diag_d_employer }
+            }
+            debug_log = "TCA_ML MEMBERSHIP_STAGE_3"
+            debug_log_scopes = yes
+            if = { limit = { scope:tca_ml_a = { merit_level = 4 merit >= var:tca_ml_balance_after_reset } scope:tca_ml_c = { merit_level = 4 merit = 12345 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_subrealm_membership 3" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_subrealm_membership 3" }
+            # 子分支曾有本朝快照，又随A迁到外国；单独返朝不能被旧快照错误跳过。
+            scope:tca_ml_c = {
+                create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_ml_home_fealty }
+                change_liege = { liege = root change = scope:tca_ml_home_fealty }
+                resolve_title_and_vassal_change = scope:tca_ml_home_fealty
+            }
+            debug_log = "TCA_TEST WAIT tca_test_merit_subrealm_membership 2 days"
+            trigger_event = { id = tca_merit_lifecycle_test.2005 days = 2 }
+        }
+    }
+}
+
+tca_merit_lifecycle_test.2005 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = {
+                limit = {
+                    scope:tca_ml_a = { top_liege = title:e_hre.holder NOT = { has_character_flag = tca_merit_active } }
+                    scope:tca_ml_c = { top_liege = root has_character_flag = tca_merit_active var:tca_merit_approved_level = 4 var:tca_merit_branch_anchor = root }
+                    scope:tca_ml_e = { employer = scope:tca_ml_c top_liege = root has_character_flag = tca_merit_active var:tca_merit_approved_level = 4 }
+                }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_merit_subrealm_membership 4"
+            }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_subrealm_membership 4" }
+            # 先归还子分支，再让祖先带整支返朝，继续核对原来的往返契约。
+            scope:tca_ml_c = {
+                create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_ml_child_restore }
+                change_liege = { liege = scope:tca_ml_a change = scope:tca_ml_child_restore }
+                resolve_title_and_vassal_change = scope:tca_ml_child_restore
+            }
+            # 两次独立迁国分开跨日，等待原生上限/等级更新；不能同链退出后立刻采纳旧读回。
+            debug_log = "TCA_TEST WAIT tca_test_merit_subrealm_membership 2 days"
+            trigger_event = { id = tca_merit_lifecycle_test.2006 days = 2 }
+        }
+    }
+}
+
+tca_merit_lifecycle_test.2006 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_ml_e = { merit_level = 4 NOT = { has_character_flag = tca_merit_active } top_liege = title:e_hre.holder } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_subrealm_membership 5" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_subrealm_membership 5" }
+            scope:tca_ml_a = {
+                set_variable = { name = tca_ml_balance_before_return value = merit }
+                create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_ml_home_fealty }
+                change_liege = { liege = root change = scope:tca_ml_home_fealty }
+                resolve_title_and_vassal_change = scope:tca_ml_home_fealty
+            }
+            debug_log = "TCA_TEST WAIT tca_test_merit_subrealm_membership 2 days"
+            trigger_event = { id = tca_merit_lifecycle_test.2004 days = 2 }
+        }
+    }
+}
+
+tca_merit_lifecycle_test.2004 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            scope:tca_ml_a = {
+                save_scope_value_as = { name = tca_ml_diag_a_native value = merit_level }
+                save_scope_value_as = { name = tca_ml_diag_a_balance value = merit }
+                save_scope_value_as = { name = tca_ml_diag_a_approved value = { value = -1 if = { limit = { has_variable = tca_merit_approved_level } value = var:tca_merit_approved_level } } }
+                save_scope_value_as = { name = tca_ml_diag_a_active value = { value = 0 if = { limit = { has_character_flag = tca_merit_active } value = 1 } } }
+                save_scope_value_as = { name = tca_ml_diag_a_celestial value = { value = 0 if = { limit = { government_has_flag = government_is_celestial } value = 1 } } }
+                save_scope_value_as = { name = tca_ml_diag_a_year value = { value = -1 if = { limit = { has_variable = tca_merit_last_ordinary_year } value = var:tca_merit_last_ordinary_year } } }
+                top_liege = { save_scope_as = tca_ml_diag_a_top }
+                liege ?= { save_scope_as = tca_ml_diag_a_liege }
+            }
+            scope:tca_ml_c = {
+                save_scope_value_as = { name = tca_ml_diag_c_native value = merit_level }
+                save_scope_value_as = { name = tca_ml_diag_c_balance value = merit }
+                save_scope_value_as = { name = tca_ml_diag_c_approved value = { value = -1 if = { limit = { has_variable = tca_merit_approved_level } value = var:tca_merit_approved_level } } }
+                save_scope_value_as = { name = tca_ml_diag_c_active value = { value = 0 if = { limit = { has_character_flag = tca_merit_active } value = 1 } } }
+                save_scope_value_as = { name = tca_ml_diag_c_celestial value = { value = 0 if = { limit = { government_has_flag = government_is_celestial } value = 1 } } }
+                save_scope_value_as = { name = tca_ml_diag_c_year value = { value = -1 if = { limit = { has_variable = tca_merit_last_ordinary_year } value = var:tca_merit_last_ordinary_year } } }
+                top_liege = { save_scope_as = tca_ml_diag_c_top }
+                liege ?= { save_scope_as = tca_ml_diag_c_liege }
+            }
+            scope:tca_ml_d = {
+                save_scope_value_as = { name = tca_ml_diag_d_active value = { value = 0 if = { limit = { has_character_flag = tca_merit_active } value = 1 } } }
+                save_scope_value_as = { name = tca_ml_diag_d_celestial value = { value = 0 if = { limit = { government_has_flag = government_is_celestial } value = 1 } } }
+                top_liege = { save_scope_as = tca_ml_diag_d_top }
+                employer ?= { save_scope_as = tca_ml_diag_d_employer }
+            }
+            scope:tca_ml_e = {
+                save_scope_value_as = { name = tca_ml_diag_e_approved value = { value = -1 if = { limit = { has_variable = tca_merit_approved_level } value = var:tca_merit_approved_level } } }
+                save_scope_value_as = { name = tca_ml_diag_e_active value = { value = 0 if = { limit = { has_character_flag = tca_merit_active } value = 1 } } }
+                save_scope_value_as = { name = tca_ml_diag_e_native value = merit_level }
+                save_scope_value_as = { name = tca_ml_diag_e_phase value = { value = -1 if = { limit = { has_variable = tca_merit_grant_phase } value = var:tca_merit_grant_phase } } }
+                top_liege = { save_scope_as = tca_ml_diag_e_top }
+                employer ?= { save_scope_as = tca_ml_diag_e_employer }
+            }
+            debug_log = "TCA_ML MEMBERSHIP_STAGE_4"
+            debug_log_scopes = yes
+            if = { limit = { scope:tca_ml_a = { top_liege = root has_character_flag = tca_merit_active var:tca_merit_approved_level = 4 merit >= var:tca_ml_balance_before_return var:tca_merit_last_ordinary_year = current_year tca_merit_ordinary_candidate_trigger = no } scope:tca_ml_c = { liege = scope:tca_ml_a top_liege = root has_character_flag = tca_merit_active var:tca_merit_approved_level = 4 merit = 12345 var:tca_merit_last_ordinary_year = current_year tca_merit_ordinary_candidate_trigger = no } scope:tca_ml_d = { employer = scope:tca_ml_c top_liege = root NOT = { has_character_flag = tca_merit_active } } scope:tca_ml_e = { employer = scope:tca_ml_c has_character_flag = tca_merit_active var:tca_merit_approved_level = 4 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_subrealm_membership 6" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_subrealm_membership 6" }
+            # 归还借用县后再销毁临时公爵领，避免留下被测试改变的县持有人与首都。
+            create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_ml_restore_county }
+            scope:tca_ml_landed_county = { change_title_holder = { holder = scope:tca_ml_county_original_holder change = scope:tca_ml_restore_county } }
+            resolve_title_and_vassal_change = scope:tca_ml_restore_county
+            scope:tca_ml_county_original_holder = {
+                set_realm_capital = scope:tca_ml_county_original_capital
+                if = { limit = { has_character_flag = tca_ml_holder_protection_owned } remove_character_flag = tca_ml_holder_protection_owned tca_test_restore_character_effect = yes }
+            }
+            scope:tca_ml_a = { remove_variable = tca_ml_balance_before_leave remove_variable = tca_ml_balance_after_reset remove_variable = tca_ml_balance_before_return destroy_title = scope:tca_ml_office tca_merit_leave_celestial_effect = yes tca_test_cleanup_merit_probe_character_effect = yes }
+            scope:tca_ml_c = { tca_merit_leave_celestial_effect = yes tca_test_cleanup_merit_probe_character_effect = yes }
+            scope:tca_ml_d = { remove_character_flag = ai_will_not_convert tca_test_restore_character_effect = yes }
+            scope:tca_ml_e = { tca_merit_leave_celestial_effect = yes tca_test_cleanup_merit_probe_character_effect = yes }
+            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_merit_subrealm_membership" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_merit_subrealm_membership" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            remove_character_flag = tca_test_case_failed
+            remove_character_flag = tca_test_delayed_case_active
+            tca_test_continue_delayed_effect = yes
+        }
+    }
+}
+
+# 旅行选项与决议共同使用的真实退休确认事件；只验证确认分支的退出状态及恢复。
+# 一次性家门人物没有实际官职，不借用真实头衔；不把此例当作旅行活动链、卸任或自然继任验收。
+# 派发前补齐portrait所需new_governor；原事件自身保存liege，唯一AI选项执行后真实等待三日。
+tca_merit_lifecycle_test.3 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_merit_lifecycle_test.3 tca_test_merit_direct_retirement"
+        remove_character_flag = tca_test_case_failed
+        if = {
+            limit = { debug_only = yes is_alive = yes title:h_china.holder = root }
+            tca_test_create_merit_probe_character_effect = { CHARACTER = tca_ml_direct_retirement_actor GOVERNMENT = celestial_government }
+            scope:tca_ml_direct_retirement_actor = {
+                tca_test_add_native_merit_probe_exams_effect = yes
+                add_trait = education_stewardship_1
+                # 只保留本次新建家门；阻断等待期间的初始补位和议会招聘，不借用任命超时识别退出。
+                add_character_flag = cannot_be_diarch
+                set_variable = { name = block_hire_councillor value = root }
+                change_merit = 24000
+                primary_title = { save_scope_as = tca_ml_direct_retirement_family }
+                clear_appointment_timeout = yes
+            }
+            if = { limit = { scope:tca_ml_direct_retirement_actor = { government_has_flag = government_is_celestial is_councillor = no tgp_has_minister_title = no NOT = { has_character_flag = tca_merit_retired } NOT = { has_character_modifier = ep3_renounced_governorship_merit } appointment_timeout_days = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_direct_retirement 1" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_direct_retirement 1" }
+            # 本例无前任/继任者；显示回退人物显式取报告者，避免读取其它用例遗留或缺失的scope。
+            save_scope_as = new_governor
+            scope:tca_ml_direct_retirement_actor = { trigger_event = ep3_decisions_event.4090 }
+            add_character_flag = tca_test_delayed_case_active
+            trigger_event = { id = tca_merit_lifecycle_test.3001 days = 3 }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_merit_direct_retirement" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_continue_delayed_effect = yes }
+    }
+}
+
+tca_merit_lifecycle_test.3001 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            # 本例原超时为零；确认分支写三年，三日等待后应准确剩余1092日。
+            if = { limit = { scope:tca_ml_direct_retirement_actor = { has_character_modifier = ep3_renounced_governorship_merit has_character_flag = tca_merit_retired tca_merit_population_trigger = no appointment_timeout_days = 1092 } scope:tca_ml_direct_retirement_family.holder = scope:tca_ml_direct_retirement_actor } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_direct_retirement 2" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_direct_retirement 2" }
+            scope:tca_ml_direct_retirement_actor = { if = { limit = { can_execute_decision = tgp_resume_appointments_decision } execute_decision = tgp_resume_appointments_decision } }
+            if = { limit = { scope:tca_ml_direct_retirement_actor = { appointment_timeout_days = 0 NOT = { has_character_flag = tca_merit_retired } tca_merit_population_trigger = yes has_character_modifier = ep3_renounced_governorship_merit is_civilian_candidate_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_direct_retirement 3" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_direct_retirement 3" }
+            # 恢复后再参加考试，与未恢复退休的共享修正不能混为退出原因。
+            scope:tca_ml_direct_retirement_actor = { set_appointment_timeout = { months = 6 desc = appointment_timeout_desc_examinations } }
+            if = { limit = { scope:tca_ml_direct_retirement_actor = { appointment_timeout_days > 0 appointment_timeout_days < 365 tca_merit_population_trigger = yes has_character_modifier = ep3_renounced_governorship_merit is_civilian_candidate_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_direct_retirement 4" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_direct_retirement 4" }
+            scope:tca_ml_direct_retirement_actor = { remove_character_modifier = ep3_renounced_governorship_merit tca_merit_leave_celestial_effect = yes tca_test_cleanup_merit_probe_character_effect = yes }
+            # 退出正式身份并隔离夹具，清理不触及真实官职；家门仍归这名一次性人物。
+            if = { limit = { scope:tca_ml_direct_retirement_actor = { NOT = { has_character_flag = tca_merit_active } NOT = { has_variable = tca_merit_approved_level } NOT = { has_character_modifier = tca_merit_approved_base_modifier } NOT = { has_character_modifier = tca_merit_approved_reduction_modifier } NOT = { has_character_modifier = tca_merit_probe_stasis_modifier } has_character_flag = tca_merit_interface_probe } scope:tca_ml_direct_retirement_family.holder = scope:tca_ml_direct_retirement_actor } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_direct_retirement 5" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_direct_retirement 5" }
+            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_merit_direct_retirement" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_merit_direct_retirement" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            remove_character_flag = tca_test_case_failed
+            remove_character_flag = tca_test_delayed_case_active
+            tca_test_continue_delayed_effect = yes
+        }
+    }
+}

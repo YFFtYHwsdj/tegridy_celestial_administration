@@ -439,6 +439,8 @@ tca_office_funding_test.1002 = {
                 # 不人工调用月回调；等待原生王朝循环完整一月，核对两个正式官署都实际收到结算。
                 scope:tca_test_funding_circuit_office = { remove_variable = tca_office_funding_paid remove_variable = tca_office_funding_last_amount }
                 scope:tca_test_funding_county_office = { remove_variable = tca_office_funding_paid remove_variable = tca_office_funding_last_amount }
+                scope:tca_test_funding_circuit_office.holder = { add_character_modifier = tca_office_income_probe_vassal_zero_modifier }
+                scope:tca_test_funding_county_office.holder = { add_character_modifier = tca_office_income_probe_vassal_zero_modifier }
                 save_scope_value_as = { name = tca_test_funding_start value = current_date }
                 add_character_flag = tca_test_delayed_case_active
                 trigger_event = { id = tca_office_funding_test.1001 days = 35 }
@@ -463,8 +465,14 @@ tca_office_funding_test.1001 = {
             scope:tca_test_funding_circuit_office = { save_scope_value_as = { name = tca_test_funding_natural_circuit_merit value = { value = var:tca_office_funding_last_amount multiply = 0.2 } } }
             if = { limit = { scope:tca_test_funding_county_office = { has_variable = tca_office_funding_last_merit var:tca_office_funding_last_merit = scope:tca_test_funding_natural_county_merit var:tca_office_funding_last_merit_recipient = holder } scope:tca_test_funding_circuit_office = { has_variable = tca_office_funding_last_merit var:tca_office_funding_last_merit = scope:tca_test_funding_natural_circuit_merit var:tca_office_funding_last_merit_recipient = holder } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 69" }
             else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 69" }
+            # 原位只读诊断：关闭原生 liege salary 后，保留四项零收入断言，验证官署经费不注入原生月国库收入。
+            debug_log = tca_merit_funding_diagnostic
             if = { limit = { scope:tca_test_funding_circuit_office.holder = { monthly_character_treasury_income = 0 monthly_character_treasury_variable_income = 0 } scope:tca_test_funding_county_office.holder = { monthly_character_treasury_income = 0 monthly_character_treasury_variable_income = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_funding 22" }
             else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_funding 22" }
+            scope:tca_test_funding_circuit_office.holder = { remove_character_modifier = tca_office_income_probe_vassal_zero_modifier }
+            scope:tca_test_funding_county_office.holder = { remove_character_modifier = tca_office_income_probe_vassal_zero_modifier }
+            scope:tca_test_funding_officer = { remove_character_modifier = tca_office_income_probe_vassal_zero_modifier }
+            scope:tca_test_funding_tongpan = { remove_character_modifier = tca_office_income_probe_vassal_zero_modifier }
             if = { limit = { has_character_flag = tca_test_case_failed } change_variable = { name = tca_test_suite_failed add = 1 } debug_log = "TCA_TEST FAIL tca_test_office_funding" }
             else = { change_variable = { name = tca_test_suite_passed add = 1 } debug_log = "TCA_TEST PASS tca_test_office_funding" }
             if = { limit = { has_character_flag = tca_test_funding_restore_disabled } remove_character_flag = tca_test_funding_restore_disabled add_realm_law_skip_effects = tca_tongpan_disabled_law tca_refresh_tongpan_realm_effect = yes }

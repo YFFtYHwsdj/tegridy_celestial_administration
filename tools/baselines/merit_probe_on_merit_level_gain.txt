@@ -1,0 +1,150 @@
+﻿on_merit_level_gain = {
+	effect = {
+		if = {
+			limit = {
+				government_allows = merit
+				# Not the top lieges of celestial or meritocratic government.
+				this != top_liege
+			}
+			# Notify of level increase
+			send_interface_toast = {
+				type = msg_character_level_increase
+				title = merit_level_gain.message
+				desc = merit_level_gain.desc
+				left_icon = root
+
+				# Domicile buildings
+				if = {
+					limit = {
+						exists = domicile
+					}
+					if = {
+						limit = {
+							domicile = { has_domicile_parameter = estate_merit_rank_increase_bonus_6 }
+						}
+						add_prestige = estate_merit_rank_increase_bonus_6_value
+						add_piety = estate_merit_rank_increase_bonus_6_value
+						change_influence = estate_merit_rank_increase_bonus_6_value
+					}
+					else_if = {
+						limit = {
+							domicile = { has_domicile_parameter = estate_merit_rank_increase_bonus_5 }
+						}
+						add_prestige = estate_merit_rank_increase_bonus_5_value
+						add_piety = estate_merit_rank_increase_bonus_5_value
+						change_influence = estate_merit_rank_increase_bonus_5_value
+					}
+					else_if = {
+						limit = {
+							domicile = { has_domicile_parameter = estate_merit_rank_increase_bonus_4 }
+						}
+						add_prestige = estate_merit_rank_increase_bonus_4_value
+						add_piety = estate_merit_rank_increase_bonus_4_value
+						change_influence = estate_merit_rank_increase_bonus_4_value
+					}
+					else_if = {
+						limit = {
+							domicile = { has_domicile_parameter = estate_merit_rank_increase_bonus_3 }
+						}
+						add_prestige = estate_merit_rank_increase_bonus_3_value
+						add_piety = estate_merit_rank_increase_bonus_3_value
+						change_influence = estate_merit_rank_increase_bonus_3_value
+					}
+					else_if = {
+						limit = {
+							domicile = { has_domicile_parameter = estate_merit_rank_increase_bonus_2 }
+						}
+						add_prestige = estate_merit_rank_increase_bonus_2_value
+						add_piety = estate_merit_rank_increase_bonus_2_value
+						change_influence = estate_merit_rank_increase_bonus_2_value
+					}
+					else_if = {
+						limit = {
+							domicile = { has_domicile_parameter = estate_merit_rank_increase_bonus_1 }
+						}
+						add_prestige = estate_merit_rank_increase_bonus_1_value
+						add_piety = estate_merit_rank_increase_bonus_1_value
+						change_influence = estate_merit_rank_increase_bonus_1_value
+					}
+				}
+			}
+
+			# When advancing a merit level for the first time - Get an event telling you about it
+			if = {
+				limit = {
+					is_ai = no
+				}
+				trigger_event = { id = tgp_china_career.0010 days = { 2 10 } }
+			}
+		}
+		# Remove the elder relation if the elder has lower merit level than the disciple
+		every_relation = {
+			type = elder
+			limit = {
+				merit_level <= root.merit_level
+			}
+			remove_relation_disciple = root
+		}
+		if = {
+			limit = {
+				culture = {
+					has_cultural_parameter = family_shares_merit
+				}
+				merit_level = 5
+				any_close_family_member = {
+					culture = {
+						has_cultural_parameter = family_shares_merit
+					}
+					is_faith_dominant_gender = yes
+					merit_level < 5
+					top_liege = root.top_liege
+				}
+			}
+			send_interface_toast = {
+				type = event_toast_effect_good
+				title = tradition_stratified_society_toast_title
+				left_icon = root
+				custom_tooltip = tradition_stratified_society_toast_desc
+			}
+			save_temporary_scope_as = family_success
+			every_close_family_member = {
+				limit = {
+					culture = {
+						has_cultural_parameter = family_shares_merit
+					}
+					is_faith_dominant_gender = yes
+					merit_level < 5
+					top_liege = root.top_liege
+				}
+				change_merit = stratified_society_merit_gain_value
+				if = {
+					limit = {
+						NOT = {
+							has_character_flag = passed_provincial_exam
+						}
+					}
+					add_character_flag = passed_provincial_exam
+					if = {
+						limit = {
+							NOR = {
+								has_character_modifier = tgp_passed_provincial_exam_modifier
+								has_character_modifier = tgp_bypassed_provincial_exam_modifier
+								has_character_modifier = tgp_nepotism_bypass_exams_modifier
+							}
+						}
+						add_character_modifier = {
+							modifier = tgp_nepotism_bypass_exams_modifier
+						}
+					}
+				}
+				send_interface_toast = {
+					type = event_toast_effect_good
+					title = tradition_stratified_society_family_member_toast_title
+					left_icon = this
+					right_icon = root
+					custom_tooltip = tradition_stratified_society_family_member_toast_desc
+				}
+			}
+		}
+	}
+}

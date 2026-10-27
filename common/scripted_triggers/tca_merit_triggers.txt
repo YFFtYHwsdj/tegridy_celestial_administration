@@ -1,0 +1,100 @@
+﻿# 人物作用域：全国归属以真实最高领主为准，无地廷臣与家门成员同样可入人口。
+# 路线异常者仍按最后合法路线占额；从无唯一路线者由年度诊断列U账。
+# 只有debug局显式标记的旧接口探针可隔离；普通人物即使误有同名标记也不改变规则。
+tca_merit_interface_probe_trigger = {
+    debug_only = yes
+    has_character_flag = tca_merit_interface_probe
+}
+tca_merit_population_trigger = {
+    NOT = { tca_merit_interface_probe_trigger = yes }
+    is_alive = yes
+    # 人物池里的人可能没有最高领主；exists维持拒绝语义，?=只避免空scope报错。
+    exists = top_liege top_liege ?= { government_has_flag = government_is_celestial }
+    government_has_flag = government_is_celestial
+    is_independent_ruler = no
+    has_character_flag = tca_merit_active
+    NOT = { has_character_flag = tca_merit_entry_pending }
+    has_variable = tca_merit_approved_level
+    tca_merit_level_value >= 1
+    tca_merit_level_value <= 9
+    NOT = { has_character_flag = tca_merit_retired }
+    NOT = { has_character_flag = tca_merit_refused }
+}
+
+# 年度提交复验只读身份硬条件，Merit由冻结值判断；临时授职／考试冷却不排除。
+# 来源等级与所属国家由调用者另验，避免被冻结后在另一国家重复授品。
+tca_merit_ordinary_hard_candidate_trigger = {
+    tca_merit_population_trigger = yes
+    is_adult = yes
+    # 退出后也可安全复验；身份仍由population拒绝，等级getter只避免缺变量读取。
+    tca_merit_level_value < 7
+    tca_merit_theoretical_cap_value > tca_merit_level_value
+    NOT = { has_character_flag = tca_merit_central_pending }
+    NOT = { var:tca_merit_last_ordinary_year ?= current_year }
+    has_variable = tca_merit_route
+    OR = {
+        AND = { is_civilian_candidate_trigger = yes is_military_candidate_trigger = no var:tca_merit_route ?= 1 }
+        AND = { is_military_candidate_trigger = yes is_civilian_candidate_trigger = no var:tca_merit_route ?= 2 }
+    }
+}
+tca_merit_ordinary_candidate_trigger = {
+    tca_merit_ordinary_hard_candidate_trigger = yes
+    NOT = { has_character_flag = tca_merit_grant_suppress }
+    NOT = { has_variable = tca_merit_grant_phase }
+    merit >= tca_merit_next_threshold_value
+}
+
+# 人物作用域；仅真实中央持职的未入品来源进入中央事务，不加入普通人口。
+# 原生零级分两种：尚未接管的普通零级，以及已有真实入品准备的entry_pending；
+# 两种都可从SOURCE=0一次授到实际职位目标，但普通竞争仍由population拒绝零级。
+# 这里只做准入；落账前由commit trigger重新读取实际头衔、议会职位与退出标记。
+tca_merit_central_zero_source_trigger = {
+    NOT = { tca_merit_interface_probe_trigger = yes }
+    is_alive = yes
+    merit_level = 0
+    tca_merit_central_target_value > 0
+    NOT = { has_character_flag = tca_merit_retired }
+    NOT = { has_character_flag = tca_merit_refused }
+    OR = {
+        NOT = { has_character_flag = tca_merit_active }
+        AND = { has_character_flag = tca_merit_entry_pending var:tca_merit_approved_level ?= 1 }
+    }
+    OR = {
+        AND = { is_civilian_candidate_trigger = yes is_military_candidate_trigger = no }
+        AND = { is_military_candidate_trigger = yes is_civilian_candidate_trigger = no }
+    }
+}
+
+# 人物作用域；零级中央来源落账前复验。目标必须等于当前实际职位应得品级，
+# 并重新核对头衔／议会、最高领主（由central_target_value读取）、路线及退出标记。
+# 不接受prepare时的过期任命快照，也不把普通population的低品限制放宽到零级。
+tca_merit_central_zero_source_commit_trigger = {
+    tca_merit_central_zero_source_trigger = yes
+    tca_merit_central_target_value = var:tca_merit_grant_target
+    OR = {
+        AND = { var:tca_merit_grant_route = 1 is_civilian_candidate_trigger = yes is_military_candidate_trigger = no }
+        AND = { var:tca_merit_grant_route = 2 is_military_candidate_trigger = yes is_civilian_candidate_trigger = no }
+    }
+}
+
+# 人物作用域；局部改制／迁国入口的廉价筛选，旧scope只在原生回调提供时读取。
+# 当前已退出者由active识别；未接管的迁入分支由当前最高领主识别。
+tca_merit_realm_change_relevant_trigger = {
+    OR = {
+        has_character_flag = tca_merit_active
+        government_has_flag = government_is_celestial
+        AND = { exists = top_liege top_liege ?= { government_has_flag = government_is_celestial } }
+        AND = { exists = scope:old_government scope:old_government = government_type:celestial_government }
+        AND = { exists = scope:old_liege.top_liege scope:old_liege.top_liege ?= { government_has_flag = government_is_celestial } }
+    }
+}
+
+# 原生进出宫廷回调；保留离境者及新旧雇主涉及天朝的移动，其余不排延迟事件。
+tca_merit_court_change_relevant_trigger = {
+    OR = {
+        has_character_flag = tca_merit_active
+        AND = { exists = top_liege top_liege ?= { government_has_flag = government_is_celestial } }
+        AND = { exists = scope:old_employer.top_liege scope:old_employer.top_liege ?= { government_has_flag = government_is_celestial } }
+        AND = { exists = scope:new_employer.top_liege scope:new_employer.top_liege ?= { government_has_flag = government_is_celestial } }
+    }
+}

@@ -25,7 +25,7 @@
 
 - `common/`、`events/`、`gui/`、`localization/` 等目录保存游戏实现，新增脚本标识使用 `tca_` 前缀。
 - [架构导航](ARCHITECTURE.md)提供模块关系和阅读入口；[开发规范](docs/development/README.md)说明文档与证据的维护方式。
-- [research/](research/) 保存历史考证，引用与核验要求见 [考证规范](research/standards.md)。
+- [research/](research) 保存历史考证，引用与核验要求见 [考证规范](research/standards.md)。
 - `events/tests/` 保存原生游戏测试，`tools/` 保存运行与检查工具；框架与编写方式见 [统一测试文档](docs/testing/framework.md)，自动运行方式见 [CLI 测试说明](docs/testing/README.md)。测试会修改世界状态，使用专用测试局。
 
 日常开发在对应模块内维护实现与文档。新增功能、调整数值、修复缺陷和补充验收记录无需同步修改本页，架构导航仅在模块边界、共享依赖或入口变化时维护。README 仅在项目定位、加载方式或上述公共入口改变时更新。

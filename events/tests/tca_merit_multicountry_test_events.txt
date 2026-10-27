@@ -1,0 +1,115 @@
+﻿# 多国年度锚点：有廷臣及空仕途人口的独立天朝，与宋同轮调用真实年度工作器。
+# 只验证国家列表/人口冻结/诊断落地；不宣称历史自然局面或长期平衡。
+namespace = tca_merit_multicountry_test
+
+tca_merit_multicountry_test.1 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { has_character_flag = tca_test_delayed_case_active } debug_log = "TCA_TEST CASE_BUSY" }
+        else = {
+            debug_log = "TCA_TEST BEGIN tca_merit_multicountry_test.1 tca_test_merit_multicountry"
+            remove_character_flag = tca_test_case_failed
+            if = {
+                limit = { debug_only = yes is_alive = yes title:h_china.holder = root }
+                save_scope_as = tca_mct_reporter
+                add_character_flag = tca_test_delayed_case_active
+                if = { limit = { NOT = { has_global_variable = tca_merit_annual_run_count } } set_global_variable = { name = tca_merit_annual_run_count value = 0 } }
+                create_character = { age = 40 gender_female_chance = 0 random_traits = no dynasty = none location = root.location culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_mct_ruler }
+                scope:tca_mct_ruler = {
+                    tca_test_protect_character_effect = yes
+                    add_character_flag = ai_will_not_convert
+                    add_trait = education_stewardship_1
+                }
+                create_dynamic_title = { tier = empire name = tca_test_arrest_office_name }
+                scope:new_title = { save_scope_as = tca_mct_title set_capital_county = root.capital_county set_landless_title = yes }
+                create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_mct_grant }
+                scope:tca_mct_title = { change_title_holder = { holder = scope:tca_mct_ruler change = scope:tca_mct_grant } }
+                resolve_title_and_vassal_change = scope:tca_mct_grant
+                scope:tca_mct_ruler = { change_government = celestial_government }
+                create_character = {
+                    age = 40 gender_female_chance = 0 random_traits = no dynasty = none
+                    employer = scope:tca_mct_ruler culture = root.culture faith = root.faith rite = root.rite
+                    save_scope_as = tca_mct_courtier
+                }
+                scope:tca_mct_courtier = {
+                    tca_test_protect_character_effect = yes
+                    add_character_flag = ai_will_not_convert
+                    add_trait = education_stewardship_1
+                    set_merit_level = 1
+                    change_merit_no_experience = { value = 100 subtract = merit }
+                    tca_merit_initialize_character_effect = yes
+                }
+                if = { limit = { scope:tca_mct_courtier = { top_liege = scope:tca_mct_ruler has_character_flag = tca_merit_active var:tca_merit_approved_level = 1 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_multicountry 1" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_multicountry 1" }
+                # 空国家仍须更新零核准快照；旧年非零值保证不能靠默认缺变量混过断言。
+                create_character = { age = 40 gender_female_chance = 0 random_traits = no dynasty = none location = root.location culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_mct_empty_ruler }
+                scope:tca_mct_empty_ruler = { tca_test_protect_character_effect = yes add_character_flag = ai_will_not_convert add_trait = education_stewardship_1 }
+                create_dynamic_title = { tier = empire name = tca_test_arrest_office_name }
+                scope:new_title = { save_scope_as = tca_mct_empty_title set_capital_county = root.capital_county set_landless_title = yes }
+                create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_mct_empty_grant }
+                scope:tca_mct_empty_title = { change_title_holder = { holder = scope:tca_mct_empty_ruler change = scope:tca_mct_empty_grant } }
+                resolve_title_and_vassal_change = scope:tca_mct_empty_grant
+                scope:tca_mct_empty_ruler = { change_government = celestial_government }
+                scope:tca_mct_empty_title = {
+                    set_variable = { name = tca_merit_feedback_year value = { value = current_year subtract = 1 } }
+                    set_variable = { name = tca_merit_feedback_success_1 value = 7 }
+                    set_variable = { name = tca_merit_feedback_q_1_1 value = 7 }
+                    set_variable = { name = tca_merit_feedback_band_pop_1_1 value = 7 }
+                }
+                set_variable = { name = tca_mct_empty_population value = 0 }
+                every_living_character = {
+                    limit = { tca_merit_population_trigger = yes top_liege ?= scope:tca_mct_empty_ruler }
+                    scope:tca_mct_reporter = { change_variable = { name = tca_mct_empty_population add = 1 } }
+                }
+                set_global_variable = { name = tca_merit_annual_processed_year value = { value = current_year subtract = 1 } }
+                tca_merit_run_annual_effect = yes
+                scope:tca_mct_reporter = {
+                    if = { limit = { scope:tca_mct_title = { has_variable = tca_merit_annual_unclassified_count var:tca_merit_annual_unclassified_count = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_multicountry 2" }
+                    else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_multicountry 2" }
+                    if = { limit = { scope:tca_mct_courtier = { var:tca_merit_approved_level = 1 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_multicountry 3" }
+                    else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_multicountry 3" }
+                    if = {
+                        limit = { var:tca_mct_empty_population = 0 scope:tca_mct_empty_ruler = { is_independent_ruler = yes government_has_flag = government_is_celestial primary_title = scope:tca_mct_empty_title } }
+                        debug_log = "TCA_TEST CHECK_PASS tca_test_merit_multicountry 4"
+                    }
+                    else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_multicountry 4" }
+                    if = {
+                        limit = {
+                            scope:tca_mct_empty_title = {
+                                var:tca_merit_feedback_year = current_year
+                                var:tca_merit_feedback_success_1 = 0 var:tca_merit_feedback_success_2 = 0
+                                var:tca_merit_feedback_q_1_1 = 0 var:tca_merit_feedback_ok_1_1 = 0
+                                var:tca_merit_feedback_band_pop_1_1 = 0 var:tca_merit_feedback_band_pop_1_2 = 0
+                                var:tca_merit_feedback_band_pop_1_3 = 0 var:tca_merit_feedback_band_pop_1_4 = 0
+                                var:tca_merit_feedback_band_pop_2_1 = 0 var:tca_merit_feedback_band_pop_2_2 = 0
+                                var:tca_merit_feedback_band_pop_2_3 = 0 var:tca_merit_feedback_band_pop_2_4 = 0
+                            }
+                        }
+                        debug_log = "TCA_TEST CHECK_PASS tca_test_merit_multicountry 5"
+                    }
+                    else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_multicountry 5" }
+                    if = {
+                        limit = { scope:tca_mct_empty_title = { NOT = { has_variable = tca_ma_route } NOT = { has_variable = tca_ma_quota_1_1 } NOT = { has_variable = tca_ma_work_n_1_1 } NOT = { has_variable = tca_mf_band } var:tca_merit_annual_unclassified_count = 0 var:tca_merit_annual_route_anomaly_count = 0 } }
+                        debug_log = "TCA_TEST CHECK_PASS tca_test_merit_multicountry 6"
+                    }
+                    else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_multicountry 6" }
+                    remove_variable = tca_mct_empty_population
+                    scope:tca_mct_empty_title = {
+                        tca_merit_feedback_test_clear_anchor_effect = yes
+                        remove_variable = tca_merit_annual_unclassified_count
+                        remove_variable = tca_merit_annual_route_anomaly_count
+                    }
+                    scope:tca_mct_empty_ruler = { destroy_title = scope:tca_mct_empty_title tca_test_cleanup_merit_probe_character_effect = yes }
+                    scope:tca_mct_courtier = { tca_merit_leave_celestial_effect = yes tca_test_cleanup_merit_probe_character_effect = yes tca_test_restore_character_effect = yes }
+                    scope:tca_mct_ruler = { destroy_title = scope:tca_mct_title tca_test_cleanup_merit_probe_character_effect = yes }
+                    if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_merit_multicountry" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+                    else = { debug_log = "TCA_TEST PASS tca_test_merit_multicountry" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+                    remove_character_flag = tca_test_case_failed
+                    remove_character_flag = tca_test_delayed_case_active
+                    tca_test_continue_delayed_effect = yes
+                }
+            }
+            else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_merit_multicountry" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_continue_delayed_effect = yes }
+        }
+    }
+}

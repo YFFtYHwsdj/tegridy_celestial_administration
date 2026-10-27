@@ -1,0 +1,250 @@
+imperial_examination_disburse_activity_entrant_rewards = {
+	save_temporary_scope_as = entrant
+	#This variable is set to track the loc we show players when notifying them of their family's results.
+
+	#Cheaters
+	if = {
+		limit = { has_variable = been_caught_cheating_longterm }
+		#No influence for cheaters
+		change_merit = {
+			value = imperial_examination_merit_base_reward_value
+			multiply = 0.1
+		}
+	}
+	#Entrants
+	else_if = {
+		limit = {
+			OR = {
+				is_in_guest_subset = { name = entrants }
+				is_in_guest_subset = { name = palace_entrants }
+			}
+		}
+		#Influence based on your score
+		if = {
+			limit = { is_ai = no }
+			#Record it
+			involved_activity = {
+				add_activity_log_entry = {
+					key = imperial_examination_entrant_rewards
+					score = 80
+					tags = { completed }
+					show_in_conclusion = yes
+					character = scope:entrant
+					location = scope:entrant.location
+					scope:entrant = {
+						if = {
+							limit = {
+								NOT = { has_character_modifier = tgp_passed_provincial_exam_modifier }
+							}
+							add_character_flag = passed_provincial_exam
+							add_character_modifier = {
+								modifier = tgp_bypassed_provincial_exam_modifier
+							}
+						}
+						change_influence = imperial_examination_entrant_influence_reward_value
+						#Merit based on your score
+						change_merit = imperial_examination_entrant_merit_reward_value
+						# Gain Prestige if you have the relevant flag
+						if = {
+							limit = { has_character_flag = examination_prestige_reward }
+							remove_character_flag = examination_prestige_reward
+							add_prestige = major_prestige_gain
+						}
+					}
+				}
+			}
+		}
+		else = {
+			if = {
+				limit = {
+					NOT = { has_character_modifier = tgp_passed_provincial_exam_modifier }
+				}
+				add_character_flag = passed_provincial_exam
+				add_character_modifier = {
+					modifier = tgp_bypassed_provincial_exam_modifier
+				}
+				if = {
+					limit = { is_lowborn = no }
+					change_merit = local_examination_merit_base_reward_value
+				}
+			}
+			if = {
+				limit = {
+					OR = {
+						is_lowborn = no
+						has_perfect_score_trigger = { SCORE_VAR = imperial_examination_score }
+					}
+					
+				}
+				change_influence = imperial_examination_entrant_influence_reward_value
+				#Merit based on your score
+				change_merit = imperial_examination_entrant_merit_reward_value
+				# Gain Prestige if you have the relevant flag
+				if = {
+					limit = { has_character_flag = examination_prestige_reward }
+					remove_character_flag = examination_prestige_reward
+					add_prestige = major_prestige_gain
+				}
+			}
+		}
+		if = {
+			limit = {
+				is_in_guest_subset = { name = palace_entrants }
+			}
+			if = {
+				limit = {
+					NOT = { has_character_flag = passed_metropolitan_exam }
+				}
+				add_character_flag = passed_metropolitan_exam
+				add_character_modifier = {
+					modifier = tgp_passed_metropolitan_exam_modifier
+				}
+			}
+			add_character_flag = passed_palace_exam
+			add_character_modifier = {
+				modifier = tgp_passed_palace_exam_modifier
+			}
+			create_character_memory = {
+				type = passed_metropolitan_exam_memory
+			}
+			create_character_memory = {
+				type = passed_palace_exam_memory
+			}
+			# Notify close family members
+			every_close_family_member = {
+				# House head is notified separately
+				limit = { is_house_head = no }
+				send_interface_message = {
+					type = event_msg_merit_effect_good
+					title = palace_exam_close_family_passed
+					right_icon = root
+					desc = msg_palace_exam_close_family_passed_desc
+				}
+			}
+		}
+		else_if = {
+			limit = {
+				is_in_guest_subset = { name = entrants }
+			}
+			save_temporary_scope_as = temp_scope
+			add_character_flag = passed_metropolitan_exam
+			add_character_modifier = {
+				modifier = tgp_passed_metropolitan_exam_modifier
+			}
+			if = {
+				limit = {
+					# Let's give metropolitan entrants the chance to pass Palace as well.
+					is_ai = yes
+					is_lowborn = no
+					# We don't mess with any player families
+					NOT = {
+						any_close_or_extended_family_member = { is_ai = no }
+					}
+				}
+				random = {
+					chance = 20
+					add_character_flag = passed_palace_exam
+					add_character_modifier = {
+						modifier = tgp_passed_palace_exam_modifier
+					}
+					change_merit = empire_starting_merit_value
+				}
+			}
+			create_character_memory = {
+				type = passed_metropolitan_exam_memory
+			}
+			# Notify close family members
+			every_close_family_member = {
+				# House head is notified separately
+				limit = { is_house_head = no }
+				send_interface_message = {
+					type = event_msg_merit_effect_good
+					title = metropolitan_exam_close_family_passed
+					right_icon = root
+					desc = msg_metropolitan_exam_close_family_passed_desc
+				}
+			}
+		}
+		#Remove failed_imperial_examination flags for those who have it
+		if = {
+			limit = {
+				has_character_flag = failed_imperial_examination
+			}
+			remove_character_flag = failed_imperial_examination
+		}
+        if = {
+        	limit = {
+        		has_character_flag = exam_cheat_intent
+        		has_none_of_variables = {
+        			name = been_caught_cheating
+        			name = been_caught_cheating_longterm
+        		}
+				government_allows = merit
+        	}
+			add_secret = {
+				target = scope:host
+				type = secret_exam_cheater
+			}
+        }
+	}
+	#Failees
+	else = {
+		if = {
+			limit = { is_ai = no }
+			#Record it
+			involved_activity = {
+				add_activity_log_entry = {
+					key = imperial_examination_entrant_rewards
+					score = 80
+					tags = { completed }
+					show_in_conclusion = yes
+					character = scope:entrant
+					location = scope:entrant.location
+					scope:entrant = {
+						#Dwindling influence & merit for failees
+						change_influence = imperial_examination_failee_influence_reward_value
+						change_merit = imperial_examination_failee_merit_reward_value
+						# Gain Prestige if you have the relevant flag
+						if = {
+							limit = { has_character_flag = examination_prestige_reward }
+							remove_character_flag = examination_prestige_reward
+							add_prestige = major_prestige_loss
+						}
+					}
+					failee_chance_to_gain_elder_effect = yes
+				}
+			}
+		}
+		else = {
+			#Dwindling influence & merit for failees
+			change_influence = imperial_examination_failee_influence_reward_value
+			change_merit = imperial_examination_failee_merit_reward_value
+			involved_activity = {
+				failee_chance_to_gain_elder_effect = yes
+			}
+			# Gain Prestige if you have the relevant flag
+			if = {
+				limit = { has_character_flag = examination_prestige_reward }
+				remove_character_flag = examination_prestige_reward
+				add_prestige = major_prestige_loss
+			}
+		}
+		#Set "failed examination" flags
+		add_character_flag = failed_imperial_examination
+		create_character_memory = {
+			type = failed_metropolitan_exam_memory
+		}
+		# Notify close family members
+		every_close_family_member = {
+			# House head is notified separately
+			limit = { is_house_head = no }
+			send_interface_message = {
+				type = event_msg_merit_effect_bad
+				title = metropolitan_exam_close_family_failed
+				right_icon = root
+				desc = msg_metropolitan_exam_close_family_failed_desc
+			}
+		}
+	}
+	scope:entrant = { add_to_list = exam_entrants }
+}

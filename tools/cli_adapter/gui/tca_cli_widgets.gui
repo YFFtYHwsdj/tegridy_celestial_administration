@@ -5,9 +5,16 @@
  alpha = 0
  visible_at_creation = no
  datacontext = "[GetTitleByKey('h_china')]"
- visible = "[And(IsInGame, EqualTo_CFixedPoint(Title.MakeScope.Var('tca_cli_ready').GetValue, '(CFixedPoint)1'))]"
+ # 新UI会话可以先确认观察者，不能等可能仍排队的脚本阶段更新而互相等待。
+ # 首进程保存前已写会话标记，其保存态2不重复进入观察者；普通测试没有阶段变量。
+ visible = "[And(IsInGame, And(EqualTo_CFixedPoint(Title.MakeScope.Var('tca_cli_ready').GetValue, '(CFixedPoint)1'), Or(Not(EqualTo_CFixedPoint(Title.MakeScope.Var('tca_merit_saveload_phase').GetValue, '(CFixedPoint)2')), Not(GetVariableSystem.HasValue('tca_merit_probe_started', 'yes')))))]"
  state = {
   name = _show
+  duration = 0.5
+  next = "tca_cli_enter_observe"
+ }
+ state = {
+  name = "tca_cli_enter_observe"
   on_start = "[ExecuteConsoleCommand('observe')]"
   on_start = "[SetGameSpeed('(int32)4')]"
  }

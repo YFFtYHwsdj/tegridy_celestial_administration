@@ -1,0 +1,645 @@
+﻿# 原版仕途经营互动覆盖；受领者功绩奖励前准备九品准入，保留免试、代价、AI与提示原文。
+influence_meritorious_career_interaction = {
+	icon = support_candidacy
+	category = interaction_category_succession
+	common_interaction = yes
+	interface_priority = 100
+
+	desc = influence_meritorious_career_interaction_desc
+
+	is_available = {
+		government_has_mechanic = administrative
+		trigger_if = {
+			limit = { is_ai = yes }
+			influence >= monumental_influence_value # Only consider doing this if you have the influence to spare
+			government_allows = merit
+			OR = {
+				is_landed_or_landless_administrative_or_theocratic = yes
+				highest_held_title_tier >= tier_empire
+			}
+		}
+		government_has_flag = government_has_merit
+	}
+
+	is_shown = {
+		scope:recipient = {
+			OR = {
+				AND = {
+					government_has_mechanic = administrative
+					government_has_flag = government_has_merit
+				}
+				is_ruler = no
+			}
+			top_liege ?= scope:actor.top_liege
+			this != top_liege
+		}
+	}
+
+	is_valid_showing_failures_only = {
+		scope:actor = {
+			influence >= 0
+			OR = {
+				is_landed_or_landless_administrative_or_theocratic = yes
+				tgp_has_minister_title = yes
+			}
+			is_adult = yes
+		}
+		scope:recipient = {
+			is_adult = yes
+			trigger_if = {
+				limit = {
+					is_female = yes
+				}
+				custom_tooltip = {
+					text = recipient_cannot_be_appointed_gender_laws_tt
+					top_liege ?= {
+						NOR = {
+							has_realm_law = male_only_law
+							has_realm_law = male_preference_law
+						}
+					}
+				}
+			}
+			trigger_else = {
+				custom_tooltip = {
+					text = recipient_cannot_be_appointed_gender_laws_tt
+					top_liege ?= {
+						NOR = {
+							has_realm_law = female_only_law
+							has_realm_law = female_preference_law
+						}
+					}
+				}
+			}
+		}
+	}
+
+	can_send = {
+	}
+
+	# There's no real reason for the AI to refuse
+	auto_accept = yes
+
+	send_option = {
+		is_shown = {
+			scope:actor = {
+				tgp_is_any_minister = no
+			}
+		}
+		flag = major_influence_option
+		localization = "major_influence_option_desc"
+		starts_enabled = {
+			scope:actor = { influence >= career_score_major_cost_value }
+		}
+	}
+	send_option = {
+		is_shown = {
+			scope:actor = {
+				tgp_is_any_minister = no
+			}
+		}
+		flag = medium_influence_option
+		localization = "medium_influence_option_desc"
+		starts_enabled = {
+			scope:actor = {
+				influence < career_score_major_cost_value
+				influence >= career_score_medium_cost_value
+			}
+		}
+	}
+	send_option = {
+		is_shown = {
+			scope:actor = {
+				tgp_is_any_minister = no
+			}
+		}
+		flag = minor_influence_option
+		localization = "minor_influence_option_desc"
+		starts_enabled = {
+			scope:actor = { influence < career_score_medium_cost_value }
+		}
+	}
+
+	send_option = {
+		is_shown = {
+			scope:actor = {
+				tgp_is_any_minister = yes
+			}
+		}
+		flag = candidate_succession_score_option
+		localization = "candidate_succession_score_option_desc"
+	}
+	send_option = {
+		is_shown = {
+			scope:actor = {
+				tgp_is_any_minister = yes
+			}
+		}
+		is_valid = {
+			scope:recipient = {
+				merit_level < maximum_merit_level
+			}
+		}
+		flag = merit_bestowal_option
+		localization = "merit_bestowal_option_desc"
+	}
+	send_option = {
+		is_shown = {
+			scope:actor = {
+				tgp_is_any_minister = yes
+			}
+		}
+		is_valid = {
+			scope:recipient = {
+				is_close_or_extended_family_of = scope:actor
+				custom_tooltip = {
+					text = has_passed_all_exams
+					OR = {
+						NOT = {
+							has_character_flag = passed_provincial_exam
+						}
+						NOT = {
+							has_character_flag = passed_metropolitan_exam
+						}
+						NOT = {
+							has_character_flag = passed_palace_exam
+						}
+					}
+				}
+			}
+		}
+		flag = examination_bypass_option
+		localization = "examination_bypass_option_desc"
+	}
+
+	localization_values = {
+		MAJOR_INFLUENCE_OPTION = scope:actor.career_score_major_total_value
+		MEDIUM_INFLUENCE_OPTION = scope:actor.career_score_medium_total_value
+		MINOR_INFLUENCE_OPTION = scope:actor.career_score_minor_total_value
+	}
+
+	cost = {
+		influence = {
+			# Base cost
+			switch = {
+				trigger = yes
+				scope:major_influence_option = {
+					add = {
+						value = career_score_major_cost_value
+						desc = BASE
+					}
+				}
+				scope:medium_influence_option = {
+					add = {
+						value = career_score_medium_cost_value
+						desc = BASE
+					}
+				}
+				scope:minor_influence_option = {
+					add = {
+						value = career_score_minor_cost_value
+						desc = BASE
+					}
+				}
+				scope:candidate_succession_score_option = {
+					add = {
+						value = career_score_major_cost_value
+						desc = BASE
+					}
+				}
+				scope:merit_bestowal_option = {
+					add = {
+						value = career_score_major_cost_value
+						multiply = 0.8
+						desc = BASE
+					}
+				}
+				scope:examination_bypass_option = {
+					add = {
+						value = career_score_major_cost_value
+						multiply = 0.6
+						desc = BASE
+					}
+				}
+			}
+
+			save_temporary_value_as = calculated_base_cost
+
+			# Movement leaders have a small reduction bonus
+			if = {
+				limit = {
+					scope:actor = { is_any_movement_leader = yes }
+				}
+				add = {
+					value = scope:calculated_base_cost
+					multiply = -0.1
+					desc = you_are_a_movement_leader_desc
+				}
+			}
+
+			# Ministers
+			if = {
+				limit = {
+					scope:actor = { has_title = title:e_minister_chancellor }
+				}
+				add = {
+					value = scope:calculated_base_cost
+					multiply = -0.5
+					desc = you_are_the_grand_chancellor_desc
+				}
+			}
+			if = {
+				limit = {
+					scope:actor = { has_title = title:e_minister_of_personnel }
+				}
+				add = {
+					value = scope:calculated_base_cost
+					multiply = -0.3
+					desc = you_are_the_minister_of_personnel_desc
+				}
+			}
+
+			# A dominant family gets to spend less influence
+			if = {
+				limit = {
+					scope:actor.house ?= { is_dominant_family = yes }
+				}
+				add = {
+					value = scope:calculated_base_cost
+					multiply = -0.2
+					desc = "[dominant_family|E]"
+				}
+			}
+
+			# House Aspiration
+			if = {
+				limit = {
+					scope:actor.house ?= {
+						OR = {
+							has_house_aspiration_parameter = influence_career_bonus_1
+							has_house_aspiration_parameter = influence_career_bonus_2
+						}
+					}
+					scope:recipient.house ?= scope:actor.house
+				}
+				add = {
+					value = scope:calculated_base_cost
+					multiply = {
+						scope:actor.house = {
+							if = {
+								limit = { has_house_aspiration_parameter = influence_career_bonus_2 }
+								add = influence_career_bonus_2_value
+							}
+							else_if = {
+								limit = { has_house_aspiration_parameter = influence_career_bonus_1 }
+								add = influence_career_bonus_1_value
+							}
+						}
+					}
+					desc = celestial_traditional_name_desc
+				}
+			}
+
+			# Dynasty Legacy
+			if = {
+				limit = {
+					scope:actor = {
+						dynasty ?= {
+							has_dynasty_perk = tgp_chinese_legacy_5
+						}
+					}
+				}
+				add = {
+					value = scope:calculated_base_cost
+					multiply = dynasty_legacy_influence_career_discount_value
+					desc = court_position_tgp_dynasty_legacy
+				}
+			}
+		}
+	}
+
+	on_accept = {
+		switch = {
+			trigger = yes
+			scope:major_influence_option = {
+				save_scope_value_as = {
+					name = increased_career_score
+					value = career_score_major_base_value
+				}
+				save_scope_value_as = {
+					name = opinion_change_value
+					value = 15
+				}
+			}
+			scope:medium_influence_option = {
+				# Save the score value
+				save_scope_value_as = {
+					name = increased_career_score
+					value = career_score_medium_base_value
+				}
+				save_scope_value_as = {
+					name = opinion_change_value
+					value = 10
+				}
+			}
+			scope:minor_influence_option = {
+				# Save the score value
+				save_scope_value_as = {
+					name = increased_career_score
+					value = career_score_minor_base_value
+				}
+				save_scope_value_as = {
+					name = opinion_change_value
+					value = 5
+				}
+			}
+			scope:candidate_succession_score_option = {
+				scope:recipient = {
+					send_interface_toast = {
+						type = event_toast_effect_good
+						title = bolstered_career_notification
+						left_icon = scope:actor
+						right_icon = scope:recipient
+						save_scope_value_as = {
+							name = increased_career_score
+							value = {
+								add = career_score_major_base_value
+								multiply = 1.5
+							}
+						}
+						save_scope_value_as = {
+							name = opinion_change_value
+							value = 15
+						}
+						if = {
+							limit = {
+								is_military_candidate_trigger = yes
+							}
+							custom_tooltip = influence_meritorious_career_effect_military_desc
+						}
+						else = {
+							custom_tooltip = influence_meritorious_career_effect_civilian_desc
+						}
+						add_opinion = {
+							modifier = pleased_opinion
+							target = scope:actor
+							opinion = 20
+						}
+						custom_tooltip = influence_meritorious_career_effect_warning_desc
+					}
+				}
+			}
+			scope:merit_bestowal_option = {
+				scope:recipient = {
+					send_interface_toast = {
+						type = event_toast_effect_good
+						title = bolstered_career_notification
+						left_icon = scope:actor
+						right_icon = scope:recipient
+						tca_merit_before_reward_effect = yes
+						change_merit = {
+							value = 0
+							add = monumental_merit_gain
+							multiply = scope:actor.merit_level
+						}
+						tca_merit_after_reward_effect = yes
+						add_opinion = {
+							modifier = pleased_opinion
+							target = scope:actor
+							opinion = 20
+						}
+					}
+				}
+			}
+			scope:examination_bypass_option = {
+				scope:actor = {
+					if = {
+						limit = {
+							NOT = {
+								has_character_flag = used_examination_bypass
+							}
+						}
+						add_character_flag = used_examination_bypass
+					}
+					else = {
+						change_merit = {
+							value = monumental_merit_loss
+							multiply = scope:actor.merit_level
+						}
+						hidden_effect = {
+							situation:dynastic_cycle ?= {
+								if = {
+									limit = {
+										situation_top_has_catalyst = catalyst_ministers_abused_privilege_of_office
+									}
+									trigger_situation_catalyst = {
+										catalyst = catalyst_ministers_abused_privilege_of_office
+										character = scope:actor
+									}
+								}
+							}
+						}
+						custom_tooltip = examination_bypass_option_you_have_been_warned_desc
+					}
+				}
+				scope:recipient = {
+					send_interface_toast = {
+						type = event_toast_effect_good
+						title = exam_bypass_notification
+						left_icon = scope:actor
+						right_icon = scope:recipient
+						if = {
+							limit = {
+								NOT = {
+									has_character_flag = passed_provincial_exam
+								}
+							}
+							add_character_flag = passed_provincial_exam
+							add_character_modifier = {
+								modifier = tgp_passed_provincial_exam_modifier
+							}
+						}
+						if = {
+							limit = {
+								NOT = {
+									has_character_flag = passed_metropolitan_exam
+								}
+							}
+							add_character_flag = passed_metropolitan_exam
+							add_character_modifier = {
+								modifier = tgp_passed_metropolitan_exam_modifier
+							}
+						}
+						if = {
+							limit = {
+								NOT = {
+									has_character_flag = passed_palace_exam
+								}
+							}
+							add_character_flag = passed_palace_exam
+							add_character_modifier = {
+								modifier = tgp_passed_palace_exam_modifier
+							}
+						}
+						tca_merit_before_reward_effect = yes
+						change_merit = kingdom_starting_merit_value
+						tca_merit_after_reward_effect = yes
+						if = {
+							limit = {
+								scope:actor = {
+									NOT = {
+										has_character_flag = used_examination_bypass
+									}
+								}
+							}
+							custom_tooltip = examination_bypass_option_warning_desc
+						}
+					}
+					add_opinion = {
+						modifier = pleased_opinion
+						target = scope:actor
+						opinion = 30
+					}
+				}
+			}
+		}
+
+		# Update the score for the target character
+		scope:recipient = {
+			hidden_effect = {
+				if = {
+					limit = {
+						is_military_candidate_trigger = yes
+						exists = scope:increased_career_score # since we now have options that don't save this
+					}
+					if = {
+						limit = {
+							has_variable = merit_military_career_score_bonus
+						}
+						change_variable = {
+							name = merit_military_career_score_bonus
+							add = scope:increased_career_score
+						}
+					}
+					else = {
+						set_variable = {
+							name = merit_military_career_score_bonus
+							value = scope:increased_career_score
+						}
+					}
+				}
+				else_if = {
+					limit = {
+						exists = scope:increased_career_score # since we now have options that don't save this
+					}
+					if = {
+						limit = {
+							has_variable = merit_civilian_career_score_bonus
+						}
+						change_variable = {
+							name = merit_civilian_career_score_bonus
+							add = scope:increased_career_score
+						}
+					}
+					else = {
+						set_variable = {
+							name = merit_civilian_career_score_bonus
+							value = scope:increased_career_score
+						}
+					}
+				}
+			}
+			if = {
+				limit = {
+					scope:actor = {
+						tgp_is_any_minister = no # we only show this for everything when you don't trigger the special options
+					}
+				}
+				# Display the relevant information
+				if = {
+					limit = {
+						is_military_candidate_trigger = yes
+					}
+					custom_tooltip = influence_meritorious_career_effect_military_desc
+				}
+				else = {
+					custom_tooltip = influence_meritorious_career_effect_civilian_desc
+				}
+				custom_tooltip = influence_meritorious_career_effect_warning_desc
+			}
+		}
+	}
+
+	ai_targets = {
+		ai_recipients = self
+		ai_recipients = liege
+	}
+	ai_targets = {
+		ai_recipients = family
+		max = 10
+	}
+	ai_targets = {
+		ai_recipients = peer_vassals
+		max = 10
+	}
+
+	ai_frequency_by_tier = {
+		barony = 0
+		county = 42
+		duchy = 30
+		kingdom = 18
+		empire = 12
+		hegemony = 6
+	}
+
+	ai_will_do = {
+		base = -10
+
+		# Opinion
+		opinion_modifier = {
+			opinion_target = scope:recipient
+			multiplier = 0.5
+			trigger = { scope:actor != scope:recipient }
+		}
+
+		# Family relations
+		modifier = {
+			add = 25
+			exists = scope:recipient.house
+			house ?= scope:recipient.house
+		}
+		modifier = {
+			add = 20
+			is_close_family_of = scope:recipient
+		}
+
+		# Other relations
+		modifier = {
+			add = 20
+			has_relation_disciple = scope:recipient
+		}
+		modifier = {
+			add = 20
+			OR = {
+				has_relation_friend = scope:recipient
+				has_relation_lover = scope:recipient
+			}
+		}
+		modifier = {
+			add = 10
+			is_in_same_movement_as = { TARGET = scope:recipient }
+		}
+
+		# Less useful if recipient is a governor already already
+		modifier = {
+			add = -50
+			scope:recipient = { is_governor = yes }
+		}
+
+		# Don't do it at all towards empire tier characters - they cannot get a higher position anyway
+		modifier = {
+			factor = 0
+			scope:recipient = { highest_held_title_tier >= tier_empire }
+		}
+	}
+}

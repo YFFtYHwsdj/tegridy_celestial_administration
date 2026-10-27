@@ -1,0 +1,127 @@
+﻿# 领域人口与无地官署计数的独立接口探针；不实现年度员额公式，不复用真实官署登记。
+# A 为无地官署持有人，C 仅持家门，B 为 A 的普通廷臣，D 为外国领主的独立夹具。
+# every_living_character 配合 top_liege 的覆盖是待引擎实测假设，不冒充原版 MeritPool 等价证明。
+namespace = tca_merit_population_probe
+
+tca_merit_population_probe.1 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_merit_population_probe.1 tca_test_merit_population_interfaces"
+        remove_character_flag = tca_test_case_failed
+        if = {
+            limit = {
+                debug_only = yes is_alive = yes title:h_china.holder = root
+                exists = capital_county
+                exists = title:e_byzantium.holder
+                title:e_byzantium.holder.top_liege != root
+            }
+            save_scope_as = tca_mpp_host
+            tca_test_create_merit_interface_character_effect = { CHARACTER = tca_mpp_a GOVERNMENT = celestial_government }
+            tca_test_create_merit_interface_character_effect = { CHARACTER = tca_mpp_c GOVERNMENT = celestial_government }
+            tca_test_create_merit_interface_character_effect = { CHARACTER = tca_mpp_d GOVERNMENT = celestial_government }
+            # 沿现有独立无地官署的创建顺序；不设置提刑／通判身份与业务登记变量。
+            create_dynamic_title = { tier = duchy name = tca_test_arrest_office_name }
+            scope:new_title = { save_scope_as = tca_mpp_office set_capital_county = root.capital_county set_landless_title = yes }
+            create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_mpp_grant }
+            scope:tca_mpp_office = { change_title_holder = { holder = scope:tca_mpp_a change = scope:tca_mpp_grant } }
+            resolve_title_and_vassal_change = scope:tca_mpp_grant
+            scope:tca_mpp_a = {
+                if = { limit = { NOT = { liege = scope:tca_mpp_host } }
+                    create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_mpp_a_fealty }
+                    change_liege = { liege = scope:tca_mpp_host change = scope:tca_mpp_a_fealty }
+                    resolve_title_and_vassal_change = scope:tca_mpp_a_fealty
+                }
+                add_character_flag = tca_mpp_fixture
+                set_variable = { name = tca_mpp_living_count value = 0 }
+                set_variable = { name = tca_mpp_vassal_count value = 0 }
+                set_variable = { name = tca_mpp_county_count value = 0 }
+                set_variable = { name = tca_mpp_county_outside value = 0 }
+                set_variable = { name = tca_mpp_raw_titles value = 0 }
+                set_variable = { name = tca_mpp_unique_titles value = 0 }
+            }
+            scope:tca_mpp_c = {
+                if = { limit = { NOT = { liege = scope:tca_mpp_host } }
+                    create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_mpp_c_fealty }
+                    change_liege = { liege = scope:tca_mpp_host change = scope:tca_mpp_c_fealty }
+                    resolve_title_and_vassal_change = scope:tca_mpp_c_fealty
+                }
+                add_character_flag = tca_mpp_fixture
+            }
+            scope:tca_mpp_d = {
+                if = { limit = { NOT = { liege = title:e_byzantium.holder } }
+                    create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_mpp_d_fealty }
+                    change_liege = { liege = title:e_byzantium.holder change = scope:tca_mpp_d_fealty }
+                    resolve_title_and_vassal_change = scope:tca_mpp_d_fealty
+                }
+                add_character_flag = tca_mpp_fixture
+            }
+            create_character = { age = 35 random_traits = no gender_female_chance = 0 dynasty = none employer = scope:tca_mpp_a culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_mpp_b }
+            scope:tca_mpp_b = { tca_test_protect_character_effect = yes add_character_flag = tca_mpp_fixture }
+            if = { limit = { scope:tca_mpp_a.top_liege = scope:tca_mpp_host scope:tca_mpp_c.top_liege = scope:tca_mpp_host scope:tca_mpp_b.employer = scope:tca_mpp_a scope:tca_mpp_d.top_liege != scope:tca_mpp_host } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_population_interfaces 1" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_population_interfaces 1" }
+            every_living_character = {
+                limit = { has_character_flag = tca_mpp_fixture top_liege = scope:tca_mpp_host }
+                add_character_flag = tca_mpp_seen_living
+                scope:tca_mpp_a = { change_variable = { name = tca_mpp_living_count add = 1 } }
+            }
+            if = { limit = { scope:tca_mpp_a = { has_character_flag = tca_mpp_seen_living } scope:tca_mpp_b = { has_character_flag = tca_mpp_seen_living } scope:tca_mpp_c = { has_character_flag = tca_mpp_seen_living } scope:tca_mpp_d = { NOT = { has_character_flag = tca_mpp_seen_living } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_population_interfaces 2" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_population_interfaces 2" }
+            every_vassal_or_below = {
+                limit = { has_character_flag = tca_mpp_fixture }
+                add_character_flag = tca_mpp_seen_vassal
+                scope:tca_mpp_a = { change_variable = { name = tca_mpp_vassal_count add = 1 } }
+            }
+            if = { limit = { scope:tca_mpp_a = { has_character_flag = tca_mpp_seen_vassal } scope:tca_mpp_c = { has_character_flag = tca_mpp_seen_vassal } scope:tca_mpp_b = { NOT = { has_character_flag = tca_mpp_seen_vassal } } scope:tca_mpp_d = { NOT = { has_character_flag = tca_mpp_seen_vassal } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_population_interfaces 3" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_population_interfaces 3" }
+            if = { limit = { scope:tca_mpp_a = { var:tca_mpp_living_count = 3 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_population_interfaces 4" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_population_interfaces 4" }
+            if = { limit = { scope:tca_mpp_a = { var:tca_mpp_vassal_count = 2 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_population_interfaces 5" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_population_interfaces 5" }
+            if = { limit = { scope:tca_mpp_office = { is_landless_type_title = yes tier = tier_duchy holder = scope:tca_mpp_a } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_population_interfaces 6" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_population_interfaces 6" }
+            every_sub_realm_title = { limit = { this = scope:tca_mpp_office } scope:tca_mpp_a = { add_character_flag = tca_mpp_seen_subrealm_office } }
+            if = { limit = { scope:tca_mpp_a = { NOT = { has_character_flag = tca_mpp_seen_subrealm_office } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_population_interfaces 7" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_population_interfaces 7" }
+            every_realm_county = {
+                scope:tca_mpp_a = { change_variable = { name = tca_mpp_county_count add = 1 } }
+                if = { limit = { holder.top_liege != scope:tca_mpp_host } scope:tca_mpp_a = { change_variable = { name = tca_mpp_county_outside add = 1 } } }
+            }
+            if = { limit = { scope:tca_mpp_a = { var:tca_mpp_county_count > 0 var:tca_mpp_county_outside = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_population_interfaces 8" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_population_interfaces 8" }
+            scope:tca_mpp_office = { add_to_list = tca_mpp_title_entries add_to_list = tca_mpp_title_entries }
+            # 不预设原生名单是否自动消除重复；明确记录原始访问数，业务去重始终按头衔身份。
+            every_in_list = {
+                list = tca_mpp_title_entries
+                scope:tca_mpp_a = { change_variable = { name = tca_mpp_raw_titles add = 1 } }
+                if = { limit = { NOT = { has_variable = tca_mpp_title_counted } } set_variable = { name = tca_mpp_title_counted value = yes } scope:tca_mpp_a = { change_variable = { name = tca_mpp_unique_titles add = 1 } } }
+            }
+            if = { limit = { scope:tca_mpp_a = { var:tca_mpp_raw_titles = 1 } } debug_log = "TCA_MPP TITLE_LIST_RAW 1" }
+            else_if = { limit = { scope:tca_mpp_a = { var:tca_mpp_raw_titles = 2 } } debug_log = "TCA_MPP TITLE_LIST_RAW 2" }
+            else = { debug_log = "TCA_MPP TITLE_LIST_RAW unexpected" }
+            if = { limit = { scope:tca_mpp_a = { var:tca_mpp_raw_titles >= 1 var:tca_mpp_raw_titles <= 2 var:tca_mpp_unique_titles = 1 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_population_interfaces 9" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_population_interfaces 9" }
+            # 再访问同一名单，确认后续需求来源再次引用同头衔也不重复累计。
+            every_in_list = { list = tca_mpp_title_entries if = { limit = { NOT = { has_variable = tca_mpp_title_counted } } set_variable = { name = tca_mpp_title_counted value = yes } scope:tca_mpp_a = { change_variable = { name = tca_mpp_unique_titles add = 1 } } } }
+            if = { limit = { scope:tca_mpp_a = { var:tca_mpp_unique_titles = 1 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_population_interfaces 10" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_population_interfaces 10" }
+            scope:tca_mpp_office = { remove_variable = tca_mpp_title_counted }
+            scope:tca_mpp_a = {
+                destroy_title = scope:tca_mpp_office
+                remove_variable = tca_mpp_living_count remove_variable = tca_mpp_vassal_count remove_variable = tca_mpp_county_count remove_variable = tca_mpp_county_outside remove_variable = tca_mpp_raw_titles remove_variable = tca_mpp_unique_titles
+                remove_character_flag = tca_mpp_fixture remove_character_flag = tca_mpp_seen_living remove_character_flag = tca_mpp_seen_vassal remove_character_flag = tca_mpp_seen_subrealm_office
+                tca_test_cleanup_merit_probe_character_effect = yes
+            }
+            scope:tca_mpp_b = { remove_character_flag = tca_mpp_fixture remove_character_flag = tca_mpp_seen_living remove_character_flag = tca_mpp_seen_vassal tca_test_cleanup_merit_probe_character_effect = yes }
+            scope:tca_mpp_c = { remove_character_flag = tca_mpp_fixture remove_character_flag = tca_mpp_seen_living remove_character_flag = tca_mpp_seen_vassal tca_test_cleanup_merit_probe_character_effect = yes }
+            scope:tca_mpp_d = { remove_character_flag = tca_mpp_fixture remove_character_flag = tca_mpp_seen_living remove_character_flag = tca_mpp_seen_vassal tca_test_cleanup_merit_probe_character_effect = yes }
+            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_merit_population_interfaces" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_merit_population_interfaces" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        }
+        else = {
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_merit_population_interfaces"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+        }
+        remove_character_flag = tca_test_case_failed
+    }
+}

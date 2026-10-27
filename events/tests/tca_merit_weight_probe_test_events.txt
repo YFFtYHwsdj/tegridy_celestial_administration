@@ -1,0 +1,234 @@
+﻿# 动态名单与指数权重探针；仅在可丢弃 debug 局执行，不是正式晋升入口。
+namespace = tca_merit_weight_probe_test
+
+# 确定性边界：自身权重、零权重、冻结 Merit、负／小数指数、不放回及耗尽。
+# 浮点数学期望不等于引擎精度；极小权重只报告实际零／非零边界。
+tca_merit_weight_probe_test.1 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        if = { limit = { has_character_flag = tca_test_delayed_case_active } debug_log = "TCA_TEST CASE_BUSY" }
+        else = {
+            debug_log = "TCA_TEST BEGIN tca_merit_weight_probe_test.1 tca_test_merit_weight_contract"
+            remove_character_flag = tca_test_case_failed
+            if = {
+                limit = { debug_only = yes is_alive = yes title:h_china.holder = root }
+                save_scope_as = tca_mwp_reporter
+                set_variable = { name = tca_mwp_max value = 40000 }
+                tca_test_create_merit_interface_character_effect = { CHARACTER = tca_mwp_a GOVERNMENT = celestial_government }
+                tca_test_create_merit_interface_character_effect = { CHARACTER = tca_mwp_b GOVERNMENT = celestial_government }
+                scope:tca_mwp_a = {
+                    change_merit_no_experience = { value = 40000 subtract = merit }
+                    set_variable = { name = tca_mwp_frozen value = merit }
+                    set_variable = { name = tca_mwp_direct_weight value = 1 }
+                    add_to_list = tca_mwp_remaining
+                }
+                scope:tca_mwp_b = {
+                    change_merit_no_experience = { value = 39000 subtract = merit }
+                    set_variable = { name = tca_mwp_frozen value = merit }
+                    set_variable = { name = tca_mwp_direct_weight value = 0 }
+                    add_to_list = tca_mwp_remaining
+                }
+
+                if = { limit = { scope:tca_mwp_a = { tca_merit_weight_probe_value = 1024 } scope:tca_mwp_b = { tca_merit_weight_probe_value > 511 tca_merit_weight_probe_value < 513 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_weight_contract 1" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_weight_contract 1" }
+                # 活余额反向变化，冻结源保持不变；禁止让本轮后续抽选读取结算后的 Merit。
+                scope:tca_mwp_a = { change_merit_no_experience = -40000 }
+                scope:tca_mwp_b = { change_merit_no_experience = 100000 }
+                if = { limit = { scope:tca_mwp_a = { merit = 0 tca_merit_weight_probe_value = 1024 } scope:tca_mwp_b = { merit = 139000 tca_merit_weight_probe_value > 511 tca_merit_weight_probe_value < 513 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_weight_contract 2" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_weight_contract 2" }
+                set_variable = { name = tca_mwp_draws value = 0 }
+                random_in_list = {
+                    list = tca_mwp_remaining
+                    weight = { base = 0 modifier = { add = var:tca_mwp_direct_weight } }
+                    save_scope_as = tca_mwp_first
+                    scope:tca_mwp_reporter = { change_variable = { name = tca_mwp_draws add = 1 } }
+                    remove_from_list = tca_mwp_remaining
+                }
+                if = { limit = { scope:tca_mwp_first = scope:tca_mwp_a var:tca_mwp_draws = 1 tca_merit_weight_probe_remaining_count = 1 scope:tca_mwp_a = { NOT = { is_in_list = tca_mwp_remaining } } scope:tca_mwp_b = { is_in_list = tca_mwp_remaining } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_weight_contract 3" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_weight_contract 3" }
+                # 唯一剩余候选赋正权重：第二抽必须得到不同人物；再抽空池不执行效果。
+                scope:tca_mwp_b = { set_variable = { name = tca_mwp_direct_weight value = 1 } }
+                random_in_list = {
+                    list = tca_mwp_remaining
+                    weight = { base = 0 modifier = { add = var:tca_mwp_direct_weight } }
+                    save_scope_as = tca_mwp_second
+                    scope:tca_mwp_reporter = { change_variable = { name = tca_mwp_draws add = 1 } }
+                    remove_from_list = tca_mwp_remaining
+                }
+                random_in_list = { list = tca_mwp_remaining scope:tca_mwp_reporter = { change_variable = { name = tca_mwp_draws add = 1 } } }
+                if = { limit = { scope:tca_mwp_second = scope:tca_mwp_b var:tca_mwp_draws = 2 tca_merit_weight_probe_remaining_count = 0 } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_weight_contract 4" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_weight_contract 4" }
+                # 小数差通过正幂倒数计算，sqrt(2)×512；窄区间容纳原生近似误差。
+                scope:tca_mwp_b = { set_variable = { name = tca_mwp_frozen value = 39500 } }
+                if = { limit = { scope:tca_mwp_b = { tca_merit_weight_probe_value > 723 tca_merit_weight_probe_value < 725 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_weight_contract 5" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_weight_contract 5" }
+                scope:tca_mwp_b = { set_variable = { name = tca_mwp_frozen value = 30000 } }
+                if = { limit = { scope:tca_mwp_b = { tca_merit_weight_probe_value > 0.999 tca_merit_weight_probe_value < 1.001 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_weight_contract 6" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_weight_contract 6" }
+                scope:tca_mwp_b = { set_variable = { name = tca_mwp_frozen value = 20000 } }
+
+                if = { limit = { scope:tca_mwp_b = { tca_merit_weight_probe_value >= 0 tca_merit_weight_probe_value <= 0.002 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_weight_contract 7" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_weight_contract 7" }
+                if = { limit = { scope:tca_mwp_b = { tca_merit_weight_probe_value = 0 } } debug_log = "TCA_MERIT_WEIGHT BINARY_GAP_20_ZERO" }
+                else = { debug_log = "TCA_MERIT_WEIGHT BINARY_GAP_20_POSITIVE" }
+                if = { limit = { scope:tca_mwp_b = { tca_merit_weight_probe_unshifted_value = 0 } } debug_log = "TCA_MERIT_WEIGHT UNSHIFTED_GAP_20_ZERO" }
+                else = { debug_log = "TCA_MERIT_WEIGHT UNSHIFTED_GAP_20_POSITIVE" }
+                # 差40个半衰单位，超出受控计算范围，权重应为0。
+                scope:tca_mwp_b = { set_variable = { name = tca_mwp_frozen value = 0 } }
+
+                if = { limit = { scope:tca_mwp_b = { tca_merit_weight_probe_value >= 0 tca_merit_weight_probe_value <= 0.001 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_weight_contract 8" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_weight_contract 8" }
+                if = { limit = { scope:tca_mwp_b = { tca_merit_weight_probe_value = 0 } } debug_log = "TCA_MERIT_WEIGHT BINARY_GAP_40_ZERO" }
+                else = { debug_log = "TCA_MERIT_WEIGHT BINARY_GAP_40_POSITIVE" }
+                # 真实指数权重读取冻结值，不能回读已被反向修改的余额。
+                # 2:1抽样2048次，宽区间只抓取退化为均匀／反向等明显错误；仍有随机误报概率。
+                # 这里不验证精确概率定律、全部排名分布或不同平台随机源。
+                scope:tca_mwp_a = { add_to_list = tca_mwp_remaining }
+                scope:tca_mwp_b = { set_variable = { name = tca_mwp_frozen value = 39000 } add_to_list = tca_mwp_remaining }
+                set_variable = { name = tca_mwp_a_hits value = 0 }
+                set_variable = { name = tca_mwp_draws value = 0 }
+                while = {
+                    count = 2048
+                    random_in_list = {
+                        list = tca_mwp_remaining
+                        weight = { base = 0 modifier = { add = tca_merit_weight_probe_value } }
+                        scope:tca_mwp_reporter = { change_variable = { name = tca_mwp_draws add = 1 } }
+                        if = { limit = { this = scope:tca_mwp_a } scope:tca_mwp_reporter = { change_variable = { name = tca_mwp_a_hits add = 1 } } }
+                    }
+                }
+                if = { limit = { var:tca_mwp_draws = 2048 var:tca_mwp_a_hits >= 1200 var:tca_mwp_a_hits <= 1550 } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_weight_contract 9" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_weight_contract 9" }
+                # 公式保留小数不等于抽选器保留小数；以唯一0.001正权重另验读取边界。
+                scope:tca_mwp_a = { set_variable = { name = tca_mwp_direct_weight value = 0 } }
+                scope:tca_mwp_b = { set_variable = { name = tca_mwp_direct_weight value = 0.001 } }
+                set_variable = { name = tca_mwp_draws value = 0 }
+                set_variable = { name = tca_mwp_a_hits value = 0 }
+                while = {
+                    count = 128
+                    random_in_list = {
+                        list = tca_mwp_remaining
+                        weight = { base = 0 modifier = { add = var:tca_mwp_direct_weight } }
+                        scope:tca_mwp_reporter = { change_variable = { name = tca_mwp_draws add = 1 } }
+                        if = { limit = { this = scope:tca_mwp_a } scope:tca_mwp_reporter = { change_variable = { name = tca_mwp_a_hits add = 1 } } }
+                    }
+                }
+                if = { limit = { var:tca_mwp_draws = 128 var:tca_mwp_a_hits = 0 } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_weight_contract 10" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_weight_contract 10" }
+                # 原失败公式作为数值安全负对照，不将其意外的巨大权重纳入抽选。
+                scope:tca_mwp_b = { set_variable = { name = tca_mwp_frozen value = 0 } }
+                if = { limit = { scope:tca_mwp_b = { tca_merit_weight_probe_unsafe_value > 1000 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_weight_contract 11" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_weight_contract 11" }
+                scope:tca_mwp_b = { set_variable = { name = tca_mwp_frozen value = 10000 } }
+                if = { limit = { scope:tca_mwp_b = { tca_merit_weight_probe_value >= 0 tca_merit_weight_probe_value < 0.001 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_weight_contract 12" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_weight_contract 12" }
+                # 旧池顶已离池且剩余者远低于它时，须按剩余名单重算同一轮的归一化常数。
+                scope:tca_mwp_a = { remove_from_list = tca_mwp_remaining }
+                scope:tca_mwp_b = { set_variable = { name = tca_mwp_frozen value = 0 } }
+                set_variable = { name = tca_mwp_max value = tca_merit_weight_probe_max_remaining_value }
+                set_variable = { name = tca_mwp_draws value = 0 }
+                random_in_list = {
+                    list = tca_mwp_remaining
+                    weight = { base = 0 modifier = { add = tca_merit_weight_probe_value } }
+                    save_scope_as = tca_mwp_rebased
+                    scope:tca_mwp_reporter = { change_variable = { name = tca_mwp_draws add = 1 } }
+                    remove_from_list = tca_mwp_remaining
+                }
+                if = { limit = { var:tca_mwp_max = 0 var:tca_mwp_draws = 1 scope:tca_mwp_rebased = scope:tca_mwp_b scope:tca_mwp_b = { tca_merit_weight_probe_value = 1024 } tca_merit_weight_probe_remaining_count = 0 } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_weight_contract 13" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_weight_contract 13" }
+                scope:tca_mwp_a = { remove_from_list = tca_mwp_remaining remove_variable = tca_mwp_frozen remove_variable = tca_mwp_direct_weight tca_test_cleanup_merit_probe_character_effect = yes }
+                scope:tca_mwp_b = { remove_from_list = tca_mwp_remaining remove_variable = tca_mwp_frozen remove_variable = tca_mwp_direct_weight tca_test_cleanup_merit_probe_character_effect = yes }
+                remove_variable = tca_mwp_max
+                remove_variable = tca_mwp_draws
+                remove_variable = tca_mwp_a_hits
+                if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_merit_weight_contract" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+                else = { debug_log = "TCA_TEST PASS tca_test_merit_weight_contract" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            }
+            else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_merit_weight_contract" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } }
+            remove_character_flag = tca_test_case_failed
+        }
+    }
+}
+
+# 512个普通临时廷臣，不建512个家门；全程同步，不需要长期保护。
+# 基线总权重524288；压力总权重512000000仅是待验证输入，不能预称安全。
+# 128次抽选只断言每次选中有效人物，不断言每名候选必然中选或概率分布正确。
+tca_merit_weight_probe_test.2 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        if = { limit = { has_character_flag = tca_test_delayed_case_active } debug_log = "TCA_TEST CASE_BUSY" }
+        else = {
+            debug_log = "TCA_TEST BEGIN tca_merit_weight_probe_test.2 tca_test_merit_weight_large_pool"
+            remove_character_flag = tca_test_case_failed
+            if = {
+                limit = { debug_only = yes is_alive = yes }
+                save_scope_as = tca_mwp_reporter
+                set_variable = { name = tca_mwp_draws value = 0 }
+                while = {
+                    count = 512
+                    create_character = {
+                        age = 40
+                        gender_female_chance = 0
+                        random_traits = no
+                        dynasty = none
+                        employer = root
+                        culture = root.culture
+                        faith = root.faith
+                        rite = root.rite
+                        after_creation = {
+                            set_variable = { name = tca_mwp_direct_weight value = 1024 }
+                            add_to_list = tca_mwp_large
+                        }
+                    }
+                }
+                if = { limit = { tca_merit_weight_probe_large_count = 512 tca_merit_weight_probe_large_sum = 524288 } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_weight_large_pool 1" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_weight_large_pool 1" }
+                while = {
+                    count = 128
+                    random_in_list = {
+                        list = tca_mwp_large
+                        weight = { base = 0 modifier = { add = var:tca_mwp_direct_weight } }
+                        scope:tca_mwp_reporter = { change_variable = { name = tca_mwp_draws add = 1 } }
+                    }
+                }
+                if = { limit = { var:tca_mwp_draws = 128 } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_weight_large_pool 2" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_weight_large_pool 2" }
+                every_in_list = { list = tca_mwp_large set_variable = { name = tca_mwp_direct_weight value = 1000000 } }
+                if = { limit = { tca_merit_weight_probe_large_sum = 512000000 } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_weight_large_pool 3" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_weight_large_pool 3" }
+                while = {
+                    count = 128
+                    random_in_list = {
+                        list = tca_mwp_large
+                        weight = { base = 0 modifier = { add = var:tca_mwp_direct_weight } }
+                        scope:tca_mwp_reporter = { change_variable = { name = tca_mwp_draws add = 1 } }
+                    }
+                }
+                if = { limit = { var:tca_mwp_draws = 256 } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_weight_large_pool 4" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_weight_large_pool 4" }
+                # 完整不放回耗尽同一512人名单；若删除接口失效，最终人数不会归零。
+                while = {
+                    count = 512
+                    random_in_list = {
+                        list = tca_mwp_large
+                        weight = { base = 0 modifier = { add = var:tca_mwp_direct_weight } }
+                        scope:tca_mwp_reporter = { change_variable = { name = tca_mwp_draws add = 1 } }
+                        add_to_list = tca_mwp_cleanup
+                        remove_from_list = tca_mwp_large
+                    }
+                }
+                if = { limit = { var:tca_mwp_draws = 768 tca_merit_weight_probe_large_count = 0 } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_weight_large_pool 5" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_weight_large_pool 5" }
+                # 成败均清理：失败时可能仍在原名单中的人物也退出任命并删除临时变量。
+                every_in_list = { list = tca_mwp_large remove_variable = tca_mwp_direct_weight add_character_flag = cannot_be_diarch set_variable = { name = block_hire_councillor value = root } set_appointment_timeout = { years = 150 desc = appointment_timeout_desc_refusing } remove_from_list = tca_mwp_large }
+                every_in_list = { list = tca_mwp_cleanup remove_variable = tca_mwp_direct_weight add_character_flag = cannot_be_diarch set_variable = { name = block_hire_councillor value = root } set_appointment_timeout = { years = 150 desc = appointment_timeout_desc_refusing } remove_from_list = tca_mwp_cleanup }
+                remove_variable = tca_mwp_draws
+                if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_merit_weight_large_pool" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+                else = { debug_log = "TCA_TEST PASS tca_test_merit_weight_large_pool" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            }
+            else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_merit_weight_large_pool" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } }
+            remove_character_flag = tca_test_case_failed
+        }
+    }
+}

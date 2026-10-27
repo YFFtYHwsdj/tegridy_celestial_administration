@@ -1,0 +1,91 @@
+﻿# 原版统一退休确认事件；仅在实际天朝退休分支维护三年离散退出状态。
+# 人物作用域；原生来路保存的new_governor等scope及全部退职效果原样保留。
+namespace = ep3_decisions_event
+
+ep3_decisions_event.4090 = {
+	id_override_priority = 1
+	type = character_event
+	title = ep3_decisions_event.4090.t
+	desc = ep3_decisions_event.4090.desc
+	theme = administrative
+	override_background = { reference = estate }
+	right_portrait = {
+		character = root
+		triggered_animation = {
+			trigger = {	government_allows = merit }
+			animation = writing
+		}
+		triggered_animation = {
+			trigger = {	has_trait_benevolent_trigger = yes }
+			animation = worry
+		}
+		animation = scheme
+	}
+	lower_left_portrait = scope:new_governor
+
+	immediate = {
+		liege = { save_scope_as = liege } # 本地化引用
+	}
+
+	option = {
+		name = ep3_decisions_event.4090.a
+		name = {
+			trigger = {
+				government_allows = merit
+			}
+			text = ep3_decisions_event.4090.a_merit
+		}
+
+		if = {
+			limit = {
+				involved_activity ?= {
+					has_activity_type = activity_imperial_examination
+				}
+			}
+			set_activity_intent = imperial_exam_taker_intent
+		}
+
+		if = {
+			limit = {
+				government_allows = merit
+			}
+			# 在实际确认退休时记退出；必须早于退职改变政体，覆盖决议与旅行两条入口。
+			if = { limit = { government_has_flag = government_is_celestial } tca_merit_mark_retired_effect = yes }
+			add_character_modifier = {
+				modifier = ep3_renounced_governorship_merit
+				years = 15
+			}
+			set_appointment_timeout = {
+				years = 3
+				desc = appointment_timeout_desc_retired_governor
+			}
+		}
+		else_if = {
+			limit = {
+				government_is_japanese_trigger = yes
+			}
+			add_gold = major_gold_value
+			change_influence = major_influence_value
+			add_character_modifier = {
+				modifier = renounced_governorship_japan
+				years = 15
+			}
+		}
+		else = {
+			add_gold = massive_gold_value
+			add_character_modifier = {
+				modifier = ep3_renounced_governorship
+				years = 15
+			}
+		}
+		force_step_down_landed_titles = yes
+		if = {
+			limit = {
+				tgp_is_any_minister = yes
+			}
+			liege = { save_scope_as = councillor_liege } # 原版解职效果所需
+			fired_minister_position_effect = yes
+		}
+		tgp_step_down_title_recipient_tooltip_effect = yes
+	}
+}

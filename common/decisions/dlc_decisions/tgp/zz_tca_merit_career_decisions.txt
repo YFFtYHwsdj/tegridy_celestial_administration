@@ -1,0 +1,93 @@
+﻿# 原版决议仅在effect末尾增加天朝离散退出维护，原生条件与效果保留。
+tgp_refuse_appointments_decision = {
+	decision_group_type = admin
+	title = tgp_refuse_appointments_decision
+	desc = tgp_refuse_appointments_decision_desc
+	selection_tooltip = tgp_refuse_appointments_decision_tooltip
+	picture = {
+		reference = "gfx/interface/illustrations/decisions/tgp_retire.dds"
+	}
+	confirm_text = tgp_refuse_appointments_decision_confirm
+	sort_order = 75
+
+	is_shown = {
+		government_has_flag = government_has_merit
+		this != top_liege
+		custom_tooltip = {
+			text = you_are_not_refusing_appointments_desc
+			appointment_timeout_days < 36500
+		}
+		has_tgp_dlc_trigger = yes
+	}
+
+	is_valid_showing_failures_only = {
+		is_adult = yes
+		is_available = yes
+	}
+
+	cost = {
+		influence = {
+			value = 50
+		}
+	}
+
+	effect = {
+		custom_tooltip = {
+			text = tgp_refuse_appointments_decision_refuse_desc
+			set_appointment_timeout = {
+				years = 150 # I.e. we make it pseudo-permanent
+				desc = appointment_timeout_desc_refusing
+			}
+		}
+	
+		# 仅真实天朝行为维护离散退出，不从共享超时时长反推原因。
+		if = { limit = { government_has_flag = government_is_celestial } tca_merit_mark_refused_effect = yes }
+	}
+	
+	ai_check_interval = 0
+	
+	ai_potential = { always = no }
+}
+
+tgp_resume_appointments_decision = {
+	decision_group_type = admin
+	title = tgp_resume_appointments_decision
+	desc = tgp_resume_appointments_decision_desc
+	selection_tooltip = tgp_resume_appointments_decision_tooltip
+	picture = {
+		reference = "gfx/interface/illustrations/decisions/tgp_career.dds"
+	}
+	confirm_text = tgp_resume_appointments_decision_confirm
+	sort_order = 75
+
+	is_shown = {
+		government_has_flag = government_has_merit
+		appointment_timeout_days > 0
+		has_tgp_dlc_trigger = yes
+		this != top_liege
+	}
+
+	is_valid_showing_failures_only = {
+		is_adult = yes
+		is_available = yes
+	}
+
+	cost = {
+	}
+
+	effect = {
+		custom_tooltip = {
+			text = tgp_refuse_appointments_decision_accept_desc
+			clear_appointment_timeout = yes
+		}
+	
+		# 恢复决议在贤能制也可执行：必须按真实入口清除跨制度的辞谢/退休标记。
+		# 若仅在当前天朝清理，天朝辞谢→贤能制→恢复→返天朝会残留永久辞谢标记，
+		# 冷却已清后恢复决议隐藏，人物继续被年度候选排除。
+		tca_merit_restore_participation_effect = yes
+	}
+	
+	ai_check_interval = 0
+	
+	ai_potential = { always = no }
+}

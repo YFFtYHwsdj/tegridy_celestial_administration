@@ -1,0 +1,62 @@
+﻿# 最小组合事务探针，全部入口只供独立测试人物使用，不是正式年度业务。
+# 人物作用域；SOURCE/TARGET由调用者冻结的核定等级提供，BASE为目标最低经验/余额。
+# 前置：已有核定动态上限两修正、及第副本，且未参与其他保护窗口；不读取同链等级作业务判断。
+# phase：1核准队列、2已提交待跨日校验、3资格失效取消、4不升品；任何已有phase均拒绝重入。
+# 持久保存来源、目标、基准、最高领主和phase；核准期间不改上限/双账、不设置回调保护。
+tca_test_begin_merit_transaction_probe_effect = {
+    if = {
+        limit = { NOT = { has_variable = tca_mtx_phase } }
+        set_variable = { name = tca_mtx_source value = $SOURCE$ }
+        set_variable = { name = tca_mtx_target value = $TARGET$ }
+        set_variable = { name = tca_mtx_base value = $BASE$ }
+        set_variable = { name = tca_mtx_liege value = top_liege }
+        set_variable = { name = tca_merit_reset_probe_gain_count value = 0 }
+        set_variable = { name = tca_merit_reset_probe_loss_count value = 0 }
+        set_variable = { name = tca_merit_reset_probe_marked_count value = 0 }
+        if = {
+            limit = { var:tca_mtx_target > var:tca_mtx_source }
+            set_variable = { name = tca_mtx_phase value = 1 }
+        }
+        else = { set_variable = { name = tca_mtx_phase value = 4 } }
+    }
+}
+
+# 人物作用域，无参数；核准队列可跨日/保存重载，提交起点重新复核资格。
+# 提交为不可撤销的同链边界：短保护归一化→刷新目标cap→保护set目标→余额基准→解除保护。
+# 不手动补发合法回调；随后cap的异步刷新产生恰一次原生gain，调用方至少跨日再验。
+# 显式补发或解除保护后set目标均与异步gain叠加为双发；独立负对照保留这个限制。
+# phase2拒绝任何重入，不重新归一化；失效时不碰双账或上限，也无待撤销的cap变化。
+tca_test_commit_merit_transaction_probe_effect = {
+    if = {
+        limit = { var:tca_mtx_phase = 1 }
+        if = {
+            limit = { is_alive = yes has_government = celestial_government top_liege = var:tca_mtx_liege }
+            add_character_flag = tca_merit_reset_probe_suppress
+            set_merit_level = 0
+            set_merit_level = var:tca_mtx_source
+            set_variable = { name = tca_merit_probe_approved value = var:tca_mtx_target }
+            remove_character_modifier = tca_merit_probe_approved_reduction_modifier
+            add_character_modifier = { modifier = tca_merit_probe_approved_reduction_modifier }
+            set_merit_level = var:tca_mtx_target
+            change_merit_no_experience = { value = var:tca_mtx_base subtract = merit }
+            remove_character_flag = tca_merit_reset_probe_suppress
+            set_variable = { name = tca_mtx_phase value = 2 }
+        }
+        else = {
+            set_variable = { name = tca_mtx_phase value = 3 }
+        }
+    }
+}
+
+# 人物作用域；清理事务持久字段与观测变量，不清理共享人物夹具，允许调用者随后断言清理。
+tca_test_cleanup_merit_transaction_probe_effect = {
+    remove_character_flag = tca_merit_reset_probe_suppress
+    remove_variable = tca_mtx_source
+    remove_variable = tca_mtx_target
+    remove_variable = tca_mtx_base
+    remove_variable = tca_mtx_liege
+    remove_variable = tca_mtx_phase
+    remove_variable = tca_merit_reset_probe_gain_count
+    remove_variable = tca_merit_reset_probe_loss_count
+    remove_variable = tca_merit_reset_probe_marked_count
+}

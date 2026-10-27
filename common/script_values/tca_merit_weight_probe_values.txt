@@ -1,0 +1,61 @@
+﻿# 指数权重接口探针；只供独立测试，不接入年度升品或正式任命。
+# 人物作用域：读取本人冻结 Merit；报告者保存池顶 Merit 和固定 H=1000。
+# 理想权重为1024×2^((M-Mmax)/H)，等价 exp，T=H/ln(2)；实现仅为有限精度近似。
+# 原版 _script_values.info 明确支持 pow；负数及小数指数、数值精度仍须引擎探针。
+# 原生幂存在近似误差，较大负指数会发生数值失真；正式候选先算非负指数的倒数。
+# 超过30个半衰差时直接取0，避免无限Merit差造成幂溢出；这是明确的有限精度近似。
+tca_merit_weight_probe_gap_value = {
+    value = scope:tca_mwp_reporter.var:tca_mwp_max
+    subtract = var:tca_mwp_frozen
+    divide = 1000
+    min = 0
+}
+tca_merit_weight_probe_value = {
+    value = 0
+    if = {
+        limit = { tca_merit_weight_probe_gap_value <= 30 }
+        value = 2
+        pow = tca_merit_weight_probe_gap_value
+        save_temporary_value_as = tca_mwp_denominator
+        value = 1024
+        divide = scope:tca_mwp_denominator
+    }
+}
+
+# 失败公式保留为负对照：指数-30时数学上应接近0，但本机引擎实测约9478。
+tca_merit_weight_probe_unsafe_value = {
+    value = 2
+    pow = { value = var:tca_mwp_frozen subtract = scope:tca_mwp_reporter.var:tca_mwp_max divide = 1000 add = 10 }
+}
+
+# 对照：先幂再缩放可能提前量化为零；只用于观察计算顺序的精度差异。
+tca_merit_weight_probe_unshifted_value = {
+    value = 2
+    pow = {
+        value = var:tca_mwp_frozen
+        subtract = scope:tca_mwp_reporter.var:tca_mwp_max
+        divide = 1000
+    }
+    multiply = 1024
+}
+
+# 临时人物名单的原生遍历计数，不复刻业务规则。
+tca_merit_weight_probe_remaining_count = {
+    value = 0
+    every_in_list = { list = tca_mwp_remaining add = 1 }
+}
+tca_merit_weight_probe_large_count = {
+    value = 0
+    every_in_list = { list = tca_mwp_large add = 1 }
+}
+tca_merit_weight_probe_large_sum = {
+    value = 0
+    every_in_list = { list = tca_mwp_large add = var:tca_mwp_direct_weight }
+}
+
+# 每抽后用剩余名单的冻结Merit重新归一化；避免最高者移除后全池下溢。
+# min 的原生含义是设置下界，故遍历后得到最大值，不是取数学最小值。
+tca_merit_weight_probe_max_remaining_value = {
+    value = 0
+    every_in_list = { list = tca_mwp_remaining min = var:tca_mwp_frozen }
+}

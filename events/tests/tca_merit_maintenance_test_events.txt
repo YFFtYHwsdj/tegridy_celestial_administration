@@ -1,0 +1,77 @@
+﻿# 功绩维护回归：有限期限是可观察的副作用，避免用生产计数器验证实现本身。
+namespace = tca_merit_state_test
+
+tca_merit_state_test.7 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { has_character_flag = tca_test_delayed_case_active } debug_log = "TCA_TEST CASE_BUSY" }
+        else = {
+            debug_log = "TCA_TEST BEGIN tca_merit_state_test.7 tca_test_merit_maintenance_idempotence"
+            remove_character_flag = tca_test_case_failed
+            if = {
+                limit = { debug_only = yes is_alive = yes title:h_china.holder = root exists = title:e_hre.holder title:e_hre.holder = { has_government = feudal_government } }
+                tca_test_create_merit_probe_character_effect = { CHARACTER = tca_mp_actor GOVERNMENT = celestial_government }
+                tca_test_create_merit_probe_character_effect = { CHARACTER = tca_mp_other GOVERNMENT = celestial_government }
+                scope:tca_mp_actor = { add_trait = education_stewardship_1 set_merit_level = 1 change_merit_no_experience = { value = 100 subtract = merit } }
+                scope:tca_mp_other = { add_trait = education_stewardship_1 set_merit_level = 1 change_merit_no_experience = { value = 100 subtract = merit } }
+                add_character_flag = tca_test_delayed_case_active
+                debug_log = "TCA_TEST WAIT tca_test_merit_maintenance_idempotence 2 days"
+                trigger_event = { id = tca_merit_state_test.7001 days = 2 }
+            }
+            else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_merit_maintenance_idempotence" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_continue_delayed_effect = yes }
+        }
+    }
+}
+tca_merit_state_test.7001 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            scope:tca_mp_actor = {
+                tca_merit_initialize_character_effect = yes
+                add_character_modifier = { modifier = tgp_passed_provincial_exam_modifier days = 2 }
+                tca_merit_initialize_character_effect = yes
+            }
+            scope:tca_mp_other = { tca_merit_initialize_character_effect = yes remove_character_modifier = tca_merit_approved_base_modifier }
+            # 无关的外国维护不得顺手修复本朝人物；年度校验才是全世界兜底。
+            title:e_hre.holder = { tca_merit_sync_realm_membership_effect = yes }
+            if = { limit = { scope:tca_mp_other = { NOT = { has_character_modifier = tca_merit_approved_base_modifier } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_maintenance_idempotence 1" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_maintenance_idempotence 1" }
+            # 合法隔离态不能被年度维护重新安装上限或覆盖核定等级。
+            scope:tca_mp_other = { set_variable = { name = tca_merit_grant_phase value = 3 } }
+            debug_log = "TCA_TEST WAIT tca_test_merit_maintenance_idempotence 3 days"
+            trigger_event = { id = tca_merit_state_test.7002 days = 3 }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_merit_maintenance_idempotence" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_continue_delayed_effect = yes }
+    }
+}
+tca_merit_state_test.7002 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_mp_actor = { NOT = { has_character_modifier = tgp_passed_provincial_exam_modifier } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_maintenance_idempotence 2" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_maintenance_idempotence 2" }
+            scope:tca_mp_actor = { remove_character_modifier = tca_merit_approved_base_modifier }
+            set_global_variable = { name = tca_merit_annual_processed_year value = { value = current_year subtract = 1 } }
+            tca_merit_run_annual_effect = yes
+            if = { limit = { scope:tca_mp_actor = { has_character_modifier = tca_merit_approved_base_modifier var:tca_merit_approved_level = 1 merit = 100 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_maintenance_idempotence 3" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_maintenance_idempotence 3" }
+            if = { limit = { scope:tca_mp_other = { var:tca_merit_grant_phase = 3 var:tca_merit_approved_level = 1 NOT = { has_character_modifier = tca_merit_approved_base_modifier } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_maintenance_idempotence 4" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_maintenance_idempotence 4" }
+            scope:tca_mp_other = { remove_variable = tca_merit_grant_phase tca_merit_initialize_character_effect = yes }
+            if = { limit = { scope:tca_mp_other = { has_character_modifier = tca_merit_approved_base_modifier var:tca_merit_approved_level = 1 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_maintenance_idempotence 5" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_maintenance_idempotence 5" }
+            scope:tca_mp_actor = { tca_merit_leave_celestial_effect = yes tca_test_cleanup_merit_probe_character_effect = yes }
+            scope:tca_mp_other = { tca_merit_leave_celestial_effect = yes tca_test_cleanup_merit_probe_character_effect = yes }
+            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_merit_maintenance_idempotence" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_merit_maintenance_idempotence" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_merit_maintenance_idempotence" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } }
+        remove_character_flag = tca_test_case_failed
+        remove_character_flag = tca_test_delayed_case_active
+        tca_test_continue_delayed_effect = yes
+    }
+}

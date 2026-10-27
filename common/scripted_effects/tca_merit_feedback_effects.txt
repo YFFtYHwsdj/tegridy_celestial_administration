@@ -1,0 +1,220 @@
+﻿# 功绩玩家反馈：年度清理前复制展示快照，并按真实结算归属发送本人/皇帝消息。
+# 所有入口只读正式年度工作账、冻结名单与授品结果；不重算配额、不重跑抽选、不发奖。
+# 快照只保留最近一轮标量；消息使用显式国家scope，旧文本跨年/重载稳定性另作玩家验收。
+# 防重：国家title上的 tca_merit_feedback_year、人物上的 last_year 均按自然年比较。
+
+# 国家title作用域；参数 YEAR 为本轮自然年。正式年度在清理临时名单前调用。
+# 副作用：写入本国最近一轮快照、给本国人类候选记录本人结果、给人类皇帝发送右侧简报。
+# 同一锚点同一 YEAR 重复调用直接返回，不重发、不改写本轮快照。
+tca_merit_feedback_capture_country_effect = {
+    if = {
+        limit = { NOT = { var:tca_merit_feedback_year ?= $YEAR$ } }
+        save_scope_as = tca_ma_anchor
+        set_variable = { name = tca_merit_feedback_year value = $YEAR$ }
+        set_variable = { name = tca_merit_feedback_success_1 value = 0 }
+        set_variable = { name = tca_merit_feedback_success_2 value = 0 }
+        tca_merit_feedback_capture_route_effect = { ROUTE = 1 }
+        tca_merit_feedback_capture_route_effect = { ROUTE = 2 }
+        tca_merit_feedback_capture_bands_effect = { ROUTE = 1 }
+        tca_merit_feedback_capture_bands_effect = { ROUTE = 2 }
+        every_in_list = {
+            list = tca_ma_candidates
+            limit = { var:tca_ma_frozen_anchor = scope:tca_ma_anchor }
+            tca_merit_feedback_capture_personal_effect = { YEAR = $YEAR$ }
+        }
+        if = {
+            limit = { exists = holder }
+            holder = {
+                if = { limit = { tca_merit_feedback_human_recipient_trigger = yes } tca_merit_feedback_send_briefing_effect = yes }
+            }
+        }
+        # 只读自检，实际读取全部快照标量；add=0 不改变本轮结果。
+        if = {
+            limit = { tca_merit_feedback_snapshot_read_trigger = yes }
+            change_variable = { name = tca_merit_feedback_year add = 0 }
+        }
+        remove_variable = tca_mf_band
+        remove_variable = tca_mf_band_low
+        remove_variable = tca_mf_band_high
+    }
+}
+
+# 国家title作用域；参数 ROUTE。复制六关计划额度(Q)与真实成功提交数。
+# 成功数只读取年度同链提交时累加的 tca_ma_success_*，不读取抽中数、Q或即时原生等级。
+tca_merit_feedback_capture_route_effect = {
+    set_variable = { name = tca_ma_route value = $ROUTE$ }
+    tca_merit_feedback_capture_gate_effect = { ROUTE = $ROUTE$ SOURCE = 1 }
+    tca_merit_feedback_capture_gate_effect = { ROUTE = $ROUTE$ SOURCE = 2 }
+    tca_merit_feedback_capture_gate_effect = { ROUTE = $ROUTE$ SOURCE = 3 }
+    tca_merit_feedback_capture_gate_effect = { ROUTE = $ROUTE$ SOURCE = 4 }
+    tca_merit_feedback_capture_gate_effect = { ROUTE = $ROUTE$ SOURCE = 5 }
+    tca_merit_feedback_capture_gate_effect = { ROUTE = $ROUTE$ SOURCE = 6 }
+}
+
+# 国家title作用域；参数 ROUTE/SOURCE。缺工作账时按0处理，避免旧接口/夹具产生空读取。
+tca_merit_feedback_capture_gate_effect = {
+    set_variable = { name = tca_merit_feedback_q_$ROUTE$_$SOURCE$ value = 0 }
+    if = {
+        limit = { has_variable = tca_ma_quota_$ROUTE$_$SOURCE$ }
+        set_variable = { name = tca_merit_feedback_q_$ROUTE$_$SOURCE$ value = var:tca_ma_quota_$ROUTE$_$SOURCE$ }
+    }
+    set_variable = { name = tca_merit_feedback_ok_$ROUTE$_$SOURCE$ value = 0 }
+    if = {
+        limit = { has_variable = tca_ma_success_$ROUTE$_$SOURCE$ }
+        set_variable = { name = tca_merit_feedback_ok_$ROUTE$_$SOURCE$ value = var:tca_ma_success_$ROUTE$_$SOURCE$ }
+        change_variable = { name = tca_merit_feedback_success_$ROUTE$ add = var:tca_ma_success_$ROUTE$_$SOURCE$ }
+    }
+}
+
+# 国家title作用域；参数 ROUTE。冻结四带参与人口与既定软目标 T_b=1.65J_b。
+# 既定目标只从本轮冻结需求J换算，不新增拥堵阈值、不重算配额。
+tca_merit_feedback_capture_bands_effect = {
+    set_variable = { name = tca_ma_route value = $ROUTE$ }
+    tca_merit_feedback_capture_band_effect = { ROUTE = $ROUTE$ BAND = 1 LOW = 1 HIGH = 2 }
+    tca_merit_feedback_capture_band_effect = { ROUTE = $ROUTE$ BAND = 2 LOW = 3 HIGH = 4 }
+    tca_merit_feedback_capture_band_effect = { ROUTE = $ROUTE$ BAND = 3 LOW = 5 HIGH = 6 }
+    tca_merit_feedback_capture_band_effect = { ROUTE = $ROUTE$ BAND = 4 LOW = 7 HIGH = 9 }
+}
+tca_merit_feedback_capture_band_effect = {
+    set_variable = { name = tca_mf_band value = $BAND$ }
+    set_variable = { name = tca_mf_band_low value = $LOW$ }
+    set_variable = { name = tca_mf_band_high value = $HIGH$ }
+    set_variable = { name = tca_merit_feedback_band_pop_$ROUTE$_$BAND$ value = tca_merit_feedback_band_population_value }
+    set_variable = { name = tca_merit_feedback_band_demand_$ROUTE$_$BAND$ value = tca_merit_feedback_band_demand_value }
+    set_variable = {
+        name = tca_merit_feedback_band_target_$ROUTE$_$BAND$
+        value = { value = var:tca_merit_feedback_band_demand_$ROUTE$_$BAND$ multiply = 1.65 }
+    }
+}
+
+# 人物作用域；参数 YEAR。只处理本轮冻结候选中的真实人类。
+# 正常落选才发送轻量右侧消息；等待审计、取消、隔离、迁国/转轨/退休等只记录非正常结果。
+# 每人物每个自然年最多一条记录；AI不建立展示账，也不发送消息。
+tca_merit_feedback_capture_personal_effect = {
+    if = {
+        limit = {
+            tca_merit_feedback_human_recipient_trigger = yes
+            has_variable = tca_ma_frozen_anchor
+            var:tca_ma_frozen_anchor ?= scope:tca_ma_anchor
+            NOT = { var:tca_merit_feedback_last_year ?= $YEAR$ }
+        }
+        set_variable = { name = tca_mf_eval_year value = $YEAR$ }
+        set_variable = { name = tca_merit_feedback_personal_result value = tca_merit_feedback_personal_result_value }
+        if = {
+            limit = { var:tca_merit_feedback_personal_result = 0 }
+            tca_merit_feedback_record_personal_effect = { RESULT = 0 YEAR = $YEAR$ ROUTE = var:tca_ma_frozen_route SOURCE = var:tca_ma_frozen_level }
+            if = { limit = { var:tca_ma_frozen_route = 1 } send_interface_message = { type = tca_merit_feedback_loss_civil } }
+            else_if = { limit = { var:tca_ma_frozen_route = 2 } send_interface_message = { type = tca_merit_feedback_loss_military } }
+        }
+        else_if = {
+            limit = { var:tca_merit_feedback_personal_result = 1 }
+            tca_merit_feedback_record_personal_effect = { RESULT = 1 YEAR = $YEAR$ ROUTE = var:tca_ma_frozen_route SOURCE = var:tca_ma_frozen_level }
+        }
+        else_if = {
+            limit = { var:tca_merit_feedback_personal_result = 2 }
+            tca_merit_feedback_record_personal_effect = { RESULT = 2 YEAR = $YEAR$ ROUTE = var:tca_ma_frozen_route SOURCE = var:tca_ma_frozen_level }
+        }
+        remove_variable = tca_merit_feedback_personal_result
+        remove_variable = tca_mf_eval_year
+        remove_variable = tca_merit_feedback_attempted_year
+    }
+}
+
+# 人物作用域；参数 RESULT/YEAR/ROUTE/SOURCE。只写最近一轮必要标量，不保存候选名单。
+# RESULT：0正常落选，1普通获准，2待审计/取消/资格失效（不冒充正常落选）。
+tca_merit_feedback_record_personal_effect = {
+    set_variable = { name = tca_merit_feedback_last_year value = $YEAR$ }
+    set_variable = { name = tca_merit_feedback_last_result value = $RESULT$ }
+    set_variable = { name = tca_merit_feedback_last_route value = $ROUTE$ }
+    set_variable = { name = tca_merit_feedback_last_source value = $SOURCE$ }
+    # 只读自检，实际读取全部本人结果标量；add=0不改变结果。
+    if = {
+        limit = { tca_merit_feedback_personal_read_trigger = yes }
+        change_variable = { name = tca_merit_feedback_last_year add = 0 }
+    }
+}
+
+# 国家title作用域；全部展示标量已经由capture写入。输出43个saved scope values，
+# 供下一独立事件使用；不保存/回读可变title数据，不重算配额，不持久化AI消息历史。
+tca_merit_feedback_freeze_briefing_effect = {
+    save_scope_value_as = { name = tca_mf_year value = var:tca_merit_feedback_year }
+    save_scope_value_as = { name = tca_mf_success_1 value = var:tca_merit_feedback_success_1 }
+    save_scope_value_as = { name = tca_mf_q_1_1 value = var:tca_merit_feedback_q_1_1 }
+    save_scope_value_as = { name = tca_mf_ok_1_1 value = var:tca_merit_feedback_ok_1_1 }
+    save_scope_value_as = { name = tca_mf_q_1_2 value = var:tca_merit_feedback_q_1_2 }
+    save_scope_value_as = { name = tca_mf_ok_1_2 value = var:tca_merit_feedback_ok_1_2 }
+    save_scope_value_as = { name = tca_mf_q_1_3 value = var:tca_merit_feedback_q_1_3 }
+    save_scope_value_as = { name = tca_mf_ok_1_3 value = var:tca_merit_feedback_ok_1_3 }
+    save_scope_value_as = { name = tca_mf_q_1_4 value = var:tca_merit_feedback_q_1_4 }
+    save_scope_value_as = { name = tca_mf_ok_1_4 value = var:tca_merit_feedback_ok_1_4 }
+    save_scope_value_as = { name = tca_mf_q_1_5 value = var:tca_merit_feedback_q_1_5 }
+    save_scope_value_as = { name = tca_mf_ok_1_5 value = var:tca_merit_feedback_ok_1_5 }
+    save_scope_value_as = { name = tca_mf_q_1_6 value = var:tca_merit_feedback_q_1_6 }
+    save_scope_value_as = { name = tca_mf_ok_1_6 value = var:tca_merit_feedback_ok_1_6 }
+    save_scope_value_as = { name = tca_mf_band_pop_1_1 value = var:tca_merit_feedback_band_pop_1_1 }
+    save_scope_value_as = { name = tca_mf_band_target_1_1 value = var:tca_merit_feedback_band_target_1_1 }
+    save_scope_value_as = { name = tca_mf_band_pop_1_2 value = var:tca_merit_feedback_band_pop_1_2 }
+    save_scope_value_as = { name = tca_mf_band_target_1_2 value = var:tca_merit_feedback_band_target_1_2 }
+    save_scope_value_as = { name = tca_mf_band_pop_1_3 value = var:tca_merit_feedback_band_pop_1_3 }
+    save_scope_value_as = { name = tca_mf_band_target_1_3 value = var:tca_merit_feedback_band_target_1_3 }
+    save_scope_value_as = { name = tca_mf_band_pop_1_4 value = var:tca_merit_feedback_band_pop_1_4 }
+    save_scope_value_as = { name = tca_mf_band_target_1_4 value = var:tca_merit_feedback_band_target_1_4 }
+    save_scope_value_as = { name = tca_mf_success_2 value = var:tca_merit_feedback_success_2 }
+    save_scope_value_as = { name = tca_mf_q_2_1 value = var:tca_merit_feedback_q_2_1 }
+    save_scope_value_as = { name = tca_mf_ok_2_1 value = var:tca_merit_feedback_ok_2_1 }
+    save_scope_value_as = { name = tca_mf_q_2_2 value = var:tca_merit_feedback_q_2_2 }
+    save_scope_value_as = { name = tca_mf_ok_2_2 value = var:tca_merit_feedback_ok_2_2 }
+    save_scope_value_as = { name = tca_mf_q_2_3 value = var:tca_merit_feedback_q_2_3 }
+    save_scope_value_as = { name = tca_mf_ok_2_3 value = var:tca_merit_feedback_ok_2_3 }
+    save_scope_value_as = { name = tca_mf_q_2_4 value = var:tca_merit_feedback_q_2_4 }
+    save_scope_value_as = { name = tca_mf_ok_2_4 value = var:tca_merit_feedback_ok_2_4 }
+    save_scope_value_as = { name = tca_mf_q_2_5 value = var:tca_merit_feedback_q_2_5 }
+    save_scope_value_as = { name = tca_mf_ok_2_5 value = var:tca_merit_feedback_ok_2_5 }
+    save_scope_value_as = { name = tca_mf_q_2_6 value = var:tca_merit_feedback_q_2_6 }
+    save_scope_value_as = { name = tca_mf_ok_2_6 value = var:tca_merit_feedback_ok_2_6 }
+    save_scope_value_as = { name = tca_mf_band_pop_2_1 value = var:tca_merit_feedback_band_pop_2_1 }
+    save_scope_value_as = { name = tca_mf_band_target_2_1 value = var:tca_merit_feedback_band_target_2_1 }
+    save_scope_value_as = { name = tca_mf_band_pop_2_2 value = var:tca_merit_feedback_band_pop_2_2 }
+    save_scope_value_as = { name = tca_mf_band_target_2_2 value = var:tca_merit_feedback_band_target_2_2 }
+    save_scope_value_as = { name = tca_mf_band_pop_2_3 value = var:tca_merit_feedback_band_pop_2_3 }
+    save_scope_value_as = { name = tca_mf_band_target_2_3 value = var:tca_merit_feedback_band_target_2_3 }
+    save_scope_value_as = { name = tca_mf_band_pop_2_4 value = var:tca_merit_feedback_band_pop_2_4 }
+    save_scope_value_as = { name = tca_mf_band_target_2_4 value = var:tca_merit_feedback_band_target_2_4 }
+}
+
+# 人物作用域（本国皇帝）；scope:tca_ma_anchor须指向本轮国家快照。
+# 同链本地化可能读取此前缓存的scope，故先冻结数值再排独立次日事件，不在本链渲染。
+# 标题year锁在capture前已写；重复年度调用不会重复排件，保存重载沿原排队事件续接。
+tca_merit_feedback_send_briefing_effect = {
+    if = {
+        limit = {
+            is_alive = yes tca_merit_feedback_human_recipient_trigger = yes
+            exists = scope:tca_ma_anchor scope:tca_ma_anchor = { holder = prev }
+        }
+        scope:tca_ma_anchor = { tca_merit_feedback_freeze_briefing_effect = yes }
+        trigger_event = { id = tca_merit_feedback.1 days = 1 }
+    }
+}
+
+# 人物作用域；仅由新事件携带冻结的tca_mf_*数值进入，不读取最新title/年度变量。
+# 默认右侧feed，无暂停/审批/奖励。AI或已故原接收者不补发；实际玩家显示另验。
+# desc 在此事件上下文求值后由消息模板 event_message_text 接收；模板不能直接绑定动态摘要。
+tca_merit_feedback_deliver_briefing_effect = {
+    if = {
+        limit = { is_alive = yes tca_merit_feedback_human_recipient_trigger = yes }
+        send_interface_message = {
+            type = tca_merit_feedback_emperor_briefing
+            left_icon = root
+            tooltip = tca_merit_feedback_briefing_details
+            desc = {
+                desc = tca_merit_feedback_briefing_summary
+                desc = tca_merit_feedback_linebreak
+                desc = tca_merit_feedback_briefing_civil_line
+                desc = tca_merit_feedback_linebreak
+                desc = tca_merit_feedback_briefing_military_line
+                desc = tca_merit_feedback_linebreak
+                desc = tca_merit_feedback_briefing_scope_note
+            }
+        }
+    }
+}

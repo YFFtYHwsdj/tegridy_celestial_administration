@@ -1,0 +1,49 @@
+﻿# 中央授品原生回归专用；人物作用域，只撤销本例复任引入的冷却与待授请求。
+# TIMEOUT是借用前的原生剩余日数快照，ELAPSED是同一测试实际等待的总日数。
+# 调用前置必须保证原任没有中央pending/phase；原有长冷却按真实经过日数保留，不按近期授职期限截断。
+tca_test_restore_central_timeout_effect = {
+    remove_character_flag = tca_merit_central_pending
+    # 原任若也未入品，复任会建立零级准备；本例新建的请求取消时必须连同借用上限/路线清理。
+    tca_merit_cancel_central_zero_prep_effect = yes
+    tca_merit_cancel_central_zero_source_effect = yes
+    tca_test_restore_central_timeout_only_effect = { TIMEOUT = $TIMEOUT$ ELAPSED = $ELAPSED$ }
+}
+
+# 同一冷却恢复，不取得中央请求所有权；供借用前可能已有真实pending的旧串行用例使用。
+tca_test_restore_central_timeout_only_effect = {
+    clear_appointment_timeout = yes
+    if = {
+        limit = { $TIMEOUT$ > $ELAPSED$ }
+        set_variable = { name = tca_merit_central_remaining_timeout value = { value = $TIMEOUT$ subtract = $ELAPSED$ } }
+        set_appointment_timeout = { days = tca_merit_central_remaining_timeout_days }
+        remove_variable = tca_merit_central_remaining_timeout
+    }
+}
+
+# 报告者作用域；输出旧零级事务提交前的实际人物/最高领主与阶段，避免输出整个世界scope。
+tca_test_log_central_zero_migrate_effect = {
+    scope:tca_mczm_actor = {
+        top_liege = { save_scope_as = tca_mczm_diag_top }
+        save_scope_value_as = { name = tca_mczd_native value = merit_level }
+        save_scope_value_as = { name = tca_mczd_merit value = merit }
+        save_scope_value_as = { name = tca_mczd_target value = tca_merit_central_target_value }
+        save_scope_value_as = { name = tca_mczd_phase value = { value = -1 if = { limit = { has_variable = tca_merit_grant_phase } value = var:tca_merit_grant_phase } } }
+    }
+    debug_log = tca_merit_central_zero_migrate_diagnostic
+}
+
+# 测试报告者作用域；CHARACTER为借用前原任，TITLE/POSITION为真实中央职位对应键。
+# 先精确归还中央头衔恢复直属关系，再只同步议会槽；不假定失职原任仍直属皇帝。
+# TIMEOUT/ELAPSED沿用原冷却快照；前置须保证借用前无pending/phase，只撤本例复任产生的借用准备。
+tca_test_restore_central_office_effect = {
+    title:$TITLE$ = {
+        create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_test_central_restore_title }
+        change_title_holder = { holder = $CHARACTER$ change = scope:tca_test_central_restore_title }
+        resolve_title_and_vassal_change = scope:tca_test_central_restore_title
+    }
+    if = {
+        limit = { NOT = { cp:$POSITION$ = $CHARACTER$ } }
+        assign_councillor_type = { type = $POSITION$ target = $CHARACTER$ fire_on_actions = no remove_existing_councillor = yes }
+    }
+    $CHARACTER$ = { tca_test_restore_central_timeout_effect = { TIMEOUT = $TIMEOUT$ ELAPSED = $ELAPSED$ } }
+}

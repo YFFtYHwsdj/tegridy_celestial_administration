@@ -1,0 +1,187 @@
+﻿# 功绩玩家反馈的只读取值接口；不抽选、不改余额/品级/事务，也不派发消息。
+# 面板状态、门槛进度和本人结果判定放在这里，GUI 与年度快照只读本文件。
+# 年度工作账、候选名单和事务阶段仍由正式状态/年度/授品文件维护。
+
+# 人物作用域：测试可临时指定评估年，正式路径始终返回当前自然年。
+# 该覆盖只供原生接口用例模拟跨年，不写入存档、不改变业务年标记。
+tca_merit_feedback_eval_year_value = {
+    value = current_year
+    if = { limit = { has_variable = tca_mf_eval_year } value = var:tca_mf_eval_year }
+}
+
+# 人物作用域；输出面板状态码。0=非天朝/不显示，1=皇帝，3=审计隔离，4=授品事务中，
+# 5=退休，6=辞谢，7=未入品，8=未成年，9=路线异常，10=三品普通终点，11=本年普通已升，
+# 12=中央待授，13=资格封顶，14=功绩不足，15=可参选，16=二品仅中央，17=已至一品，
+# 18=天朝尚未接管，19=本年已受迁秩，20=其他硬条件不满足。
+# 优先级：不适用/事务异常 → 退出 → 皇帝 → 未入品/年龄/路线 → 普通终点 → 本年已升/中央等待
+# → 资格/功绩/可参选。只读 getter，不产生随机数或状态副作用。
+tca_merit_panel_state_value = {
+    value = 0
+    if = {
+        limit = { is_alive = yes government_has_flag = government_is_celestial is_independent_ruler = yes }
+        value = 1
+    }
+    else_if = {
+        limit = {
+            is_alive = yes
+            has_character_flag = tca_merit_active
+            has_variable = tca_merit_approved_level
+            government_has_flag = government_is_celestial
+            exists = top_liege
+            top_liege ?= { government_has_flag = government_is_celestial }
+            is_independent_ruler = no
+        }
+        if = { limit = { var:tca_merit_grant_phase ?= 3 } value = 3 }
+        else_if = { limit = { has_variable = tca_merit_grant_phase } value = 4 }
+        else_if = { limit = { has_character_flag = tca_merit_retired } value = 5 }
+        else_if = { limit = { has_character_flag = tca_merit_refused } value = 6 }
+        else_if = { limit = { tca_merit_level_value <= 0 } value = 7 }
+        else_if = { limit = { is_adult = no } value = 8 }
+        else_if = {
+            limit = {
+                OR = {
+                    NOT = { has_variable = tca_merit_route }
+                    AND = { is_civilian_candidate_trigger = yes is_military_candidate_trigger = yes }
+                    AND = { is_civilian_candidate_trigger = no is_military_candidate_trigger = no }
+                }
+            }
+            value = 9
+        }
+        else_if = { limit = { tca_merit_level_value = 7 } value = 10 }
+        else_if = { limit = { tca_merit_level_value = 8 } value = 16 }
+        else_if = { limit = { tca_merit_level_value = 9 } value = 17 }
+        else_if = { limit = { var:tca_merit_last_ordinary_success_year ?= current_year } value = 11 }
+        else_if = { limit = { has_character_flag = tca_merit_central_pending } value = 12 }
+        else_if = { limit = { var:tca_merit_last_ordinary_year ?= current_year } value = 19 }
+        else_if = { limit = { tca_merit_theoretical_cap_value <= tca_merit_level_value } value = 13 }
+        else_if = { limit = { merit < tca_merit_next_threshold_value } value = 14 }
+        else_if = { limit = { tca_merit_ordinary_hard_candidate_trigger = yes } value = 15 }
+        else = { value = 20 }
+    }
+    else_if = {
+        limit = {
+            is_alive = yes
+            government_has_flag = government_is_celestial
+            exists = top_liege
+            top_liege ?= { government_has_flag = government_is_celestial }
+            is_independent_ruler = no
+        }
+        value = 18
+    }
+}
+
+# 人物作用域；下一品原生门槛。未激活、未入品或已至一品返回0，调用方据此隐藏门槛行。
+# 二/一品也返回门槛（仅中央特授），由状态文本说明普通铨叙不适用。
+tca_merit_feedback_next_threshold_value = {
+    value = 0
+    if = {
+        limit = {
+            has_character_flag = tca_merit_active
+            has_variable = tca_merit_approved_level
+            tca_merit_level_value >= 1
+            tca_merit_level_value <= 8
+        }
+        value = tca_merit_next_threshold_value
+    }
+}
+
+# 人物作用域；当前余额相对下一品门槛的百分比，只钳制显示，不是获选概率。
+# 门槛缺失或为0时返回0；不修改 merit、经验或年度标记。
+tca_merit_feedback_progress_value = {
+    value = 0
+    if = {
+        limit = { tca_merit_feedback_next_threshold_value > 0 }
+        value = merit
+        divide = tca_merit_feedback_next_threshold_value
+        multiply = 100
+        min = 0
+        max = 100
+    }
+}
+
+# 人物作用域；只对年度冻结候选调用。输出 1=本年普通获准，0=正常落选，2=待审计/取消/资格失效。
+# 2 不发送落选通知；调用方必须已完成冻结名单筛选，不能把非候选当0。
+# 结果按 YEAR 评估，不写状态；attempted/phase/central pending 均是阻止伪造落选的硬信号。
+tca_merit_feedback_personal_result_value = {
+    value = 0
+    if = {
+        limit = { var:tca_merit_last_ordinary_success_year ?= tca_merit_feedback_eval_year_value }
+        value = 1
+    }
+    else_if = {
+        limit = {
+            OR = {
+                has_variable = tca_merit_grant_phase
+                has_character_flag = tca_merit_central_pending
+                var:tca_merit_feedback_attempted_year ?= tca_merit_feedback_eval_year_value
+            }
+        }
+        value = 2
+    }
+    else_if = {
+        limit = { NOT = { tca_merit_feedback_candidate_intact_trigger = { LEVEL = var:tca_ma_frozen_level ROUTE = var:tca_ma_frozen_route } } }
+        value = 2
+    }
+}
+
+# 国家title作用域；反馈读取冻结统计，不读已受晋升净流影响的工作账。
+# 调用者设置路线与带上下界；统计在年度清理前有效。
+tca_merit_feedback_band_population_value = {
+    value = 0
+    if = {
+        limit = { var:tca_ma_route = 1 }
+        if = { limit = { var:tca_mf_band_low <= 1 var:tca_mf_band_high >= 1 } add = var:tca_ma_frozen_n_1_1 }
+        if = { limit = { var:tca_mf_band_low <= 2 var:tca_mf_band_high >= 2 } add = var:tca_ma_frozen_n_1_2 }
+        if = { limit = { var:tca_mf_band_low <= 3 var:tca_mf_band_high >= 3 } add = var:tca_ma_frozen_n_1_3 }
+        if = { limit = { var:tca_mf_band_low <= 4 var:tca_mf_band_high >= 4 } add = var:tca_ma_frozen_n_1_4 }
+        if = { limit = { var:tca_mf_band_low <= 5 var:tca_mf_band_high >= 5 } add = var:tca_ma_frozen_n_1_5 }
+        if = { limit = { var:tca_mf_band_low <= 6 var:tca_mf_band_high >= 6 } add = var:tca_ma_frozen_n_1_6 }
+        if = { limit = { var:tca_mf_band_low <= 7 var:tca_mf_band_high >= 7 } add = var:tca_ma_frozen_n_1_7 }
+        if = { limit = { var:tca_mf_band_low <= 8 var:tca_mf_band_high >= 8 } add = var:tca_ma_frozen_n_1_8 }
+        if = { limit = { var:tca_mf_band_low <= 9 var:tca_mf_band_high >= 9 } add = var:tca_ma_frozen_n_1_9 }
+    }
+    if = {
+        limit = { var:tca_ma_route = 2 }
+        if = { limit = { var:tca_mf_band_low <= 1 var:tca_mf_band_high >= 1 } add = var:tca_ma_frozen_n_2_1 }
+        if = { limit = { var:tca_mf_band_low <= 2 var:tca_mf_band_high >= 2 } add = var:tca_ma_frozen_n_2_2 }
+        if = { limit = { var:tca_mf_band_low <= 3 var:tca_mf_band_high >= 3 } add = var:tca_ma_frozen_n_2_3 }
+        if = { limit = { var:tca_mf_band_low <= 4 var:tca_mf_band_high >= 4 } add = var:tca_ma_frozen_n_2_4 }
+        if = { limit = { var:tca_mf_band_low <= 5 var:tca_mf_band_high >= 5 } add = var:tca_ma_frozen_n_2_5 }
+        if = { limit = { var:tca_mf_band_low <= 6 var:tca_mf_band_high >= 6 } add = var:tca_ma_frozen_n_2_6 }
+        if = { limit = { var:tca_mf_band_low <= 7 var:tca_mf_band_high >= 7 } add = var:tca_ma_frozen_n_2_7 }
+        if = { limit = { var:tca_mf_band_low <= 8 var:tca_mf_band_high >= 8 } add = var:tca_ma_frozen_n_2_8 }
+        if = { limit = { var:tca_mf_band_low <= 9 var:tca_mf_band_high >= 9 } add = var:tca_ma_frozen_n_2_9 }
+    }
+}
+
+# 国家title作用域；读取唯一头衔登记时累计的四带J，不再遍历需求名单。
+tca_merit_feedback_band_demand_value = {
+    value = 0
+    if = {
+        limit = { var:tca_ma_route = 1 }
+        if = { limit = { var:tca_mf_band = 1 } value = var:tca_ma_frozen_j_1_1 }
+        if = { limit = { var:tca_mf_band = 2 } value = var:tca_ma_frozen_j_1_2 }
+        if = { limit = { var:tca_mf_band = 3 } value = var:tca_ma_frozen_j_1_3 }
+        if = { limit = { var:tca_mf_band = 4 } value = var:tca_ma_frozen_j_1_4 }
+    }
+    if = {
+        limit = { var:tca_ma_route = 2 }
+        if = { limit = { var:tca_mf_band = 1 } value = var:tca_ma_frozen_j_2_1 }
+        if = { limit = { var:tca_mf_band = 2 } value = var:tca_ma_frozen_j_2_2 }
+        if = { limit = { var:tca_mf_band = 3 } value = var:tca_ma_frozen_j_2_3 }
+        if = { limit = { var:tca_mf_band = 4 } value = var:tca_ma_frozen_j_2_4 }
+    }
+}
+
+# 人物作用域；最近一轮本人结果年份。缺失时返回0，供GUI/本地化安全读取，避免空变量报错。
+tca_merit_feedback_last_year_value = {
+    value = 0
+    if = { limit = { has_variable = tca_merit_feedback_last_year } value = var:tca_merit_feedback_last_year }
+}
+
+# 人物作用域；距下一品门槛的剩余功绩，仅用于显示，不扣除余额。
+tca_merit_feedback_remaining_merit_value = {
+    value = tca_merit_feedback_next_threshold_value
+    subtract = merit
+    min = 0
+}

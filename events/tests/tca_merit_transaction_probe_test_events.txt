@@ -1,0 +1,476 @@
+﻿# 最小组合事务；核准队列不改账/上限，提交仅同链保护，不是正式升品接口。
+namespace = tca_merit_transaction_probe
+tca_merit_transaction_probe.1 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { has_character_flag = tca_test_delayed_case_active } debug_log = "TCA_TEST CASE_BUSY" }
+        else = {
+            debug_log = "TCA_TEST BEGIN tca_merit_transaction_probe.1 tca_test_merit_transaction_contract"
+            remove_character_flag = tca_test_case_failed
+            if = { limit = { debug_only = yes is_alive = yes title:h_china.holder = root }
+                tca_test_create_merit_interface_character_effect = { CHARACTER = tca_mtx_excess GOVERNMENT = celestial_government }
+                scope:tca_mtx_excess = {
+                    set_variable = { name = tca_merit_probe_approved value = 1 }
+                    tca_test_add_scaled_merit_probe_exams_effect = yes
+                    add_character_modifier = { modifier = tca_merit_probe_approved_base_modifier }
+                    add_character_modifier = { modifier = tca_merit_probe_approved_reduction_modifier }
+                    change_merit = 30000
+                }
+                tca_test_create_merit_interface_character_effect = { CHARACTER = tca_mtx_low GOVERNMENT = celestial_government }
+                scope:tca_mtx_low = {
+                    set_variable = { name = tca_merit_probe_approved value = 1 }
+                    tca_test_add_scaled_merit_probe_exams_effect = yes
+                    add_character_modifier = { modifier = tca_merit_probe_approved_base_modifier }
+                    add_character_modifier = { modifier = tca_merit_probe_approved_reduction_modifier }
+                    change_merit = 100
+                }
+                tca_test_create_merit_interface_character_effect = { CHARACTER = tca_mtx_split GOVERNMENT = celestial_government }
+                scope:tca_mtx_split = {
+                    set_variable = { name = tca_merit_probe_approved value = 1 }
+                    tca_test_add_scaled_merit_probe_exams_effect = yes
+                    add_character_modifier = { modifier = tca_merit_probe_approved_base_modifier }
+                    add_character_modifier = { modifier = tca_merit_probe_approved_reduction_modifier }
+                    change_merit = 30000
+                }
+                tca_test_create_merit_interface_character_effect = { CHARACTER = tca_mtx_same GOVERNMENT = celestial_government }
+                scope:tca_mtx_same = {
+                    set_variable = { name = tca_merit_probe_approved value = 1 }
+                    tca_test_add_scaled_merit_probe_exams_effect = yes
+                    add_character_modifier = { modifier = tca_merit_probe_approved_base_modifier }
+                    add_character_modifier = { modifier = tca_merit_probe_approved_reduction_modifier }
+                    change_merit = 100
+                }
+                tca_test_create_merit_interface_character_effect = { CHARACTER = tca_mtx_lost GOVERNMENT = celestial_government }
+                scope:tca_mtx_lost = {
+                    set_variable = { name = tca_merit_probe_approved value = 1 }
+                    tca_test_add_scaled_merit_probe_exams_effect = yes
+                    add_character_modifier = { modifier = tca_merit_probe_approved_base_modifier }
+                    add_character_modifier = { modifier = tca_merit_probe_approved_reduction_modifier }
+                    change_merit = 100
+                }
+                scope:tca_mtx_split = { change_merit_no_experience = { value = 7 subtract = merit } }
+                add_character_flag = tca_test_delayed_case_active
+            debug_log = "TCA_TEST WAIT tca_test_merit_transaction_contract 2 days"
+            trigger_event = { id = tca_merit_transaction_probe.1001 days = 2 }
+            }
+            else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_merit_transaction_contract" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_continue_delayed_effect = yes }
+        }
+    }
+}
+
+tca_merit_transaction_probe.1001 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_mtx_excess = { merit_level = 1 } scope:tca_mtx_low = { merit_level = 1 } scope:tca_mtx_split = { merit_level = 1 } scope:tca_mtx_same = { merit_level = 1 } scope:tca_mtx_lost = { merit_level = 1 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_transaction_contract 1" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_transaction_contract 1" }
+            scope:tca_mtx_excess = { tca_test_begin_merit_transaction_probe_effect = { SOURCE = 1 TARGET = 2 BASE = 1000 } }
+            scope:tca_mtx_low = { tca_test_begin_merit_transaction_probe_effect = { SOURCE = 1 TARGET = 2 BASE = 1000 } }
+            scope:tca_mtx_split = { tca_test_begin_merit_transaction_probe_effect = { SOURCE = 1 TARGET = 2 BASE = 1000 } }
+            scope:tca_mtx_same = { tca_test_begin_merit_transaction_probe_effect = { SOURCE = 1 TARGET = 1 BASE = 1000 } }
+            scope:tca_mtx_lost = { tca_test_begin_merit_transaction_probe_effect = { SOURCE = 1 TARGET = 2 BASE = 1000 } }
+            scope:tca_mtx_lost = { change_government = meritocratic_government }
+            debug_log = "TCA_TEST WAIT tca_test_merit_transaction_contract 2 days"
+            trigger_event = { id = tca_merit_transaction_probe.1002 days = 2 }
+        }
+    }
+}
+
+tca_merit_transaction_probe.1002 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_mtx_excess = { merit_level = 1 merit = 30000 var:tca_mtx_phase = 1 var:tca_merit_probe_approved = 1 NOT = { has_character_flag = tca_merit_reset_probe_suppress } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_transaction_contract 2" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_transaction_contract 2" }
+            if = { limit = { scope:tca_mtx_low = { merit_level = 1 merit = 100 var:tca_mtx_phase = 1 } scope:tca_mtx_split = { merit_level = 1 merit = 7 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_transaction_contract 3" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_transaction_contract 3" }
+            scope:tca_mtx_excess = { tca_test_commit_merit_transaction_probe_effect = yes }
+            scope:tca_mtx_low = { tca_test_commit_merit_transaction_probe_effect = yes }
+            scope:tca_mtx_split = { tca_test_commit_merit_transaction_probe_effect = yes }
+            scope:tca_mtx_same = { tca_test_commit_merit_transaction_probe_effect = yes }
+            scope:tca_mtx_lost = { tca_test_commit_merit_transaction_probe_effect = yes }
+            debug_log = "TCA_TEST WAIT tca_test_merit_transaction_contract 2 days"
+            trigger_event = { id = tca_merit_transaction_probe.1003 days = 2 }
+        }
+    }
+}
+
+tca_merit_transaction_probe.1003 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_mtx_excess = { merit_level = 2 merit = 1000 var:tca_mtx_phase = 2 var:tca_merit_probe_approved = 2 var:tca_merit_reset_probe_gain_count = 1 var:tca_merit_reset_probe_loss_count = 0 NOT = { has_character_flag = tca_merit_reset_probe_suppress } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_transaction_contract 4" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_transaction_contract 4" }
+            if = { limit = { scope:tca_mtx_low = { merit_level = 2 merit = 1000 var:tca_mtx_phase = 2 var:tca_merit_probe_approved = 2 var:tca_merit_reset_probe_gain_count = 1 var:tca_merit_reset_probe_loss_count = 0 NOT = { has_character_flag = tca_merit_reset_probe_suppress } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_transaction_contract 5" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_transaction_contract 5" }
+            if = { limit = { scope:tca_mtx_split = { merit_level = 2 merit = 1000 var:tca_mtx_phase = 2 var:tca_merit_probe_approved = 2 var:tca_merit_reset_probe_gain_count = 1 var:tca_merit_reset_probe_loss_count = 0 NOT = { has_character_flag = tca_merit_reset_probe_suppress } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_transaction_contract 6" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_transaction_contract 6" }
+            if = { limit = { scope:tca_mtx_same = { merit_level = 1 merit = 100 var:tca_mtx_phase = 4 var:tca_merit_reset_probe_gain_count = 0 var:tca_merit_reset_probe_loss_count = 0 var:tca_merit_probe_approved = 1 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_transaction_contract 7" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_transaction_contract 7" }
+            if = { limit = { scope:tca_mtx_lost = { has_government = meritocratic_government merit_level = 1 merit = 100 var:tca_mtx_phase = 3 var:tca_merit_reset_probe_gain_count = 0 var:tca_merit_reset_probe_loss_count = 0 var:tca_merit_probe_approved = 1 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_transaction_contract 8" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_transaction_contract 8" }
+            scope:tca_mtx_excess = { tca_test_begin_merit_transaction_probe_effect = { SOURCE = 1 TARGET = 2 BASE = 1000 } tca_test_commit_merit_transaction_probe_effect = yes }
+            scope:tca_mtx_low = { tca_test_begin_merit_transaction_probe_effect = { SOURCE = 1 TARGET = 2 BASE = 1000 } tca_test_commit_merit_transaction_probe_effect = yes }
+            scope:tca_mtx_split = { tca_test_begin_merit_transaction_probe_effect = { SOURCE = 1 TARGET = 2 BASE = 1000 } tca_test_commit_merit_transaction_probe_effect = yes }
+            scope:tca_mtx_same = { tca_test_begin_merit_transaction_probe_effect = { SOURCE = 1 TARGET = 2 BASE = 1000 } tca_test_commit_merit_transaction_probe_effect = yes }
+            scope:tca_mtx_lost = { tca_test_begin_merit_transaction_probe_effect = { SOURCE = 1 TARGET = 2 BASE = 1000 } tca_test_commit_merit_transaction_probe_effect = yes }
+            scope:tca_mtx_excess = { set_variable = { name = tca_merit_probe_approved value = 3 } remove_character_modifier = tca_merit_probe_approved_reduction_modifier add_character_modifier = { modifier = tca_merit_probe_approved_reduction_modifier } }
+            scope:tca_mtx_low = { set_variable = { name = tca_merit_probe_approved value = 3 } remove_character_modifier = tca_merit_probe_approved_reduction_modifier add_character_modifier = { modifier = tca_merit_probe_approved_reduction_modifier } }
+            scope:tca_mtx_split = { set_variable = { name = tca_merit_probe_approved value = 3 } remove_character_modifier = tca_merit_probe_approved_reduction_modifier add_character_modifier = { modifier = tca_merit_probe_approved_reduction_modifier } }
+            debug_log = "TCA_TEST WAIT tca_test_merit_transaction_contract 2 days"
+            trigger_event = { id = tca_merit_transaction_probe.1004 days = 2 }
+        }
+    }
+}
+
+tca_merit_transaction_probe.1004 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_mtx_excess = { merit_level = 2 merit = 1000 var:tca_merit_reset_probe_gain_count = 1 var:tca_merit_reset_probe_loss_count = 0 var:tca_mtx_phase = 2 } scope:tca_mtx_low = { merit_level = 2 merit = 1000 var:tca_merit_reset_probe_gain_count = 1 var:tca_merit_reset_probe_loss_count = 0 var:tca_mtx_phase = 2 } scope:tca_mtx_split = { merit_level = 2 merit = 1000 var:tca_merit_reset_probe_gain_count = 1 var:tca_merit_reset_probe_loss_count = 0 var:tca_mtx_phase = 2 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_transaction_contract 9" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_transaction_contract 9" }
+            if = { limit = { scope:tca_mtx_same = { merit = 100 merit_level = 1 var:tca_mtx_phase = 4 var:tca_merit_reset_probe_gain_count = 0 } scope:tca_mtx_lost = { merit = 100 merit_level = 1 var:tca_mtx_phase = 3 var:tca_merit_reset_probe_gain_count = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_transaction_contract 10" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_transaction_contract 10" }
+            scope:tca_mtx_excess = { change_merit = 999 }
+            scope:tca_mtx_low = { change_merit = 999 }
+            scope:tca_mtx_split = { change_merit = 999 }
+            debug_log = "TCA_TEST WAIT tca_test_merit_transaction_contract 2 days"
+            trigger_event = { id = tca_merit_transaction_probe.1005 days = 2 }
+        }
+    }
+}
+
+tca_merit_transaction_probe.1005 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_mtx_excess = { merit_level = 2 merit = 1999 var:tca_merit_reset_probe_gain_count = 1 } scope:tca_mtx_low = { merit_level = 2 merit = 1999 var:tca_merit_reset_probe_gain_count = 1 } scope:tca_mtx_split = { merit_level = 2 merit = 1999 var:tca_merit_reset_probe_gain_count = 1 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_transaction_contract 11" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_transaction_contract 11" }
+            scope:tca_mtx_excess = { change_merit = 1 }
+            scope:tca_mtx_low = { change_merit = 1 }
+            scope:tca_mtx_split = { change_merit = 1 }
+            debug_log = "TCA_TEST WAIT tca_test_merit_transaction_contract 2 days"
+            trigger_event = { id = tca_merit_transaction_probe.1006 days = 2 }
+        }
+    }
+}
+
+tca_merit_transaction_probe.1006 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_mtx_excess = { merit_level = 3 merit = 2000 var:tca_merit_reset_probe_gain_count = 2 var:tca_merit_reset_probe_loss_count = 0 } scope:tca_mtx_low = { merit_level = 3 merit = 2000 var:tca_merit_reset_probe_gain_count = 2 var:tca_merit_reset_probe_loss_count = 0 } scope:tca_mtx_split = { merit_level = 3 merit = 2000 var:tca_merit_reset_probe_gain_count = 2 var:tca_merit_reset_probe_loss_count = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_transaction_contract 12" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_transaction_contract 12" }
+            scope:tca_mtx_excess = { tca_test_cleanup_merit_transaction_probe_effect = yes }
+            scope:tca_mtx_low = { tca_test_cleanup_merit_transaction_probe_effect = yes }
+            scope:tca_mtx_split = { tca_test_cleanup_merit_transaction_probe_effect = yes }
+            scope:tca_mtx_same = { tca_test_cleanup_merit_transaction_probe_effect = yes }
+            scope:tca_mtx_lost = { tca_test_cleanup_merit_transaction_probe_effect = yes }
+            if = { limit = { scope:tca_mtx_excess = { NOT = { has_variable = tca_mtx_phase } NOT = { has_variable = tca_mtx_source } NOT = { has_variable = tca_mtx_target } NOT = { has_variable = tca_mtx_base } NOT = { has_variable = tca_mtx_liege } NOT = { has_character_flag = tca_merit_reset_probe_suppress } NOT = { has_variable = tca_merit_reset_probe_gain_count } } scope:tca_mtx_low = { NOT = { has_variable = tca_mtx_phase } NOT = { has_variable = tca_mtx_source } NOT = { has_variable = tca_mtx_target } NOT = { has_variable = tca_mtx_base } NOT = { has_variable = tca_mtx_liege } NOT = { has_character_flag = tca_merit_reset_probe_suppress } NOT = { has_variable = tca_merit_reset_probe_gain_count } } scope:tca_mtx_split = { NOT = { has_variable = tca_mtx_phase } NOT = { has_variable = tca_mtx_source } NOT = { has_variable = tca_mtx_target } NOT = { has_variable = tca_mtx_base } NOT = { has_variable = tca_mtx_liege } NOT = { has_character_flag = tca_merit_reset_probe_suppress } NOT = { has_variable = tca_merit_reset_probe_gain_count } } scope:tca_mtx_same = { NOT = { has_variable = tca_mtx_phase } NOT = { has_variable = tca_mtx_source } NOT = { has_variable = tca_mtx_target } NOT = { has_variable = tca_mtx_base } NOT = { has_variable = tca_mtx_liege } NOT = { has_character_flag = tca_merit_reset_probe_suppress } NOT = { has_variable = tca_merit_reset_probe_gain_count } } scope:tca_mtx_lost = { NOT = { has_variable = tca_mtx_phase } NOT = { has_variable = tca_mtx_source } NOT = { has_variable = tca_mtx_target } NOT = { has_variable = tca_mtx_base } NOT = { has_variable = tca_mtx_liege } NOT = { has_character_flag = tca_merit_reset_probe_suppress } NOT = { has_variable = tca_merit_reset_probe_gain_count } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_transaction_contract 13" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_transaction_contract 13" }
+            scope:tca_mtx_excess = { tca_test_cleanup_merit_probe_character_effect = yes }
+            scope:tca_mtx_low = { tca_test_cleanup_merit_probe_character_effect = yes }
+            scope:tca_mtx_split = { tca_test_cleanup_merit_probe_character_effect = yes }
+            scope:tca_mtx_same = { tca_test_cleanup_merit_probe_character_effect = yes }
+            scope:tca_mtx_lost = { tca_test_cleanup_merit_probe_character_effect = yes }
+            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_merit_transaction_contract" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_merit_transaction_contract" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            remove_character_flag = tca_test_case_failed
+            remove_character_flag = tca_test_delayed_case_active
+            tca_test_continue_delayed_effect = yes
+        }
+    }
+}
+
+tca_merit_transaction_probe.2 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { has_character_flag = tca_test_delayed_case_active } debug_log = "TCA_TEST CASE_BUSY" }
+        else = {
+            debug_log = "TCA_TEST BEGIN tca_merit_transaction_probe.2 tca_test_merit_transaction_wait_callback"
+            remove_character_flag = tca_test_case_failed
+            if = { limit = { debug_only = yes is_alive = yes title:h_china.holder = root }
+                tca_test_create_merit_interface_character_effect = { CHARACTER = tca_mtx_wait GOVERNMENT = celestial_government }
+                scope:tca_mtx_wait = {
+                    set_variable = { name = tca_merit_probe_approved value = 1 }
+                    tca_test_add_scaled_merit_probe_exams_effect = yes
+                    add_character_modifier = { modifier = tca_merit_probe_approved_base_modifier }
+                    add_character_modifier = { modifier = tca_merit_probe_approved_reduction_modifier }
+                    change_merit = 30000
+                }
+                add_character_flag = tca_test_delayed_case_active
+            debug_log = "TCA_TEST WAIT tca_test_merit_transaction_wait_callback 2 days"
+            trigger_event = { id = tca_merit_transaction_probe.2001 days = 2 }
+            }
+            else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_merit_transaction_wait_callback" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_continue_delayed_effect = yes }
+        }
+    }
+}
+
+tca_merit_transaction_probe.2001 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_mtx_wait = { merit_level = 1 merit = 30000 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_transaction_wait_callback 1" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_transaction_wait_callback 1" }
+            scope:tca_mtx_wait = { tca_test_begin_merit_transaction_probe_effect = { SOURCE = 1 TARGET = 2 BASE = 1000 } }
+            debug_log = "TCA_TEST WAIT tca_test_merit_transaction_wait_callback 2 days"
+            trigger_event = { id = tca_merit_transaction_probe.2002 days = 2 }
+        }
+    }
+}
+
+tca_merit_transaction_probe.2002 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_mtx_wait = { merit_level = 1 var:tca_mtx_phase = 1 NOT = { has_character_flag = tca_merit_reset_probe_suppress } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_transaction_wait_callback 2" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_transaction_wait_callback 2" }
+            scope:tca_mtx_wait = { change_merit_experience = -40000 }
+            debug_log = "TCA_TEST WAIT tca_test_merit_transaction_wait_callback 2 days"
+            trigger_event = { id = tca_merit_transaction_probe.2003 days = 2 }
+        }
+    }
+}
+
+tca_merit_transaction_probe.2003 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_mtx_wait = { merit_level = 0 var:tca_merit_reset_probe_loss_count = 1 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_transaction_wait_callback 3" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_transaction_wait_callback 3" }
+            scope:tca_mtx_wait = { tca_test_cleanup_merit_transaction_probe_effect = yes tca_test_cleanup_merit_probe_character_effect = yes }
+            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_merit_transaction_wait_callback" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_merit_transaction_wait_callback" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            remove_character_flag = tca_test_case_failed
+            remove_character_flag = tca_test_delayed_case_active
+            tca_test_continue_delayed_effect = yes
+        }
+    }
+}
+
+# 同链刷新与显式设置的最小接口试验；不从缓存等级推断set效果是否允许。
+tca_merit_transaction_probe.3 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_merit_transaction_probe.3 tca_test_merit_transaction_atomic"
+        remove_character_flag = tca_test_case_failed
+        if = { limit = { debug_only = yes is_alive = yes title:h_china.holder = root }
+            tca_test_create_merit_interface_character_effect = { CHARACTER = tca_mtx_atomic GOVERNMENT = celestial_government }
+            scope:tca_mtx_atomic = {
+                set_variable = { name = tca_merit_probe_approved value = 1 }
+                tca_test_add_scaled_merit_probe_exams_effect = yes
+                add_character_modifier = { modifier = tca_merit_probe_approved_base_modifier }
+                add_character_modifier = { modifier = tca_merit_probe_approved_reduction_modifier }
+                change_merit = 30000
+            }
+            tca_test_create_merit_interface_character_effect = { CHARACTER = tca_mtx_direct GOVERNMENT = celestial_government }
+            scope:tca_mtx_direct = {
+                set_variable = { name = tca_merit_probe_approved value = 1 }
+                tca_test_add_scaled_merit_probe_exams_effect = yes
+                add_character_modifier = { modifier = tca_merit_probe_approved_base_modifier }
+                add_character_modifier = { modifier = tca_merit_probe_approved_reduction_modifier }
+                change_merit = 30000
+            }
+            add_character_flag = tca_test_delayed_case_active
+            trigger_event = { id = tca_merit_transaction_probe.3001 days = 2 }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_merit_transaction_atomic" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_continue_delayed_effect = yes }
+    }
+}
+tca_merit_transaction_probe.3001 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_mtx_atomic = { merit_level = 1 merit = 30000 } scope:tca_mtx_direct = { merit_level = 1 merit = 30000 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_transaction_atomic 1" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_transaction_atomic 1" }
+            scope:tca_mtx_atomic = {
+                set_variable = { name = tca_merit_reset_probe_gain_count value = 0 }
+                set_variable = { name = tca_merit_reset_probe_loss_count value = 0 }
+                set_variable = { name = tca_merit_reset_probe_marked_count value = 0 }
+                add_character_flag = tca_merit_reset_probe_suppress
+                # 先截断旧经验，避免刷新上限时把旧经验兑现为额外合法升级。
+                set_merit_level = 0
+                set_merit_level = 1
+                set_variable = { name = tca_merit_probe_approved value = 2 }
+                remove_character_modifier = tca_merit_probe_approved_reduction_modifier
+                add_character_modifier = { modifier = tca_merit_probe_approved_reduction_modifier }
+                set_merit_level = 2
+                change_merit_no_experience = { value = 1000 subtract = merit }
+                remove_character_flag = tca_merit_reset_probe_suppress
+            }
+            scope:tca_mtx_direct = {
+                set_variable = { name = tca_merit_reset_probe_gain_count value = 0 }
+                set_variable = { name = tca_merit_reset_probe_loss_count value = 0 }
+                set_variable = { name = tca_merit_reset_probe_marked_count value = 0 }
+                add_character_flag = tca_merit_reset_probe_suppress
+                set_merit_level = 0
+                set_variable = { name = tca_merit_probe_approved value = 2 }
+                remove_character_modifier = tca_merit_probe_approved_reduction_modifier
+                add_character_modifier = { modifier = tca_merit_probe_approved_reduction_modifier }
+                set_merit_level = 2
+                change_merit_no_experience = { value = 1000 subtract = merit }
+                remove_character_flag = tca_merit_reset_probe_suppress
+            }
+            trigger_event = { id = tca_merit_transaction_probe.3002 days = 2 }
+        }
+    }
+}
+tca_merit_transaction_probe.3002 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_mtx_atomic = { merit_level = 0 } } debug_log = "TCA_MERIT_TRANSACTION atomic LEVEL0" }
+            if = { limit = { scope:tca_mtx_atomic = { merit_level = 1 } } debug_log = "TCA_MERIT_TRANSACTION atomic LEVEL1" }
+            if = { limit = { scope:tca_mtx_atomic = { merit_level = 2 } } debug_log = "TCA_MERIT_TRANSACTION atomic LEVEL2" }
+            if = { limit = { scope:tca_mtx_atomic = { merit = 1000 } } debug_log = "TCA_MERIT_TRANSACTION atomic BALANCE1000" }
+            if = { limit = { scope:tca_mtx_atomic = { var:tca_merit_reset_probe_gain_count = 0 } } debug_log = "TCA_MERIT_TRANSACTION atomic GAIN0" }
+            if = { limit = { scope:tca_mtx_atomic = { var:tca_merit_reset_probe_gain_count = 1 } } debug_log = "TCA_MERIT_TRANSACTION atomic GAIN1" }
+            if = { limit = { scope:tca_mtx_atomic = { var:tca_merit_reset_probe_gain_count = 2 } } debug_log = "TCA_MERIT_TRANSACTION atomic GAIN2" }
+            if = { limit = { scope:tca_mtx_atomic = { var:tca_merit_reset_probe_gain_count = 3 } } debug_log = "TCA_MERIT_TRANSACTION atomic GAIN3" }
+            if = { limit = { scope:tca_mtx_atomic = { var:tca_merit_reset_probe_loss_count = 0 } } debug_log = "TCA_MERIT_TRANSACTION atomic LOSS0" }
+            if = { limit = { scope:tca_mtx_atomic = { var:tca_merit_reset_probe_loss_count = 1 } } debug_log = "TCA_MERIT_TRANSACTION atomic LOSS1" }
+            if = { limit = { scope:tca_mtx_direct = { merit_level = 0 } } debug_log = "TCA_MERIT_TRANSACTION direct LEVEL0" }
+            if = { limit = { scope:tca_mtx_direct = { merit_level = 1 } } debug_log = "TCA_MERIT_TRANSACTION direct LEVEL1" }
+            if = { limit = { scope:tca_mtx_direct = { merit_level = 2 } } debug_log = "TCA_MERIT_TRANSACTION direct LEVEL2" }
+            if = { limit = { scope:tca_mtx_direct = { merit = 1000 } } debug_log = "TCA_MERIT_TRANSACTION direct BALANCE1000" }
+            if = { limit = { scope:tca_mtx_direct = { var:tca_merit_reset_probe_gain_count = 0 } } debug_log = "TCA_MERIT_TRANSACTION direct GAIN0" }
+            if = { limit = { scope:tca_mtx_direct = { var:tca_merit_reset_probe_gain_count = 1 } } debug_log = "TCA_MERIT_TRANSACTION direct GAIN1" }
+            if = { limit = { scope:tca_mtx_direct = { var:tca_merit_reset_probe_gain_count = 2 } } debug_log = "TCA_MERIT_TRANSACTION direct GAIN2" }
+            if = { limit = { scope:tca_mtx_direct = { var:tca_merit_reset_probe_gain_count = 3 } } debug_log = "TCA_MERIT_TRANSACTION direct GAIN3" }
+            if = { limit = { scope:tca_mtx_direct = { var:tca_merit_reset_probe_loss_count = 0 } } debug_log = "TCA_MERIT_TRANSACTION direct LOSS0" }
+            if = { limit = { scope:tca_mtx_direct = { var:tca_merit_reset_probe_loss_count = 1 } } debug_log = "TCA_MERIT_TRANSACTION direct LOSS1" }
+            if = { limit = { scope:tca_mtx_atomic = { merit_level = 2 merit = 1000 var:tca_merit_reset_probe_gain_count = 1 var:tca_merit_reset_probe_loss_count = 0 NOT = { has_character_flag = tca_merit_reset_probe_suppress } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_transaction_atomic 2" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_transaction_atomic 2" }
+            scope:tca_mtx_atomic = { tca_test_cleanup_merit_transaction_probe_effect = yes tca_test_cleanup_merit_probe_character_effect = yes }
+            if = { limit = { scope:tca_mtx_direct = { merit_level = 2 merit = 1000 var:tca_merit_reset_probe_gain_count = 1 var:tca_merit_reset_probe_loss_count = 0 NOT = { has_character_flag = tca_merit_reset_probe_suppress } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_transaction_atomic 3" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_transaction_atomic 3" }
+            scope:tca_mtx_direct = { tca_test_cleanup_merit_transaction_probe_effect = yes tca_test_cleanup_merit_probe_character_effect = yes }
+            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_merit_transaction_atomic" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_merit_transaction_atomic" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            remove_character_flag = tca_test_case_failed
+            remove_character_flag = tca_test_delayed_case_active
+            tca_test_continue_delayed_effect = yes
+        }
+    }
+}
+# 已否定的接口组合负对照：先刷新cap，再解除保护set目标或手动补发，均会重复派发。
+# 本例故意执行错误方案，断言其确实gain2，不能把此PASS解释为合法授品通过。
+# 最初gain1预期的真实红断言和原始日志保留于运行证据；正确方案由.1/.3验证gain1。
+tca_merit_transaction_probe.4 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_merit_transaction_probe.4 tca_test_merit_transaction_duplicate_rejected"
+        remove_character_flag = tca_test_case_failed
+        if = { limit = { debug_only = yes is_alive = yes title:h_china.holder = root }
+            tca_test_create_merit_interface_character_effect = { CHARACTER = tca_mtx_atomic GOVERNMENT = celestial_government }
+            scope:tca_mtx_atomic = {
+                set_variable = { name = tca_merit_probe_approved value = 1 }
+                tca_test_add_scaled_merit_probe_exams_effect = yes
+                add_character_modifier = { modifier = tca_merit_probe_approved_base_modifier }
+                add_character_modifier = { modifier = tca_merit_probe_approved_reduction_modifier }
+                change_merit = 30000
+            }
+            tca_test_create_merit_interface_character_effect = { CHARACTER = tca_mtx_direct GOVERNMENT = celestial_government }
+            scope:tca_mtx_direct = {
+                set_variable = { name = tca_merit_probe_approved value = 1 }
+                tca_test_add_scaled_merit_probe_exams_effect = yes
+                add_character_modifier = { modifier = tca_merit_probe_approved_base_modifier }
+                add_character_modifier = { modifier = tca_merit_probe_approved_reduction_modifier }
+                change_merit = 30000
+            }
+            add_character_flag = tca_test_delayed_case_active
+            trigger_event = { id = tca_merit_transaction_probe.4001 days = 2 }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_merit_transaction_duplicate_rejected" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_continue_delayed_effect = yes }
+    }
+}
+tca_merit_transaction_probe.4001 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_mtx_atomic = { merit_level = 1 merit = 30000 } scope:tca_mtx_direct = { merit_level = 1 merit = 30000 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_transaction_duplicate_rejected 1" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_transaction_duplicate_rejected 1" }
+            scope:tca_mtx_atomic = {
+                set_variable = { name = tca_merit_reset_probe_gain_count value = 0 }
+                set_variable = { name = tca_merit_reset_probe_loss_count value = 0 }
+                set_variable = { name = tca_merit_reset_probe_marked_count value = 0 }
+                add_character_flag = tca_merit_reset_probe_suppress
+                set_variable = { name = tca_merit_probe_approved value = 2 }
+                remove_character_modifier = tca_merit_probe_approved_reduction_modifier
+                add_character_modifier = { modifier = tca_merit_probe_approved_reduction_modifier }
+                set_merit_level = 0
+                set_merit_level = 1
+                remove_character_flag = tca_merit_reset_probe_suppress
+                set_merit_level = 2
+                change_merit_no_experience = { value = 1000 subtract = merit }
+            }
+            scope:tca_mtx_direct = {
+                set_variable = { name = tca_merit_reset_probe_gain_count value = 0 }
+                set_variable = { name = tca_merit_reset_probe_loss_count value = 0 }
+                set_variable = { name = tca_merit_reset_probe_marked_count value = 0 }
+                add_character_flag = tca_merit_reset_probe_suppress
+                set_variable = { name = tca_merit_probe_approved value = 2 }
+                remove_character_modifier = tca_merit_probe_approved_reduction_modifier
+                add_character_modifier = { modifier = tca_merit_probe_approved_reduction_modifier }
+                set_merit_level = 0
+                set_merit_level = 2
+                remove_character_flag = tca_merit_reset_probe_suppress
+                trigger_event = { on_action = on_merit_level_gain }
+                change_merit_no_experience = { value = 1000 subtract = merit }
+            }
+            trigger_event = { id = tca_merit_transaction_probe.4002 days = 2 }
+        }
+    }
+}
+tca_merit_transaction_probe.4002 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_mtx_atomic = { merit_level = 0 } } debug_log = "TCA_MERIT_TRANSACTION atomic LEVEL0" }
+            if = { limit = { scope:tca_mtx_atomic = { merit_level = 1 } } debug_log = "TCA_MERIT_TRANSACTION atomic LEVEL1" }
+            if = { limit = { scope:tca_mtx_atomic = { merit_level = 2 } } debug_log = "TCA_MERIT_TRANSACTION atomic LEVEL2" }
+            if = { limit = { scope:tca_mtx_atomic = { merit = 1000 } } debug_log = "TCA_MERIT_TRANSACTION atomic BALANCE1000" }
+            if = { limit = { scope:tca_mtx_atomic = { var:tca_merit_reset_probe_gain_count = 0 } } debug_log = "TCA_MERIT_TRANSACTION atomic GAIN0" }
+            if = { limit = { scope:tca_mtx_atomic = { var:tca_merit_reset_probe_gain_count = 1 } } debug_log = "TCA_MERIT_TRANSACTION atomic GAIN1" }
+            if = { limit = { scope:tca_mtx_atomic = { var:tca_merit_reset_probe_gain_count = 2 } } debug_log = "TCA_MERIT_TRANSACTION atomic GAIN2" }
+            if = { limit = { scope:tca_mtx_atomic = { var:tca_merit_reset_probe_gain_count = 3 } } debug_log = "TCA_MERIT_TRANSACTION atomic GAIN3" }
+            if = { limit = { scope:tca_mtx_atomic = { var:tca_merit_reset_probe_loss_count = 0 } } debug_log = "TCA_MERIT_TRANSACTION atomic LOSS0" }
+            if = { limit = { scope:tca_mtx_atomic = { var:tca_merit_reset_probe_loss_count = 1 } } debug_log = "TCA_MERIT_TRANSACTION atomic LOSS1" }
+            if = { limit = { scope:tca_mtx_direct = { merit_level = 0 } } debug_log = "TCA_MERIT_TRANSACTION direct LEVEL0" }
+            if = { limit = { scope:tca_mtx_direct = { merit_level = 1 } } debug_log = "TCA_MERIT_TRANSACTION direct LEVEL1" }
+            if = { limit = { scope:tca_mtx_direct = { merit_level = 2 } } debug_log = "TCA_MERIT_TRANSACTION direct LEVEL2" }
+            if = { limit = { scope:tca_mtx_direct = { merit = 1000 } } debug_log = "TCA_MERIT_TRANSACTION direct BALANCE1000" }
+            if = { limit = { scope:tca_mtx_direct = { var:tca_merit_reset_probe_gain_count = 0 } } debug_log = "TCA_MERIT_TRANSACTION direct GAIN0" }
+            if = { limit = { scope:tca_mtx_direct = { var:tca_merit_reset_probe_gain_count = 1 } } debug_log = "TCA_MERIT_TRANSACTION direct GAIN1" }
+            if = { limit = { scope:tca_mtx_direct = { var:tca_merit_reset_probe_gain_count = 2 } } debug_log = "TCA_MERIT_TRANSACTION direct GAIN2" }
+            if = { limit = { scope:tca_mtx_direct = { var:tca_merit_reset_probe_gain_count = 3 } } debug_log = "TCA_MERIT_TRANSACTION direct GAIN3" }
+            if = { limit = { scope:tca_mtx_direct = { var:tca_merit_reset_probe_loss_count = 0 } } debug_log = "TCA_MERIT_TRANSACTION direct LOSS0" }
+            if = { limit = { scope:tca_mtx_direct = { var:tca_merit_reset_probe_loss_count = 1 } } debug_log = "TCA_MERIT_TRANSACTION direct LOSS1" }
+            if = { limit = { scope:tca_mtx_atomic = { merit_level = 2 merit = 1000 var:tca_merit_reset_probe_gain_count = 2 var:tca_merit_reset_probe_loss_count = 0 NOT = { has_character_flag = tca_merit_reset_probe_suppress } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_transaction_duplicate_rejected 2" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_transaction_duplicate_rejected 2" }
+            scope:tca_mtx_atomic = { tca_test_cleanup_merit_transaction_probe_effect = yes tca_test_cleanup_merit_probe_character_effect = yes }
+            if = { limit = { scope:tca_mtx_direct = { merit_level = 2 merit = 1000 var:tca_merit_reset_probe_gain_count = 2 var:tca_merit_reset_probe_loss_count = 0 NOT = { has_character_flag = tca_merit_reset_probe_suppress } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_transaction_duplicate_rejected 3" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_transaction_duplicate_rejected 3" }
+            scope:tca_mtx_direct = { tca_test_cleanup_merit_transaction_probe_effect = yes tca_test_cleanup_merit_probe_character_effect = yes }
+            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_merit_transaction_duplicate_rejected" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_merit_transaction_duplicate_rejected" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            remove_character_flag = tca_test_case_failed
+            remove_character_flag = tca_test_delayed_case_active
+            tca_test_continue_delayed_effect = yes
+        }
+    }
+}

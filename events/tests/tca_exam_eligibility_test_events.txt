@@ -46,6 +46,34 @@ tca_exam_eligibility_test.1 = {
                 # 在任实地人物仍被门槛拒绝，不因新增无地官职规则而放行。
                 if = { limit = { is_landed = yes tca_exam_can_take_exam_trigger = no } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_eligibility 6" }
                 else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_eligibility 6" }
+                # 地域接口只验证正式判定，不构造活动、邀请或主持人死亡后的活动清理链。
+                # 同域仍放行；不依赖本测试的应试身份或官职资格。
+                if = { limit = { scope:tca_test_exam_officer = { tca_exam_local_guest_region_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_eligibility 7" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_eligibility 7" }
+                clear_saved_scope = host
+                if = { limit = { scope:tca_test_exam_officer = { tca_exam_local_guest_region_trigger = no } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_eligibility 8" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_eligibility 8" }
+                # 无雇主、无头衔的新人物没有首府；缺首府不能被当作无地域限制。
+                create_character = { age = 40 gender_female_chance = 0 random_traits = no dynasty = none location = root.location culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_test_exam_region_host }
+                scope:tca_test_exam_region_host = { save_scope_as = host tca_test_protect_character_effect = yes }
+                if = { limit = { scope:host = { is_alive = yes NOT = { exists = capital_county } } scope:tca_test_exam_officer = { tca_exam_local_guest_region_trigger = no } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_eligibility 9" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_eligibility 9" }
+                create_dynamic_title = { tier = empire name = tca_test_arrest_office_name }
+                scope:new_title = { save_scope_as = tca_test_exam_region_title set_capital_county = root.capital_county set_landless_title = yes }
+                create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_test_exam_region_grant }
+                scope:tca_test_exam_region_title = { change_title_holder = { holder = scope:tca_test_exam_region_host change = scope:tca_test_exam_region_grant } }
+                resolve_title_and_vassal_change = scope:tca_test_exam_region_grant
+                if = { limit = { scope:host = { is_alive = yes exists = capital_county } scope:tca_test_exam_officer = { tca_exam_local_guest_region_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_eligibility 10" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_eligibility 10" }
+                # 仅移动临时无地头衔的首府，借原版法理地域构造远域，不转移真实伯爵领。
+                scope:tca_test_exam_region_title = { set_capital_county = title:c_ile_de_france }
+                if = { limit = { scope:host = { is_alive = yes capital_county = title:c_ile_de_france } scope:tca_test_exam_officer = { tca_exam_local_guest_region_trigger = no } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_eligibility 11" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_eligibility 11" }
+                scope:tca_test_exam_region_host = { destroy_title = scope:tca_test_exam_region_title tca_test_restore_character_effect = yes death = { death_reason = death_natural_causes } }
+                if = { limit = { scope:host = { is_alive = no } scope:tca_test_exam_officer = { tca_exam_local_guest_region_trigger = no } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_eligibility 12" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_eligibility 12" }
+                # 不把死去的临时主持人留在共享host；后续测试仍由原报告者拥有该作用域。
+                save_scope_as = host
                 if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_exam_eligibility" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
                 else = { debug_log = "TCA_TEST PASS tca_test_exam_eligibility" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
             }

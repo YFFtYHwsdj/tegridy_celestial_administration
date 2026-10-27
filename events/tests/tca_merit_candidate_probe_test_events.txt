@@ -1,0 +1,231 @@
+﻿# 文武分类与授职退出状态接口探针；不构造年度池，不把头衔最终继承池当作全国仕途人口。
+# 原版依据：10_tgp_triggers 的文武分类；tgp_china_decisions 的辞谢／恢复；
+# ep3_decisions_events 的退休处理；imperial_examination 的六个月考试授职超时。
+# timeout 原因尚无已确认脚本读取接口：本例只检查实际写入、剩余时间与清除行为。
+# 退休修正在恢复后仍可存在，不能据此断言人物仍退出仕途；天数也不能替代原因。
+namespace = tca_merit_candidate_probe
+
+tca_merit_candidate_probe.1 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        if = { limit = { has_character_flag = tca_test_delayed_case_active } debug_log = "TCA_TEST CASE_BUSY" }
+        else = {
+            debug_log = "TCA_TEST BEGIN tca_merit_candidate_probe.1 tca_test_merit_candidate_interfaces"
+            remove_character_flag = tca_test_case_failed
+            if = {
+                limit = { debug_only = yes is_alive = yes title:h_china.holder = root }
+                tca_test_create_merit_interface_character_effect = { CHARACTER = tca_merit_candidate_civil GOVERNMENT = celestial_government }
+                tca_test_create_merit_interface_character_effect = { CHARACTER = tca_merit_candidate_military GOVERNMENT = celestial_government }
+                tca_test_create_merit_interface_character_effect = { CHARACTER = tca_merit_candidate_retired GOVERNMENT = celestial_government }
+                tca_test_create_merit_interface_character_effect = { CHARACTER = tca_merit_candidate_refusing GOVERNMENT = celestial_government }
+                scope:tca_merit_candidate_civil = { add_trait = education_stewardship_1 change_merit = 100 clear_appointment_timeout = yes }
+                scope:tca_merit_candidate_military = { add_trait = education_martial_1 change_merit = 100 clear_appointment_timeout = yes }
+                scope:tca_merit_candidate_retired = { add_trait = education_stewardship_1 change_merit = 100 clear_appointment_timeout = yes }
+                scope:tca_merit_candidate_refusing = { add_trait = education_martial_1 change_merit = 100 clear_appointment_timeout = yes }
+                if = { limit = { scope:tca_merit_candidate_civil = { is_civilian_candidate_trigger = yes is_military_candidate_trigger = no merit_level = 1 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_candidate_interfaces 1" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_candidate_interfaces 1" }
+                if = { limit = { scope:tca_merit_candidate_military = { is_military_candidate_trigger = yes is_civilian_candidate_trigger = no merit_level = 1 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_candidate_interfaces 2" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_candidate_interfaces 2" }
+                # 覆盖变量优先于教育，分别验证相反方向，避免只证明一个分类分支。
+                scope:tca_merit_candidate_civil = { set_variable = { name = appointment_trait_override value = trait:education_martial_1 } }
+                scope:tca_merit_candidate_military = { set_variable = { name = appointment_trait_override value = trait:education_stewardship_1 } }
+                if = { limit = { scope:tca_merit_candidate_civil = { is_military_candidate_trigger = yes is_civilian_candidate_trigger = no has_trait = education_stewardship_1 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_candidate_interfaces 3" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_candidate_interfaces 3" }
+                if = { limit = { scope:tca_merit_candidate_military = { is_civilian_candidate_trigger = yes is_military_candidate_trigger = no has_trait = education_martial_1 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_candidate_interfaces 4" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_candidate_interfaces 4" }
+                scope:tca_merit_candidate_civil = { remove_variable = appointment_trait_override }
+                scope:tca_merit_candidate_military = { remove_variable = appointment_trait_override }
+                if = { limit = { scope:tca_merit_candidate_civil = { is_civilian_candidate_trigger = yes is_military_candidate_trigger = no } scope:tca_merit_candidate_military = { is_military_candidate_trigger = yes is_civilian_candidate_trigger = no } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_candidate_interfaces 5" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_candidate_interfaces 5" }
+                # 考试超时是明确临时阻止授职的原版入口；不将其过滤为退出仕途。
+                scope:tca_merit_candidate_civil = { set_appointment_timeout = { months = 6 desc = appointment_timeout_desc_examinations } }
+                scope:tca_merit_candidate_retired = {
+                    add_character_modifier = { modifier = ep3_renounced_governorship_merit years = 15 }
+                    set_appointment_timeout = { years = 3 desc = appointment_timeout_desc_retired_governor }
+                }
+                scope:tca_merit_candidate_refusing = { set_appointment_timeout = { years = 150 desc = appointment_timeout_desc_refusing } }
+                if = { limit = { scope:tca_merit_candidate_civil = { appointment_timeout_days > 0 appointment_timeout_days < 365 is_civilian_candidate_trigger = yes merit_level = 1 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_candidate_interfaces 6" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_candidate_interfaces 6" }
+                if = { limit = { scope:tca_merit_candidate_retired = { appointment_timeout_days > 365 appointment_timeout_days < 36500 has_character_modifier = ep3_renounced_governorship_merit is_civilian_candidate_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_candidate_interfaces 7" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_candidate_interfaces 7" }
+                if = { limit = { scope:tca_merit_candidate_refusing = { appointment_timeout_days > 36500 is_military_candidate_trigger = yes NOT = { has_character_modifier = ep3_renounced_governorship_merit } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_candidate_interfaces 8" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_candidate_interfaces 8" }
+                scope:tca_merit_candidate_civil = { set_variable = { name = tca_merit_candidate_timeout_before value = appointment_timeout_days } }
+                scope:tca_merit_candidate_retired = { set_variable = { name = tca_merit_candidate_timeout_before value = appointment_timeout_days } }
+                scope:tca_merit_candidate_refusing = { set_variable = { name = tca_merit_candidate_timeout_before value = appointment_timeout_days } }
+                add_character_flag = tca_test_delayed_case_active
+                debug_log = "TCA_TEST WAIT tca_test_merit_candidate_interfaces 1 day"
+                trigger_event = { id = tca_merit_candidate_probe.1001 days = 1 }
+            }
+            else = {
+                debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_merit_candidate_interfaces"
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+                tca_test_continue_delayed_effect = yes
+            }
+        }
+    }
+}
+
+# 真实原版辞谢／恢复决议入口；不复制两项决议的正式效果。
+# 原版 execute_decision 与 can_execute_decision 均直接接受决议键，参照 holy_order_events。
+# 独立家门向承载皇帝宣誓，满足非最高领主条件，并提供辞谢所需影响力。
+# 退休前史仍以夹具准备；本例不声称验证真实卸职与交接。
+tca_merit_candidate_probe.2 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_merit_candidate_probe.2 tca_test_merit_candidate_decisions"
+        remove_character_flag = tca_test_case_failed
+        if = {
+            limit = { debug_only = yes is_alive = yes title:h_china.holder = root has_tgp_dlc_trigger = yes }
+            tca_test_create_merit_interface_character_effect = { CHARACTER = tca_merit_candidate_decider GOVERNMENT = celestial_government }
+            scope:tca_merit_candidate_decider = {
+                if = { limit = { NOT = { liege = root } }
+                    create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_merit_candidate_liege_change }
+                    change_liege = { liege = root change = scope:tca_merit_candidate_liege_change }
+                    resolve_title_and_vassal_change = scope:tca_merit_candidate_liege_change
+                }
+                change_government = celestial_government
+                add_trait = education_stewardship_1
+                change_merit = 100
+                change_influence = 500
+                clear_appointment_timeout = yes
+            }
+            if = { limit = { scope:tca_merit_candidate_decider = { is_adult = yes is_available = yes this != top_liege government_has_flag = government_has_merit can_execute_decision = tgp_refuse_appointments_decision } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_candidate_decisions 1" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_candidate_decisions 1" }
+            scope:tca_merit_candidate_decider = { if = { limit = { can_execute_decision = tgp_refuse_appointments_decision } execute_decision = tgp_refuse_appointments_decision } }
+            if = { limit = { scope:tca_merit_candidate_decider = { appointment_timeout_days > 36500 can_execute_decision = tgp_resume_appointments_decision is_civilian_candidate_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_candidate_decisions 2" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_candidate_decisions 2" }
+            scope:tca_merit_candidate_decider = { if = { limit = { can_execute_decision = tgp_resume_appointments_decision } execute_decision = tgp_resume_appointments_decision } }
+            if = { limit = { scope:tca_merit_candidate_decider = { appointment_timeout_days = 0 is_civilian_candidate_trigger = yes can_execute_decision = tgp_refuse_appointments_decision } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_candidate_decisions 3" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_candidate_decisions 3" }
+            scope:tca_merit_candidate_decider = {
+                add_character_modifier = { modifier = ep3_renounced_governorship_merit years = 15 }
+                set_appointment_timeout = { years = 3 desc = appointment_timeout_desc_retired_governor }
+                if = { limit = { can_execute_decision = tgp_resume_appointments_decision } execute_decision = tgp_resume_appointments_decision }
+            }
+            if = { limit = { scope:tca_merit_candidate_decider = { appointment_timeout_days = 0 has_character_modifier = ep3_renounced_governorship_merit is_civilian_candidate_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_candidate_decisions 4" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_candidate_decisions 4" }
+            # 反例：退休者真实恢复后再次参加考试，旧退休修正与新考试超时同时存在。
+            # 因而“有退休修正且 timeout > 0”会把已经恢复的人误判为退出，不能成为正式过滤器。
+            scope:tca_merit_candidate_decider = { set_appointment_timeout = { months = 6 desc = appointment_timeout_desc_examinations } }
+            if = { limit = { scope:tca_merit_candidate_decider = { appointment_timeout_days > 0 appointment_timeout_days < 365 has_character_modifier = ep3_renounced_governorship_merit can_execute_decision = tgp_resume_appointments_decision is_civilian_candidate_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_candidate_decisions 5" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_candidate_decisions 5" }
+            scope:tca_merit_candidate_decider = { if = { limit = { can_execute_decision = tgp_resume_appointments_decision } execute_decision = tgp_resume_appointments_decision } }
+            if = { limit = { scope:tca_merit_candidate_decider = { appointment_timeout_days = 0 has_character_modifier = ep3_renounced_governorship_merit is_civilian_candidate_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_candidate_decisions 6" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_candidate_decisions 6" }
+            # 真实通判初始池不读取appointment timeout；探针清理必须另行阻止夹具再入职。
+            save_scope_as = tca_tp_sovereign
+            save_scope_as = tca_tp_liege
+            if = { limit = { scope:tca_merit_candidate_decider = { tca_is_initial_tongpan_candidate_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_candidate_decisions 7" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_candidate_decisions 7" }
+            scope:tca_merit_candidate_decider = { remove_character_modifier = ep3_renounced_governorship_merit tca_test_cleanup_merit_probe_character_effect = yes }
+            if = { limit = { scope:tca_merit_candidate_decider = { appointment_timeout_days > 36500 tca_is_initial_tongpan_candidate_trigger = no can_be_councillor_basics_trigger = no } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_candidate_decisions 8" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_candidate_decisions 8" }
+            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_merit_candidate_decisions" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_merit_candidate_decisions" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        }
+        else = {
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_merit_candidate_decisions"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+        }
+        remove_character_flag = tca_test_case_failed
+    }
+}
+
+# 次日确认超时独立递减，随后使用恢复决议的真实清除接口。
+# 本例未执行玩家决议、真实退休交接或考试活动；这些原始路径仍需另外验收。
+tca_merit_candidate_probe.1001 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_merit_candidate_civil = { appointment_timeout_days > 0 appointment_timeout_days < var:tca_merit_candidate_timeout_before is_civilian_candidate_trigger = yes merit_level = 1 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_candidate_interfaces 9" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_candidate_interfaces 9" }
+            if = { limit = { scope:tca_merit_candidate_retired = { appointment_timeout_days > 365 appointment_timeout_days < var:tca_merit_candidate_timeout_before has_character_modifier = ep3_renounced_governorship_merit } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_candidate_interfaces 10" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_candidate_interfaces 10" }
+            if = { limit = { scope:tca_merit_candidate_refusing = { appointment_timeout_days > 36500 appointment_timeout_days < var:tca_merit_candidate_timeout_before is_military_candidate_trigger = yes merit_level = 1 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_candidate_interfaces 11" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_candidate_interfaces 11" }
+            scope:tca_merit_candidate_civil = { clear_appointment_timeout = yes }
+            scope:tca_merit_candidate_retired = { clear_appointment_timeout = yes }
+            scope:tca_merit_candidate_refusing = { clear_appointment_timeout = yes }
+            if = { limit = { scope:tca_merit_candidate_civil = { appointment_timeout_days = 0 is_civilian_candidate_trigger = yes merit_level = 1 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_candidate_interfaces 12" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_candidate_interfaces 12" }
+            # 原版恢复只清 timeout，不撤掉十五年退休修正；修正存在不等于仍在拒绝授职。
+            if = { limit = { scope:tca_merit_candidate_retired = { appointment_timeout_days = 0 has_character_modifier = ep3_renounced_governorship_merit is_civilian_candidate_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_candidate_interfaces 13" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_candidate_interfaces 13" }
+            if = { limit = { scope:tca_merit_candidate_refusing = { appointment_timeout_days = 0 is_military_candidate_trigger = yes merit_level = 1 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_candidate_interfaces 14" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_candidate_interfaces 14" }
+            scope:tca_merit_candidate_civil = { remove_variable = tca_merit_candidate_timeout_before tca_test_cleanup_merit_probe_character_effect = yes }
+            scope:tca_merit_candidate_military = { tca_test_cleanup_merit_probe_character_effect = yes }
+            scope:tca_merit_candidate_retired = { remove_character_modifier = ep3_renounced_governorship_merit remove_variable = tca_merit_candidate_timeout_before tca_test_cleanup_merit_probe_character_effect = yes }
+            scope:tca_merit_candidate_refusing = { remove_variable = tca_merit_candidate_timeout_before tca_test_cleanup_merit_probe_character_effect = yes }
+            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_merit_candidate_interfaces" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_merit_candidate_interfaces" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            remove_character_flag = tca_test_case_failed
+            remove_character_flag = tca_test_delayed_case_active
+            tca_test_continue_delayed_effect = yes
+        }
+    }
+}
+
+# 原生退休决议→实际退休事件→恢复决议；只使用新建夹具，暂替刑部原任。
+# 本例不写正式退出标记；它验证可供正式适配的实际入口和超时语义。
+tca_merit_candidate_probe.3 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_merit_candidate_probe.3 tca_test_merit_real_retirement"
+        remove_character_flag = tca_test_case_failed
+        if = {
+            limit = { debug_only = yes title:h_china.holder = root exists = cp:minister_justice cp:minister_justice = title:e_minister_of_justice.holder }
+            cp:minister_justice = { save_scope_as = tca_merit_retirement_original }
+            tca_test_create_merit_interface_character_effect = { CHARACTER = tca_merit_retirement_actor GOVERNMENT = celestial_government }
+            scope:tca_merit_retirement_actor = {
+                tca_test_add_native_merit_probe_exams_effect = yes
+                add_trait = education_stewardship_1
+                change_merit = 24000
+                change_influence = 1000
+                clear_appointment_timeout = yes
+            }
+            assign_councillor_type = { type = minister_justice target = scope:tca_merit_retirement_actor fire_on_actions = yes remove_existing_councillor = yes }
+            if = { limit = { cp:minister_justice = scope:tca_merit_retirement_actor scope:tca_merit_retirement_actor = { has_title = title:e_minister_of_justice can_execute_decision = renounce_governorship_decision } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_real_retirement 1" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_real_retirement 1" }
+            # 原生刚授职有五年冷却；退休三年不会覆盖已有更长超时，须保存真实前值。
+            scope:tca_merit_retirement_actor = { save_scope_value_as = { name = tca_merit_retirement_timeout value = appointment_timeout_days } if = { limit = { can_execute_decision = renounce_governorship_decision } execute_decision = renounce_governorship_decision } }
+            add_character_flag = tca_test_delayed_case_active
+            trigger_event = { id = tca_merit_candidate_probe.3001 days = 3 }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_merit_real_retirement" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_continue_delayed_effect = yes }
+    }
+}
+
+tca_merit_candidate_probe.3001 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_merit_retirement_actor = { NOT = { has_title = title:e_minister_of_justice } has_character_modifier = ep3_renounced_governorship_merit has_character_flag = tca_merit_retired appointment_timeout_days = { value = scope:tca_merit_retirement_timeout subtract = 3 } } NOT = { cp:minister_justice = scope:tca_merit_retirement_actor } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_real_retirement 2" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_real_retirement 2" }
+            scope:tca_merit_retirement_actor = { if = { limit = { can_execute_decision = tgp_resume_appointments_decision } execute_decision = tgp_resume_appointments_decision } }
+            if = { limit = { scope:tca_merit_retirement_actor = { appointment_timeout_days = 0 has_character_modifier = ep3_renounced_governorship_merit is_civilian_candidate_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_real_retirement 3" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_real_retirement 3" }
+            # 恢复后再参加考试，与未恢复退休的共享修正不能混为退出原因。
+            scope:tca_merit_retirement_actor = { set_appointment_timeout = { months = 6 desc = appointment_timeout_desc_examinations } }
+            if = { limit = { scope:tca_merit_retirement_actor = { appointment_timeout_days > 0 appointment_timeout_days < 365 has_character_modifier = ep3_renounced_governorship_merit is_civilian_candidate_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_real_retirement 4" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_real_retirement 4" }
+            scope:tca_merit_retirement_actor = { remove_character_modifier = ep3_renounced_governorship_merit tca_test_cleanup_merit_probe_character_effect = yes }
+            assign_councillor_type = { type = minister_justice target = scope:tca_merit_retirement_original fire_on_actions = yes remove_existing_councillor = yes }
+            if = { limit = { cp:minister_justice = scope:tca_merit_retirement_original title:e_minister_of_justice.holder = scope:tca_merit_retirement_original } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_real_retirement 5" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_real_retirement 5" }
+            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_merit_real_retirement" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_merit_real_retirement" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            remove_character_flag = tca_test_case_failed
+            remove_character_flag = tca_test_delayed_case_active
+            tca_test_continue_delayed_effect = yes
+        }
+    }
+}

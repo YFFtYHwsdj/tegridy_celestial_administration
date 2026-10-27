@@ -1,0 +1,429 @@
+imperial_examination_set_up_examiners_effect = {
+	scope:activity.activity_location = { save_scope_as = location }
+	#Got anyone else we can invite to be an examiner?
+	$HOST$ = {
+		ordered_courtier = {
+			limit = {
+				has_trait = confucian_education
+				trigger_if = {
+					limit = {
+						scope:activity = {
+							has_activity_type = activity_imperial_examination
+						}
+					}
+					has_character_flag = passed_metropolitan_exam
+				}
+				trigger_else = {
+					has_character_flag = passed_provincial_exam
+				}
+				is_available_imperial_examiner_trigger = { ATTENDING_CHAR = $HOST$ }
+				#It's not one of our dedicated examiners
+				save_temporary_scope_as = char_check
+				scope:activity = {
+					NOT = {
+						is_target_in_variable_list = {
+							name = imperial_examiners_list
+							target = scope:char_check
+						}
+					}
+				}
+			}
+			order_by = imperial_examination_entry_value
+			max = examiners_amount
+			check_range_bounds = no #Don't care if this is 0
+			save_temporary_scope_as = temp_char
+			#Yes we do it this way to pull in people who might not be interested in being Entrants	
+			scope:activity = {
+				add_to_variable_list = {
+					name = imperial_examiners_list
+					target = scope:temp_char
+				}
+			} 
+		}
+	}
+	#Check for available landed rulers visiting the event (AI only)
+	if = {
+		limit = {
+			scope:activity = {
+				OR = {
+					NOT = { has_variable_list = imperial_examiners_list }
+					variable_list_size = {
+						name = imperial_examiners_list
+						value < examiners_amount
+					}
+				}
+			}
+		}
+		#List exists
+		scope:activity = {
+			if = {
+				limit = {
+					has_variable_list = imperial_examiners_list
+					variable_list_size = {
+						name = imperial_examiners_list
+						value < examiners_amount
+					}
+				}
+				while = {
+					limit = {
+						variable_list_size = {
+							name = imperial_examiners_list
+							value < examiners_amount
+						}
+						any_attending_character = {
+							location = scope:location
+							this != scope:host
+							is_ai = yes
+							tgp_gender_can_be_exam_entrant_trigger = yes
+							trigger_if = {
+								limit = {
+									scope:activity = {
+										has_activity_type = activity_imperial_examination
+									}
+								}
+								has_character_flag = passed_metropolitan_exam
+							}
+							trigger_else = {
+								has_character_flag = passed_provincial_exam
+							}
+						}
+					}
+					random_attending_character = {
+						limit = {
+							location = scope:location
+							is_ai = yes
+							this != scope:host
+							tgp_gender_can_be_exam_entrant_trigger = yes
+							trigger_if = {
+								limit = {
+									scope:activity = {
+										has_activity_type = activity_imperial_examination
+									}
+								}
+								has_character_flag = passed_metropolitan_exam
+							}
+							trigger_else = {
+								has_character_flag = passed_provincial_exam
+							}
+						}
+						save_scope_as = new_examiner
+					}
+					#Yes we do it this way to pull in people who might not be interested in being Entrants
+					add_to_variable_list = {
+						name = imperial_examiners_list
+						target = scope:new_examiner
+					}
+				}
+			}
+			#List doesn't exist
+			else = {
+				while = {
+					count = examiners_amount
+					limit = {
+						any_attending_character = {
+							location = scope:activity.activity_location
+							is_ai = yes
+							#tgp_gender_can_be_exam_entrant_trigger = yes
+							trigger_if = {
+								limit = {
+									scope:activity = {
+										has_activity_type = activity_imperial_examination
+									}
+								}
+								has_character_flag = passed_metropolitan_exam
+							}
+							trigger_else = {
+								has_character_flag = passed_provincial_exam
+							}
+						}
+					}
+					random_attending_character = {
+						limit = {
+							location = scope:activity.activity_location
+							is_ai = yes
+							#tgp_gender_can_be_exam_entrant_trigger = yes
+							trigger_if = {
+								limit = {
+									scope:activity = {
+										has_activity_type = activity_imperial_examination
+									}
+								}
+								has_character_flag = passed_metropolitan_exam
+							}
+							trigger_else = {
+								has_character_flag = passed_provincial_exam
+							}
+						}
+						save_scope_as = new_examiner
+					}
+					#Yes we do it this way to pull in people who might not be interested in being Entrants
+					add_to_variable_list = {
+						name = imperial_examiners_list
+						target = scope:new_examiner
+					}
+				}
+			}
+		}
+	}
+
+	#Check for available pool examiners first
+	if = {
+		limit = {
+			scope:activity = {
+				OR = {
+					NOT = { has_variable_list = imperial_examiners_list }
+					variable_list_size = {
+						name = imperial_examiners_list
+						value < examiners_amount
+					}
+				}
+			}
+		}
+		#List exists
+		if = {
+			limit = {
+				scope:activity = { 
+					has_variable_list = imperial_examiners_list
+					variable_list_size = {
+						name = imperial_examiners_list
+						value < examiners_amount
+					}
+				}
+			}
+			while = {
+				limit = {
+					scope:activity = {
+						variable_list_size = {
+							name = imperial_examiners_list
+							value < examiners_amount
+						}
+					}
+					any_pool_character = {
+						province = scope:location
+						has_trait = confucian_education
+						trigger_if = {
+							limit = {
+								scope:activity = {
+									has_activity_type = activity_imperial_examination
+								}
+							}
+							has_character_flag = passed_metropolitan_exam
+						}
+						trigger_else = {
+							has_character_flag = passed_provincial_exam
+						}
+						is_available_imperial_examiner_trigger = { ATTENDING_CHAR = $HOST$ }
+					}
+				}
+				random_pool_character = {
+					province = scope:location
+					limit = {
+						has_trait = confucian_education
+						trigger_if = {
+							limit = {
+								scope:activity = {
+									has_activity_type = activity_imperial_examination
+								}
+							}
+							has_character_flag = passed_metropolitan_exam
+						}
+						trigger_else = {
+							has_character_flag = passed_provincial_exam
+						}
+						is_available_imperial_examiner_trigger = { ATTENDING_CHAR = $HOST$ }
+					}
+					save_scope_as = new_examiner
+					#Add as courtier, if possible
+					if = {
+						limit = {
+							NOT = { is_courtier_of = $HOST$ }
+						}
+						$HOST$ = { add_courtier = scope:new_examiner }
+					}
+				}	
+				#Yes we do it this way to pull in people who might not be interested in being Entrants
+				scope:activity = {
+					add_to_variable_list = {
+						name = imperial_examiners_list
+						target = scope:new_examiner
+					}
+				}
+			}
+		}
+		#List doesn't exist
+		else = {
+			while = {
+				count = examiners_amount
+				limit = {
+					any_pool_character = {
+						province = scope:location
+						has_trait = confucian_education
+						trigger_if = {
+							limit = {
+								scope:activity = {
+									has_activity_type = activity_imperial_examination
+								}
+							}
+							has_character_flag = passed_metropolitan_exam
+						}
+						trigger_else = {
+							has_character_flag = passed_provincial_exam
+						}
+						is_available_imperial_examiner_trigger = { ATTENDING_CHAR = $HOST$ }
+					}
+				}
+				random_pool_character = {
+					province = scope:location
+					limit = {
+						has_trait = confucian_education
+						trigger_if = {
+							limit = {
+								scope:activity = {
+									has_activity_type = activity_imperial_examination
+								}
+							}
+							has_character_flag = passed_metropolitan_exam
+						}
+						trigger_else = {
+							has_character_flag = passed_provincial_exam
+						}
+						is_available_imperial_examiner_trigger = { ATTENDING_CHAR = $HOST$ }
+					}
+					save_scope_as = new_examiner
+					#Add as courtier, if possible
+					if = {
+						limit = {
+							NOT = { is_courtier_of = $HOST$ }
+						}
+						$HOST$ = { add_courtier = scope:new_examiner }
+					}
+				}
+				#Yes we do it this way to pull in people who might not be interested in being Entrants
+				scope:activity = {
+					add_to_variable_list = {
+						name = imperial_examiners_list
+						target = scope:new_examiner
+					}
+				}
+			}
+		}
+	}
+	#Then start creating them
+	if = {
+		limit = {
+			scope:activity = {
+				OR = {
+					NOT = { has_variable_list = imperial_examiners_list }
+					variable_list_size = {
+						name = imperial_examiners_list
+						value < examiners_amount
+					}
+				}
+			}
+		}
+		#List exists
+		if = {
+			limit = {
+				scope:activity = {
+					has_variable_list = imperial_examiners_list
+					variable_list_size = {
+						name = imperial_examiners_list
+						value < examiners_amount
+					}
+				}
+			}
+			while = {
+				limit = {
+					scope:activity = {
+						variable_list_size = {
+							name = imperial_examiners_list
+							value < examiners_amount
+						}
+					}
+				}
+				imperial_examination_create_appropriate_examiner_effect = yes
+				scope:new_examiner = {
+					if = {
+						limit = {
+							scope:activity = {
+								has_activity_type = activity_imperial_examination
+							}
+						}
+						add_character_flag = passed_metropolitan_exam
+						add_character_modifier = {
+							modifier = tgp_passed_metropolitan_exam_modifier
+						}
+						add_character_flag = passed_provincial_exam
+						add_character_modifier = {
+							modifier = tgp_passed_provincial_exam_modifier
+						}
+					}
+					else = {
+						add_character_flag = passed_provincial_exam
+						add_character_modifier = {
+							modifier = tgp_passed_provincial_exam_modifier
+						}
+					}			
+				}
+				$HOST$ = { add_courtier = scope:new_examiner }
+				scope:activity = {
+					add_to_variable_list = {
+						name = imperial_examiners_list
+						target = scope:new_examiner
+					}
+				}
+			}
+		}
+		#List doesn't exist
+		else = {
+			while = {
+				count = examiners_amount
+				imperial_examination_create_appropriate_examiner_effect = yes
+				scope:new_examiner = {
+					if = {
+						limit = {
+							scope:activity = {
+								has_activity_type = activity_imperial_examination
+							}
+						}
+						add_character_flag = passed_metropolitan_exam
+						add_character_modifier = {
+							modifier = tgp_passed_metropolitan_exam_modifier
+						}
+						add_character_flag = passed_provincial_exam
+						add_character_modifier = {
+							modifier = tgp_passed_provincial_exam_modifier
+						}
+					}
+					else = {
+						add_character_flag = passed_provincial_exam
+						add_character_modifier = {
+							modifier = tgp_passed_provincial_exam_modifier
+						}
+					}				
+				}
+				$HOST$ = { add_courtier = scope:new_examiner }
+				scope:activity = {
+					add_to_variable_list = {
+						name = imperial_examiners_list
+						target = scope:new_examiner
+					}
+				}
+			}
+		}
+	}
+	#Add 'em to the activity
+	every_in_list = {
+		variable = imperial_examiners_list
+		limit = {
+			NOR = { 
+				exists = involved_activity
+				scope:activity = { 
+					any_attending_character = { this = scope:new_examiner }
+				}
+				any_invited_activity = { this = scope:activity }
+			}
+		}
+		add_to_activity = scope:activity
+	}
+}

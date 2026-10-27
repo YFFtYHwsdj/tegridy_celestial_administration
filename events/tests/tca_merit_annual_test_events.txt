@@ -1,0 +1,279 @@
+﻿# 正式年度控制器原生回归；直接调用正式配额、冻结读取和抽选，不复制公式。
+namespace = tca_merit_annual_test
+
+tca_merit_annual_test.1 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_merit_annual_test.1 tca_test_merit_annual_quota"
+        remove_character_flag = tca_test_case_failed
+        if = {
+            limit = { debug_only = yes is_alive = yes }
+            set_variable = { name = tca_ma_B value = 0 }
+            set_variable = { name = tca_ma_S value = 10 }
+            set_variable = { name = tca_ma_E value = 10 }
+            tca_merit_annual_compute_quota_effect = yes
+            if = { limit = { var:tca_ma_q = 0 var:tca_ma_Q = 0 } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_annual_quota 1" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_annual_quota 1" }
+            set_variable = { name = tca_ma_B value = 10 }
+            tca_merit_annual_compute_quota_effect = yes
+            if = { limit = { var:tca_ma_q = 0.6 OR = { var:tca_ma_Q = 0 var:tca_ma_Q = 1 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_annual_quota 2" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_annual_quota 2" }
+            set_variable = { name = tca_ma_S value = 11 }
+            tca_merit_annual_compute_quota_effect = yes
+            if = { limit = { var:tca_ma_q = 0.24 OR = { var:tca_ma_Q = 0 var:tca_ma_Q = 1 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_annual_quota 3" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_annual_quota 3" }
+            set_variable = { name = tca_ma_S value = 0 }
+            set_variable = { name = tca_ma_E value = 2 }
+            tca_merit_annual_compute_quota_effect = yes
+            if = { limit = { var:tca_ma_q = 2 var:tca_ma_Q = 2 } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_annual_quota 4" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_annual_quota 4" }
+            set_variable = { name = tca_ma_E value = 0 }
+            tca_merit_annual_compute_quota_effect = yes
+            if = { limit = { var:tca_ma_q = 0 var:tca_ma_Q = 0 } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_annual_quota 5" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_annual_quota 5" }
+            # 整数小池：多次调用始终只在相邻整数，禁止每年至少一名的隐形下限。
+            set_variable = { name = tca_ma_B value = 1 }
+            set_variable = { name = tca_ma_S value = 1 }
+            set_variable = { name = tca_ma_E value = 1 }
+            set_variable = { name = tca_mat_zeros value = 0 }
+            while = { count = 128
+                tca_merit_annual_compute_quota_effect = yes
+                if = { limit = { var:tca_ma_Q = 0 } change_variable = { name = tca_mat_zeros add = 1 } }
+                if = { limit = { OR = { var:tca_ma_Q < 0 var:tca_ma_Q > 1 } } add_character_flag = tca_test_case_failed }
+            }
+            if = { limit = { var:tca_ma_q = 0.06 var:tca_mat_zeros > 0 } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_annual_quota 6" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_annual_quota 6" }
+            remove_variable = tca_ma_B remove_variable = tca_ma_S remove_variable = tca_ma_E remove_variable = tca_ma_q remove_variable = tca_ma_Q remove_variable = tca_mat_zeros
+            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_merit_annual_quota" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_merit_annual_quota" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_merit_annual_quota" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } }
+        remove_character_flag = tca_test_case_failed
+    }
+}
+
+tca_merit_annual_test.2 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_merit_annual_test.2 tca_test_merit_annual_isolation"
+        remove_character_flag = tca_test_case_failed
+        if = {
+            limit = { debug_only = yes is_alive = yes exists = primary_title exists = title:e_byzantium.holder title:e_byzantium.holder.top_liege != root }
+            primary_title = { save_scope_as = tca_mat_a }
+            title:e_byzantium = { save_scope_as = tca_mat_b }
+            scope:tca_mat_a = { tca_merit_annual_initialize_statistics_effect = yes }
+            scope:tca_mat_b = { tca_merit_annual_initialize_statistics_effect = yes }
+            # 两个实际国家的同名临时名单：冻结对象只凭锚点变量隔离，资格及Merit变动不重建。
+            create_character = { age = 40 gender_female_chance = 0 random_traits = no employer = root culture = root.culture faith = root.faith save_scope_as = tca_mat_person_a }
+            create_character = { age = 40 gender_female_chance = 0 random_traits = no employer = root culture = root.culture faith = root.faith save_scope_as = tca_mat_person_b }
+            scope:tca_mat_person_a = { tca_test_protect_character_effect = yes set_variable = { name = tca_ma_frozen_anchor value = scope:tca_mat_a } set_variable = { name = tca_ma_frozen_route value = 1 } set_variable = { name = tca_ma_frozen_level value = 2 } set_variable = { name = tca_ma_frozen_merit value = 5000 } add_to_list = tca_ma_population add_to_list = tca_ma_candidates }
+            scope:tca_mat_person_b = { tca_test_protect_character_effect = yes set_variable = { name = tca_ma_frozen_anchor value = scope:tca_mat_b } set_variable = { name = tca_ma_frozen_route value = 1 } set_variable = { name = tca_ma_frozen_level value = 3 } set_variable = { name = tca_ma_frozen_merit value = 10000 } add_to_list = tca_ma_population add_to_list = tca_ma_candidates }
+            scope:tca_mat_person_a = { tca_merit_annual_count_population_effect = { CANDIDATE = yes } }
+            scope:tca_mat_person_b = { tca_merit_annual_count_population_effect = { CANDIDATE = yes } }
+            scope:tca_mat_a = {
+                save_scope_as = tca_ma_anchor set_variable = { name = tca_ma_route value = 1 } set_variable = { name = tca_ma_source value = 2 }
+                set_variable = { name = tca_mat_E value = tca_merit_annual_candidates_value }
+                set_variable = { name = tca_mat_S value = tca_merit_annual_tail_value }
+            }
+            if = { limit = { scope:tca_mat_a = { var:tca_mat_E = 1 var:tca_mat_S = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_annual_isolation 1" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_annual_isolation 1" }
+            scope:tca_mat_b = {
+                save_scope_as = tca_ma_anchor set_variable = { name = tca_ma_route value = 1 } set_variable = { name = tca_ma_source value = 2 }
+                set_variable = { name = tca_mat_E value = tca_merit_annual_candidates_value }
+                set_variable = { name = tca_mat_S value = tca_merit_annual_tail_value }
+            }
+            if = { limit = { scope:tca_mat_b = { var:tca_mat_E = 0 var:tca_mat_S = 1 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_annual_isolation 2" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_annual_isolation 2" }
+            # 独立公级头衔重复登记不翻倍；两个路线不能各计一次同头衔。
+            create_dynamic_title = { tier = duchy name = tca_test_arrest_office_name }
+            scope:new_title = { save_scope_as = tca_mat_demand set_capital_county = root.capital_county set_landless_title = yes }
+            scope:tca_mat_a = { save_scope_as = tca_ma_anchor }
+            scope:tca_mat_demand = { tca_merit_annual_register_demand_effect = yes tca_merit_annual_register_demand_effect = yes }
+            scope:tca_mat_a = { set_variable = { name = tca_ma_source value = 3 } set_variable = { name = tca_mat_B value = tca_merit_annual_target_tail_value } }
+            if = { limit = { scope:tca_mat_a = { var:tca_mat_B = 0.99 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_annual_isolation 3" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_annual_isolation 3" }
+            scope:tca_mat_a = { set_variable = { name = tca_ma_route value = 2 } set_variable = { name = tca_mat_B value = tca_merit_annual_target_tail_value } }
+            if = { limit = { scope:tca_mat_a = { var:tca_mat_B = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_annual_isolation 4" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_annual_isolation 4" }
+            # 固定阶段差与剩余池顶：源1的半衰差450，领先900者权重是另一人的4倍。
+            scope:tca_mat_a = { set_variable = { name = tca_ma_source value = 1 } set_variable = { name = tca_ma_half_gap value = tca_merit_annual_half_gap_value } }
+            scope:tca_mat_person_a = { set_variable = { name = tca_ma_frozen_merit value = 1000 } add_to_list = tca_ma_remaining }
+            scope:tca_mat_person_b = { set_variable = { name = tca_ma_frozen_merit value = 1900 } add_to_list = tca_ma_remaining }
+            scope:tca_mat_a = { set_variable = { name = tca_ma_max value = tca_merit_annual_max_value } }
+            scope:tca_mat_person_a = { set_variable = { name = tca_mat_weight value = tca_merit_annual_weight_value } }
+            if = { limit = { scope:tca_mat_a = { var:tca_ma_half_gap = 450 var:tca_ma_max = 1900 } scope:tca_mat_person_a = { var:tca_mat_weight >= 255 var:tca_mat_weight <= 257 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_annual_isolation 5" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_annual_isolation 5" }
+            scope:tca_mat_person_b = { remove_from_list = tca_ma_remaining }
+            scope:tca_mat_a = { set_variable = { name = tca_ma_max value = tca_merit_annual_max_value } }
+            scope:tca_mat_person_a = { set_variable = { name = tca_mat_weight value = tca_merit_annual_weight_value } }
+            if = { limit = { scope:tca_mat_a = { var:tca_ma_max = 1000 } scope:tca_mat_person_a = { var:tca_mat_weight = 1024 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_annual_isolation 6" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_annual_isolation 6" }
+            # 两个不同公级头衔各计一次；J按去重头衔集合，不按同一持有人捆绑。
+            create_dynamic_title = { tier = duchy name = tca_test_arrest_office_name }
+            scope:new_title = { save_scope_as = tca_mat_demand_two set_capital_county = root.capital_county set_landless_title = yes }
+            scope:tca_mat_a = { save_scope_as = tca_ma_anchor set_variable = { name = tca_ma_route value = 1 } set_variable = { name = tca_ma_source value = 1 } }
+            scope:tca_mat_demand_two = { tca_merit_annual_register_demand_effect = yes }
+            scope:tca_mat_a = { set_variable = { name = tca_mat_B value = tca_merit_annual_target_tail_value } }
+            if = { limit = { scope:tca_mat_a = { var:tca_mat_B = 3.30 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_annual_isolation 7" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_annual_isolation 7" }
+            every_in_list = { list = tca_ma_remaining remove_from_list = tca_ma_remaining }
+            every_in_list = { list = tca_ma_candidates remove_from_list = tca_ma_candidates }
+            every_in_list = { list = tca_ma_population remove_variable = tca_ma_frozen_anchor remove_variable = tca_ma_frozen_route remove_variable = tca_ma_frozen_level remove_variable = tca_ma_frozen_merit remove_variable = tca_mat_weight tca_test_restore_character_effect = yes remove_from_list = tca_ma_population }
+            scope:tca_mat_demand = { remove_variable = tca_ma_demand_anchor remove_variable = tca_ma_demand_route remove_variable = tca_ma_demand_band remove_from_list = tca_ma_demand }
+            destroy_title = scope:tca_mat_demand
+            scope:tca_mat_demand_two = { remove_variable = tca_ma_demand_anchor remove_variable = tca_ma_demand_route remove_variable = tca_ma_demand_band remove_from_list = tca_ma_demand }
+            destroy_title = scope:tca_mat_demand_two
+            scope:tca_mat_a = { tca_merit_annual_clean_route_effect = { ROUTE = 1 } tca_merit_annual_clean_route_effect = { ROUTE = 2 } remove_variable = tca_ma_route remove_variable = tca_ma_source remove_variable = tca_ma_half_gap remove_variable = tca_ma_max remove_variable = tca_mat_E remove_variable = tca_mat_S remove_variable = tca_mat_B }
+            scope:tca_mat_b = { tca_merit_annual_clean_route_effect = { ROUTE = 1 } tca_merit_annual_clean_route_effect = { ROUTE = 2 } remove_variable = tca_ma_route remove_variable = tca_ma_source remove_variable = tca_mat_E remove_variable = tca_mat_S }
+            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_merit_annual_isolation" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_merit_annual_isolation" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_merit_annual_isolation" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } }
+        remove_character_flag = tca_test_case_failed
+    }
+}
+
+# 指定国家/来源池：真实授品、无放回、失效补抽、工作人口守恒及当年再入保护。
+tca_merit_annual_test.3 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { has_character_flag = tca_test_delayed_case_active } debug_log = "TCA_TEST CASE_BUSY" }
+        else = {
+            debug_log = "TCA_TEST BEGIN tca_merit_annual_test.3 tca_test_merit_annual_draw"
+            remove_character_flag = tca_test_case_failed
+            if = {
+                limit = { debug_only = yes is_alive = yes title:h_china.holder = root }
+                tca_test_create_merit_probe_character_effect = { CHARACTER = tca_mat_valid_a GOVERNMENT = celestial_government }
+                tca_test_create_merit_probe_character_effect = { CHARACTER = tca_mat_valid_b GOVERNMENT = celestial_government }
+                tca_test_create_merit_probe_character_effect = { CHARACTER = tca_mat_invalid GOVERNMENT = celestial_government }
+                scope:tca_mat_valid_a = { add_trait = education_stewardship_3 tca_test_add_native_merit_probe_exams_effect = yes change_merit = 100 add_to_list = tca_mat_actors }
+                scope:tca_mat_valid_b = { add_trait = education_stewardship_3 tca_test_add_native_merit_probe_exams_effect = yes change_merit = 100 add_to_list = tca_mat_actors }
+                scope:tca_mat_invalid = { add_trait = education_stewardship_3 tca_test_add_native_merit_probe_exams_effect = yes change_merit = 100 add_to_list = tca_mat_actors }
+                add_character_flag = tca_test_delayed_case_active
+                debug_log = "TCA_TEST WAIT tca_test_merit_annual_draw 2 days"
+                trigger_event = { id = tca_merit_annual_test.1003 days = 2 }
+            }
+            else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_merit_annual_draw" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_continue_delayed_effect = yes }
+        }
+    }
+}
+tca_merit_annual_test.1003 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            # 延迟事件不保留临时list，三个人物saved scope由事件链保留。
+            scope:tca_mat_valid_a = { tca_merit_initialize_character_effect = yes change_merit = 29900 }
+            scope:tca_mat_valid_b = { tca_merit_initialize_character_effect = yes change_merit = 29900 }
+            scope:tca_mat_invalid = { tca_merit_initialize_character_effect = yes change_merit = 59900 }
+            debug_log = "TCA_TEST WAIT tca_test_merit_annual_draw 2 days"
+            trigger_event = { id = tca_merit_annual_test.1004 days = 2 }
+        }
+    }
+}
+tca_merit_annual_test.1004 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            primary_title = { save_scope_as = tca_ma_anchor }
+            scope:tca_mat_valid_a = { add_to_list = tca_mat_actors }
+            scope:tca_mat_valid_b = { add_to_list = tca_mat_actors }
+            scope:tca_mat_invalid = { add_to_list = tca_mat_actors }
+            every_in_list = { list = tca_mat_actors
+                set_variable = { name = tca_ma_frozen_anchor value = scope:tca_ma_anchor }
+                set_variable = { name = tca_ma_frozen_level value = 1 }
+                set_variable = { name = tca_ma_frozen_route value = 1 }
+                set_variable = { name = tca_ma_frozen_merit value = merit }
+                add_to_list = tca_ma_candidates
+            }
+            if = { limit = { scope:tca_mat_valid_a = { tca_merit_ordinary_candidate_trigger = yes } scope:tca_mat_valid_b = { tca_merit_ordinary_candidate_trigger = yes } scope:tca_mat_invalid = { tca_merit_ordinary_candidate_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_annual_draw 1" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_annual_draw 1" }
+            # 退休是冻结后硬失效；另一人余额减少不撤销冻结资望。
+            scope:tca_mat_invalid = { add_character_flag = tca_merit_retired }
+            scope:tca_mat_valid_a = { change_merit = -29900 }
+            scope:tca_ma_anchor = {
+                set_variable = { name = tca_ma_quota_1_1 value = 2 }
+                set_variable = { name = tca_ma_success_1_1 value = 0 }
+                set_variable = { name = tca_ma_work_n_1_1 value = 3 }
+                set_variable = { name = tca_ma_work_n_1_2 value = 0 }
+                tca_merit_annual_draw_pool_effect = { ROUTE = 1 SOURCE = 1 TARGET = 2 }
+            }
+            if = { limit = { scope:tca_mat_valid_a = { var:tca_merit_approved_level = 2 merit = 1000 } scope:tca_mat_valid_b = { var:tca_merit_approved_level = 2 merit = 1000 } scope:tca_mat_invalid = { var:tca_merit_approved_level = 1 merit = 60000 NOT = { has_variable = tca_merit_last_ordinary_year } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_annual_draw 2" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_annual_draw 2" }
+            if = { limit = { scope:tca_ma_anchor = { var:tca_ma_success_1_1 = 2 var:tca_ma_work_n_1_1 = 1 var:tca_ma_work_n_1_2 = 2 var:tca_ma_attempts = 3 } tca_merit_annual_remaining_count_value = 0 } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_annual_draw 3" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_annual_draw 3" }
+            scope:tca_ma_anchor = { tca_merit_annual_draw_pool_effect = { ROUTE = 1 SOURCE = 1 TARGET = 2 } }
+            if = { limit = { scope:tca_ma_anchor = { var:tca_ma_success_1_1 = 2 var:tca_ma_quota_1_1 = 2 var:tca_ma_attempts = 0 } scope:tca_mat_valid_a = { var:tca_ma_frozen_level = 1 var:tca_merit_last_ordinary_year = current_year } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_annual_draw 4" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_annual_draw 4" }
+            every_in_list = { list = tca_mat_actors remove_variable = tca_ma_frozen_anchor remove_variable = tca_ma_frozen_level remove_variable = tca_ma_frozen_route remove_variable = tca_ma_frozen_merit remove_from_list = tca_ma_candidates remove_from_list = tca_mat_actors }
+            scope:tca_ma_anchor = { tca_merit_annual_clean_route_effect = { ROUTE = 1 } remove_variable = tca_ma_route remove_variable = tca_ma_source remove_variable = tca_ma_target remove_variable = tca_ma_half_gap remove_variable = tca_ma_max remove_variable = tca_ma_attempt_limit remove_variable = tca_ma_attempts }
+            debug_log = "TCA_TEST WAIT tca_test_merit_annual_draw 4 days"
+            trigger_event = { id = tca_merit_annual_test.1005 days = 4 }
+        }
+    }
+}
+tca_merit_annual_test.1005 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_mat_valid_a = { merit_level = 2 NOT = { has_variable = tca_merit_grant_phase } } scope:tca_mat_valid_b = { merit_level = 2 NOT = { has_variable = tca_merit_grant_phase } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_annual_draw 5" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_annual_draw 5" }
+            scope:tca_mat_valid_a = { tca_test_cleanup_merit_probe_character_effect = yes }
+            scope:tca_mat_valid_b = { tca_test_cleanup_merit_probe_character_effect = yes }
+            scope:tca_mat_invalid = { remove_character_flag = tca_merit_retired tca_test_cleanup_merit_probe_character_effect = yes }
+            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_merit_annual_draw" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_merit_annual_draw" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            remove_character_flag = tca_test_case_failed remove_character_flag = tca_test_delayed_case_active
+            tca_test_continue_delayed_effect = yes
+        }
+    }
+}
+
+# 等待真实1月1日；仅在自然派发后调用一次入口检验同年幂等，不代替自然派发本身。
+tca_merit_annual_test.4 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { has_character_flag = tca_test_delayed_case_active } debug_log = "TCA_TEST CASE_BUSY" }
+        else = {
+            debug_log = "TCA_TEST BEGIN tca_merit_annual_test.4 tca_test_merit_annual_natural"
+            remove_character_flag = tca_test_case_failed
+            if = {
+                limit = { debug_only = yes is_alive = yes title:h_china.holder = root }
+                set_variable = { name = tca_mat_start_year value = current_year }
+                set_variable = { name = tca_mat_start_count value = 0 }
+                if = { limit = { has_global_variable = tca_merit_annual_run_count } set_variable = { name = tca_mat_start_count value = global_var:tca_merit_annual_run_count } }
+                add_character_flag = tca_test_delayed_case_active
+                debug_log = "TCA_TEST WAIT tca_test_merit_annual_natural 370 days"
+                trigger_event = { id = tca_merit_annual_test.1006 days = 370 }
+            }
+            else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_merit_annual_natural" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_continue_delayed_effect = yes }
+        }
+    }
+}
+tca_merit_annual_test.1006 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            set_variable = { name = tca_mat_expected value = { value = current_year subtract = var:tca_mat_start_year add = var:tca_mat_start_count } }
+            if = { limit = { global_var:tca_merit_annual_processed_year = current_year global_var:tca_merit_annual_run_count = var:tca_mat_expected } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_annual_natural 1" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_annual_natural 1" }
+            tca_merit_run_annual_effect = yes
+            if = { limit = { global_var:tca_merit_annual_run_count = var:tca_mat_expected } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_annual_natural 2" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_annual_natural 2" }
+            remove_variable = tca_mat_start_year remove_variable = tca_mat_start_count remove_variable = tca_mat_expected
+            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_merit_annual_natural" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_merit_annual_natural" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            remove_character_flag = tca_test_case_failed remove_character_flag = tca_test_delayed_case_active
+            tca_test_continue_delayed_effect = yes
+        }
+    }
+}
+
+

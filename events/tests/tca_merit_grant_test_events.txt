@@ -1,0 +1,218 @@
+﻿# 正式事务的独立原生回归；每项由新建AI人物准备资格、资源及回调计数。
+# 此处顺序模拟跨年成功标记，验证连续事务与旧token；不冒充真实年度脉冲或保存重载。
+namespace = tca_merit_grant_test
+
+tca_merit_grant_test.1 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { has_character_flag = tca_test_delayed_case_active } debug_log = "TCA_TEST CASE_BUSY" }
+        else = {
+            debug_log = "TCA_TEST BEGIN tca_merit_grant_test.1 tca_test_merit_grant_contract"
+            remove_character_flag = tca_test_case_failed
+            if = {
+                limit = { debug_only = yes is_alive = yes title:h_china.holder = root }
+                tca_test_create_merit_probe_character_effect = { CHARACTER = tca_grant_actor GOVERNMENT = celestial_government }
+                scope:tca_grant_actor = {
+                    add_trait = education_stewardship_3
+                    tca_test_add_native_merit_probe_exams_effect = yes
+                    change_merit = 100
+                }
+                add_character_flag = tca_test_delayed_case_active
+                debug_log = "TCA_TEST WAIT tca_test_merit_grant_contract 2 days"
+                trigger_event = { id = tca_merit_grant_test.1001 days = 2 }
+            }
+            else = {
+                debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_merit_grant_contract"
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+                tca_test_continue_delayed_effect = yes
+            }
+        }
+    }
+}
+
+tca_merit_grant_test.1001 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            scope:tca_grant_actor = {
+                tca_merit_initialize_character_effect = yes
+                change_merit = 29900
+            }
+            debug_log = "TCA_TEST WAIT tca_test_merit_grant_contract 2 days"
+            trigger_event = { id = tca_merit_grant_test.1002 days = 2 }
+        }
+    }
+}
+
+tca_merit_grant_test.1002 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_grant_actor = { merit_level = 1 var:tca_merit_approved_level = 1 merit = 30000 tca_merit_ordinary_candidate_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_grant_contract 1" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_grant_contract 1" }
+            scope:tca_grant_actor = {
+                set_variable = { name = tca_merit_reset_probe_gain_count value = 0 }
+                set_variable = { name = tca_merit_reset_probe_loss_count value = 0 }
+                # 非相邻目标、中央无实际持职和错误自然年均不得改变双账或核定状态。
+                tca_merit_begin_grant_effect = { SOURCE = 1 TARGET = 3 MODE = 1 YEAR = current_year }
+                tca_merit_begin_grant_effect = { SOURCE = 1 TARGET = 8 MODE = 2 YEAR = current_year }
+                tca_merit_begin_grant_effect = { SOURCE = 1 TARGET = 2 MODE = 1 YEAR = 1 }
+            }
+            if = { limit = { scope:tca_grant_actor = { var:tca_merit_grant_result = 0 var:tca_merit_approved_level = 1 merit = 30000 NOT = { has_variable = tca_merit_last_ordinary_year } NOT = { has_variable = tca_merit_grant_phase } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_grant_contract 2" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_grant_contract 2" }
+            scope:tca_grant_actor = {
+                # 核准时仍合格；核准后退休、提交前失资格，必须取消而不动双账和成功年。
+                tca_merit_prepare_grant_effect = { SOURCE = 1 TARGET = 2 MODE = 1 YEAR = current_year }
+                add_character_flag = tca_merit_retired
+                tca_merit_commit_grant_effect = { TOKEN = var:tca_merit_grant_token }
+            }
+            if = { limit = { scope:tca_grant_actor = { var:tca_merit_grant_result = 0 var:tca_merit_approved_level = 1 merit = 30000 NOT = { has_variable = tca_merit_last_ordinary_year } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_grant_contract 3" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_grant_contract 3" }
+            scope:tca_grant_actor = {
+                remove_character_flag = tca_merit_retired
+                tca_merit_begin_grant_effect = { SOURCE = 1 TARGET = 2 MODE = 1 YEAR = current_year }
+                save_scope_value_as = { name = tca_grant_first_token value = var:tca_merit_grant_token }
+            }
+            if = { limit = { scope:tca_grant_actor = { var:tca_merit_grant_result = 1 var:tca_merit_approved_level = 2 var:tca_merit_grant_phase = 2 var:tca_merit_last_ordinary_year = current_year merit = 1000 NOT = { has_character_flag = tca_merit_grant_suppress } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_grant_contract 4" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_grant_contract 4" }
+            scope:tca_grant_actor = {
+                tca_merit_commit_grant_effect = { TOKEN = scope:tca_grant_first_token }
+                tca_merit_begin_grant_effect = { SOURCE = 2 TARGET = 3 MODE = 1 YEAR = current_year }
+            }
+            if = { limit = { scope:tca_grant_actor = { var:tca_merit_grant_result = 0 var:tca_merit_grant_token = scope:tca_grant_first_token var:tca_merit_approved_level = 2 merit = 1000 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_grant_contract 5" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_grant_contract 5" }
+            debug_log = "TCA_TEST WAIT tca_test_merit_grant_contract 4 days"
+            trigger_event = { id = tca_merit_grant_test.1003 days = 4 }
+        }
+    }
+}
+
+tca_merit_grant_test.1003 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_grant_actor = { merit_level = 2 merit = 1000 var:tca_merit_reset_probe_gain_count = 1 var:tca_merit_reset_probe_loss_count = 0 NOT = { has_variable = tca_merit_grant_phase } NOT = { has_variable = tca_merit_grant_notified_token } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_grant_contract 6" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_grant_contract 6" }
+            scope:tca_grant_actor = {
+                tca_merit_audit_grant_effect = { TOKEN = scope:tca_grant_first_token }
+                change_merit = 20000
+                tca_merit_begin_grant_effect = { SOURCE = 2 TARGET = 3 MODE = 1 YEAR = current_year }
+            }
+            if = { limit = { scope:tca_grant_actor = { var:tca_merit_grant_result = 0 var:tca_merit_approved_level = 2 merit = 21000 var:tca_merit_last_ordinary_year = current_year } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_grant_contract 7" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_grant_contract 7" }
+            scope:tca_grant_actor = {
+                # 仅夹具把上次成功年改成去年，隔离测试第二项合法事务；真实跨年由年度组验收。
+                set_variable = { name = tca_merit_last_ordinary_year value = { value = current_year subtract = 1 } }
+                tca_merit_begin_grant_effect = { SOURCE = 2 TARGET = 3 MODE = 1 YEAR = current_year }
+                tca_merit_audit_grant_effect = { TOKEN = scope:tca_grant_first_token }
+                tca_merit_commit_grant_effect = { TOKEN = scope:tca_grant_first_token }
+            }
+            if = { limit = { scope:tca_grant_actor = { var:tca_merit_grant_result = 1 var:tca_merit_approved_level = 3 var:tca_merit_grant_phase = 2 var:tca_merit_grant_token > scope:tca_grant_first_token merit = 2000 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_grant_contract 8" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_grant_contract 8" }
+            debug_log = "TCA_TEST WAIT tca_test_merit_grant_contract 4 days"
+            trigger_event = { id = tca_merit_grant_test.1004 days = 4 }
+        }
+    }
+}
+
+tca_merit_grant_test.1004 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_grant_actor = { merit_level = 3 merit = 2000 var:tca_merit_reset_probe_gain_count = 2 var:tca_merit_reset_probe_loss_count = 0 NOT = { has_variable = tca_merit_grant_phase } NOT = { has_variable = tca_merit_grant_notified_token } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_grant_contract 9" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_grant_contract 9" }
+            # 仅数据准备接口检查结果快照与防重；该AI从未收到玩家事件。
+            scope:tca_grant_actor = {
+                set_variable = { name = tca_merit_grant_phase value = 2 }
+                tca_merit_prepare_grant_notice_effect = { TOKEN = var:tca_merit_grant_token }
+            }
+            if = { limit = { scope:tca_grant_actor = { var:tca_merit_grant_notice_ready = 1 var:tca_merit_grant_notified_token = var:tca_merit_grant_token } scope:tca_merit_notice_source = 8 scope:tca_merit_notice_target = 7 scope:tca_merit_notice_mode = 1 scope:tca_merit_notice_route = 1 scope:tca_merit_notice_cross = 1 } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_grant_contract 10" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_grant_contract 10" }
+            scope:tca_grant_actor = {
+                set_variable = { name = tca_merit_grant_target value = 9 }
+                set_variable = { name = tca_merit_grant_mode value = 2 }
+                tca_merit_prepare_grant_notice_effect = { TOKEN = var:tca_merit_grant_token }
+                tca_merit_prepare_grant_notice_effect = { TOKEN = scope:tca_grant_first_token }
+            }
+            if = { limit = { scope:tca_grant_actor = { var:tca_merit_grant_notice_ready = 0 } scope:tca_merit_notice_source = 8 scope:tca_merit_notice_target = 7 scope:tca_merit_notice_mode = 1 } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_grant_contract 11" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_grant_contract 11" }
+            scope:tca_grant_actor = {
+                # 构造第五次审计边界：原生仍为3，目标快照为9；不得解锁或提交中央待授。
+                set_variable = { name = tca_merit_grant_audit_attempts value = 4 }
+                add_character_flag = tca_merit_central_pending
+                tca_merit_audit_grant_effect = { TOKEN = var:tca_merit_grant_token }
+                tca_merit_process_central_pending_effect = yes
+                save_scope_value_as = { name = tca_grant_quarantined_token value = var:tca_merit_grant_token }
+                tca_merit_begin_grant_effect = { SOURCE = 3 TARGET = 8 MODE = 2 YEAR = current_year }
+            }
+            if = { limit = { scope:tca_grant_actor = { var:tca_merit_grant_phase = 3 var:tca_merit_grant_audit_attempts = 5 var:tca_merit_grant_audit_failed_token = var:tca_merit_grant_token var:tca_merit_grant_token = scope:tca_grant_quarantined_token var:tca_merit_grant_result = 0 has_character_flag = tca_merit_central_pending merit = 2000 var:tca_merit_approved_level = 3 var:tca_merit_reset_probe_gain_count = 2 var:tca_merit_reset_probe_loss_count = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_grant_contract 12" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_grant_contract 12" }
+            scope:tca_grant_actor = {
+                # 即使原生已恢复匹配，迟到audit仍不自动解除隔离；须明确恢复接口。
+                set_variable = { name = tca_merit_grant_target value = 3 }
+                tca_merit_audit_grant_effect = { TOKEN = var:tca_merit_grant_token }
+                tca_merit_audit_grant_effect = { TOKEN = scope:tca_grant_first_token }
+                tca_merit_process_central_pending_effect = yes
+            }
+            if = { limit = { scope:tca_grant_actor = { var:tca_merit_grant_phase = 3 var:tca_merit_grant_audit_attempts = 5 has_character_flag = tca_merit_central_pending merit = 2000 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_grant_contract 13" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_grant_contract 13" }
+            scope:tca_grant_actor = {
+                # 模拟人类最近一轮普通结果：AI仅检验恢复接口，不触发玩家消息。
+                set_variable = { name = tca_merit_grant_mode value = 1 }
+                set_variable = { name = tca_merit_feedback_last_year value = var:tca_merit_grant_year }
+                set_variable = { name = tca_merit_feedback_last_route value = var:tca_merit_grant_route }
+                set_variable = { name = tca_merit_feedback_last_source value = var:tca_merit_grant_source }
+                set_variable = { name = tca_merit_feedback_last_result value = 2 }
+                tca_merit_resume_grant_audit_effect = { TOKEN = var:tca_merit_grant_token }
+            }
+            if = { limit = { scope:tca_grant_actor = { NOT = { has_variable = tca_merit_grant_phase } NOT = { has_character_flag = tca_merit_central_pending } var:tca_merit_feedback_last_result = 1 merit = 2000 var:tca_merit_approved_level = 3 var:tca_merit_reset_probe_gain_count = 2 var:tca_merit_reset_probe_loss_count = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_grant_contract 14" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_grant_contract 14" }
+            # 别年的历史记录与中央事务不能被这次普通确认覆盖。
+            scope:tca_grant_actor = {
+                set_variable = { name = tca_merit_feedback_last_result value = 2 }
+                set_variable = { name = tca_merit_feedback_last_year value = { value = var:tca_merit_grant_year subtract = 1 } }
+                set_variable = { name = tca_merit_grant_phase value = 2 }
+                tca_merit_audit_grant_effect = { TOKEN = var:tca_merit_grant_token }
+            }
+            if = { limit = { scope:tca_grant_actor = { var:tca_merit_feedback_last_result = 2 NOT = { has_variable = tca_merit_grant_phase } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_grant_contract 15" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_grant_contract 15" }
+            scope:tca_grant_actor = {
+                set_variable = { name = tca_merit_feedback_last_year value = var:tca_merit_grant_year }
+                set_variable = { name = tca_merit_grant_mode value = 2 }
+                set_variable = { name = tca_merit_grant_phase value = 2 }
+                tca_merit_audit_grant_effect = { TOKEN = var:tca_merit_grant_token }
+            }
+            if = { limit = { scope:tca_grant_actor = { var:tca_merit_feedback_last_result = 2 NOT = { has_variable = tca_merit_grant_phase } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_grant_contract 16" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_grant_contract 16" }
+            scope:tca_grant_actor = {
+                set_variable = { name = tca_merit_grant_phase value = 3 }
+                tca_merit_leave_celestial_effect = yes
+            }
+            if = { limit = { scope:tca_grant_actor = { NOT = { has_variable = tca_merit_grant_phase } var:tca_merit_grant_token = scope:tca_grant_quarantined_token merit = 2000 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_grant_contract 17" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_grant_contract 17" }
+            scope:tca_grant_actor = {
+                remove_variable = tca_merit_feedback_last_year
+                remove_variable = tca_merit_feedback_last_route
+                remove_variable = tca_merit_feedback_last_source
+                remove_variable = tca_merit_feedback_last_result
+                remove_variable = tca_merit_reset_probe_gain_count
+                remove_variable = tca_merit_reset_probe_loss_count
+                tca_test_cleanup_merit_probe_character_effect = yes
+            }
+            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_merit_grant_contract" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_merit_grant_contract" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            remove_character_flag = tca_test_case_failed
+            remove_character_flag = tca_test_delayed_case_active
+            tca_test_continue_delayed_effect = yes
+        }
+    }
+}
+
