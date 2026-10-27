@@ -1,13 +1,63 @@
 ﻿# 无根作用域；仅由原版after_lobby原effect末尾调用，确保原版考试/功绩初始化已执行。
-# 不重跑任何原版考试奖励，不由延迟若干日猜测接管时点；已有等级和余额原样采纳。
+# 不重跑原版考试奖励，不由延迟日数猜测接管时点；普通人物同级接管，中央现任另核定下限，余额不变。
 tca_merit_finish_native_startup_effect = {
     if = {
         limit = { NOT = { has_global_variable = tca_merit_startup_ready } }
         set_global_variable = { name = tca_merit_startup_ready value = 1 }
         every_living_character = {
-            limit = { government_has_flag = government_is_celestial exists = top_liege top_liege ?= { government_has_flag = government_is_celestial } is_independent_ruler = no merit_level >= 1 }
+            limit = { government_has_flag = government_is_celestial exists = top_liege top_liege ?= { government_has_flag = government_is_celestial } is_independent_ruler = no OR = { merit_level >= 1 tca_merit_central_target_value > 0 } }
             set_variable = { name = tca_merit_initial_level value = merit_level }
+            # 与原生初始品级一起保留中央现任的余额依据；核定只补品级，不补／截Merit。
+            if = { limit = { tca_merit_central_target_value > 0 } set_variable = { name = tca_merit_initial_balance value = merit } }
             tca_merit_initialize_character_effect = yes
+            tca_merit_initialize_central_startup_effect = yes
+        }
+    }
+}
+
+# 人物作用域，无参数或输出scope；仅由新开局屏障调用，不属于日常维护／中央授品事务。
+# 真实头衔与议会席位一致才核定下限；已有更高品级不降，零级现任直接建立目标身份。
+# set_merit_level仅补等级经验，不改余额；保护根gain/loss回调，避免开局核定派发奖励。
+# 本入口取得的回调保护保留至原生等级跨日确认，不能同链释放而漏出异步gain。
+# 不写成功年、TOKEN或通知，不重发考试资格；重复调用不会重结算或降低核定值。
+tca_merit_initialize_central_startup_effect = {
+    if = {
+        limit = { is_alive = yes tca_merit_central_target_value > tca_merit_level_value NOT = { has_variable = tca_merit_grant_phase } }
+        if = { limit = { NOT = { has_character_flag = tca_merit_grant_suppress } } add_character_flag = tca_merit_grant_suppress add_character_flag = tca_merit_startup_owns_suppress }
+        set_variable = { name = tca_merit_approved_level value = tca_merit_central_target_value }
+        add_character_flag = tca_merit_active
+        tca_merit_initialize_character_effect = yes
+        set_merit_level = var:tca_merit_approved_level
+        if = {
+            limit = { has_character_flag = tca_merit_startup_owns_suppress }
+            set_variable = { name = tca_merit_startup_audit_attempts value = 0 }
+            trigger_event = { id = tca_merit_entry.6 days = 1 }
+        }
+    }
+}
+
+# 人物作用域；仅释放本开局核定取得的保护。等级确认前继续等待，不依靠固定日数宣告完成。
+# 真实退出／死亡时直接释放；最多检查五次，失败留下诊断标记而不永久屏蔽后续正常奖励。
+tca_merit_audit_central_startup_effect = {
+    if = {
+        limit = { has_character_flag = tca_merit_startup_owns_suppress }
+        change_variable = { name = tca_merit_startup_audit_attempts add = 1 }
+        if = {
+            limit = { OR = { var:tca_merit_approved_level ?= merit_level NOT = { has_character_flag = tca_merit_active } is_alive = no } }
+            remove_character_flag = tca_merit_startup_owns_suppress
+            remove_character_flag = tca_merit_grant_suppress
+            remove_variable = tca_merit_startup_audit_attempts
+        }
+        else_if = {
+            limit = { var:tca_merit_startup_audit_attempts < 5 }
+            trigger_event = { id = tca_merit_entry.6 days = 1 }
+        }
+        else = {
+            add_character_flag = tca_merit_startup_audit_failed
+            debug_log = "TCA_MERIT_STARTUP AUDIT_FAILED"
+            remove_character_flag = tca_merit_startup_owns_suppress
+            remove_character_flag = tca_merit_grant_suppress
+            remove_variable = tca_merit_startup_audit_attempts
         }
     }
 }
