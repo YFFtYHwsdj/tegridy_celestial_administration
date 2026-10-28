@@ -1,0 +1,159 @@
+﻿# 旧九品升八品隔离的最小复现：正式提交后恢复旧上限快照，保留原TOKEN与成功年。
+namespace = tca_merit_cap_repair_test
+
+tca_merit_cap_repair_test.1 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_merit_cap_repair_test.1 tca_test_merit_legacy_cap_repair"
+        remove_character_flag = tca_test_case_failed
+        if = {
+            limit = { debug_only = yes is_alive = yes title:h_china.holder = root }
+            tca_test_create_merit_courtier_effect = { CHARACTER = tca_cr_actor }
+            tca_test_create_merit_courtier_effect = { CHARACTER = tca_cr_wrong_token }
+            tca_test_create_merit_courtier_effect = { CHARACTER = tca_cr_other_grant }
+            tca_test_create_merit_courtier_effect = { CHARACTER = tca_cr_pending }
+            tca_test_create_merit_courtier_effect = { CHARACTER = tca_cr_plain }
+            tca_test_create_merit_courtier_effect = { CHARACTER = tca_cr_completed }
+            tca_test_create_merit_courtier_effect = { CHARACTER = tca_cr_early }
+            add_character_flag = tca_test_delayed_case_active
+            trigger_event = { id = tca_merit_cap_repair_test.2 days = 2 }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_merit_legacy_cap_repair" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_continue_delayed_effect = yes }
+    }
+}
+tca_merit_cap_repair_test.2 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            scope:tca_cr_actor = { tca_merit_initialize_character_effect = yes change_merit = 29900 }
+            scope:tca_cr_wrong_token = { tca_merit_initialize_character_effect = yes change_merit = 29900 }
+            scope:tca_cr_other_grant = { tca_merit_initialize_character_effect = yes change_merit = 29900 }
+            scope:tca_cr_pending = { tca_merit_initialize_character_effect = yes change_merit = 29900 }
+            scope:tca_cr_plain = { tca_merit_initialize_character_effect = yes change_merit = 29900 }
+            scope:tca_cr_completed = { tca_merit_initialize_character_effect = yes change_merit = 29900 }
+            scope:tca_cr_early = { tca_merit_initialize_character_effect = yes change_merit = 29900 }
+            trigger_event = { id = tca_merit_cap_repair_test.3 days = 2 }
+        }
+    }
+}
+tca_merit_cap_repair_test.3 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            scope:tca_cr_actor = { tca_test_make_legacy_merit_cap_grant_effect = yes }
+            scope:tca_cr_early = { tca_test_make_legacy_merit_cap_grant_effect = yes }
+            scope:tca_cr_wrong_token = { tca_test_make_legacy_merit_cap_grant_effect = yes change_variable = { name = tca_merit_grant_audit_failed_token add = 1 } }
+            scope:tca_cr_other_grant = { tca_test_make_legacy_merit_cap_grant_effect = yes set_variable = { name = tca_merit_grant_source value = 2 } }
+            scope:tca_cr_pending = { tca_test_make_legacy_merit_cap_grant_effect = yes set_variable = { name = tca_merit_grant_phase value = 2 } set_variable = { name = tca_merit_grant_audit_attempts value = 0 } }
+            scope:tca_cr_completed = { tca_merit_begin_grant_effect = { SOURCE = 1 TARGET = 2 MODE = 1 YEAR = current_year } }
+            scope:tca_cr_plain = {
+                add_character_flag = tca_merit_grant_suppress
+                remove_character_modifier = tca_merit_courtier_cap_compensation_modifier
+                remove_variable = tca_merit_applied_cap_base
+                set_variable = { name = tca_merit_reset_probe_gain_count value = 0 }
+                set_variable = { name = tca_merit_reset_probe_loss_count value = 0 }
+            }
+            trigger_event = { id = tca_merit_cap_repair_test.4 days = 2 }
+        }
+    }
+}
+tca_merit_cap_repair_test.4 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_cr_actor = { merit_level = 1 var:tca_merit_approved_level = 2 var:tca_merit_grant_phase = 3 var:tca_merit_grant_audit_attempts = 5 NOT = { has_variable = tca_merit_applied_cap_base } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_legacy_cap_repair 1" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_legacy_cap_repair 1" }
+            scope:tca_cr_actor = {
+                save_scope_value_as = { name = tca_cr_original_token value = var:tca_merit_grant_token }
+                save_scope_value_as = { name = tca_cr_original_year value = var:tca_merit_grant_year }
+                tca_merit_repair_legacy_cap_character_effect = yes
+                tca_merit_repair_legacy_cap_character_effect = yes
+            }
+            scope:tca_cr_wrong_token = { tca_merit_repair_legacy_cap_character_effect = yes }
+            scope:tca_cr_other_grant = { tca_merit_repair_legacy_cap_character_effect = yes }
+            scope:tca_cr_pending = { tca_merit_repair_legacy_cap_character_effect = yes }
+            # 不经过迁移worker，直接维护旧人物，不能因此重复发放既有九品奖励。
+            scope:tca_cr_plain = { remove_character_flag = tca_merit_grant_suppress tca_merit_initialize_character_effect = yes }
+            # 模拟月扫描前由真实头衔入口调用共享刷新；后续仍须保留原隔离TOKEN的恢复资格。
+            scope:tca_cr_early = { tca_merit_refresh_cap_effect = yes tca_merit_repair_legacy_cap_character_effect = yes }
+            if = { limit = { scope:tca_cr_actor = { var:tca_merit_cap_repair_pending_token = scope:tca_cr_original_token } scope:tca_cr_pending = { has_variable = tca_merit_cap_repair_review_token } scope:tca_cr_wrong_token = { var:tca_merit_grant_phase = 3 NOT = { has_variable = tca_merit_cap_repair_pending_token } } scope:tca_cr_other_grant = { var:tca_merit_grant_phase = 3 NOT = { has_variable = tca_merit_cap_repair_pending_token } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_legacy_cap_repair 2" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_legacy_cap_repair 2" }
+            trigger_event = { id = tca_merit_cap_repair_test.5 days = 8 }
+        }
+    }
+}
+tca_merit_cap_repair_test.5 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_cr_actor = { merit_level = 2 merit = 1000 var:tca_merit_grant_token = scope:tca_cr_original_token var:tca_merit_grant_year = scope:tca_cr_original_year var:tca_merit_last_ordinary_year = scope:tca_cr_original_year var:tca_merit_reset_probe_gain_count = 1 var:tca_merit_reset_probe_loss_count = 0 NOT = { has_variable = tca_merit_grant_phase } NOT = { has_variable = tca_merit_cap_repair_pending_token } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_legacy_cap_repair 3" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_legacy_cap_repair 3" }
+            # 模拟12日复核前真实身份维护刷新了cap；已认证旧TOKEN仍须完成恢复。
+            scope:tca_cr_pending = { tca_merit_refresh_cap_effect = yes }
+            scope:tca_cr_actor = {
+                tca_merit_repair_legacy_cap_character_effect = yes
+                tca_merit_finish_legacy_cap_repair_effect = { TOKEN = scope:tca_cr_original_token }
+                change_merit = 1000
+                tca_merit_begin_grant_effect = { SOURCE = 2 TARGET = 3 MODE = 1 YEAR = current_year }
+                tca_merit_finish_legacy_cap_repair_effect = { TOKEN = scope:tca_cr_original_token }
+            }
+            if = { limit = { scope:tca_cr_actor = { var:tca_merit_grant_token > scope:tca_cr_original_token var:tca_merit_grant_phase = 2 merit = 2000 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_legacy_cap_repair 4" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_legacy_cap_repair 4" }
+            scope:tca_cr_completed = {
+                add_character_flag = tca_merit_grant_suppress
+                remove_character_modifier = tca_merit_courtier_cap_compensation_modifier
+                remove_variable = tca_merit_applied_cap_base
+                remove_variable = tca_merit_grant_gain_callback_token
+                set_variable = { name = tca_merit_reset_probe_gain_count value = 0 }
+                set_variable = { name = tca_merit_reset_probe_loss_count value = 0 }
+            }
+            trigger_event = { id = tca_merit_cap_repair_test.501 days = 2 }
+            trigger_event = { id = tca_merit_cap_repair_test.6 days = 10 }
+        }
+    }
+}
+tca_merit_cap_repair_test.6 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_cr_actor = { merit_level = 3 merit = 2000 var:tca_merit_reset_probe_gain_count = 2 var:tca_merit_reset_probe_loss_count = 0 NOT = { has_variable = tca_merit_grant_phase } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_legacy_cap_repair 5" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_legacy_cap_repair 5" }
+            if = { limit = { scope:tca_cr_pending = { merit_level = 2 merit = 1000 var:tca_merit_reset_probe_gain_count = 1 var:tca_merit_reset_probe_loss_count = 0 NOT = { has_variable = tca_merit_grant_phase } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_legacy_cap_repair 6" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_legacy_cap_repair 6" }
+            if = { limit = { scope:tca_cr_plain = { merit_level = 1 merit = 30000 var:tca_merit_approved_level = 1 var:tca_merit_reset_probe_gain_count = 0 var:tca_merit_reset_probe_loss_count = 0 NOT = { has_variable = tca_merit_grant_phase } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_legacy_cap_repair 7" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_legacy_cap_repair 7" }
+            if = { limit = { scope:tca_cr_completed = { merit_level = 2 merit = 1000 var:tca_merit_approved_level = 2 var:tca_merit_grant_gain_callback_token = var:tca_merit_grant_token var:tca_merit_reset_probe_gain_count = 0 var:tca_merit_reset_probe_loss_count = 0 NOT = { has_variable = tca_merit_grant_phase } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_legacy_cap_repair 8" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_legacy_cap_repair 8" }
+            if = { limit = { scope:tca_cr_early = { merit_level = 2 merit = 1000 var:tca_merit_reset_probe_gain_count = 1 var:tca_merit_reset_probe_loss_count = 0 NOT = { has_variable = tca_merit_grant_phase } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_legacy_cap_repair 9" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_legacy_cap_repair 9" }
+            scope:tca_cr_early = { tca_merit_leave_celestial_effect = yes tca_test_cleanup_merit_probe_character_effect = yes }
+            scope:tca_cr_completed = { tca_merit_leave_celestial_effect = yes tca_test_cleanup_merit_probe_character_effect = yes }
+            scope:tca_cr_plain = { tca_merit_leave_celestial_effect = yes tca_test_cleanup_merit_probe_character_effect = yes }
+            scope:tca_cr_pending = { tca_merit_leave_celestial_effect = yes tca_test_cleanup_merit_probe_character_effect = yes }
+            scope:tca_cr_actor = { tca_test_cleanup_merit_probe_character_effect = yes }
+            scope:tca_cr_wrong_token = { tca_merit_leave_celestial_effect = yes tca_test_cleanup_merit_probe_character_effect = yes }
+            scope:tca_cr_other_grant = { tca_merit_leave_celestial_effect = yes tca_test_cleanup_merit_probe_character_effect = yes }
+            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_merit_legacy_cap_repair" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_merit_legacy_cap_repair" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            remove_character_flag = tca_test_case_failed
+            remove_character_flag = tca_test_delayed_case_active
+            tca_test_continue_delayed_effect = yes
+        }
+    }
+}
+
+# 等待旧完成事务的缺失补偿真正降低原生读回，再恢复；不能同链移除重加冒充回归。
+tca_merit_cap_repair_test.501 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            scope:tca_cr_completed = { remove_character_flag = tca_merit_grant_suppress tca_merit_before_reward_effect = yes }
+        }
+    }
+}

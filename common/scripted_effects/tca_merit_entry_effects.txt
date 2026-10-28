@@ -70,7 +70,16 @@ tca_merit_sync_membership_effect = {
             limit = { government_has_flag = government_is_celestial exists = top_liege top_liege ?= { government_has_flag = government_is_celestial } is_independent_ruler = no }
             tca_merit_initialize_character_effect = yes
         }
-        else_if = { limit = { has_character_flag = tca_merit_active } tca_merit_leave_celestial_effect = yes }
+        else_if = {
+            limit = { has_character_flag = tca_merit_active }
+            # 原生家门生成先给头衔再归附，同链会短暂独立；此时不能删核定值后按旧等级重接管。
+            # 只对已确认基数发生变化的边界延迟一日，最后仍真实离境者由entry.7明确清理。
+            if = {
+                limit = { has_variable = tca_merit_applied_cap_base NOT = { var:tca_merit_applied_cap_base = tca_merit_native_cap_base_value } }
+                tca_merit_queue_cap_sync_effect = yes
+            }
+            else = { tca_merit_leave_celestial_effect = yes }
+        }
     }
 }
 

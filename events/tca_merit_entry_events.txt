@@ -19,3 +19,53 @@ tca_merit_entry.6 = {
     hidden = yes
     immediate = { tca_merit_audit_central_startup_effect = yes }
 }
+
+# 真实授失职后的上限基数同步；不改变核定等级、余额、事务号或成功年。
+tca_merit_entry.7 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = {
+            limit = { is_alive = yes has_character_flag = tca_merit_active government_has_flag = government_is_celestial exists = top_liege top_liege ?= { government_has_flag = government_is_celestial } is_independent_ruler = no }
+            tca_merit_refresh_cap_effect = yes
+            # getter与上限修正的刷新不同步；实际等级确认前不释放过渡回调保护。
+            if = {
+                limit = {
+                    OR = {
+                        merit_level = var:tca_merit_approved_level
+                        AND = { has_character_flag = tca_merit_entry_pending merit_level = 0 }
+                        AND = { tca_merit_legacy_cap_grant_trigger = yes merit_level = var:tca_merit_grant_source }
+                    }
+                }
+                # 入品准备及待补足经验的原事务可稳定等待在合法来源等级，不误报同步失败。
+                # 等级getter可先于原生回调队列稳定；连续两日确认后才放开，避免最后一次反弹重奖。
+                if = { limit = { has_character_flag = tca_merit_cap_sync_confirmed } remove_character_flag = tca_merit_cap_sync_pending remove_character_flag = tca_merit_cap_sync_confirmed remove_variable = tca_merit_cap_sync_attempts }
+                else = { add_character_flag = tca_merit_cap_sync_confirmed trigger_event = { id = tca_merit_entry.7 days = 1 } }
+            }
+            else = {
+                remove_character_flag = tca_merit_cap_sync_confirmed
+                if = { limit = { NOT = { has_variable = tca_merit_cap_sync_attempts } } set_variable = { name = tca_merit_cap_sync_attempts value = 0 } }
+                change_variable = { name = tca_merit_cap_sync_attempts add = 1 }
+                if = { limit = { var:tca_merit_cap_sync_attempts < 5 } trigger_event = { id = tca_merit_entry.7 days = 1 } }
+                else = { add_character_flag = tca_merit_cap_sync_failed remove_character_flag = tca_merit_cap_sync_pending remove_variable = tca_merit_cap_sync_attempts debug_log = "TCA_MERIT_CAP SYNC_FAILED" }
+            }
+        }
+        else = {
+            remove_character_flag = tca_merit_cap_sync_pending
+            remove_character_flag = tca_merit_cap_sync_confirmed
+            remove_variable = tca_merit_cap_sync_attempts
+            if = { limit = { has_character_flag = tca_merit_active } tca_merit_leave_celestial_effect = yes }
+        }
+    }
+}
+
+# 仅版本修复排队；原TOKEN与pending所有权同时匹配才可补足经验并重开原审计。
+tca_merit_entry.8 = {
+    type = character_event hidden = yes
+    immediate = { tca_merit_finish_legacy_cap_repair_effect = { TOKEN = scope:tca_merit_cap_repair_token } }
+}
+
+# 一次版本扫描遇到旧phase2时，只冻结TOKEN等待原有五轮审计结束；不抢先改快照或重授。
+tca_merit_entry.9 = {
+    type = character_event hidden = yes
+    immediate = { tca_merit_review_legacy_cap_pending_effect = { TOKEN = scope:tca_merit_cap_review_token } }
+}

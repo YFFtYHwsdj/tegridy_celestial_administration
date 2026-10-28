@@ -4,7 +4,8 @@ on_vassal_change = { on_actions = { tca_merit_liege_changed } }
 on_join_court = { on_actions = { tca_merit_court_joined } }
 on_leave_court = { on_actions = { tca_merit_court_left } }
 on_merit_level_gain = { on_actions = { tca_merit_native_gain } }
-on_title_gain = { on_actions = { tca_merit_central_title_gain } }
+on_title_gain = { on_actions = { tca_merit_central_title_gain tca_merit_cap_title_changed } }
+on_title_lost = { on_actions = { tca_merit_cap_title_changed } }
 
 tca_merit_government_changed = {
     trigger = { has_global_variable = tca_merit_startup_ready tca_merit_realm_change_relevant_trigger = yes }
@@ -47,7 +48,12 @@ tca_merit_court_left = {
 }
 tca_merit_native_gain = {
     trigger = { has_global_variable = tca_merit_startup_ready government_has_flag = government_is_celestial NOT = { has_character_flag = tca_merit_grant_suppress } NOT = { tca_merit_interface_probe_trigger = yes } }
-    effect = { tca_merit_accept_native_gain_effect = yes tca_merit_maybe_queue_central_catchup_effect = yes }
+    effect = {
+        # 与根gain准入配合；在过渡保护中仍保留本事务首次真实目标gain，后续反弹不能重奖。
+        if = { limit = { tca_merit_cap_grant_gain_trigger = yes } set_variable = { name = tca_merit_grant_gain_callback_token value = var:tca_merit_grant_token } }
+        tca_merit_accept_native_gain_effect = yes
+        tca_merit_maybe_queue_central_catchup_effect = yes
+    }
 }
 tca_merit_central_title_gain = {
     trigger = {
@@ -55,4 +61,11 @@ tca_merit_central_title_gain = {
         OR = { scope:title = title:e_minister_chancellor scope:title = title:e_minister_censor scope:title = title:e_minister_grand_marshal scope:title = title:e_minister_of_personnel scope:title = title:e_minister_of_revenue scope:title = title:e_minister_of_rites scope:title = title:e_minister_of_war scope:title = title:e_minister_of_justice scope:title = title:e_minister_of_works }
     }
     effect = { tca_merit_queue_central_effect = yes }
+}
+
+# root为原生受封者/失去头衔者；取得/失去最后一个头衔后，次日读取最终统治身份。
+# 不重新初始化事务中的核定等级，仅刷新上限快照；同日多次转授只排一次。
+tca_merit_cap_title_changed = {
+    trigger = { has_global_variable = tca_merit_startup_ready has_character_flag = tca_merit_active NOT = { tca_merit_interface_probe_trigger = yes } }
+    effect = { tca_merit_queue_cap_sync_effect = yes }
 }

@@ -1,0 +1,46 @@
+﻿# 报告者人物作用域；CHARACTER输出无自有头衔的天朝廷臣，不能调用家门统治者夹具。
+tca_test_create_merit_courtier_effect = {
+    create_character = { age = 40 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite save_scope_as = $CHARACTER$ }
+    scope:$CHARACTER$ = {
+        tca_test_protect_character_effect = yes
+        add_character_flag = ai_will_not_convert
+        add_trait = education_stewardship_3
+        add_character_modifier = { modifier = tca_merit_probe_stasis_modifier }
+        set_appointment_timeout = { years = 150 desc = appointment_timeout_desc_refusing }
+        tca_test_add_native_merit_probe_exams_effect = yes
+        change_merit = 100
+    }
+}
+
+# 人物作用域；先走正式提交，再仅污染上限快照，重建旧缺陷的phase3持久状态。
+# 旧年标记用于验证恢复不占本年次数；不改TOKEN、不复制业务结算算法。
+tca_test_make_legacy_merit_cap_grant_effect = {
+    tca_merit_begin_grant_effect = { SOURCE = 1 TARGET = 2 MODE = 1 YEAR = current_year }
+    add_character_flag = tca_merit_grant_suppress
+    # 当前两项旧定义未变；移除新增补偿即可还原真实旧廷臣上限1，核定仍为2。
+    remove_character_modifier = tca_merit_courtier_cap_compensation_modifier
+    set_merit_level = 0
+    set_merit_level = 1
+    remove_variable = tca_merit_applied_cap_base
+    set_variable = { name = tca_merit_grant_phase value = 3 }
+    set_variable = { name = tca_merit_grant_audit_attempts value = 5 }
+    set_variable = { name = tca_merit_grant_audit_failed_token value = var:tca_merit_grant_token }
+    set_variable = { name = tca_merit_grant_year value = { value = current_year subtract = 1 } }
+    set_variable = { name = tca_merit_last_ordinary_year value = var:tca_merit_grant_year }
+    set_variable = { name = tca_merit_last_ordinary_success_year value = var:tca_merit_grant_year }
+    set_variable = { name = tca_merit_reset_probe_gain_count value = 0 }
+    set_variable = { name = tca_merit_reset_probe_loss_count value = 0 }
+    remove_character_flag = tca_merit_grant_suppress
+}
+
+# 人物作用域；只供失败现场使用，记录实际等级、余额、核定快照与原生回调计数，不修改业务状态。
+tca_test_log_merit_cap_state_effect = {
+    save_scope_value_as = { name = tca_cap_test_level value = merit_level }
+    save_scope_value_as = { name = tca_cap_test_merit value = merit }
+    if = { limit = { has_variable = tca_merit_approved_level } save_scope_value_as = { name = tca_cap_test_approved value = var:tca_merit_approved_level } }
+    if = { limit = { has_variable = tca_merit_applied_cap_base } save_scope_value_as = { name = tca_cap_test_basis value = var:tca_merit_applied_cap_base } }
+    if = { limit = { has_variable = tca_merit_reset_probe_gain_count } save_scope_value_as = { name = tca_cap_test_gains value = var:tca_merit_reset_probe_gain_count } }
+    if = { limit = { has_variable = tca_merit_reset_probe_loss_count } save_scope_value_as = { name = tca_cap_test_losses value = var:tca_merit_reset_probe_loss_count } }
+    debug_log = "TCA_MERIT_CAP TEST_STATE"
+    debug_log_scopes = yes
+}

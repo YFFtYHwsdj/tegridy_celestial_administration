@@ -1,0 +1,105 @@
+﻿# 廷臣上限基数的定向版本修复；不属于旧版三档契约或任意旧存档迁移。
+# 无根作用域；王朝循环月脉冲调用，整个世界仅扫描一次。先锁版本，防止并行局势重复排队。
+tca_merit_repair_legacy_caps_effect = {
+    if = {
+        limit = { has_global_variable = tca_merit_startup_ready NOT = { has_global_variable = tca_merit_cap_basis_revision } }
+        set_global_variable = { name = tca_merit_cap_basis_revision value = 1 }
+        every_living_character = { tca_merit_repair_legacy_cap_character_effect = yes }
+    }
+}
+
+# 人物作用域；新版快照缺失或原TOKEN已认证才视为旧状态。无事务只刷新上限；其它隔离保持人工审计。
+# 仅修复已提交的普通九升八、失败TOKEN一致且仍核定八品者。原TOKEN、余额、年份均保持。
+# 修正添加是异步快照，先刷新上限，跨两日后才补足原目标经验；不再次调用prepare/commit。
+tca_merit_repair_legacy_cap_character_effect = {
+    if = {
+        limit = {
+            is_alive = yes has_character_flag = tca_merit_active has_variable = tca_merit_approved_level
+            NOT = { tca_merit_interface_probe_trigger = yes }
+            government_has_flag = government_is_celestial exists = top_liege top_liege ?= { government_has_flag = government_is_celestial } is_independent_ruler = no
+            # 旧phase2已被本次扫描认证后，期间授职刷新快照不应抹掉原TOKEN的恢复资格。
+            OR = { NOT = { has_variable = tca_merit_applied_cap_base } var:tca_merit_cap_repair_legacy_token ?= var:tca_merit_grant_token }
+        }
+        if = {
+            limit = {
+                var:tca_merit_grant_phase ?= 3 var:tca_merit_grant_mode ?= 1
+                var:tca_merit_grant_source ?= 1 var:tca_merit_grant_target ?= 2 var:tca_merit_approved_level = 2
+                var:tca_merit_grant_audit_attempts ?= 5
+                has_variable = tca_merit_grant_token var:tca_merit_grant_audit_failed_token ?= var:tca_merit_grant_token
+                NOT = { var:tca_merit_cap_repair_attempted_token ?= var:tca_merit_grant_token }
+            }
+            set_variable = { name = tca_merit_cap_repair_attempted_token value = var:tca_merit_grant_token }
+            set_variable = { name = tca_merit_cap_repair_pending_token value = var:tca_merit_grant_token }
+            tca_merit_refresh_cap_effect = yes
+            save_scope_value_as = { name = tca_merit_cap_repair_token value = var:tca_merit_grant_token }
+            trigger_event = { id = tca_merit_entry.8 days = 2 }
+        }
+        else_if = {
+            limit = {
+                var:tca_merit_grant_phase ?= 2 var:tca_merit_grant_mode ?= 1 var:tca_merit_grant_source ?= 1 var:tca_merit_grant_target ?= 2 var:tca_merit_approved_level = 2
+                has_variable = tca_merit_grant_token
+                NOT = { var:tca_merit_cap_repair_review_token ?= var:tca_merit_grant_token }
+            }
+            set_variable = { name = tca_merit_cap_repair_legacy_token value = var:tca_merit_grant_token }
+            set_variable = { name = tca_merit_cap_repair_review_token value = var:tca_merit_grant_token }
+            save_scope_value_as = { name = tca_merit_cap_review_token value = var:tca_merit_grant_token }
+            trigger_event = { id = tca_merit_entry.9 days = 12 }
+        }
+        else_if = {
+            limit = { NOT = { has_variable = tca_merit_grant_phase } }
+            # 仅恢复上限不重奖既有官品。旧已完成事务没有新版gain收据，先承认其原TOKEN已完成。
+            tca_merit_acknowledge_legacy_completed_gain_effect = yes
+            tca_merit_queue_cap_sync_effect = yes
+            tca_merit_refresh_cap_effect = yes
+        }
+    }
+}
+
+# 人物作用域；TOKEN来自版本修复事件。先消费本次pending，重复/迟到调用不能修改后续事务。
+# 仅补足尚缺经验，不归一化余额、不重设等级到零、不重发考试资格。真实gain仍走原生回调。
+tca_merit_finish_legacy_cap_repair_effect = {
+    if = {
+        limit = { var:tca_merit_cap_repair_pending_token ?= $TOKEN$ }
+        remove_variable = tca_merit_cap_repair_pending_token
+        if = {
+            limit = {
+                var:tca_merit_grant_token ?= $TOKEN$ var:tca_merit_grant_phase ?= 3
+                var:tca_merit_grant_mode ?= 1 var:tca_merit_grant_source ?= 1 var:tca_merit_grant_target ?= 2 var:tca_merit_approved_level ?= 2
+                is_alive = yes has_character_flag = tca_merit_active
+                government_has_flag = government_is_celestial exists = top_liege top_liege ?= { government_has_flag = government_is_celestial } is_independent_ruler = no
+            }
+            if = { limit = { merit_level < var:tca_merit_grant_target } set_merit_level = var:tca_merit_grant_target }
+            tca_merit_resume_grant_audit_effect = { TOKEN = $TOKEN$ }
+        }
+        # 保留认证至补足经验及原生gain派发之后；不能先删掉phase3首次gain的准入证据。
+        if = { limit = { var:tca_merit_cap_repair_legacy_token ?= $TOKEN$ } remove_variable = tca_merit_cap_repair_legacy_token }
+    }
+}
+
+# 人物作用域；先消费复核所有权，旧TOKEN不能恢复新事务。没有全世界二次扫描。
+tca_merit_review_legacy_cap_pending_effect = {
+    if = {
+        limit = { var:tca_merit_cap_repair_review_token ?= $TOKEN$ }
+        remove_variable = tca_merit_cap_repair_review_token
+        if = { limit = { var:tca_merit_grant_token ?= $TOKEN$ } tca_merit_repair_legacy_cap_character_effect = yes }
+    }
+}
+
+# 人物作用域；旧完成记录只认领既有奖励，不派发回调。共享刷新和版本worker都由此维护。
+tca_merit_acknowledge_legacy_completed_gain_effect = {
+    if = {
+        limit = { NOT = { has_variable = tca_merit_grant_phase } has_variable = tca_merit_grant_token var:tca_merit_grant_result ?= 1 var:tca_merit_approved_level ?= var:tca_merit_grant_target }
+        set_variable = { name = tca_merit_grant_gain_callback_token value = var:tca_merit_grant_token }
+    }
+}
+
+# 首次重建旧布局前的共同入口；只认证/排队，不调用刷新或修复worker，避免递归。
+# 正常奖励、授失职、年度维护先于月扫描时，也不能提前丢掉旧TOKEN证据或重奖。
+tca_merit_note_legacy_cap_layout_effect = {
+    if = {
+        limit = { NOT = { tca_merit_interface_probe_trigger = yes } tca_merit_legacy_cap_layout_trigger = yes }
+        tca_merit_acknowledge_legacy_completed_gain_effect = yes
+        if = { limit = { tca_merit_legacy_cap_grant_trigger = yes } set_variable = { name = tca_merit_cap_repair_legacy_token value = var:tca_merit_grant_token } }
+        tca_merit_queue_cap_sync_effect = yes
+    }
+}

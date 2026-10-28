@@ -216,3 +216,516 @@ tca_merit_grant_test.1004 = {
     }
 }
 
+
+# 无自有头衔的廷臣完整授品与普通官职转授；失去官职后仍保留原生家门统治者身份。
+tca_merit_grant_test.2 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_merit_grant_test.2 tca_test_merit_courtier_grant"
+        remove_character_flag = tca_test_case_failed
+        if = {
+            limit = { debug_only = yes is_alive = yes title:h_china.holder = root }
+            tca_test_create_merit_courtier_effect = { CHARACTER = tca_gc_actor }
+            add_character_flag = tca_test_delayed_case_active
+            trigger_event = { id = tca_merit_grant_test.2001 days = 2 }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_merit_courtier_grant" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_continue_delayed_effect = yes }
+    }
+}
+tca_merit_grant_test.2001 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            scope:tca_gc_actor = { tca_merit_initialize_character_effect = yes change_merit = 29900 }
+            trigger_event = { id = tca_merit_grant_test.2002 days = 2 }
+        }
+    }
+}
+tca_merit_grant_test.2002 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_gc_actor = { is_ruler = no merit_level = 1 merit = 30000 tca_merit_ordinary_candidate_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_courtier_grant 1" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_courtier_grant 1" }
+            scope:tca_gc_actor = {
+                set_variable = { name = tca_merit_reset_probe_gain_count value = 0 }
+                set_variable = { name = tca_merit_reset_probe_loss_count value = 0 }
+                tca_merit_begin_grant_effect = { SOURCE = 1 TARGET = 2 MODE = 1 YEAR = current_year }
+            }
+            trigger_event = { id = tca_merit_grant_test.2003 days = 12 }
+        }
+    }
+}
+tca_merit_grant_test.2003 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_gc_actor = { merit_level = 2 merit = 1000 NOT = { has_variable = tca_merit_grant_phase } var:tca_merit_reset_probe_gain_count = 1 var:tca_merit_reset_probe_loss_count = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_courtier_grant 2" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_courtier_grant 2" }
+            # 本例使用原子普通官职转授；原版家门生成的两步路径由.3/.4分别验证。
+            # 大额经验锁在八品，用于捕捉基数变化时临时多一档造成的伪gain。
+            scope:tca_gc_actor = { change_merit = 20000 create_dynasty = { spread_to_descendants = yes } }
+            create_dynamic_title = { tier = duchy name = tca_test_arrest_office_name }
+            scope:new_title = { save_scope_as = tca_gc_family set_capital_county = root.capital_county set_landless_title = yes }
+            create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_gc_fealty }
+            scope:tca_gc_family = { change_title_holder = { holder = scope:tca_gc_actor change = scope:tca_gc_fealty } }
+            scope:tca_gc_actor = { change_liege = { liege = root change = scope:tca_gc_fealty } }
+            resolve_title_and_vassal_change = scope:tca_gc_fealty
+            trigger_event = { id = tca_merit_grant_test.2004 days = 3 }
+        }
+    }
+}
+tca_merit_grant_test.2004 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_gc_actor = { is_ruler = yes merit_level = 2 merit = 21000 var:tca_merit_reset_probe_gain_count = 1 var:tca_merit_reset_probe_loss_count = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_courtier_grant 3" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_courtier_grant 3" scope:tca_gc_actor = { tca_test_log_merit_cap_state_effect = yes } }
+            create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_gc_unland }
+            scope:tca_gc_family = { change_title_holder = { holder = root change = scope:tca_gc_unland } }
+            resolve_title_and_vassal_change = scope:tca_gc_unland
+            if = { limit = { scope:tca_gc_actor = { is_ruler = no NOT = { employer ?= root } } } add_courtier = scope:tca_gc_actor }
+            trigger_event = { id = tca_merit_grant_test.2005 days = 3 }
+        }
+    }
+}
+tca_merit_grant_test.2005 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_gc_actor = { is_ruler = yes merit_level = 2 merit = 21000 var:tca_merit_reset_probe_gain_count = 1 var:tca_merit_reset_probe_loss_count = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_courtier_grant 4" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_courtier_grant 4" scope:tca_gc_actor = { tca_test_log_merit_cap_state_effect = yes } }
+            scope:tca_gc_actor = {
+                # 最高品的扣减倍率仍须非负；边界准备屏蔽夹具产生的伪回调。
+                add_character_flag = tca_merit_grant_suppress
+                set_variable = { name = tca_merit_approved_level value = 9 }
+                tca_merit_refresh_cap_effect = yes
+                set_merit_level = 9
+            }
+            trigger_event = { id = tca_merit_grant_test.2006 days = 2 }
+        }
+    }
+}
+tca_merit_grant_test.2006 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_gc_actor = { merit_level = 9 var:tca_merit_approved_level = 9 has_character_modifier = tca_merit_approved_reduction_modifier } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_courtier_grant 5" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_courtier_grant 5" }
+            # 丢弃本例自动生成的家门；官职已归还，不能把临时头衔留给后续全组。
+            scope:tca_gc_actor = { every_held_title = { save_scope_as = tca_gc_cleanup_title root = { destroy_title = scope:tca_gc_cleanup_title } } remove_character_flag = tca_merit_grant_suppress tca_test_cleanup_merit_probe_character_effect = yes }
+            destroy_title = scope:tca_gc_family
+            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_merit_courtier_grant" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_merit_courtier_grant" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            remove_character_flag = tca_test_case_failed
+            remove_character_flag = tca_test_delayed_case_active
+            tca_test_continue_delayed_effect = yes
+        }
+    }
+}
+
+# 无自有头衔的廷臣完整授品与真实得失家门头衔；不借统治者夹具代替廷臣。
+tca_merit_grant_test.3 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_merit_grant_test.3 tca_test_merit_family_cap_transfer"
+        remove_character_flag = tca_test_case_failed
+        if = {
+            limit = { debug_only = yes is_alive = yes title:h_china.holder = root }
+            tca_test_create_merit_courtier_effect = { CHARACTER = tca_gf_actor }
+            add_character_flag = tca_test_delayed_case_active
+            trigger_event = { id = tca_merit_grant_test.3001 days = 2 }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_merit_family_cap_transfer" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_continue_delayed_effect = yes }
+    }
+}
+tca_merit_grant_test.3001 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            scope:tca_gf_actor = { tca_merit_initialize_character_effect = yes change_merit = 29900 }
+            trigger_event = { id = tca_merit_grant_test.3002 days = 2 }
+        }
+    }
+}
+tca_merit_grant_test.3002 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_gf_actor = { is_ruler = no merit_level = 1 merit = 30000 tca_merit_ordinary_candidate_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_family_cap_transfer 1" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_family_cap_transfer 1" }
+            scope:tca_gf_actor = {
+                set_variable = { name = tca_merit_reset_probe_gain_count value = 0 }
+                set_variable = { name = tca_merit_reset_probe_loss_count value = 0 }
+                tca_merit_begin_grant_effect = { SOURCE = 1 TARGET = 2 MODE = 1 YEAR = current_year }
+            }
+            trigger_event = { id = tca_merit_grant_test.3003 days = 12 }
+        }
+    }
+}
+tca_merit_grant_test.3003 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_gf_actor = { merit_level = 2 merit = 1000 NOT = { has_variable = tca_merit_grant_phase } var:tca_merit_reset_probe_gain_count = 1 var:tca_merit_reset_probe_loss_count = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_family_cap_transfer 2" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_family_cap_transfer 2" }
+            scope:tca_gf_actor = {
+                change_merit = 20000
+                create_dynasty = { spread_to_descendants = yes }
+                give_noble_family_title = { name = noble_family_name tier = county article = DEFAULT_TITLE_NAME_ARTICLE government = celestial_government save_scope_as = tca_gf_family }
+                create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_gf_fealty }
+                change_liege = { liege = root change = scope:tca_gf_fealty }
+                resolve_title_and_vassal_change = scope:tca_gf_fealty
+            }
+            trigger_event = { id = tca_merit_grant_test.3004 days = 3 }
+        }
+    }
+}
+tca_merit_grant_test.3004 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_gf_actor = { is_ruler = yes merit_level = 2 merit = 21000 var:tca_merit_reset_probe_gain_count = 1 var:tca_merit_reset_probe_loss_count = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_family_cap_transfer 3" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_family_cap_transfer 3" scope:tca_gf_actor = { tca_test_log_merit_cap_state_effect = yes } }
+            scope:tca_gf_actor = { destroy_title = scope:tca_gf_family }
+            if = { limit = { scope:tca_gf_actor = { NOT = { employer ?= root } } } add_courtier = scope:tca_gf_actor }
+            trigger_event = { id = tca_merit_grant_test.3005 days = 3 }
+        }
+    }
+}
+tca_merit_grant_test.3005 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_gf_actor = { is_ruler = no merit_level = 2 merit = 21000 var:tca_merit_reset_probe_gain_count = 1 var:tca_merit_reset_probe_loss_count = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_family_cap_transfer 4" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_family_cap_transfer 4" scope:tca_gf_actor = { tca_test_log_merit_cap_state_effect = yes } }
+            scope:tca_gf_actor = {
+                # 最高品的扣减倍率仍须非负；边界准备屏蔽夹具产生的伪回调。
+                add_character_flag = tca_merit_grant_suppress
+                set_variable = { name = tca_merit_approved_level value = 9 }
+                tca_merit_refresh_cap_effect = yes
+                set_merit_level = 9
+            }
+            trigger_event = { id = tca_merit_grant_test.3006 days = 2 }
+        }
+    }
+}
+tca_merit_grant_test.3006 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_gf_actor = { merit_level = 9 var:tca_merit_approved_level = 9 has_character_modifier = tca_merit_approved_reduction_modifier } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_family_cap_transfer 5" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_family_cap_transfer 5" }
+            scope:tca_gf_actor = { remove_character_flag = tca_merit_grant_suppress tca_test_cleanup_merit_probe_character_effect = yes }
+            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_merit_family_cap_transfer" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_merit_family_cap_transfer" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            remove_character_flag = tca_test_case_failed
+            remove_character_flag = tca_test_delayed_case_active
+            tca_test_continue_delayed_effect = yes
+        }
+    }
+}
+
+# 无自有头衔的廷臣完整授品与真实得失家门头衔；不借统治者夹具代替廷臣。
+tca_merit_grant_test.4 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_merit_grant_test.4 tca_test_merit_grant_family_inflight"
+        remove_character_flag = tca_test_case_failed
+        if = {
+            limit = { debug_only = yes is_alive = yes title:h_china.holder = root }
+            tca_test_create_merit_courtier_effect = { CHARACTER = tca_gi_actor }
+            add_character_flag = tca_test_delayed_case_active
+            trigger_event = { id = tca_merit_grant_test.4001 days = 2 }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_merit_grant_family_inflight" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_continue_delayed_effect = yes }
+    }
+}
+tca_merit_grant_test.4001 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            scope:tca_gi_actor = { tca_merit_initialize_character_effect = yes change_merit = 29900 }
+            trigger_event = { id = tca_merit_grant_test.4002 days = 2 }
+        }
+    }
+}
+tca_merit_grant_test.4002 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_gi_actor = { is_ruler = no merit_level = 1 merit = 30000 tca_merit_ordinary_candidate_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_grant_family_inflight 1" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_grant_family_inflight 1" }
+            scope:tca_gi_actor = {
+                set_variable = { name = tca_merit_reset_probe_gain_count value = 0 }
+                set_variable = { name = tca_merit_reset_probe_loss_count value = 0 }
+                tca_merit_begin_grant_effect = { SOURCE = 1 TARGET = 2 MODE = 1 YEAR = current_year }
+            }
+            scope:tca_gi_actor = {
+                create_dynasty = { spread_to_descendants = yes }
+                give_noble_family_title = { name = noble_family_name tier = county article = DEFAULT_TITLE_NAME_ARTICLE government = celestial_government save_scope_as = tca_gi_family }
+                create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_gi_fealty }
+                change_liege = { liege = root change = scope:tca_gi_fealty }
+                resolve_title_and_vassal_change = scope:tca_gi_fealty
+            }
+            trigger_event = { id = tca_merit_grant_test.4003 days = 12 }
+        }
+    }
+}
+tca_merit_grant_test.4003 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_gi_actor = { merit_level = 2 merit = 1000 NOT = { has_variable = tca_merit_grant_phase } var:tca_merit_reset_probe_gain_count = 1 var:tca_merit_reset_probe_loss_count = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_grant_family_inflight 2" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_grant_family_inflight 2" }
+            trigger_event = { id = tca_merit_grant_test.4004 days = 3 }
+        }
+    }
+}
+tca_merit_grant_test.4004 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_gi_actor = { is_ruler = yes merit_level = 2 merit = 1000 var:tca_merit_reset_probe_gain_count = 1 var:tca_merit_reset_probe_loss_count = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_grant_family_inflight 3" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_grant_family_inflight 3" scope:tca_gi_actor = { tca_test_log_merit_cap_state_effect = yes } }
+            scope:tca_gi_actor = { destroy_title = scope:tca_gi_family }
+            if = { limit = { scope:tca_gi_actor = { NOT = { employer ?= root } } } add_courtier = scope:tca_gi_actor }
+            trigger_event = { id = tca_merit_grant_test.4005 days = 3 }
+        }
+    }
+}
+tca_merit_grant_test.4005 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_gi_actor = { is_ruler = no merit_level = 2 merit = 1000 var:tca_merit_reset_probe_gain_count = 1 var:tca_merit_reset_probe_loss_count = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_grant_family_inflight 4" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_grant_family_inflight 4" scope:tca_gi_actor = { tca_test_log_merit_cap_state_effect = yes } }
+            scope:tca_gi_actor = {
+                # 最高品的扣减倍率仍须非负；边界准备屏蔽夹具产生的伪回调。
+                add_character_flag = tca_merit_grant_suppress
+                set_variable = { name = tca_merit_approved_level value = 9 }
+                tca_merit_refresh_cap_effect = yes
+                set_merit_level = 9
+            }
+            trigger_event = { id = tca_merit_grant_test.4006 days = 2 }
+        }
+    }
+}
+tca_merit_grant_test.4006 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_gi_actor = { merit_level = 9 var:tca_merit_approved_level = 9 has_character_modifier = tca_merit_approved_reduction_modifier } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_grant_family_inflight 5" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_grant_family_inflight 5" }
+            scope:tca_gi_actor = { remove_character_flag = tca_merit_grant_suppress tca_test_cleanup_merit_probe_character_effect = yes }
+            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_merit_grant_family_inflight" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_merit_grant_family_inflight" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            remove_character_flag = tca_test_case_failed
+            remove_character_flag = tca_test_delayed_case_active
+            tca_test_continue_delayed_effect = yes
+        }
+    }
+}
+
+# 入品准备中的零级廷臣同链取得家门后，首次真实gain必须保留；不能被上限转换保护吞掉。
+tca_merit_grant_test.5 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_merit_grant_test.5 tca_test_merit_cap_first_entry"
+        remove_character_flag = tca_test_case_failed
+        if = {
+            limit = { debug_only = yes is_alive = yes title:h_china.holder = root }
+            create_character = { age = 40 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_ge_actor }
+            scope:tca_ge_actor = {
+                tca_test_protect_character_effect = yes
+                add_character_flag = ai_will_not_convert
+                add_trait = education_stewardship_3
+                add_character_modifier = { modifier = tca_merit_probe_stasis_modifier }
+                set_appointment_timeout = { years = 150 desc = appointment_timeout_desc_refusing }
+                tca_merit_before_reward_effect = yes
+                tca_test_add_native_merit_probe_exams_effect = yes
+                set_variable = { name = tca_merit_reset_probe_gain_count value = 0 }
+                set_variable = { name = tca_merit_reset_probe_loss_count value = 0 }
+                create_dynasty = { spread_to_descendants = yes }
+                give_noble_family_title = { name = noble_family_name tier = county article = DEFAULT_TITLE_NAME_ARTICLE government = celestial_government save_scope_as = tca_ge_family }
+                create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_ge_fealty }
+                change_liege = { liege = root change = scope:tca_ge_fealty }
+                resolve_title_and_vassal_change = scope:tca_ge_fealty
+                change_merit = 100
+            }
+            add_character_flag = tca_test_delayed_case_active
+            trigger_event = { id = tca_merit_grant_test.5001 days = 4 }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_merit_cap_first_entry" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_continue_delayed_effect = yes }
+    }
+}
+tca_merit_grant_test.5001 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_ge_actor = { merit_level = 1 merit = 100 has_character_flag = tca_merit_active var:tca_merit_approved_level = 1 NOT = { has_character_flag = tca_merit_entry_pending } var:tca_merit_reset_probe_gain_count = 1 var:tca_merit_reset_probe_loss_count = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_cap_first_entry 1" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_cap_first_entry 1" }
+            scope:tca_ge_actor = { tca_test_cleanup_merit_probe_character_effect = yes }
+            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_merit_cap_first_entry" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_merit_cap_first_entry" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            remove_character_flag = tca_test_case_failed
+            remove_character_flag = tca_test_delayed_case_active
+            tca_test_continue_delayed_effect = yes
+        }
+    }
+}
+
+# 真实零级中央任命：入品准备已激活后，在SOURCE0准备阶段自然入品仍须清除entry_pending。
+tca_merit_grant_test.6 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_merit_grant_test.6 tca_test_merit_cap_zero_source_entry"
+        remove_character_flag = tca_test_case_failed
+        if = {
+            limit = { debug_only = yes is_alive = yes title:h_china.holder = root exists = cp:minister_justice cp:minister_justice = title:e_minister_of_justice.holder }
+            cp:minister_justice = { save_scope_as = tca_gz_original save_scope_value_as = { name = tca_gz_timeout value = appointment_timeout_days } }
+            create_character = { age = 40 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_gz_actor }
+            scope:tca_gz_actor = {
+                tca_test_protect_character_effect = yes
+                add_character_flag = ai_will_not_convert
+                add_trait = education_stewardship_3
+                add_character_modifier = { modifier = tca_merit_probe_stasis_modifier }
+                set_appointment_timeout = { years = 150 desc = appointment_timeout_desc_refusing }
+                tca_merit_before_reward_effect = yes
+                set_variable = { name = tca_merit_reset_probe_gain_count value = 0 }
+                set_variable = { name = tca_merit_reset_probe_loss_count value = 0 }
+            }
+            assign_councillor_type = { type = minister_justice target = scope:tca_gz_actor fire_on_actions = yes remove_existing_councillor = yes }
+            scope:tca_gz_actor = {
+                # 取消任命现场排队请求，保留自己的真实入品准备；原事件不应抢先提交。
+                remove_character_flag = tca_merit_central_pending
+                tca_merit_prepare_grant_effect = { SOURCE = 0 TARGET = 8 MODE = 2 YEAR = current_year }
+                save_scope_value_as = { name = tca_gz_token value = var:tca_merit_grant_token }
+            }
+            if = { limit = { scope:tca_gz_actor = { merit_level = 0 has_character_flag = tca_merit_active has_character_flag = tca_merit_entry_pending var:tca_merit_grant_phase ?= 1 var:tca_merit_grant_source ?= 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_cap_zero_source_entry 1" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_cap_zero_source_entry 1" }
+            scope:tca_gz_actor = { change_merit = 100 }
+            add_character_flag = tca_test_delayed_case_active
+            trigger_event = { id = tca_merit_grant_test.6001 days = 4 }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_merit_cap_zero_source_entry" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_continue_delayed_effect = yes }
+    }
+}
+tca_merit_grant_test.6001 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_gz_actor = { merit_level = 1 merit = 100 has_character_flag = tca_merit_active var:tca_merit_approved_level = 1 NOT = { has_character_flag = tca_merit_entry_pending } var:tca_merit_grant_phase ?= 1 var:tca_merit_grant_token = scope:tca_gz_token var:tca_merit_reset_probe_gain_count = 1 var:tca_merit_reset_probe_loss_count = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_cap_zero_source_entry 2" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_cap_zero_source_entry 2" }
+            scope:tca_gz_actor = { tca_merit_commit_grant_effect = { TOKEN = scope:tca_gz_token } }
+            if = { limit = { scope:tca_gz_actor = { merit_level = 1 var:tca_merit_approved_level = 1 merit = 100 var:tca_merit_grant_result = 0 NOT = { has_variable = tca_merit_grant_phase } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_cap_zero_source_entry 3" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_cap_zero_source_entry 3" }
+            tca_test_restore_central_office_effect = { CHARACTER = scope:tca_gz_original TITLE = e_minister_of_justice POSITION = minister_justice TIMEOUT = scope:tca_gz_timeout ELAPSED = 4 }
+            scope:tca_gz_actor = { remove_character_flag = tca_merit_central_pending remove_character_flag = tca_merit_central_await_entry tca_merit_leave_celestial_effect = yes tca_test_cleanup_merit_probe_character_effect = yes }
+            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_merit_cap_zero_source_entry" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_merit_cap_zero_source_entry" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            remove_character_flag = tca_test_case_failed
+            remove_character_flag = tca_test_delayed_case_active
+            tca_test_continue_delayed_effect = yes
+        }
+    }
+}
+
+# 旧倍率快照的统治者在月度修复前仍须保持核定品级，不能因新定义重载而临时多一档。
+tca_merit_grant_test.7 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_merit_grant_test.7 tca_test_merit_legacy_ruler_cap"
+        remove_character_flag = tca_test_case_failed
+        if = {
+            limit = { debug_only = yes is_alive = yes title:h_china.holder = root }
+            # 本例只检查加载后、修复前的旧快照；保留并恢复全局版本锁，不执行迁移。
+            if = { limit = { has_global_variable = tca_merit_cap_basis_revision } save_scope_value_as = { name = tca_gl_revision value = global_var:tca_merit_cap_basis_revision } }
+            else = { add_character_flag = tca_gl_revision_absent }
+            set_global_variable = { name = tca_merit_cap_basis_revision value = 1 }
+            tca_test_create_merit_probe_character_effect = { CHARACTER = tca_gl_actor GOVERNMENT = celestial_government }
+            scope:tca_gl_actor = {
+                add_trait = education_stewardship_3
+                tca_test_add_native_merit_probe_exams_effect = yes
+                change_merit = 100
+            }
+            add_character_flag = tca_test_delayed_case_active
+            trigger_event = { id = tca_merit_grant_test.7001 days = 2 }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_merit_legacy_ruler_cap" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_continue_delayed_effect = yes }
+    }
+}
+tca_merit_grant_test.7001 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            scope:tca_gl_actor = {
+                tca_merit_initialize_character_effect = yes
+                add_character_flag = tca_merit_grant_suppress
+                set_variable = { name = tca_merit_approved_level value = 2 }
+                tca_merit_refresh_cap_effect = yes
+                change_merit = 29900
+            }
+            trigger_event = { id = tca_merit_grant_test.7002 days = 4 }
+        }
+    }
+}
+tca_merit_grant_test.7003 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_gl_actor = { is_ruler = yes merit_level = 2 merit = 30000 var:tca_merit_approved_level = 2 NOT = { has_variable = tca_merit_applied_cap_base } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_legacy_ruler_cap 2" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_legacy_ruler_cap 2" scope:tca_gl_actor = { tca_test_log_merit_cap_state_effect = yes } }
+            scope:tca_gl_actor = { remove_character_flag = tca_merit_grant_suppress tca_merit_leave_celestial_effect = yes tca_test_cleanup_merit_probe_character_effect = yes }
+            if = { limit = { has_character_flag = tca_gl_revision_absent } remove_global_variable = tca_merit_cap_basis_revision remove_character_flag = tca_gl_revision_absent }
+            else = { set_global_variable = { name = tca_merit_cap_basis_revision value = scope:tca_gl_revision } }
+            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_merit_legacy_ruler_cap" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_merit_legacy_ruler_cap" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            remove_character_flag = tca_test_case_failed
+            remove_character_flag = tca_test_delayed_case_active
+            tca_test_continue_delayed_effect = yes
+        }
+    }
+}
+
+# 先等待新建家门自身的过渡事件排空，再构造旧快照，避免维护事件污染加载前检查点。
+tca_merit_grant_test.7002 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_gl_actor = { merit_level = 2 merit = 30000 NOT = { has_character_flag = tca_merit_cap_sync_pending } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_legacy_ruler_cap 1" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_legacy_ruler_cap 1" }
+            scope:tca_gl_actor = {
+                # 探针旧对象保持9-approved的添加时倍率，等价于旧存档中已保存的倍率7。
+                remove_character_modifier = tca_merit_approved_reduction_modifier
+                set_variable = { name = tca_merit_probe_approved value = 2 }
+                add_character_modifier = { modifier = tca_merit_probe_approved_reduction_modifier }
+                remove_variable = tca_merit_applied_cap_base
+            }
+            trigger_event = { id = tca_merit_grant_test.7003 days = 2 }
+        }
+    }
+}

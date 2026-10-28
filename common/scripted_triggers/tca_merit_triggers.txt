@@ -98,3 +98,56 @@ tca_merit_court_change_relevant_trigger = {
         AND = { exists = scope:new_employer.top_liege scope:new_employer.top_liege ?= { government_has_flag = government_is_celestial } }
     }
 }
+
+# 旧存档添加时快照的共同特征。首次重建前识别，不能等写入新版basis后才认证。
+tca_merit_legacy_cap_layout_trigger = {
+    has_character_flag = tca_merit_active
+    has_variable = tca_merit_approved_level
+    NOT = { has_variable = tca_merit_applied_cap_base }
+    has_character_modifier = tca_merit_approved_base_modifier
+    has_character_modifier = tca_merit_approved_reduction_modifier
+    NOT = { has_character_modifier = tca_merit_courtier_cap_compensation_modifier }
+}
+
+# 只认证旧普通九升八；phase3还须保留五次失败及完全一致的失败TOKEN。
+tca_merit_legacy_cap_grant_trigger = {
+    has_variable = tca_merit_grant_token
+    var:tca_merit_grant_mode ?= 1 var:tca_merit_grant_source ?= 1 var:tca_merit_grant_target ?= 2 var:tca_merit_approved_level ?= 2
+    OR = {
+        var:tca_merit_grant_phase ?= 2
+        AND = { var:tca_merit_grant_phase ?= 3 var:tca_merit_grant_audit_attempts ?= 5 var:tca_merit_grant_audit_failed_token ?= var:tca_merit_grant_token }
+    }
+}
+
+# 原生等级回调边界；旧布局未重建前和基数转换窗口都屏蔽过渡升降。
+tca_merit_cap_transition_trigger = {
+    NOT = { tca_merit_interface_probe_trigger = yes }
+    has_character_flag = tca_merit_active
+    OR = {
+        tca_merit_legacy_cap_layout_trigger = yes
+        AND = { has_variable = tca_merit_applied_cap_base OR = { has_character_flag = tca_merit_cap_sync_pending NOT = { var:tca_merit_applied_cap_base = tca_merit_native_cap_base_value } } }
+    }
+}
+
+# 根gain准入与子on_action收据使用同一条件；旧phase3首次达目标亦只放行一次。
+# 旧已完成状态须由首次重建认领收据，不用late-gain例外在认领前重发旧奖。
+tca_merit_cap_grant_gain_trigger = {
+    var:tca_merit_grant_result ?= 1
+    has_variable = tca_merit_grant_token
+    var:tca_merit_approved_level ?= var:tca_merit_grant_target
+    merit_level = var:tca_merit_grant_target
+    NOT = { var:tca_merit_grant_gain_callback_token ?= var:tca_merit_grant_token }
+    OR = {
+        var:tca_merit_grant_phase ?= 2
+        AND = { NOT = { has_variable = tca_merit_grant_phase } NOT = { tca_merit_legacy_cap_layout_trigger = yes } }
+        AND = { var:tca_merit_grant_phase ?= 3 tca_merit_legacy_cap_grant_trigger = yes OR = { tca_merit_legacy_cap_layout_trigger = yes var:tca_merit_cap_repair_legacy_token ?= var:tca_merit_grant_token } }
+    }
+}
+tca_merit_cap_gain_callback_allowed_trigger = {
+    OR = {
+        NOT = { tca_merit_cap_transition_trigger = yes }
+        # 首次入品由native_gain消费entry_pending，不要求已存在授品事务。
+        AND = { has_character_flag = tca_merit_entry_pending var:tca_merit_approved_level ?= 1 merit_level = 1 }
+        tca_merit_cap_grant_gain_trigger = yes
+    }
+}

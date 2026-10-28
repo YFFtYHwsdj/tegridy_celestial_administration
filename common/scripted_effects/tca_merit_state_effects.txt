@@ -6,12 +6,12 @@ tca_merit_initialize_character_effect = {
     if = { limit = { NOT = { has_variable = tca_merit_grant_phase } } tca_merit_initialize_character_state_effect = yes }
 }
 
-# 人物作用域；仅真实原生gain可以在SOURCE=0准备期间接管已自然入品者。
+# 人物作用域；仅真实原生gain可以在SOURCE=0准备期间接管已自然入品者，含已激活的九品入品准备。
 # 不提交/取消事务，不改TOKEN/phase；原SOURCE=0提交随后会因真实入品而正常失效。
 # 年度与普通维护仍只走上方受保护入口，不可越过准备/审计/隔离状态。
 tca_merit_accept_native_gain_effect = {
     if = {
-        limit = { var:tca_merit_grant_phase ?= 1 var:tca_merit_grant_source ?= 0 merit_level >= 1 NOT = { has_character_flag = tca_merit_active } }
+        limit = { var:tca_merit_grant_phase ?= 1 var:tca_merit_grant_source ?= 0 merit_level >= 1 OR = { NOT = { has_character_flag = tca_merit_active } AND = { has_character_flag = tca_merit_entry_pending var:tca_merit_approved_level ?= 1 } } }
         tca_merit_initialize_character_state_effect = yes
     }
     else = { tca_merit_initialize_character_effect = yes }
@@ -117,10 +117,15 @@ tca_merit_refresh_cap_effect = {
             OR = {
                 NOT = { var:tca_merit_applied_exam_scale ?= 0 }
                 NOT = { var:tca_merit_applied_level ?= var:tca_merit_approved_level }
+                NOT = { var:tca_merit_applied_cap_base ?= tca_merit_native_cap_base_value }
                 NOT = { has_character_modifier = tca_merit_approved_base_modifier }
                 NOT = { has_character_modifier = tca_merit_approved_reduction_modifier }
+                NOT = { has_character_modifier = tca_merit_courtier_cap_compensation_modifier }
             }
         }
+        tca_merit_note_legacy_cap_layout_effect = yes
+        # 某些原生失去最后头衔路径只发入廷/归属回调；不能只在on_title_lost开启保护。
+        if = { limit = { has_variable = tca_merit_applied_cap_base NOT = { var:tca_merit_applied_cap_base = tca_merit_native_cap_base_value } } tca_merit_queue_cap_sync_effect = yes }
         if = { limit = { NOT = { has_character_flag = tca_merit_grant_suppress } } add_character_flag = tca_merit_grant_suppress add_character_flag = tca_merit_state_owns_suppress }
         # scale是添加时快照；只有制度倍率改变才重加考试修正。
         # 新取得的考试修正由原版添加时直接读取当前scale，无需因品级变化再次拆装。
@@ -133,15 +138,20 @@ tca_merit_refresh_cap_effect = {
             limit = {
                 OR = {
                     NOT = { var:tca_merit_applied_level ?= var:tca_merit_approved_level }
+                    NOT = { var:tca_merit_applied_cap_base ?= tca_merit_native_cap_base_value }
                     NOT = { has_character_modifier = tca_merit_approved_base_modifier }
                     NOT = { has_character_modifier = tca_merit_approved_reduction_modifier }
+                    NOT = { has_character_modifier = tca_merit_courtier_cap_compensation_modifier }
                 }
             }
+            remove_character_modifier = tca_merit_courtier_cap_compensation_modifier
             remove_character_modifier = tca_merit_approved_reduction_modifier
             remove_character_modifier = tca_merit_approved_base_modifier
             add_character_modifier = { modifier = tca_merit_approved_base_modifier }
             add_character_modifier = { modifier = tca_merit_approved_reduction_modifier }
+            add_character_modifier = { modifier = tca_merit_courtier_cap_compensation_modifier }
             set_variable = { name = tca_merit_applied_level value = var:tca_merit_approved_level }
+            set_variable = { name = tca_merit_applied_cap_base value = tca_merit_native_cap_base_value }
         }
         if = { limit = { has_character_flag = tca_merit_state_owns_suppress } remove_character_flag = tca_merit_grant_suppress remove_character_flag = tca_merit_state_owns_suppress }
     }
@@ -159,10 +169,15 @@ tca_merit_leave_celestial_effect = {
     # 真实退出终结待核验事务（含隔离态），保留递增token使旧事件不能碰到后续事务。
     remove_variable = tca_merit_grant_phase
     remove_character_flag = tca_merit_central_pending
+    remove_character_modifier = tca_merit_courtier_cap_compensation_modifier
     remove_character_modifier = tca_merit_approved_reduction_modifier
     remove_character_modifier = tca_merit_approved_base_modifier
     remove_variable = tca_merit_approved_level
     remove_variable = tca_merit_applied_level
+    remove_variable = tca_merit_applied_cap_base
+    remove_variable = tca_merit_cap_repair_pending_token
+    remove_variable = tca_merit_cap_repair_review_token
+    remove_variable = tca_merit_cap_repair_legacy_token
     remove_variable = tca_merit_applied_exam_scale
     tca_merit_refresh_exam_modifiers_effect = yes
     if = { limit = { has_character_flag = tca_merit_state_owns_suppress } remove_character_flag = tca_merit_grant_suppress remove_character_flag = tca_merit_state_owns_suppress }
@@ -175,4 +190,16 @@ tca_merit_restore_participation_effect = {
     remove_character_flag = tca_merit_retired
     remove_character_flag = tca_merit_refused
     if = { limit = { NOT = { tca_merit_interface_probe_trigger = yes } } tca_merit_initialize_character_effect = yes }
+}
+
+# 人物作用域；仅合并过渡确认事件，不取得grant_suppress所有权，保留phase2真实gain。
+tca_merit_queue_cap_sync_effect = {
+    # 新的真实身份变化重新取得确认机会；旧失败仍可从日志追溯。
+    if = { limit = { has_character_flag = tca_merit_cap_sync_failed } remove_character_flag = tca_merit_cap_sync_failed }
+    remove_character_flag = tca_merit_cap_sync_confirmed
+    if = {
+        limit = { NOT = { has_character_flag = tca_merit_cap_sync_pending } }
+        add_character_flag = tca_merit_cap_sync_pending
+        trigger_event = { id = tca_merit_entry.7 days = 1 }
+    }
 }
