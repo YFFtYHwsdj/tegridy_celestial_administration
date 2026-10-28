@@ -1,0 +1,44 @@
+﻿# 角色作用域；只设置后台法。重复调用不叠加，不改国家政策、冷却、契约或头衔。
+# 原生can_keep/should_start_with使用同一trigger；日常变动由原生周期纠正。
+tca_sync_local_domain_character_effect = {
+    if = {
+        limit = { government_has_flag = government_is_celestial }
+        if = {
+            limit = { tca_local_domain_restricted_trigger = yes }
+            if = { limit = { NOT = { has_realm_law = tca_local_domain_restricted_law } } add_realm_law_skip_effects = tca_local_domain_restricted_law }
+        }
+        else = {
+            if = { limit = { NOT = { has_realm_law = tca_local_domain_unrestricted_law } } add_realm_law_skip_effects = tca_local_domain_unrestricted_law }
+        }
+    }
+    else_if = {
+        limit = { has_realm_law = tca_local_domain_restricted_law }
+        remove_realm_law = tca_local_domain_restricted_law
+    }
+}
+
+# 国家统治者作用域；必须在政策替换后调用，只同步真实臣属及本人，不追踪法理疆界。
+tca_sync_local_domain_realm_effect = {
+    if = {
+        limit = { tca_local_domain_sovereign_trigger = yes }
+        tca_sync_local_domain_character_effect = yes
+        every_vassal_or_below = { tca_sync_local_domain_character_effect = yes }
+    }
+}
+
+# 仅由现有新局after_lobby入口调用；旧存档缺法律时使用原生默认的量才兼领。
+# 保存到角色的初始化标记防重复调用重置玩家选择；君主更替不重跑本入口。
+tca_initialize_local_domain_new_game_effect = {
+    if = {
+        limit = { tca_local_domain_sovereign_trigger = yes NOT = { has_variable = tca_local_domain_initialized } }
+        if = {
+            limit = { tca_should_start_with_song_system_trigger = yes }
+            if = { limit = { NOT = { has_realm_law = tca_local_domain_all_law } } add_realm_law_skip_effects = tca_local_domain_all_law }
+        }
+        else = {
+            if = { limit = { NOT = { has_realm_law = tca_local_domain_original_law } } add_realm_law_skip_effects = tca_local_domain_original_law }
+        }
+        set_variable = { name = tca_local_domain_initialized value = yes }
+        tca_sync_local_domain_realm_effect = yes
+    }
+}

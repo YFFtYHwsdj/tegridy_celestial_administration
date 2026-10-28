@@ -83,6 +83,9 @@ tca_merit_saveload_probe_test.1000 = {
                     set_variable = { name = tca_merit_feedback_last_source value = 2 }
                 }
                 # 持久头衔引用给 GUI 使用；事件 saved scope 另由原链跨保存恢复。
+                # 州郡法律共用本次检查点，不额外保存／重启；各自保留独立的正式夹具。
+                tca_test_prepare_local_domain_effect = yes
+                title:h_china = { set_variable = { name = tca_local_domain_saveload_actor value = scope:tca_domain_civil } }
                 title:h_china = {
                     set_variable = { name = tca_merit_saveload_actor value = scope:tca_msl_actor }
                     set_variable = { name = tca_merit_saveload_transaction value = scope:tca_msl_transaction }
@@ -129,6 +132,8 @@ tca_merit_saveload_probe_test.1001 = {
             debug_log = "TCA_TEST WAIT tca_test_merit_saveload_contract 60 days"
             trigger_event = { id = tca_merit_saveload_probe_test.1002 days = 60 }
             title:h_china = { set_variable = { name = tca_merit_saveload_phase value = 1 } }
+            remove_variable = tca_local_domain_reform_cooldown
+            add_realm_law = tca_local_domain_civil_law
             debug_log = "TCA_MERIT_SAVELOAD GUI_ARMED"
         }
     }
@@ -142,6 +147,10 @@ tca_merit_saveload_probe_test.1002 = {
         tca_test_validate_environment_effect = yes
         if = {
             limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            # 保存后曾真实改回量才兼领；续局必须恢复文臣专领、冷却及从属限制。
+            if = { limit = { has_realm_law = tca_local_domain_civil_law has_variable = tca_local_domain_reform_cooldown scope:tca_domain_civil = { domain_limit = 1 has_realm_law = tca_local_domain_restricted_law } scope:tca_domain_military = { domain_limit > 1 has_realm_law = tca_local_domain_unrestricted_law } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_merit_saveload_contract 24" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 24" }
             if = { limit = { title:h_china = { var:tca_merit_saveload_saved = 1 OR = { var:tca_merit_saveload_phase = 2 var:tca_merit_saveload_phase = 4 } } NOT = { has_character_flag = tca_merit_saveload_corruption_logged } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_saveload_contract 3" }
             else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 3" }
             if = { limit = { exists = scope:tca_msl_actor scope:tca_msl_actor = title:h_china.var:tca_merit_saveload_actor scope:tca_msl_actor = { var:tca_merit_saveload_sentinel = 12345 var:tca_merit_probe_approved = 1 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_saveload_contract 4" }
@@ -270,6 +279,12 @@ tca_merit_saveload_probe_test.9001 = {
             if = {
                 limit = { NOT = { has_character_flag = tca_merit_saveload_corruption_logged } }
                 add_character_flag = tca_merit_saveload_corruption_logged
+                add_realm_law_skip_effects = tca_local_domain_original_law
+                remove_variable = tca_local_domain_reform_cooldown
+                tca_sync_local_domain_realm_effect = yes
+                if = { limit = { has_realm_law = tca_local_domain_original_law NOT = { has_variable = tca_local_domain_reform_cooldown } title:h_china.var:tca_local_domain_saveload_actor = { has_realm_law = tca_local_domain_unrestricted_law } }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_merit_saveload_contract 23" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 23" }
                 if = {
                     limit = { debug_only = yes title:h_china.holder = root title:h_china = { var:tca_merit_saveload_phase = 3 NOT = { has_variable_list = tca_merit_saveload_candidates } var:tca_merit_saveload_actor = { merit = 7 var:tca_merit_saveload_sentinel = 54321 } } }
                     debug_log = "TCA_TEST CHECK_PASS tca_test_merit_saveload_contract 9"
@@ -348,6 +363,9 @@ tca_merit_saveload_probe_test.1004 = {
                 var:tca_merit_feedback_band_target_1_1 >= 3.299 var:tca_merit_feedback_band_target_1_1 <= 3.301
             } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_saveload_contract 22" }
             else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 22" }
+            tca_test_cleanup_local_domain_effect = yes
+            remove_variable = tca_local_domain_reform_cooldown
+            title:h_china = { remove_variable = tca_local_domain_saveload_actor }
             if = {
                 limit = { exists = title:h_china.var:tca_merit_saveload_feedback_actor }
                 title:h_china.var:tca_merit_saveload_feedback_actor = {

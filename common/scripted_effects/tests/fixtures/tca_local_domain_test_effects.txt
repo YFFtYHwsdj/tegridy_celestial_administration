@@ -1,0 +1,82 @@
+﻿# 仅供可丢弃测试局；报告者为天朝皇帝。
+# ACTOR输出新人物scope，LEVEL为原版行省契约。保存并恢复原路与治所持有人。
+tca_test_create_local_domain_actor_effect = {
+    clear_saved_scope = tca_domain_test_circuit
+    clear_saved_scope = tca_domain_test_county
+    random_vassal_or_below = {
+        limit = { government_has_flag = government_is_celestial is_landed = yes highest_held_title_tier = tier_kingdom liege = root vassal_contract_has_flag = celestial_province_standard NOT = { has_character_flag = tca_local_domain_test_actor } }
+        primary_title = { save_scope_as = tca_domain_test_circuit }
+        capital_county = { save_scope_as = tca_domain_test_county }
+    }
+    if = { limit = { exists = scope:tca_domain_test_circuit exists = scope:tca_domain_test_county }
+        create_character = { age = 35 random_traits = no gender_female_chance = 0 dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite save_scope_as = $ACTOR$ }
+        scope:$ACTOR$ = {
+            set_variable = { name = tca_domain_test_circuit value = scope:tca_domain_test_circuit }
+            set_variable = { name = tca_domain_test_county value = scope:tca_domain_test_county }
+            set_variable = { name = tca_domain_test_old_circuit_holder value = scope:tca_domain_test_circuit.holder }
+            set_variable = { name = tca_domain_test_old_county_holder value = scope:tca_domain_test_county.holder }
+        }
+        create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_domain_test_grant }
+        scope:tca_domain_test_county = { change_title_holder = { holder = scope:$ACTOR$ change = scope:tca_domain_test_grant } }
+        scope:tca_domain_test_circuit = { change_title_holder = { holder = scope:$ACTOR$ change = scope:tca_domain_test_grant } }
+        resolve_title_and_vassal_change = scope:tca_domain_test_grant
+        scope:$ACTOR$ = {
+            change_government = celestial_government
+            create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_domain_test_fealty }
+            change_liege = { liege = root change = scope:tca_domain_test_fealty }
+            resolve_title_and_vassal_change = scope:tca_domain_test_fealty
+            vassal_contract_set_obligation_level = { type = celestial_provinces level = $LEVEL$ }
+            add_character_modifier = { modifier = tca_test_local_domain_capacity }
+            add_character_flag = tca_local_domain_test_actor
+            add_character_flag = ai_will_not_convert
+            tca_test_protect_character_effect = yes
+            set_appointment_timeout = { years = 150 desc = appointment_timeout_desc_refusing }
+            set_variable = { name = admin_contract_cooldown years = 10 }
+        }
+    }
+}
+
+# 每项自备政策和人物；保存旧政策供清理。无缺失scope时才进入业务断言。
+tca_test_prepare_local_domain_effect = {
+    save_scope_value_as = { name = tca_domain_test_old_policy value = 0 }
+    if = { limit = { has_realm_law = tca_local_domain_civil_law } save_scope_value_as = { name = tca_domain_test_old_policy value = 1 } }
+    if = { limit = { has_realm_law = tca_local_domain_all_law } save_scope_value_as = { name = tca_domain_test_old_policy value = 2 } }
+    if = { limit = { NOT = { has_realm_law = tca_local_domain_original_law } } add_realm_law_skip_effects = tca_local_domain_original_law }
+    clear_saved_scope = tca_domain_civil
+    clear_saved_scope = tca_domain_military
+    tca_test_create_local_domain_actor_effect = { ACTOR = tca_domain_civil LEVEL = celestial_province_standard }
+    tca_test_create_local_domain_actor_effect = { ACTOR = tca_domain_military LEVEL = celestial_province_military }
+    tca_sync_local_domain_realm_effect = yes
+}
+
+# 新人物作用域；只恢复本例借出的头衔，不处理任意历史人物的家门。
+tca_test_restore_local_domain_actor_effect = {
+    save_scope_as = tca_domain_test_restoring
+    create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_domain_test_restore }
+    var:tca_domain_test_county = { change_title_holder = { holder = scope:tca_domain_test_restoring.var:tca_domain_test_old_county_holder change = scope:tca_domain_test_restore } }
+    var:tca_domain_test_circuit = { change_title_holder = { holder = scope:tca_domain_test_restoring.var:tca_domain_test_old_circuit_holder change = scope:tca_domain_test_restore } }
+    resolve_title_and_vassal_change = scope:tca_domain_test_restore
+    # 原路只从帝直属长官取样。独立场景后，退任家门可能不再直属原皇帝；
+    # 仅交还头衔不会恢复领属，必须另做真实归附事务，避免后续用例失去可用路。
+    var:tca_domain_test_old_circuit_holder = {
+        if = {
+            limit = { NOT = { liege = root } }
+            create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_domain_test_restore_fealty }
+            change_liege = { liege = root change = scope:tca_domain_test_restore_fealty }
+            resolve_title_and_vassal_change = scope:tca_domain_test_restore_fealty
+        }
+    }
+    remove_character_modifier = tca_test_local_domain_capacity
+    remove_character_flag = tca_local_domain_test_actor
+    tca_test_restore_character_effect = yes
+}
+
+# 报告者作用域；恢复原政策但不重新颁布，避免测试人为增加改革费用或冷却。
+tca_test_cleanup_local_domain_effect = {
+    scope:tca_domain_civil ?= { tca_test_restore_local_domain_actor_effect = yes }
+    scope:tca_domain_military ?= { tca_test_restore_local_domain_actor_effect = yes }
+    if = { limit = { scope:tca_domain_test_old_policy = 1 } if = { limit = { NOT = { has_realm_law = tca_local_domain_civil_law } } add_realm_law_skip_effects = tca_local_domain_civil_law } }
+    else_if = { limit = { scope:tca_domain_test_old_policy = 2 } if = { limit = { NOT = { has_realm_law = tca_local_domain_all_law } } add_realm_law_skip_effects = tca_local_domain_all_law } }
+    else = { if = { limit = { NOT = { has_realm_law = tca_local_domain_original_law } } add_realm_law_skip_effects = tca_local_domain_original_law } }
+    tca_sync_local_domain_realm_effect = yes
+}
