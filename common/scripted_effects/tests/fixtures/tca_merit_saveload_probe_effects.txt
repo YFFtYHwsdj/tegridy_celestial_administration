@@ -1,0 +1,27 @@
+﻿# 保存重载的原生事务快照；人物作用域为测试报告者，只读业务状态，不修复／重建事务。
+# GUI在重载首帧、切换观察者前同步调用。记录精确恢复结果，防60日正常功绩变化混入保存断言。
+# 输出h_china上的checked/valid测试变量；准备和清理均由原保存用例负责。
+tca_test_merit_saveload_early_transaction_effect = {
+    tca_test_validate_environment_effect = yes
+    if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } NOT = { title:h_china = { has_variable = tca_msl_transaction_restore_checked } } }
+        title:h_china = {
+            set_variable = { name = tca_msl_transaction_restore_checked value = 1 }
+            set_variable = { name = tca_msl_transaction_restore_valid value = 0 }
+        }
+        if = { limit = {
+            exists = title:h_china.var:tca_merit_saveload_transaction
+            title:h_china.var:tca_merit_saveload_transaction = {
+                is_alive = yes
+                var:tca_mtx_phase = 1 var:tca_mtx_source = 1 var:tca_mtx_target = 2 var:tca_mtx_base = 1000
+                var:tca_merit_saveload_transaction_sentinel = 12345 merit = 30000 merit_level = 1
+                var:tca_merit_probe_approved = 1 top_liege = var:tca_mtx_liege
+                var:tca_merit_reset_probe_gain_count = 0 var:tca_merit_reset_probe_loss_count = 0
+                NOT = { has_character_flag = tca_merit_reset_probe_suppress }
+            }
+        }
+            title:h_china = { set_variable = { name = tca_msl_transaction_restore_valid value = 1 } }
+            debug_log = "TCA_MSL11 EARLY_SNAPSHOT_VALID"
+        }
+        else = { debug_log = "TCA_MSL11 EARLY_SNAPSHOT_INVALID" }
+    }
+}

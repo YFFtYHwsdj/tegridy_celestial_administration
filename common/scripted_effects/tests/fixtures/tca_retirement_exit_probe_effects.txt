@@ -1,0 +1,189 @@
+﻿# 闲退退出候选接口；只供可丢弃debug局，不负责卸职、付款、授品或皇帝审批。
+# 人物作用域；TRAIT只允许两种现有探针特质。首次进入保存原超时与日期；
+# 奉祠转致仕不覆盖原冷却快照，致仕不可转回奉祠。身份与超时桥接分别保存。
+tca_retirement_candidate_enter_effect = {
+    if = {
+        limit = {
+            debug_only = yes is_alive = yes is_adult = yes
+            NOT = { has_trait = tca_retirement_probe_retired }
+        }
+        if = {
+            limit = { NOT = { tca_retirement_candidate_is_exited_trigger = yes } }
+            set_variable = { name = tca_retirement_candidate_prior_timeout value = appointment_timeout_days }
+            set_variable = { name = tca_retirement_candidate_entered_date value = current_date }
+        }
+        add_character_flag = tca_retirement_candidate_enabled
+        remove_trait = tca_retirement_probe_fengci
+        add_trait = $TRAIT$
+        set_appointment_timeout = { years = 150 desc = appointment_timeout_desc_refusing }
+    }
+}
+
+# 人物作用域；再次检查资格后才扣60影响力，恢复原冷却扣除实际经过日数的余额。
+# 原生没有已确认的超时原因getter，因此这里只保存日数，不伪造原原因说明。
+# 进入后新增合法冷却须由写入入口独立维护；此探针不宣称处理未知外部模组写入。
+tca_retirement_candidate_resume_effect = {
+    if = {
+        limit = { debug_only = yes tca_retirement_candidate_can_resume_trigger = yes }
+        set_variable = {
+            name = tca_retirement_candidate_remaining_timeout
+            value = {
+                value = var:tca_retirement_candidate_prior_timeout
+                subtract = { value = current_date subtract = var:tca_retirement_candidate_entered_date }
+                min = 0
+            }
+        }
+        change_influence = -60
+        remove_trait = tca_retirement_probe_fengci
+        clear_appointment_timeout = yes
+        if = {
+            limit = { var:tca_retirement_candidate_remaining_timeout > 0 }
+            set_appointment_timeout = { days = tca_retirement_candidate_remaining_timeout_days }
+        }
+        remove_variable = tca_retirement_candidate_remaining_timeout
+        remove_variable = tca_retirement_candidate_prior_timeout
+        remove_variable = tca_retirement_candidate_entered_date
+        remove_character_flag = tca_retirement_candidate_enabled
+    }
+}
+
+# 报告者作用域；仅清理本例创建人物的候选身份及快照，再走既有夹具清理。
+tca_test_cleanup_retirement_exit_actor_effect = {
+    remove_trait = tca_retirement_probe_fengci
+    remove_trait = tca_retirement_probe_retired
+    remove_character_flag = tca_retirement_candidate_enabled
+    remove_variable = tca_retirement_candidate_prior_timeout
+    remove_variable = tca_retirement_candidate_entered_date
+    remove_variable = tca_retirement_candidate_remaining_timeout
+    tca_test_cleanup_merit_probe_character_effect = yes
+}
+
+# 报告者作用域；TITLE为真实目标头衔，CANDIDATE为该头衔初始current_heir快照。
+# 原生重算后读取整个列表；不会指定继承人或以自造资格代替阳性对照。
+tca_test_capture_retirement_heir_effect = {
+    remove_character_flag = $FLAG$
+    $TITLE$.holder = { scriptedtests_recalculate_succession = yes }
+    $TITLE$ = {
+        every_title_heir = {
+            if = { limit = { this = $CANDIDATE$ } scope:tca_re_reporter = { add_character_flag = $FLAG$ } }
+        }
+    }
+    if = { limit = { NOT = { has_character_flag = $FLAG$ } }
+        $TITLE$ = { debug_log = "TCA_RETIREMENT_NATIVE_LIST_ABSENT title=[THIS.Title.GetKey]" }
+        $CANDIDATE$ = { debug_log = "TCA_RETIREMENT_NATIVE_LIST_CONTROL id=[THIS.Char.GetID] rank=[THIS.Char.GetMeritLevel] timeout=[THIS.Char.MakeScope.ScriptValue('tca_merit_diag_timeout_value')|0]" }
+    }
+}
+
+tca_test_capture_retirement_heir_lists_effect = {
+    tca_test_capture_retirement_heir_effect = { TITLE = scope:tca_re_local_title CANDIDATE = scope:tca_re_local_heir FLAG = tca_re_in_local_list }
+    tca_test_capture_retirement_heir_effect = { TITLE = title:e_minister_of_justice CANDIDATE = scope:tca_re_ministry_heir FLAG = tca_re_in_ministry_list }
+    tca_test_capture_retirement_heir_effect = { TITLE = scope:tca_re_tongpan_title CANDIDATE = scope:tca_re_tongpan_heir FLAG = tca_re_in_tongpan_list }
+    tca_test_capture_retirement_heir_effect = { TITLE = scope:tca_re_judicial_title CANDIDATE = scope:tca_re_judicial_heir FLAG = tca_re_in_judicial_list }
+}
+
+# 报告者作用域；四个真实继任者可以是同一人物，每个动作均以人物借用旗标幂等。
+tca_test_retirement_native_controls_effect = {
+    scope:tca_re_local_heir = { $ACTION$ = yes }
+    scope:tca_re_ministry_heir = { $ACTION$ = yes }
+    scope:tca_re_tongpan_heir = { $ACTION$ = yes }
+    scope:tca_re_judicial_heir = { $ACTION$ = yes }
+}
+
+# 仅借无候选临时状态的真实人物；不写家门、头衔、官品、Merit或正式退休离散标记。
+# 保护特质用独立所有权，绝不撤回本例之前已存在的死亡保护。
+tca_test_borrow_retirement_native_heir_effect = {
+    if = { limit = { NOT = { has_character_flag = tca_re_native_borrowed } }
+        add_character_flag = tca_re_native_borrowed
+        set_variable = { name = tca_re_native_original_timeout value = appointment_timeout_days }
+        set_variable = { name = tca_re_native_borrowed_date value = current_date }
+        set_variable = { name = tca_re_native_original_influence value = influence }
+        if = { limit = { NOT = { has_trait = tca_test_death_protection } }
+            add_character_flag = tca_re_native_owns_protection
+            add_trait = tca_test_death_protection
+        }
+    }
+}
+# 借用人物在等待期间可能被自然任命写入5年冷却；首次名单核对前恢复借用时的0冷却。
+# 只处理本例已借用且尚未进入退休身份的人物，归还时仍按原超时快照处理。
+tca_test_refresh_retirement_native_borrow_effect = {
+    if = { limit = { has_character_flag = tca_re_native_borrowed NOT = { tca_retirement_candidate_is_exited_trigger = yes } }
+        if = { limit = { appointment_timeout_days > 0 }
+            debug_log = "TCA_RETIREMENT_NATIVE_BORROW TIMEOUT_DRIFT id=[THIS.Char.GetID] days=[THIS.Char.MakeScope.ScriptValue('tca_merit_diag_timeout_value')|0]"
+            clear_appointment_timeout = yes
+        }
+    }
+}
+tca_test_fengci_retirement_native_heir_effect = {
+    if = { limit = { has_character_flag = tca_re_native_borrowed NOT = { tca_retirement_candidate_is_exited_trigger = yes } }
+        tca_retirement_candidate_enter_effect = { TRAIT = tca_retirement_probe_fengci }
+    }
+}
+tca_test_resume_retirement_native_heir_effect = {
+    if = { limit = { has_character_flag = tca_re_native_borrowed has_trait = tca_retirement_probe_fengci }
+        change_influence = { value = 500 subtract = influence }
+        tca_retirement_candidate_resume_effect = yes
+        # 原生通判候选可能在新一轮名单计算时重设5年冷却；本夹具进入前原冷却为0，
+        # 起复对照必须恢复同一初始状态，而不是把测试注入的冷却当作业务结果。
+        if = { limit = { NOT = { has_trait = tca_retirement_probe_fengci } } clear_appointment_timeout = yes }
+    }
+}
+tca_test_retire_retirement_native_heir_effect = {
+    if = { limit = { has_character_flag = tca_re_native_borrowed NOT = { has_trait = tca_retirement_probe_retired } }
+        tca_retirement_candidate_enter_effect = { TRAIT = tca_retirement_probe_retired }
+    }
+}
+
+# 仅恢复本例临时身份、保护、影响力快照和按真实经过日数递减的原超时。
+# 不调用新建人物cleanup，不删任何家门、实职、考试、教育或正式官品状态。
+tca_test_restore_retirement_native_heir_effect = {
+    if = { limit = { has_character_flag = tca_re_native_borrowed is_alive = yes }
+        remove_trait = tca_retirement_probe_fengci
+        remove_trait = tca_retirement_probe_retired
+        remove_character_flag = tca_retirement_candidate_enabled
+        remove_variable = tca_retirement_candidate_prior_timeout
+        remove_variable = tca_retirement_candidate_entered_date
+        remove_variable = tca_retirement_candidate_remaining_timeout
+        clear_appointment_timeout = yes
+        if = { limit = { tca_retirement_native_probe_remaining_timeout_days > 0 }
+            set_appointment_timeout = { days = tca_retirement_native_probe_remaining_timeout_days }
+        }
+        change_influence = { value = var:tca_re_native_original_influence subtract = influence }
+        if = { limit = { has_character_flag = tca_re_native_owns_protection }
+            remove_trait = tca_test_death_protection
+            remove_character_flag = tca_re_native_owns_protection
+        }
+        remove_variable = tca_re_native_original_timeout
+        remove_variable = tca_re_native_borrowed_date
+        remove_variable = tca_re_native_original_influence
+        remove_character_flag = tca_re_native_borrowed
+    }
+}
+
+# 只保留初始真实目标与控制者摘要，不逐成员输出整张继承表。
+# 初始控制必须在原生重算后冻结，防止缓存中的冷却人物成为假阳性。
+tca_test_dump_retirement_native_heirs_effect = {
+    $TITLE$ = {
+        debug_log = "TCA_RETIREMENT_HEIR_TARGET $LABEL$ title=[THIS.Title.GetKey]"
+        current_heir ?= { debug_log = "TCA_RETIREMENT_HEIR_CONTROL $LABEL$ id=[THIS.Char.GetID] rank=[THIS.Char.GetMeritLevel] timeout=[THIS.Char.MakeScope.ScriptValue('tca_merit_diag_timeout_value')|0]" }
+    }
+}
+
+# TITLE / OUT；从原生任官名单冻结一名真实合格继任者，不指定具体人物。
+# 优先使用名单成员而非可能陈旧的current_heir缓存；仍由调用者做完整资格前置检查。
+tca_test_pick_retirement_native_heir_effect = {
+    clear_saved_scope = $OUT$
+    $TITLE$ = {
+        every_title_heir = {
+            if = {
+                limit = {
+                    is_alive = yes is_adult = yes is_incapable = no health >= 1.2 appointment_timeout_days = 0
+                    NOT = { tca_is_landless_official_trigger = yes }
+                    this != root
+                    NOT = { this = $TITLE$.holder }
+                    NOT = { this = $TITLE$.holder.liege }
+                }
+                save_scope_as = $OUT$
+            }
+        }
+    }
+}

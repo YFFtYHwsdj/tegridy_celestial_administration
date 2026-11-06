@@ -22,6 +22,22 @@ class RunEvidenceTests(unittest.TestCase):
         issues, _ = inspect_run(self.run_log() + '\n' + error, '', {'tca_test_example': 1})
         self.assertTrue(any('contract window' in issue for issue in issues))
 
+    def test_retirement_default_visibility_error_invalidates_pass(self):
+        # 两类退休契约的默认档都不得带 is_shown，否则引擎报错且本次运行不能判通过。
+        for contract, level in (('tca_zhishi_salary', 'tca_zhishi_salary_none'),
+                                ('tca_fengci_salary', 'tca_fengci_salary_none')):
+            error = (f"[14:48:17][E][subject_contract_type.cpp:436]: Obligation level '{level}' "
+                     f"in '{contract}' is marked as default but has an is_shown trigger, "
+                     "the default must always be visible to the player!")
+            issues, _ = inspect_run(self.run_log(), error, {'tca_test_example': 1})
+            self.assertTrue(any('contract default' in issue for issue in issues))
+        # 不将无关原版契约错误认作当前模组错误。
+        unrelated = ("[14:48:17][E][subject_contract_type.cpp:436]: Obligation level 'unrelated_none' "
+                     "in 'unrelated_salary' is marked as default but has an is_shown trigger, "
+                     "the default must always be visible to the player!")
+        clean, _ = inspect_run(self.run_log(), unrelated, {'tca_test_example': 1})
+        self.assertEqual(clean, [])
+
     def test_gui_file_shadow_error_without_custom_identifier_invalidates_pass(self):
         error = "[10:00:00][E]: gui/window_diarchy.gui:123 Could not find data system function 'BrokenNativeName'"
         issues, _ = inspect_run(self.run_log(), error, {'tca_test_example': 1})
@@ -154,6 +170,18 @@ class RunEvidenceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             self.event_fixture(root, 'debug_log = "TCA_TEST CHECK_PASS tca_test_fixture 2"')
+            self.assertEqual(expected_cases(root), {'tca_test_fixture': 2})
+
+    def test_event_reader_includes_gui_synchronous_fixture_assertions(self):
+        # 重载首帧检查在夹具效果中同步执行；静态索引也必须读取，不能靠孤立占位事件。
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.event_fixture(root, '')
+            fixture = root / 'common/scripted_effects/tests/fixtures/tca_fixture_effects.txt'
+            fixture.parent.mkdir(parents=True, exist_ok=True)
+            fixture.write_text('tca_fixture_effect = { '
+                               'debug_log = "TCA_TEST CHECK_PASS tca_test_fixture 2" }\n',
+                               encoding='utf-8')
             self.assertEqual(expected_cases(root), {'tca_test_fixture': 2})
 
     def test_event_reader_rejects_missing_assertion_numbers(self):

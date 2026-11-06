@@ -1,0 +1,144 @@
+﻿# 致仕五品的非天朝停付与返国复付；独立父子，正式传家后排除庄园收入。
+# 实际到账用逐日原生余额差核对；不直接发薪、补钱或调用同步worker制造迁国结果。
+namespace = tca_retirement_retired_migration_test
+
+tca_retirement_retired_migration_test.1 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_retirement_retired_migration_test.1 tca_test_retirement_retired_migration"
+        remove_character_flag = tca_test_case_failed
+        if = { limit = { debug_only = yes title:h_china.holder = root title:e_hre.holder = { is_alive = yes NOT = { government_has_flag = government_is_celestial } } }
+            tca_test_create_merit_interface_character_with_age_effect = { CHARACTER = tca_rzm_actor GOVERNMENT = celestial_government AGE = 65 }
+            scope:tca_rzm_actor = {
+                primary_title = { save_scope_as = tca_rzm_family }
+                tca_test_retirement_salary_baseline_effect = yes
+                add_character_flag = tca_merit_grant_suppress
+                add_character_modifier = tca_retirement_test_rank_cap_modifier
+                tca_test_add_native_merit_probe_exams_effect = yes add_trait = education_stewardship_1 set_merit_level = 5
+                create_character = { age = 30 gender_female_chance = 0 random_traits = no dynasty = this.dynasty father = this employer = this culture = this.culture faith = this.faith rite = this.rite save_scope_as = tca_rzm_heir }
+                tca_retirement_enter_effect = { KIND = 2 } tca_retirement_step_down_effect = yes
+                var:tca_retirement_title = { save_scope_as = tca_rzm_title }
+            }
+            scope:tca_rzm_heir = { set_house = scope:tca_rzm_actor.house tca_test_protect_character_effect = yes add_character_flag = ai_will_not_convert add_character_flag = tca_merit_interface_probe set_appointment_timeout = { years = 150 desc = appointment_timeout_desc_refusing } }
+            add_character_flag = tca_test_delayed_case_active
+            trigger_event = { id = tca_retirement_retired_migration_test.1000 days = 3 }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_retirement_retired_migration" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_continue_delayed_effect = yes }
+    }
+}
+tca_retirement_retired_migration_test.1000 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            scope:tca_rzm_actor = { tca_retirement_transfer_effect = yes }
+            if = { limit = { scope:tca_rzm_actor = { merit_level = 5 has_trait = tca_retired has_title = scope:tca_rzm_title NOT = { has_title = scope:tca_rzm_family } NOT = { exists = domicile } liege = root vassal_contract_has_flag = tca_zhishi_salary_active vassal_contract_has_flag = tca_retirement_merit_half tca_retirement_salary_weight_value = 0.125 } scope:tca_rzm_family.holder = scope:tca_rzm_heir } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_retired_migration 1" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_retired_migration 1" }
+            set_variable = { name = tca_rzm_stage value = 1 }
+            trigger_event = { id = tca_retirement_retired_migration_test.1001 days = 35 }
+        }
+    }
+}
+# 每个阳性窗口重新准备余额；最多70日捕捉一笔匹配当日毛收入的真实到账。
+tca_retirement_retired_migration_test.1001 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            set_variable = { name = tca_rzm_wait value = 0 }
+            scope:tca_rzm_actor = { remove_character_flag = tca_rir_received set_variable = { name = tca_rir_before value = gold } }
+            trigger_event = { id = tca_retirement_retired_migration_test.1002 days = 1 }
+        }
+    }
+}
+tca_retirement_retired_migration_test.1002 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            scope:tca_rzm_actor = { tca_test_retirement_capture_payment_effect = { EXPECT_SALARY = yes } }
+            change_variable = { name = tca_rzm_wait add = 1 }
+            if = { limit = { OR = { scope:tca_rzm_actor = { has_character_flag = tca_rir_received } var:tca_rzm_wait >= 70 } }
+                save_scope_value_as = { name = tca_rt_native_salary_rate value = tca_retirement_test_salary_rate_value }
+                if = { limit = { scope:tca_rzm_actor = { merit_level = 5 has_trait = tca_retired liege = root var:tca_retirement_title = scope:tca_rzm_title vassal_contract_has_flag = tca_zhishi_salary_active vassal_contract_has_flag = tca_retirement_merit_half tca_retirement_salary_weight_value = 0.125 has_character_flag = tca_rir_received var:tca_rir_delta > 0 monthly_character_treasury_income = 0 monthly_character_treasury_variable_income = 0 monthly_character_income >= { value = scope:tca_rt_native_salary_rate multiply = 0.125 subtract = 0.0002 } monthly_character_income < { value = scope:tca_rt_native_salary_rate multiply = 0.125 add = 0.0002 } } }
+                    if = { limit = { var:tca_rzm_stage = 1 } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_retired_migration 2" }
+                    else = { debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_retired_migration 6" }
+                }
+                else = { add_character_flag = tca_test_case_failed if = { limit = { var:tca_rzm_stage = 1 } debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_retired_migration 2" } else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_retired_migration 6" } }
+                if = { limit = { var:tca_rzm_stage = 1 }
+                    scope:tca_rzm_actor = { create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_rzm_move } change_liege = { liege = title:e_hre.holder change = scope:tca_rzm_move } resolve_title_and_vassal_change = scope:tca_rzm_move }
+                    trigger_event = { id = tca_retirement_retired_migration_test.1003 days = 3 }
+                }
+                else = {
+                    scope:tca_rzm_actor = { remove_character_modifier = tca_retirement_test_rank_cap_modifier tca_test_cleanup_retirement_formal_effect = yes }
+                    scope:tca_rzm_heir = { tca_test_cleanup_merit_probe_character_effect = yes }
+                    remove_variable = tca_rzm_stage remove_variable = tca_rzm_wait
+                    if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_retirement_retired_migration" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+                    else = { debug_log = "TCA_TEST PASS tca_test_retirement_retired_migration" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+                    remove_character_flag = tca_test_case_failed remove_character_flag = tca_test_delayed_case_active tca_test_continue_delayed_effect = yes
+                }
+            }
+            else = { trigger_event = { id = tca_retirement_retired_migration_test.1002 days = 1 } }
+        }
+    }
+}
+# 原版契约组由封臣本人政体决定；外国可能保留档位，停付按资格及真实收支验收，不预设清档。
+tca_retirement_retired_migration_test.1003 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            scope:tca_rzm_actor = {
+                debug_log = "TCA_RETIREMENT_RETIRED_MIGRATION foreign rank=[THIS.Char.GetMeritLevel] top=[THIS.Char.GetTopLiege.GetID] primary=[THIS.Char.GetPrimaryTitle.GetNameNoTier]"
+                if = { limit = { merit_level = 5 } debug_log = "TCA_RETIREMENT_RETIRED_MIGRATION RANK_OK" } else = { debug_log = "TCA_RETIREMENT_RETIRED_MIGRATION RANK_BAD" }
+                if = { limit = { var:tca_retirement_title = scope:tca_rzm_title has_title = scope:tca_rzm_title } debug_log = "TCA_RETIREMENT_RETIRED_MIGRATION TITLE_OK" } else = { debug_log = "TCA_RETIREMENT_RETIRED_MIGRATION TITLE_BAD" }
+                if = { limit = { vassal_contract_has_flag = tca_retirement_salary_active } debug_log = "TCA_RETIREMENT_RETIRED_MIGRATION SALARY_ACTIVE" }
+                if = { limit = { vassal_contract_has_flag = tca_retirement_merit_half } debug_log = "TCA_RETIREMENT_RETIRED_MIGRATION HALF_ACTIVE" }
+            }
+            if = { limit = { scope:tca_rzm_actor = { merit_level = 5 has_trait = tca_retired top_liege = title:e_hre.holder var:tca_retirement_title = scope:tca_rzm_title has_title = scope:tca_rzm_title tca_retirement_income_valid_trigger = no } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_retired_migration 3" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_retired_migration 3" }
+            trigger_event = { id = tca_retirement_retired_migration_test.1004 days = 35 }
+        }
+    }
+}
+# 先清缓存，再观察完整35日；阴性逐日捕捉任何金币正增，不能只比较窗口净额。
+tca_retirement_retired_migration_test.1004 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            set_variable = { name = tca_rzm_wait value = 0 }
+            scope:tca_rzm_actor = { remove_character_flag = tca_rir_received set_variable = { name = tca_rir_before value = gold } }
+            trigger_event = { id = tca_retirement_retired_migration_test.1005 days = 1 }
+        }
+    }
+}
+tca_retirement_retired_migration_test.1005 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            scope:tca_rzm_actor = { tca_test_retirement_capture_payment_effect = { EXPECT_SALARY = no } }
+            change_variable = { name = tca_rzm_wait add = 1 }
+            if = { limit = { var:tca_rzm_wait >= 35 }
+                if = { limit = { scope:tca_rzm_actor = { merit_level = 5 has_trait = tca_retired top_liege = title:e_hre.holder NOT = { has_character_flag = tca_rir_received } monthly_character_income = 0 tca_retirement_income_valid_trigger = no } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_retired_migration 4" }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_retired_migration 4" }
+                scope:tca_rzm_actor = { create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_rzm_return } change_liege = { liege = root change = scope:tca_rzm_return } resolve_title_and_vassal_change = scope:tca_rzm_return }
+                trigger_event = { id = tca_retirement_retired_migration_test.1006 days = 3 }
+            }
+            else = { trigger_event = { id = tca_retirement_retired_migration_test.1005 days = 1 } }
+        }
+    }
+}
+tca_retirement_retired_migration_test.1006 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_rzm_actor = { merit_level = 5 has_trait = tca_retired liege = root var:tca_retirement_title = scope:tca_rzm_title vassal_contract_has_flag = tca_zhishi_salary_active vassal_contract_has_flag = tca_retirement_merit_half tca_retirement_salary_weight_value = 0.125 } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_retired_migration 5" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_retired_migration 5" }
+            set_variable = { name = tca_rzm_stage value = 2 }
+            trigger_event = { id = tca_retirement_retired_migration_test.1001 days = 35 }
+        }
+    }
+}

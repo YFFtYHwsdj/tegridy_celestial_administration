@@ -1,0 +1,119 @@
+﻿# 正式申请入口；人物作用域；KIND=1奉祠、2致仕、3起复。共享效果再次核验，直接execute不能绕过。
+# 无实职高品先致仕，再发仅问加恩的请求；皇帝不能阻止已合法退出。
+tca_retirement_apply_effect = {
+    save_scope_value_as = { name = tca_retirement_apply_kind value = $KIND$ }
+    if = { limit = { NOT = { has_variable = tca_retirement_request_kind } NOT = { has_character_flag = tca_retirement_request_denied } }
+        if = { limit = { scope:tca_retirement_apply_kind = 1 tca_retirement_can_fengci_trigger = yes }
+            if = { limit = { tca_retirement_needs_approval_trigger = yes } tca_retirement_create_request_effect = { KIND = 1 } }
+            else = { tca_retirement_finish_effect = { KIND = 1 APPROVE = no } }
+        }
+        else_if = { limit = { scope:tca_retirement_apply_kind = 2 tca_retirement_can_retire_trigger = yes }
+            if = { limit = { tca_retirement_needs_approval_trigger = yes } tca_retirement_create_request_effect = { KIND = 2 } }
+            else = {
+                tca_retirement_enter_effect = { KIND = 2 }
+                tca_retirement_step_down_effect = yes
+                if = { limit = { merit_level >= 7 merit_level < 9 } tca_retirement_create_request_effect = { KIND = 4 } }
+                else = { tca_retirement_honor_effect = { APPROVE = no } tca_retirement_offer_transfer_effect = yes }
+            }
+        }
+        else_if = { limit = { scope:tca_retirement_apply_kind = 3 tca_retirement_can_resume_trigger = yes }
+            if = { limit = { merit_level >= 7 } tca_retirement_create_request_effect = { KIND = 3 } }
+            else = { tca_retirement_resume_effect = yes }
+        }
+    }
+}
+# 人物作用域；KIND含4=已致仕纯加恩。冻结君主／国家／官品／职务名单和单调递增凭据。
+# 事件带申请者及凭据scope，任何旧回复／旧超时只处理自己，不清后来的请求。
+tca_retirement_prepare_request_effect = {
+    if = { limit = { is_alive = yes NOT = { has_variable = tca_retirement_request_kind } exists = top_liege this != top_liege }
+        if = { limit = { NOT = { has_variable = tca_retirement_request_serial } } set_variable = { name = tca_retirement_request_serial value = 0 } }
+        change_variable = { name = tca_retirement_request_serial add = 1 }
+        set_variable = { name = tca_retirement_request_kind value = $KIND$ }
+        set_variable = { name = tca_retirement_request_emperor value = top_liege }
+        set_variable = { name = tca_retirement_request_country value = top_liege.primary_title }
+        set_variable = { name = tca_retirement_request_level value = merit_level }
+        set_variable = { name = tca_retirement_request_date value = current_date }
+        set_variable = { name = tca_retirement_request_office_count value = 0 }
+        clear_variable_list = tca_retirement_request_offices
+        save_scope_as = tca_retirement_applicant
+        save_scope_value_as = { name = tca_retirement_token value = var:tca_retirement_request_serial }
+        every_held_title = {
+            limit = { is_noble_family_title = no NOT = { has_variable = tca_retirement_title } }
+            scope:tca_retirement_applicant = { add_to_variable_list = { name = tca_retirement_request_offices target = prev } change_variable = { name = tca_retirement_request_office_count add = 1 } }
+        }
+    }
+}
+# 申请者作用域；EMPEROR实际答复人、SERIAL冻结凭据、ACCEPT准许／挽留、HONOR是否加恩。
+# 不存在或不同凭据的请求完全无副作用；同凭据但快照失效则结案，零扣费零授品。
+tca_retirement_resolve_effect = {
+    if = { limit = { is_alive = yes has_variable = tca_retirement_request_kind var:tca_retirement_request_serial = $SERIAL$ }
+        save_scope_as = tca_retirement_reply_actor
+        set_variable = { name = tca_retirement_current_office_count value = 0 }
+        remove_character_flag = tca_retirement_office_snapshot_invalid
+        every_held_title = { limit = { is_noble_family_title = no NOT = { has_variable = tca_retirement_title } } scope:tca_retirement_reply_actor = { change_variable = { name = tca_retirement_current_office_count add = 1 } } }
+        every_in_list = { variable = tca_retirement_request_offices
+            if = { limit = { NOT = { holder = scope:tca_retirement_reply_actor } } scope:tca_retirement_reply_actor = { add_character_flag = tca_retirement_office_snapshot_invalid } }
+        }
+        if = { limit = {
+            var:tca_retirement_request_emperor = $EMPEROR$
+            top_liege = $EMPEROR$
+            top_liege = { government_has_flag = government_is_celestial }
+            top_liege.primary_title = var:tca_retirement_request_country
+            merit_level = var:tca_retirement_request_level
+            tca_retirement_request_age_value <= 30
+            var:tca_retirement_current_office_count = var:tca_retirement_request_office_count
+            NOT = { has_character_flag = tca_retirement_office_snapshot_invalid }
+            OR = {
+                AND = { var:tca_retirement_request_kind = 1 tca_retirement_can_fengci_trigger = yes }
+                AND = { var:tca_retirement_request_kind = 2 tca_retirement_can_retire_trigger = yes }
+                AND = { var:tca_retirement_request_kind = 3 tca_retirement_can_resume_trigger = yes }
+                AND = { var:tca_retirement_request_kind = 4 has_trait = tca_retired NOT = { has_character_flag = tca_retirement_honor_processed } }
+            }
+        }
+            set_variable = { name = tca_retirement_request_result value = 1 }
+            if = { limit = { always = $ACCEPT$ }
+                if = { limit = { var:tca_retirement_request_kind = 3 } tca_retirement_resume_effect = yes }
+                else_if = { limit = { var:tca_retirement_request_kind = 4 } tca_retirement_honor_effect = { APPROVE = $HONOR$ } tca_retirement_offer_transfer_effect = yes }
+                else = { tca_retirement_finish_effect = { KIND = var:tca_retirement_request_kind APPROVE = $HONOR$ } }
+            }
+            else = { add_character_flag = { flag = tca_retirement_request_denied days = 365 } set_variable = { name = tca_retirement_request_result value = 0 } }
+        }
+        else = { set_variable = { name = tca_retirement_request_result value = -1 } }
+        tca_retirement_clear_request_effect = yes
+        # 完成请求清理后再邀请；此前finish可能因未结请求合法跳过邀请。
+        tca_retirement_offer_transfer_effect = yes
+        remove_variable = tca_retirement_current_office_count
+        remove_character_flag = tca_retirement_office_snapshot_invalid
+        if = { limit = { is_ai = no } trigger_event = tca_retirement.12 }
+    }
+}
+# 人物作用域；仅清当前请求，保留serial及最终result供UI／旧事件去重。
+tca_retirement_clear_request_effect = {
+    remove_variable = tca_retirement_request_kind
+    remove_variable = tca_retirement_request_emperor
+    remove_variable = tca_retirement_request_country
+    remove_variable = tca_retirement_request_level
+    remove_variable = tca_retirement_request_date
+    remove_variable = tca_retirement_request_office_count
+    clear_variable_list = tca_retirement_request_offices
+}
+# 人物作用域；KIND=已核准状态，APPROVE=是否致仕加恩。
+tca_retirement_finish_effect = {
+    save_scope_value_as = { name = tca_retirement_finish_kind value = $KIND$ }
+    tca_retirement_enter_effect = { KIND = scope:tca_retirement_finish_kind }
+    tca_retirement_step_down_effect = yes
+    if = { limit = { scope:tca_retirement_finish_kind = 2 } tca_retirement_honor_effect = { APPROVE = $APPROVE$ } }
+    tca_retirement_offer_transfer_effect = yes
+}
+
+# 人物作用域；准备与投递分开，以便恢复的待处理请求继续复用同一快照。
+# 仅本入口投递皇帝事件及超时；prepare不排事件、不结案、不扣费。
+tca_retirement_create_request_effect = {
+    if = { limit = { NOT = { has_variable = tca_retirement_request_kind } }
+        tca_retirement_prepare_request_effect = { KIND = $KIND$ }
+        if = { limit = { has_variable = tca_retirement_request_kind }
+            top_liege = { trigger_event = { id = tca_retirement.10 days = 1 } }
+            trigger_event = { id = tca_retirement.11 days = 31 }
+        }
+    }
+}

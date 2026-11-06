@@ -3,8 +3,9 @@ on_government_change = { on_actions = { tca_merit_government_changed } }
 on_vassal_change = { on_actions = { tca_merit_liege_changed } }
 on_join_court = { on_actions = { tca_merit_court_joined } }
 on_leave_court = { on_actions = { tca_merit_court_left } }
-on_merit_level_gain = { on_actions = { tca_merit_native_gain } }
-on_title_gain = { on_actions = { tca_merit_central_title_gain tca_merit_cap_title_changed } }
+on_merit_level_gain = { on_actions = { tca_merit_native_gain tca_retirement_rank_changed } }
+on_merit_level_loss = { on_actions = { tca_retirement_rank_changed } }
+on_title_gain = { on_actions = { tca_merit_central_title_gain tca_merit_cap_title_changed tca_retirement_title_guard } }
 on_title_lost = { on_actions = { tca_merit_cap_title_changed } }
 
 tca_merit_government_changed = {
@@ -68,4 +69,27 @@ tca_merit_central_title_gain = {
 tca_merit_cap_title_changed = {
     trigger = { has_global_variable = tca_merit_startup_ready has_character_flag = tca_merit_active NOT = { tca_merit_interface_probe_trigger = yes } }
     effect = { tca_merit_queue_cap_sync_effect = yes }
+}
+
+# 原生受封者人物作用域；scope:title是本次头衔。退休身份不影响家门继承。
+tca_retirement_title_guard = {
+    trigger = { tca_retirement_is_exited_trigger = yes scope:title = { is_noble_family_title = no NOT = { has_variable = tca_retirement_title } } }
+    effect = {
+        if = { limit = { NOT = { has_character_flag = tca_retirement_office_cleanup_pending } }
+            add_character_flag = tca_retirement_office_cleanup_pending
+            trigger_event = { id = tca_retirement.90 days = 1 }
+        }
+    }
+}
+
+# 原生升降品人物作用域；跨日读取最终等级，同链归零回填只合并一次刷新。
+# 授品保护会屏蔽原生根回调，致仕加恩另由其审计成功入口同步。
+tca_retirement_rank_changed = {
+    trigger = { tca_retirement_is_exited_trigger = yes }
+    effect = {
+        if = { limit = { NOT = { has_character_flag = tca_retirement_income_sync_pending } }
+            add_character_flag = tca_retirement_income_sync_pending
+            trigger_event = { id = tca_retirement.93 days = 2 }
+        }
+    }
 }

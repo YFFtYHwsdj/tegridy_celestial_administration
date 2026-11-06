@@ -21,6 +21,19 @@ tca_merit_panel_state_value = {
         limit = { is_alive = yes government_has_flag = government_is_celestial is_independent_ruler = yes }
         value = 1
     }
+    # 未经过授品事务的正式退休者也应显示退休，不能只依赖 tca_merit_active。
+    else_if = {
+        limit = {
+            is_alive = yes
+            NOT = { has_variable = tca_merit_grant_phase }
+            tca_retirement_is_exited_trigger = yes
+            government_has_flag = government_is_celestial
+            exists = top_liege
+            top_liege ?= { government_has_flag = government_is_celestial }
+            is_independent_ruler = no
+        }
+        value = 5
+    }
     else_if = {
         limit = {
             is_alive = yes
@@ -33,6 +46,7 @@ tca_merit_panel_state_value = {
         }
         if = { limit = { var:tca_merit_grant_phase ?= 3 } value = 3 }
         else_if = { limit = { has_variable = tca_merit_grant_phase } value = 4 }
+        # 旧三年标记只服务未迁移的历史辞谢路径；正式退休身份由上方分支处理。
         else_if = { limit = { has_character_flag = tca_merit_retired } value = 5 }
         else_if = { limit = { has_character_flag = tca_merit_refused } value = 6 }
         else_if = { limit = { tca_merit_level_value <= 0 } value = 7 }

@@ -1,0 +1,80 @@
+﻿# 皇帝报告者作用域；tca_rq_actor为独立测试家主；本例只改测试局本朝年龄法律。
+# LAW为原版法律，四个AGE参数分别覆盖奉祠和致仕的前一岁／当岁；输出布尔变量。
+tca_test_retirement_formal_age_boundaries_effect = {
+    add_realm_law_skip_effects = $LAW$
+    set_variable = { name = tca_rq_age_ok value = yes }
+    scope:tca_rq_actor = { set_age = $FENGCI_BEFORE$ }
+    if = { limit = { scope:tca_rq_actor = { OR = { tca_retirement_can_fengci_trigger = yes tca_retirement_can_retire_trigger = yes } } } set_variable = { name = tca_rq_age_ok value = no } }
+    scope:tca_rq_actor = { set_age = $FENGCI_AT$ }
+    if = { limit = { scope:tca_rq_actor = { OR = { tca_retirement_can_fengci_trigger = no tca_retirement_can_retire_trigger = yes } } } set_variable = { name = tca_rq_age_ok value = no } }
+    scope:tca_rq_actor = { set_age = $RETIRE_BEFORE$ }
+    if = { limit = { scope:tca_rq_actor = { tca_retirement_can_retire_trigger = yes } } set_variable = { name = tca_rq_age_ok value = no } }
+    scope:tca_rq_actor = { set_age = $RETIRE_AT$ }
+    if = { limit = { scope:tca_rq_actor = { OR = { tca_retirement_can_fengci_trigger = no tca_retirement_can_retire_trigger = no } } } set_variable = { name = tca_rq_age_ok value = no } }
+}
+# 皇帝报告者；同一新建人物逐条测试，移除特质后不依赖其他用例的残留状态。
+tca_test_retirement_formal_ailment_boundaries_effect = {
+    set_variable = { name = tca_rq_xp_ok value = yes }
+    scope:tca_rq_actor = { add_trait = $TRAIT$ add_trait_xp = { trait = $TRAIT$ value = 49 } }
+    if = { limit = { scope:tca_rq_actor = { OR = { tca_retirement_ailment_mid_trigger = yes tca_retirement_ailment_severe_trigger = yes } } } set_variable = { name = tca_rq_xp_ok value = no } }
+    scope:tca_rq_actor = { add_trait_xp = { trait = $TRAIT$ value = 1 } }
+    if = { limit = { scope:tca_rq_actor = { OR = { tca_retirement_ailment_mid_trigger = no tca_retirement_ailment_severe_trigger = yes } } } set_variable = { name = tca_rq_xp_ok value = no } }
+    scope:tca_rq_actor = { add_trait_xp = { trait = $TRAIT$ value = 24 } }
+    if = { limit = { scope:tca_rq_actor = { tca_retirement_ailment_severe_trigger = yes } } set_variable = { name = tca_rq_xp_ok value = no } }
+    scope:tca_rq_actor = { add_trait_xp = { trait = $TRAIT$ value = 1 } }
+    if = { limit = { scope:tca_rq_actor = { tca_retirement_ailment_severe_trigger = no } } set_variable = { name = tca_rq_xp_ok value = no } }
+    scope:tca_rq_actor = { remove_trait = $TRAIT$ }
+}
+
+# 测试新建人物清理；只移除本例正式身份与待遇，再使用已有独立人物清理。
+tca_test_cleanup_retirement_formal_effect = {
+    add_character_flag = tca_retirement_maintaining
+    tca_retirement_release_title_effect = yes
+
+    remove_variable = tca_retirement_country
+    remove_character_flag = tca_retirement_salary_active
+    remove_character_flag = tca_retirement_exit_pending
+    remove_character_flag = tca_retirement_maintaining
+    remove_trait = tca_fengci remove_trait = tca_retired
+    tca_retirement_clear_request_effect = yes
+    tca_test_cleanup_merit_probe_character_effect = yes
+}
+
+# 新建收入夹具人物作用域；before是前一日余额，received／delta保存首次实际到账。
+# EXPECT_SALARY=yes时，日增额还须匹配原生毛收入（固定点容差0.0002），不将礼金当薪俸。
+# 停发阴性用no捕捉任何日增长；每次推进前日余额，期间支出不应抹掉下一次真实到账。
+tca_test_retirement_capture_payment_effect = {
+    if = { limit = {
+        NOT = { has_character_flag = tca_rir_received }
+        gold > var:tca_rir_before
+        OR = {
+            NOT = { always = $EXPECT_SALARY$ }
+            AND = {
+                monthly_character_income > 0
+                gold >= { value = var:tca_rir_before add = monthly_character_income subtract = 0.0002 }
+                gold <= { value = var:tca_rir_before add = monthly_character_income add = 0.0002 }
+            }
+        }
+    }
+        set_variable = { name = tca_rir_delta value = { value = gold subtract = var:tca_rir_before } }
+        add_character_flag = tca_rir_received
+    }
+    set_variable = { name = tca_rir_before value = gold }
+}
+
+# 新建收入夹具人物作用域，无参数／输出scope；隔离主动消费与外部俸禄倍率。
+# 详细账目perk对salary预算+10%，会盖过本用例要验证的官品折半；战时获利只影响战时收入，
+# 一并移除以保持既有“无war_profiteer_perk”断言。正式退休保留所有原生外部倍率，
+# 本接口不用于真实人物，不计算或补发薪俸。
+tca_test_retirement_salary_baseline_effect = {
+    if = { limit = { NOT = { has_trait = incapable } } add_trait = incapable }
+    # 金额观察不验证退闲AI；按既有逐品夹具方式封闭主动转致仕，覆盖完整多周期观察窗。
+    add_character_flag = { flag = tca_retirement_request_denied days = 3650 }
+    if = { limit = { has_perk = war_profiteer_perk } remove_perk = war_profiteer_perk }
+    if = { limit = { has_perk = detailed_ledgers_perk } remove_perk = detailed_ledgers_perk }
+    # 原生AI可把退还／剩余点再次买回该技能；仅耗尽测试人物的未分配管理点，不改收入倍率。
+    while = {
+        limit = { stewardship_lifestyle_perk_points > 0 }
+        add_stewardship_lifestyle_perk_points = -1
+    }
+}

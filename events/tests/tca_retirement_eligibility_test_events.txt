@@ -1,0 +1,495 @@
+﻿# 资格边界真实读取原生年龄、健康与五类衰老经验，不使用Python业务规则。
+namespace = tca_retirement_eligibility
+tca_retirement_eligibility.1 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_retirement_eligibility.1 tca_test_retirement_eligibility"
+        remove_character_flag = tca_test_case_failed
+        if = { limit = { debug_only = yes is_alive = yes title:h_china.holder = root }
+            save_scope_value_as = { name = tca_rq_old_age value = retirement_age_current_value }
+            tca_test_create_merit_interface_character_effect = { CHARACTER = tca_rq_actor GOVERNMENT = celestial_government }
+            scope:tca_rq_actor = { tca_test_add_native_merit_probe_exams_effect = yes add_trait = education_stewardship_1 set_merit_level = 4 }
+            add_character_flag = tca_test_delayed_case_active
+            trigger_event = { id = tca_retirement_eligibility.1001 days = 2 }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_retirement_eligibility" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_continue_delayed_effect = yes }
+    }
+}
+# 原生等级缓存跨日后才判断资格，不能把set_merit_level同链读数当作目标品级。
+tca_retirement_eligibility.1001 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            scope:tca_rq_actor = { trigger_event = tca_retirement_probe.92 }
+            tca_test_retirement_age_boundaries_effect = { LAW = celestial_retirement_law_0 FENGCI_BEFORE = 39 FENGCI_AT = 40 RETIRE_BEFORE = 49 RETIRE_AT = 50 }
+            if = { limit = { var:tca_rq_age_ok = yes } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_eligibility 1" } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_eligibility 1" }
+            tca_test_retirement_age_boundaries_effect = { LAW = celestial_retirement_law_1 FENGCI_BEFORE = 49 FENGCI_AT = 50 RETIRE_BEFORE = 59 RETIRE_AT = 60 }
+            if = { limit = { var:tca_rq_age_ok = yes } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_eligibility 2" } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_eligibility 2" }
+            tca_test_retirement_age_boundaries_effect = { LAW = celestial_retirement_law_2 FENGCI_BEFORE = 59 FENGCI_AT = 60 RETIRE_BEFORE = 69 RETIRE_AT = 70 }
+            if = { limit = { var:tca_rq_age_ok = yes } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_eligibility 3" } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_eligibility 3" }
+            tca_test_retirement_age_boundaries_effect = { LAW = celestial_retirement_law_3 FENGCI_BEFORE = 69 FENGCI_AT = 70 RETIRE_BEFORE = 79 RETIRE_AT = 80 }
+            if = { limit = { var:tca_rq_age_ok = yes } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_eligibility 4" } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_eligibility 4" }
+            tca_test_retirement_age_boundaries_effect = { LAW = celestial_retirement_law_4 FENGCI_BEFORE = 79 FENGCI_AT = 80 RETIRE_BEFORE = 89 RETIRE_AT = 90 }
+            if = { limit = { var:tca_rq_age_ok = yes } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_eligibility 5" } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_eligibility 5" }
+            add_realm_law_skip_effects = celestial_retirement_law_5
+            scope:tca_rq_actor = { set_age = 90 }
+            if = { limit = { scope:tca_rq_actor = { tca_retirement_candidate_can_fengci_trigger = no tca_retirement_candidate_can_retire_trigger = no } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_eligibility 6" } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_eligibility 6" }
+            scope:tca_rq_actor = { set_age = 60 add_trait = infirm }
+            if = { limit = { scope:tca_rq_actor = { tca_retirement_candidate_can_fengci_trigger = yes tca_retirement_candidate_can_retire_trigger = no } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_eligibility 7" } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_eligibility 7" }
+            scope:tca_rq_actor = { add_trait_xp = { trait = infirm value = 50 } }
+            if = { limit = { scope:tca_rq_actor = { tca_retirement_candidate_can_retire_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_eligibility 8" } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_eligibility 8" }
+            scope:tca_rq_actor = { remove_trait = infirm set_age = 40 }
+            tca_test_retirement_ailment_boundaries_effect = { TRAIT = infirm }
+            if = { limit = { var:tca_rq_xp_ok = yes } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_eligibility 9" } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_eligibility 9" }
+            tca_test_retirement_ailment_boundaries_effect = { TRAIT = withering_mind }
+            if = { limit = { var:tca_rq_xp_ok = yes } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_eligibility 10" } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_eligibility 10" }
+            tca_test_retirement_ailment_boundaries_effect = { TRAIT = clouded_eyes }
+            if = { limit = { var:tca_rq_xp_ok = yes } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_eligibility 11" } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_eligibility 11" }
+            tca_test_retirement_ailment_boundaries_effect = { TRAIT = faltering_heart }
+            if = { limit = { var:tca_rq_xp_ok = yes } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_eligibility 12" } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_eligibility 12" }
+            tca_test_retirement_ailment_boundaries_effect = { TRAIT = fragile_bones }
+            if = { limit = { var:tca_rq_xp_ok = yes } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_eligibility 13" } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_eligibility 13" }
+            scope:tca_rq_actor = { add_trait = incapable }
+            if = { limit = { scope:tca_rq_actor = { tca_retirement_candidate_can_fengci_trigger = yes tca_retirement_candidate_can_retire_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_eligibility 14" } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_eligibility 14" }
+            scope:tca_rq_actor = { remove_trait = incapable set_merit_level = 3 }
+            add_realm_law_skip_effects = celestial_retirement_law_0
+            if = { limit = { scope:tca_rq_actor = { tca_retirement_candidate_can_fengci_trigger = no } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_eligibility 15" } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_eligibility 15" }
+            scope:tca_rq_actor = { set_merit_level = 4 }
+            if = { limit = { scope:tca_rq_actor = { tca_retirement_candidate_can_fengci_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_eligibility 16" } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_eligibility 16" }
+            if = { limit = { scope:tca_rq_old_age = 50 } add_realm_law_skip_effects = celestial_retirement_law_0 }
+            else_if = { limit = { scope:tca_rq_old_age = 60 } add_realm_law_skip_effects = celestial_retirement_law_1 }
+            else_if = { limit = { scope:tca_rq_old_age = 70 } add_realm_law_skip_effects = celestial_retirement_law_2 }
+            else_if = { limit = { scope:tca_rq_old_age = 80 } add_realm_law_skip_effects = celestial_retirement_law_3 }
+            else_if = { limit = { scope:tca_rq_old_age = 90 } add_realm_law_skip_effects = celestial_retirement_law_4 }
+            else = { add_realm_law_skip_effects = celestial_retirement_law_5 }
+            scope:tca_rq_actor = { tca_test_cleanup_merit_probe_character_effect = yes }
+            remove_variable = tca_rq_age_ok
+            remove_variable = tca_rq_xp_ok
+            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_retirement_eligibility" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_retirement_eligibility" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_retirement_eligibility" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } }
+        remove_character_flag = tca_test_case_failed
+        remove_character_flag = tca_test_delayed_case_active
+        tca_test_continue_delayed_effect = yes
+    }
+}
+
+
+# 健康与待遇数值探针；不复测.1拥有的五类衰老XP分档。
+# 原版依据：20_health_triggers使用health，00_stress_values与00_stress_effects使用add_stress，
+# elder_events.脚本亦用内联数值；本例只读取已确认的health/stress，不猜压力倍率getter。
+# 未确认接口：stress_gain_mult/stress_loss_mult直接脚本getter。改用同一无随机人格人物的
+# 真实add_stress增减及移除后恢复作因果对照；不声称覆盖自然活动、压力崩溃或长期健康。
+# 十个人物、当前法律和原生状态均由本例自备；三品、教育、资历与原生回调隔离保持相同。
+tca_retirement_eligibility.2 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_retirement_eligibility.2 tca_test_retirement_health_and_stress"
+        remove_character_flag = tca_test_case_failed
+        if = { limit = { debug_only = yes is_alive = yes title:h_china.holder = root }
+            save_scope_value_as = { name = tca_rh_old_age value = retirement_age_current_value }
+            add_realm_law_skip_effects = celestial_retirement_law_4
+            # 无王廷的独立家门作雇主，隔离皇帝宫廷待遇的健康抵消和压力修正。
+            # 健康／压力人物统一用20岁，避开25岁后的年度健康损失在测试窗口内改变基线；
+            # 法律年龄资格由eligibility.1单独验证，不在这里用年龄替代健康判定。
+            tca_test_create_merit_interface_character_effect = { CHARACTER = tca_rh_host GOVERNMENT = celestial_government }
+            scope:tca_rh_host = { add_character_flag = tca_history_defined_character }
+            create_character = { age = 20 health = 0.99 gender_female_chance = 0 random_traits = no dynasty = none employer = scope:tca_rh_host culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_rh_below }
+            scope:tca_rh_below = {
+                add_character_flag = tca_history_defined_character
+                add_character_flag = tca_merit_interface_probe
+                add_character_flag = ai_will_not_convert
+                tca_test_protect_character_effect = yes
+                add_trait = education_stewardship_3
+                tca_test_add_native_merit_probe_exams_effect = yes
+                set_merit_level = 7
+                change_influence = 500
+                clear_appointment_timeout = yes
+            }
+            create_character = { age = 20 health = 1.0 gender_female_chance = 0 random_traits = no dynasty = none employer = scope:tca_rh_host culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_rh_at }
+            scope:tca_rh_at = {
+                add_character_flag = tca_history_defined_character
+                add_character_flag = tca_merit_interface_probe
+                add_character_flag = ai_will_not_convert
+                tca_test_protect_character_effect = yes
+                add_trait = education_stewardship_3
+                tca_test_add_native_merit_probe_exams_effect = yes
+                set_merit_level = 7
+                change_influence = 500
+                clear_appointment_timeout = yes
+            }
+            create_character = { age = 20 health = 1.2 gender_female_chance = 0 random_traits = no dynasty = none employer = scope:tca_rh_host culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_rh_above }
+            scope:tca_rh_above = {
+                add_character_flag = tca_history_defined_character
+                add_character_flag = tca_merit_interface_probe
+                add_character_flag = ai_will_not_convert
+                tca_test_protect_character_effect = yes
+                add_trait = education_stewardship_3
+                tca_test_add_native_merit_probe_exams_effect = yes
+                set_merit_level = 7
+                change_influence = 500
+                clear_appointment_timeout = yes
+            }
+            create_character = { age = 20 health = 0.99 gender_female_chance = 0 random_traits = no dynasty = none employer = scope:tca_rh_host culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_rh_resume_below }
+            scope:tca_rh_resume_below = {
+                add_character_flag = tca_history_defined_character
+                add_character_flag = tca_merit_interface_probe
+                add_character_flag = ai_will_not_convert
+                tca_test_protect_character_effect = yes
+                add_trait = education_stewardship_3
+                tca_test_add_native_merit_probe_exams_effect = yes
+                set_merit_level = 7
+                change_influence = 500
+                clear_appointment_timeout = yes
+            }
+            create_character = { age = 20 health = 1.0 gender_female_chance = 0 random_traits = no dynasty = none employer = scope:tca_rh_host culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_rh_resume_at }
+            scope:tca_rh_resume_at = {
+                add_character_flag = tca_history_defined_character
+                add_character_flag = tca_merit_interface_probe
+                add_character_flag = ai_will_not_convert
+                tca_test_protect_character_effect = yes
+                add_trait = education_stewardship_3
+                tca_test_add_native_merit_probe_exams_effect = yes
+                set_merit_level = 7
+                change_influence = 500
+                clear_appointment_timeout = yes
+            }
+            create_character = { age = 20 health = 5 gender_female_chance = 0 random_traits = no dynasty = none employer = scope:tca_rh_host culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_rh_incapable }
+            scope:tca_rh_incapable = {
+                add_character_flag = tca_history_defined_character
+                add_character_flag = tca_merit_interface_probe
+                add_character_flag = ai_will_not_convert
+                tca_test_protect_character_effect = yes
+                add_trait = education_stewardship_3
+                tca_test_add_native_merit_probe_exams_effect = yes
+                set_merit_level = 7
+                change_influence = 500
+                clear_appointment_timeout = yes
+            }
+            create_character = { age = 20 health = 5 gender_female_chance = 0 random_traits = no dynasty = none employer = scope:tca_rh_host culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_rh_blind }
+            scope:tca_rh_blind = {
+                add_character_flag = tca_history_defined_character
+                add_character_flag = tca_merit_interface_probe
+                add_character_flag = ai_will_not_convert
+                tca_test_protect_character_effect = yes
+                add_trait = education_stewardship_3
+                tca_test_add_native_merit_probe_exams_effect = yes
+                set_merit_level = 7
+                change_influence = 500
+                clear_appointment_timeout = yes
+            }
+            create_character = { age = 20 health = 5 gender_female_chance = 0 random_traits = no dynasty = none employer = scope:tca_rh_host culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_rh_wound }
+            scope:tca_rh_wound = {
+                add_character_flag = tca_history_defined_character
+                add_character_flag = tca_merit_interface_probe
+                add_character_flag = ai_will_not_convert
+                tca_test_protect_character_effect = yes
+                add_trait = education_stewardship_3
+                tca_test_add_native_merit_probe_exams_effect = yes
+                set_merit_level = 7
+                change_influence = 500
+                clear_appointment_timeout = yes
+            }
+            create_character = { age = 20 health = 5 gender_female_chance = 0 random_traits = no dynasty = none employer = scope:tca_rh_host culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_rh_eye }
+            scope:tca_rh_eye = {
+                add_character_flag = tca_history_defined_character
+                add_character_flag = tca_merit_interface_probe
+                add_character_flag = ai_will_not_convert
+                tca_test_protect_character_effect = yes
+                add_trait = education_stewardship_3
+                tca_test_add_native_merit_probe_exams_effect = yes
+                set_merit_level = 7
+                change_influence = 500
+                clear_appointment_timeout = yes
+            }
+            create_character = { age = 20 health = 5 gender_female_chance = 0 random_traits = no dynasty = none employer = scope:tca_rh_host culture = root.culture faith = faith:hellenic_pagan rite = rite:hellenic_pagan save_scope_as = tca_rh_stress }
+            scope:tca_rh_stress = {
+                add_character_flag = tca_history_defined_character
+                add_character_flag = tca_merit_interface_probe
+                add_character_flag = ai_will_not_convert
+                tca_test_protect_character_effect = yes
+                add_trait = education_stewardship_3
+                tca_test_add_native_merit_probe_exams_effect = yes
+                set_merit_level = 7
+                change_influence = 500
+                clear_appointment_timeout = yes
+            }
+            add_character_flag = tca_test_delayed_case_active
+            trigger_event = { id = tca_retirement_eligibility.2001 days = 2 }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_retirement_health_and_stress" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_continue_delayed_effect = yes }
+    }
+}
+tca_retirement_eligibility.2001 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            # 仅在等待原生官品时保留不朽保护；测量健康与压力前撤回本例拥有的保护。
+            # immortal=yes会改变原生健康读数；不以抵消修正伪造边界。
+            # 被测人物属于无王廷的临时家主，排除皇帝宫廷待遇和本人庄园修正。
+            scope:tca_rh_below = { tca_test_restore_character_effect = yes }
+            scope:tca_rh_at = { tca_test_restore_character_effect = yes }
+            scope:tca_rh_above = { tca_test_restore_character_effect = yes }
+            scope:tca_rh_resume_below = { tca_test_restore_character_effect = yes }
+            scope:tca_rh_resume_at = { tca_test_restore_character_effect = yes }
+            scope:tca_rh_incapable = { tca_test_restore_character_effect = yes }
+            scope:tca_rh_blind = { tca_test_restore_character_effect = yes }
+            scope:tca_rh_wound = { tca_test_restore_character_effect = yes }
+            scope:tca_rh_eye = { tca_test_restore_character_effect = yes }
+            scope:tca_rh_stress = { tca_test_restore_character_effect = yes }
+            if = { limit = { scope:tca_rh_below = { is_alive = yes is_adult = yes top_liege = root government_has_flag = government_is_celestial merit_level = 7 tca_retirement_candidate_has_seniority_trigger = yes } scope:tca_rh_at = { is_alive = yes is_adult = yes top_liege = root government_has_flag = government_is_celestial merit_level = 7 tca_retirement_candidate_has_seniority_trigger = yes } scope:tca_rh_above = { is_alive = yes is_adult = yes top_liege = root government_has_flag = government_is_celestial merit_level = 7 tca_retirement_candidate_has_seniority_trigger = yes } scope:tca_rh_resume_below = { is_alive = yes is_adult = yes top_liege = root government_has_flag = government_is_celestial merit_level = 7 tca_retirement_candidate_has_seniority_trigger = yes } scope:tca_rh_resume_at = { is_alive = yes is_adult = yes top_liege = root government_has_flag = government_is_celestial merit_level = 7 tca_retirement_candidate_has_seniority_trigger = yes } scope:tca_rh_incapable = { is_alive = yes is_adult = yes top_liege = root government_has_flag = government_is_celestial merit_level = 7 tca_retirement_candidate_has_seniority_trigger = yes } scope:tca_rh_blind = { is_alive = yes is_adult = yes top_liege = root government_has_flag = government_is_celestial merit_level = 7 tca_retirement_candidate_has_seniority_trigger = yes } scope:tca_rh_wound = { is_alive = yes is_adult = yes top_liege = root government_has_flag = government_is_celestial merit_level = 7 tca_retirement_candidate_has_seniority_trigger = yes } scope:tca_rh_eye = { is_alive = yes is_adult = yes top_liege = root government_has_flag = government_is_celestial merit_level = 7 tca_retirement_candidate_has_seniority_trigger = yes } scope:tca_rh_stress = { is_alive = yes is_adult = yes top_liege = root government_has_flag = government_is_celestial merit_level = 7 tca_retirement_candidate_has_seniority_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_health_and_stress 1" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_health_and_stress 1" }
+            if = { limit = { scope:tca_rh_below = { health = 0.99 tca_retirement_candidate_extreme_health_trigger = yes tca_retirement_candidate_can_fengci_trigger = yes tca_retirement_candidate_can_retire_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_health_and_stress 2" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_health_and_stress 2" }
+            if = { limit = { scope:tca_rh_at = { health = 1 tca_retirement_candidate_extreme_health_trigger = no tca_retirement_candidate_can_fengci_trigger = no tca_retirement_candidate_can_retire_trigger = no } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_health_and_stress 3" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_health_and_stress 3" }
+            if = { limit = { scope:tca_rh_above = { health = 1.2 tca_retirement_candidate_extreme_health_trigger = no tca_retirement_candidate_can_fengci_trigger = no tca_retirement_candidate_can_retire_trigger = no } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_health_and_stress 4" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_health_and_stress 4" }
+            scope:tca_rh_below = { tca_test_protect_character_effect = yes }
+            scope:tca_rh_at = { tca_test_protect_character_effect = yes }
+            scope:tca_rh_above = { tca_test_protect_character_effect = yes }
+            scope:tca_rh_resume_below = { tca_retirement_candidate_enter_effect = { TRAIT = tca_retirement_probe_fengci } change_influence = { value = 500 subtract = influence } set_variable = { name = tca_rh_influence_before value = influence } }
+            scope:tca_rh_resume_at = { tca_retirement_candidate_enter_effect = { TRAIT = tca_retirement_probe_fengci } change_influence = { value = 500 subtract = influence } set_variable = { name = tca_rh_influence_before value = influence } }
+            if = { limit = { scope:tca_rh_resume_below = { is_alive = yes is_adult = yes top_liege = root government_has_flag = government_is_celestial merit_level = 7 tca_retirement_candidate_has_seniority_trigger = yes influence >= 60 is_incapable = no tca_retirement_candidate_is_exited_trigger = yes has_trait = tca_retirement_probe_fengci NOT = { has_trait = tca_retirement_probe_retired } has_variable = tca_retirement_candidate_entered_date var:tca_retirement_candidate_prior_timeout = 0 appointment_timeout_days > 36500 } scope:tca_rh_resume_at = { is_alive = yes is_adult = yes top_liege = root government_has_flag = government_is_celestial merit_level = 7 tca_retirement_candidate_has_seniority_trigger = yes influence >= 60 is_incapable = no tca_retirement_candidate_is_exited_trigger = yes has_trait = tca_retirement_probe_fengci NOT = { has_trait = tca_retirement_probe_retired } has_variable = tca_retirement_candidate_entered_date var:tca_retirement_candidate_prior_timeout = 0 appointment_timeout_days > 36500 } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_health_and_stress 5" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_health_and_stress 5" }
+            # 衍生健康／压力修正须真实跨日刷新，不在添加特质的同一链读取缓存。
+            trigger_event = { id = tca_retirement_eligibility.2002 days = 2 }
+        }
+    }
+}
+tca_retirement_eligibility.2002 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            # 先自备此轮资源，再隔离健康边界；不能让等待期间AI花费制造假阴性。
+            scope:tca_rh_resume_below = { change_influence = { value = 500 subtract = influence } set_variable = { name = tca_rh_influence_before value = influence } }
+            scope:tca_rh_resume_at = { change_influence = { value = 500 subtract = influence } set_variable = { name = tca_rh_influence_before value = influence } }
+            if = { limit = { scope:tca_rh_resume_below = { is_ruler = no health = 1.19 tca_retirement_candidate_can_resume_trigger = no } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_health_and_stress 6" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_health_and_stress 6" }
+            if = { limit = { scope:tca_rh_resume_at = { is_ruler = no health = 1.2 tca_retirement_candidate_can_resume_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_health_and_stress 7" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_health_and_stress 7" }
+            scope:tca_rh_resume_below = { tca_retirement_candidate_resume_effect = yes }
+            if = { limit = { scope:tca_rh_resume_below = { health = 1.19 influence = var:tca_rh_influence_before tca_retirement_candidate_is_exited_trigger = yes appointment_timeout_days > 36500 } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_health_and_stress 8" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_health_and_stress 8" }
+            scope:tca_rh_resume_below = { tca_test_protect_character_effect = yes }
+            scope:tca_rh_resume_at = { tca_retirement_candidate_resume_effect = yes set_variable = { name = tca_rh_resume_cost value = { value = var:tca_rh_influence_before subtract = influence } } }
+            # 衍生健康／压力修正须真实跨日刷新，不在添加特质的同一链读取缓存。
+            scope:tca_rh_resume_at = { set_variable = { name = tca_rh_health_wait_round value = 0 } }
+            trigger_event = { id = tca_retirement_eligibility.2009 days = 1 }
+        }
+    }
+}
+tca_retirement_eligibility.2009 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            # 起复移除奉祠后等待健康回到1，避免跨日事件早于衍生值刷新。
+            if = { limit = { scope:tca_rh_resume_at = { health = 1 } }
+                debug_log = "TCA_RH_HEALTH_SETTLED_RESUME"
+                trigger_event = { id = tca_retirement_eligibility.2003 }
+            }
+            else_if = { limit = { scope:tca_rh_resume_at = { var:tca_rh_health_wait_round < 10 } }
+                scope:tca_rh_resume_at = { change_variable = { name = tca_rh_health_wait_round add = 1 } }
+                trigger_event = { id = tca_retirement_eligibility.2009 days = 1 }
+            }
+            else = { debug_log = "TCA_RH_HEALTH_WAIT_TIMEOUT_RESUME" trigger_event = { id = tca_retirement_eligibility.2003 } }
+        }
+    }
+}
+tca_retirement_eligibility.2010 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            # 起复移除奉祠后等待压力人物的健康回到5，再测压力乘数。
+            if = { limit = { scope:tca_rh_stress = { health = 5 } }
+                debug_log = "TCA_RH_HEALTH_SETTLED_STRESS"
+                trigger_event = { id = tca_retirement_eligibility.2005 }
+            }
+            else_if = { limit = { scope:tca_rh_stress = { var:tca_rh_health_wait_round < 10 } }
+                scope:tca_rh_stress = { change_variable = { name = tca_rh_health_wait_round add = 1 } }
+                trigger_event = { id = tca_retirement_eligibility.2010 days = 1 }
+            }
+            else = { debug_log = "TCA_RH_HEALTH_WAIT_TIMEOUT_STRESS" trigger_event = { id = tca_retirement_eligibility.2005 } }
+        }
+    }
+}
+tca_retirement_eligibility.2003 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_rh_resume_at = { health = 1 var:tca_rh_resume_cost = 60 tca_retirement_candidate_is_exited_trigger = no appointment_timeout_days = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_health_and_stress 9" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_health_and_stress 9" }
+            scope:tca_rh_resume_at = { tca_test_protect_character_effect = yes }
+            if = { limit = { scope:tca_rh_incapable = { health = 5 tca_retirement_candidate_can_fengci_trigger = no tca_retirement_candidate_can_retire_trigger = no } scope:tca_rh_blind = { health = 5 tca_retirement_candidate_can_fengci_trigger = no tca_retirement_candidate_can_retire_trigger = no } scope:tca_rh_wound = { health = 5 tca_retirement_candidate_can_fengci_trigger = no tca_retirement_candidate_can_retire_trigger = no } scope:tca_rh_eye = { health = 5 tca_retirement_candidate_can_fengci_trigger = no tca_retirement_candidate_can_retire_trigger = no } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_health_and_stress 10" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_health_and_stress 10" }
+            scope:tca_rh_incapable = { add_trait = incapable }
+            scope:tca_rh_blind = { add_trait = blind }
+            scope:tca_rh_wound = { add_trait = wounded_1 }
+            scope:tca_rh_eye = { add_trait = one_eyed }
+            if = { limit = { scope:tca_rh_incapable = { health > 1 is_incapable = yes tca_retirement_candidate_extreme_health_trigger = yes tca_retirement_candidate_can_fengci_trigger = yes tca_retirement_candidate_can_retire_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_health_and_stress 11" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_health_and_stress 11" }
+            if = { limit = { scope:tca_rh_blind = { health > 1 has_trait = blind tca_retirement_candidate_extreme_health_trigger = yes tca_retirement_candidate_can_fengci_trigger = yes tca_retirement_candidate_can_retire_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_health_and_stress 12" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_health_and_stress 12" }
+            if = { limit = { scope:tca_rh_wound = { health > 1 has_trait = wounded_1 tca_retirement_candidate_extreme_health_trigger = no tca_retirement_candidate_can_fengci_trigger = no tca_retirement_candidate_can_retire_trigger = no } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_health_and_stress 13" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_health_and_stress 13" }
+            if = { limit = { scope:tca_rh_eye = { health > 1 has_trait = one_eyed tca_retirement_candidate_extreme_health_trigger = no tca_retirement_candidate_can_fengci_trigger = no tca_retirement_candidate_can_retire_trigger = no } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_health_and_stress 14" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_health_and_stress 14" }
+            scope:tca_rh_incapable = { tca_test_protect_character_effect = yes }
+            scope:tca_rh_blind = { tca_test_protect_character_effect = yes }
+            scope:tca_rh_wound = { tca_test_protect_character_effect = yes }
+            scope:tca_rh_eye = { tca_test_protect_character_effect = yes }
+            if = { limit = { scope:tca_rh_stress = { health = 5 stress = 0 NOT = { has_trait = tca_retirement_probe_fengci } NOT = { has_trait = tca_retirement_probe_retired } } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_health_and_stress 15" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_health_and_stress 15" }
+            scope:tca_rh_stress = { add_stress = 30 set_variable = { name = tca_rh_stress_before value = stress } add_stress = 20 set_variable = { name = tca_rh_gain value = { value = stress subtract = var:tca_rh_stress_before } } set_variable = { name = tca_rh_stress_before value = stress } add_stress = -10 set_variable = { name = tca_rh_loss value = { value = var:tca_rh_stress_before subtract = stress } } }
+            if = { limit = { scope:tca_rh_stress = { var:tca_rh_gain = 20 var:tca_rh_loss = 10 health = 5 stress = 40 } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_health_and_stress 16" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_health_and_stress 16" }
+            scope:tca_rh_stress = { tca_retirement_candidate_enter_effect = { TRAIT = tca_retirement_probe_fengci } }
+            # 衍生健康／压力修正须真实跨日刷新，不在添加特质的同一链读取缓存。
+            trigger_event = { id = tca_retirement_eligibility.2004 days = 2 }
+        }
+    }
+}
+tca_retirement_eligibility.2004 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            scope:tca_rh_stress = { set_variable = { name = tca_rh_stress_before value = stress } add_stress = 20 set_variable = { name = tca_rh_gain value = { value = stress subtract = var:tca_rh_stress_before } } set_variable = { name = tca_rh_stress_before value = stress } add_stress = -10 set_variable = { name = tca_rh_loss value = { value = var:tca_rh_stress_before subtract = stress } } }
+            if = { limit = { scope:tca_rh_stress = { var:tca_rh_gain = 18 var:tca_rh_loss = 11 health = 5.2 stress = 47 } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_health_and_stress 17" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_health_and_stress 17" }
+            # 本段隔离压力修正，不把等待期间AI花费影响力当作起复效果失败；资源成本另有精确断言。
+            scope:tca_rh_stress = {
+                change_influence = { value = 500 subtract = influence }
+                if = { limit = { tca_retirement_candidate_can_resume_trigger = yes } debug_log = "TCA_RH_STRESS RESUME_GUARD_YES" } else = { debug_log = "TCA_RH_STRESS RESUME_GUARD_NO" }
+                tca_retirement_candidate_resume_effect = yes
+                if = { limit = { tca_retirement_candidate_is_exited_trigger = no } debug_log = "TCA_RH_STRESS EXIT_CLEARED" } else = { debug_log = "TCA_RH_STRESS EXIT_REMAINS" }
+            }
+            # 衍生健康／压力修正须真实跨日刷新，不在添加特质的同一链读取缓存。
+            scope:tca_rh_stress = { set_variable = { name = tca_rh_health_wait_round value = 0 } }
+            trigger_event = { id = tca_retirement_eligibility.2010 days = 1 }
+        }
+    }
+}
+tca_retirement_eligibility.2005 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            scope:tca_rh_stress = { set_variable = { name = tca_rh_stress_before value = stress } add_stress = 20 set_variable = { name = tca_rh_gain value = { value = stress subtract = var:tca_rh_stress_before } } set_variable = { name = tca_rh_stress_before value = stress } add_stress = -10 set_variable = { name = tca_rh_loss value = { value = var:tca_rh_stress_before subtract = stress } } }
+            if = { limit = { scope:tca_rh_stress = { tca_retirement_candidate_is_exited_trigger = no var:tca_rh_gain = 20 var:tca_rh_loss = 10 health = 5 stress = 57 } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_health_and_stress 18" }
+            else = {
+                add_character_flag = tca_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_health_and_stress 18"
+                # 失败时拆分身份、特质和压力／健康分量，避免把衍生值刷新误判为业务状态错误。
+                if = { limit = { scope:tca_rh_stress = { has_trait = tca_retirement_probe_fengci } } debug_log = "TCA_RH18 FENGCI_PRESENT" } else = { debug_log = "TCA_RH18 FENGCI_ABSENT" }
+                if = { limit = { scope:tca_rh_stress = { var:tca_rh_gain = 20 } } debug_log = "TCA_RH18 GAIN_20" } else = { debug_log = "TCA_RH18 GAIN_NOT_20" }
+                if = { limit = { scope:tca_rh_stress = { var:tca_rh_loss = 10 } } debug_log = "TCA_RH18 LOSS_10" } else = { debug_log = "TCA_RH18 LOSS_NOT_10" }
+                if = { limit = { scope:tca_rh_stress = { health = 5 } } debug_log = "TCA_RH18 HEALTH_5" } else = { debug_log = "TCA_RH18 HEALTH_NOT_5" }
+                if = { limit = { scope:tca_rh_stress = { stress = 57 } } debug_log = "TCA_RH18 STRESS_57" } else = { debug_log = "TCA_RH18 STRESS_NOT_57" }
+            }
+            scope:tca_rh_stress = { tca_retirement_candidate_enter_effect = { TRAIT = tca_retirement_probe_retired } }
+            # 衍生健康／压力修正须真实跨日刷新，不在添加特质的同一链读取缓存。
+            trigger_event = { id = tca_retirement_eligibility.2006 days = 2 }
+        }
+    }
+}
+tca_retirement_eligibility.2006 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            scope:tca_rh_stress = { set_variable = { name = tca_rh_stress_before value = stress } add_stress = 20 set_variable = { name = tca_rh_gain value = { value = stress subtract = var:tca_rh_stress_before } } set_variable = { name = tca_rh_stress_before value = stress } add_stress = -10 set_variable = { name = tca_rh_loss value = { value = var:tca_rh_stress_before subtract = stress } } }
+            if = { limit = { scope:tca_rh_stress = { var:tca_rh_gain = 16 var:tca_rh_loss = 12 health = 5.2 stress = 61 } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_health_and_stress 19" }
+            else = {
+                add_character_flag = tca_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_health_and_stress 19"
+                if = { limit = { scope:tca_rh_stress = { has_trait = tca_retirement_probe_retired } } debug_log = "TCA_RH19 RETIRED_PRESENT" } else = { debug_log = "TCA_RH19 RETIRED_ABSENT" }
+                if = { limit = { scope:tca_rh_stress = { has_trait = tca_retirement_probe_fengci } } debug_log = "TCA_RH19 FENGCI_PRESENT" } else = { debug_log = "TCA_RH19 FENGCI_ABSENT" }
+                if = { limit = { scope:tca_rh_stress = { health = 5.2 } } debug_log = "TCA_RH19 HEALTH_52" } else = { debug_log = "TCA_RH19 HEALTH_NOT_52" }
+                if = { limit = { scope:tca_rh_stress = { health > 5.2 } } debug_log = "TCA_RH19 HEALTH_ABOVE_52" }
+                if = { limit = { scope:tca_rh_stress = { health < 5.2 } } debug_log = "TCA_RH19 HEALTH_BELOW_52" }
+                if = { limit = { scope:tca_rh_stress = { has_wounds_trigger = yes } } debug_log = "TCA_RH19 WOUNDED" }
+                if = { limit = { scope:tca_rh_stress = { age < 25 } } debug_log = "TCA_RH19 AGE_BELOW_25" }
+                if = { limit = { scope:tca_rh_stress = { var:tca_rh_gain = 16 } } debug_log = "TCA_RH19 GAIN_16" } else = { debug_log = "TCA_RH19 GAIN_NOT_16" }
+                if = { limit = { scope:tca_rh_stress = { var:tca_rh_loss = 12 } } debug_log = "TCA_RH19 LOSS_12" } else = { debug_log = "TCA_RH19 LOSS_NOT_12" }
+                if = { limit = { scope:tca_rh_stress = { stress = 61 } } debug_log = "TCA_RH19 STRESS_61" } else = { debug_log = "TCA_RH19 STRESS_NOT_61" }
+            }
+            # 致仕不可起复；移除仅作测试反向对照，不提供玩法恢复入口。
+            scope:tca_rh_stress = { remove_trait = tca_retirement_probe_retired set_variable = { name = tca_rh_health_wait_round value = 0 } }
+            # 健康衍生值在个别时点会晚于跨日事件刷新；先有界等待实际值稳定，再测压力终值。
+            trigger_event = { id = tca_retirement_eligibility.2008 days = 1 }
+        }
+    }
+}
+tca_retirement_eligibility.2008 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            # 只等待健康值回到移除致仕特质后的5；不改压力，也不跨越其他状态变更。
+            if = { limit = { scope:tca_rh_stress = { health = 5 } }
+                debug_log = "TCA_RH_HEALTH_SETTLED"
+                trigger_event = { id = tca_retirement_eligibility.2007 }
+            }
+            else_if = { limit = { scope:tca_rh_stress = { var:tca_rh_health_wait_round < 10 } }
+                scope:tca_rh_stress = { change_variable = { name = tca_rh_health_wait_round add = 1 } }
+                trigger_event = { id = tca_retirement_eligibility.2008 days = 1 }
+            }
+            else = {
+                debug_log = "TCA_RH_HEALTH_WAIT_TIMEOUT"
+                if = { limit = { scope:tca_rh_stress = { has_trait = tca_retirement_probe_retired } } debug_log = "TCA_RH20 RETIRED_PRESENT" } else = { debug_log = "TCA_RH20 RETIRED_ABSENT" }
+                if = { limit = { scope:tca_rh_stress = { has_trait = tca_retirement_probe_fengci } } debug_log = "TCA_RH20 FENGCI_PRESENT" } else = { debug_log = "TCA_RH20 FENGCI_ABSENT" }
+                if = { limit = { scope:tca_rh_stress = { health = 5 } } debug_log = "TCA_RH20 HEALTH_5" } else = { debug_log = "TCA_RH20 HEALTH_NOT_5" }
+                if = { limit = { scope:tca_rh_stress = { health = 5.2 } } debug_log = "TCA_RH20 HEALTH_52" }
+                if = { limit = { scope:tca_rh_stress = { health > 5.2 } } debug_log = "TCA_RH20 HEALTH_ABOVE_52" }
+                if = { limit = { scope:tca_rh_stress = { health < 5 } } debug_log = "TCA_RH20 HEALTH_BELOW_5" }
+                if = { limit = { scope:tca_rh_stress = { has_wounds_trigger = yes } } debug_log = "TCA_RH20 WOUNDED" }
+                trigger_event = { id = tca_retirement_eligibility.2007 }
+            }
+        }
+    }
+}
+tca_retirement_eligibility.2007 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            scope:tca_rh_stress = { set_variable = { name = tca_rh_stress_before value = stress } add_stress = 20 set_variable = { name = tca_rh_gain value = { value = stress subtract = var:tca_rh_stress_before } } set_variable = { name = tca_rh_stress_before value = stress } add_stress = -10 set_variable = { name = tca_rh_loss value = { value = var:tca_rh_stress_before subtract = stress } } }
+            if = { limit = { scope:tca_rh_stress = { var:tca_rh_gain = 20 var:tca_rh_loss = 10 health = 5 stress = 71 } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_health_and_stress 20" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_health_and_stress 20" }
+            if = { limit = { scope:tca_rh_old_age = 50 } add_realm_law_skip_effects = celestial_retirement_law_0 }
+            else_if = { limit = { scope:tca_rh_old_age = 60 } add_realm_law_skip_effects = celestial_retirement_law_1 }
+            else_if = { limit = { scope:tca_rh_old_age = 70 } add_realm_law_skip_effects = celestial_retirement_law_2 }
+            else_if = { limit = { scope:tca_rh_old_age = 80 } add_realm_law_skip_effects = celestial_retirement_law_3 }
+            else_if = { limit = { scope:tca_rh_old_age = 90 } add_realm_law_skip_effects = celestial_retirement_law_4 }
+            else = { add_realm_law_skip_effects = celestial_retirement_law_5 }
+            scope:tca_rh_incapable = { remove_trait = incapable }
+            scope:tca_rh_blind = { remove_trait = blind }
+            scope:tca_rh_wound = { remove_trait = wounded_1 }
+            scope:tca_rh_eye = { remove_trait = one_eyed }
+            scope:tca_rh_below = { remove_variable = tca_rh_influence_before remove_variable = tca_rh_stress_before remove_variable = tca_rh_gain remove_variable = tca_rh_loss tca_test_cleanup_retirement_exit_actor_effect = yes }
+            scope:tca_rh_at = { remove_variable = tca_rh_influence_before remove_variable = tca_rh_stress_before remove_variable = tca_rh_gain remove_variable = tca_rh_loss tca_test_cleanup_retirement_exit_actor_effect = yes }
+            scope:tca_rh_above = { remove_variable = tca_rh_influence_before remove_variable = tca_rh_stress_before remove_variable = tca_rh_gain remove_variable = tca_rh_loss tca_test_cleanup_retirement_exit_actor_effect = yes }
+            scope:tca_rh_resume_below = { remove_variable = tca_rh_influence_before remove_variable = tca_rh_stress_before remove_variable = tca_rh_gain remove_variable = tca_rh_loss tca_test_cleanup_retirement_exit_actor_effect = yes }
+            scope:tca_rh_resume_at = { remove_variable = tca_rh_influence_before remove_variable = tca_rh_stress_before remove_variable = tca_rh_gain remove_variable = tca_rh_loss remove_variable = tca_rh_health_wait_round tca_test_cleanup_retirement_exit_actor_effect = yes }
+            scope:tca_rh_incapable = { remove_variable = tca_rh_influence_before remove_variable = tca_rh_stress_before remove_variable = tca_rh_gain remove_variable = tca_rh_loss tca_test_cleanup_retirement_exit_actor_effect = yes }
+            scope:tca_rh_blind = { remove_variable = tca_rh_influence_before remove_variable = tca_rh_stress_before remove_variable = tca_rh_gain remove_variable = tca_rh_loss tca_test_cleanup_retirement_exit_actor_effect = yes }
+            scope:tca_rh_wound = { remove_variable = tca_rh_influence_before remove_variable = tca_rh_stress_before remove_variable = tca_rh_gain remove_variable = tca_rh_loss tca_test_cleanup_retirement_exit_actor_effect = yes }
+            scope:tca_rh_eye = { remove_variable = tca_rh_influence_before remove_variable = tca_rh_stress_before remove_variable = tca_rh_gain remove_variable = tca_rh_loss tca_test_cleanup_retirement_exit_actor_effect = yes }
+            scope:tca_rh_stress = { remove_variable = tca_rh_influence_before remove_variable = tca_rh_stress_before remove_variable = tca_rh_gain remove_variable = tca_rh_loss remove_variable = tca_rh_health_wait_round tca_test_cleanup_retirement_exit_actor_effect = yes }
+            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_retirement_health_and_stress" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_retirement_health_and_stress" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_retirement_health_and_stress" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } }
+        remove_character_flag = tca_test_case_failed
+        remove_character_flag = tca_test_delayed_case_active
+        tca_test_continue_delayed_effect = yes
+    }
+}

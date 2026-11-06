@@ -1,0 +1,27 @@
+﻿# 皇帝报告者作用域；tca_rq_actor为独立测试家主；本例只改测试局本朝年龄法律。
+# LAW为原版法律，四个AGE参数分别覆盖奉祠和致仕的前一岁／当岁；输出布尔变量。
+tca_test_retirement_age_boundaries_effect = {
+    add_realm_law_skip_effects = $LAW$
+    set_variable = { name = tca_rq_age_ok value = yes }
+    scope:tca_rq_actor = { set_age = $FENGCI_BEFORE$ }
+    if = { limit = { scope:tca_rq_actor = { OR = { tca_retirement_candidate_can_fengci_trigger = yes tca_retirement_candidate_can_retire_trigger = yes } } } set_variable = { name = tca_rq_age_ok value = no } }
+    scope:tca_rq_actor = { set_age = $FENGCI_AT$ }
+    if = { limit = { scope:tca_rq_actor = { OR = { tca_retirement_candidate_can_fengci_trigger = no tca_retirement_candidate_can_retire_trigger = yes } } } set_variable = { name = tca_rq_age_ok value = no } }
+    scope:tca_rq_actor = { set_age = $RETIRE_BEFORE$ }
+    if = { limit = { scope:tca_rq_actor = { tca_retirement_candidate_can_retire_trigger = yes } } set_variable = { name = tca_rq_age_ok value = no } }
+    scope:tca_rq_actor = { set_age = $RETIRE_AT$ }
+    if = { limit = { scope:tca_rq_actor = { OR = { tca_retirement_candidate_can_fengci_trigger = no tca_retirement_candidate_can_retire_trigger = no } } } set_variable = { name = tca_rq_age_ok value = no } }
+}
+# 皇帝报告者；同一新建人物逐条测试，移除特质后不依赖其他用例的残留状态。
+tca_test_retirement_ailment_boundaries_effect = {
+    set_variable = { name = tca_rq_xp_ok value = yes }
+    scope:tca_rq_actor = { add_trait = $TRAIT$ add_trait_xp = { trait = $TRAIT$ value = 49 } }
+    if = { limit = { scope:tca_rq_actor = { OR = { tca_retirement_candidate_ailment_mid_trigger = yes tca_retirement_candidate_ailment_severe_trigger = yes } } } set_variable = { name = tca_rq_xp_ok value = no } }
+    scope:tca_rq_actor = { add_trait_xp = { trait = $TRAIT$ value = 1 } }
+    if = { limit = { scope:tca_rq_actor = { OR = { tca_retirement_candidate_ailment_mid_trigger = no tca_retirement_candidate_ailment_severe_trigger = yes } } } set_variable = { name = tca_rq_xp_ok value = no } }
+    scope:tca_rq_actor = { add_trait_xp = { trait = $TRAIT$ value = 24 } }
+    if = { limit = { scope:tca_rq_actor = { tca_retirement_candidate_ailment_severe_trigger = yes } } set_variable = { name = tca_rq_xp_ok value = no } }
+    scope:tca_rq_actor = { add_trait_xp = { trait = $TRAIT$ value = 1 } }
+    if = { limit = { scope:tca_rq_actor = { tca_retirement_candidate_ailment_severe_trigger = no } } set_variable = { name = tca_rq_xp_ok value = no } }
+    scope:tca_rq_actor = { remove_trait = $TRAIT$ }
+}

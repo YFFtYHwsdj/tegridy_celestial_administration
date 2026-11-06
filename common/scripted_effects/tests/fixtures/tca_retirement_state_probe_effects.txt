@@ -1,0 +1,91 @@
+﻿# 闲退请求与加恩候选技术接口，仅供debug探针，不加入正常决议或AI。
+# 人物作用域；KIND=3为起复请求。请求保存君主、国家、官品、日期和递增凭据。
+# 技术事件通过saved scope送达原君主；同一人物不能并发，拒绝后真实一年内不重请。
+tca_retirement_candidate_request_effect = {
+    if = {
+        limit = {
+            debug_only = yes is_alive = yes tca_retirement_candidate_can_resume_trigger = yes
+            NOT = { has_variable = tca_retirement_candidate_request_kind }
+            NOT = { has_character_flag = tca_retirement_candidate_request_denied }
+            exists = top_liege this != top_liege top_liege = { government_has_flag = government_is_celestial }
+        }
+        if = { limit = { NOT = { has_variable = tca_retirement_candidate_request_serial } } set_variable = { name = tca_retirement_candidate_request_serial value = 0 } }
+        change_variable = { name = tca_retirement_candidate_request_serial add = 1 }
+        set_variable = { name = tca_retirement_candidate_request_kind value = $KIND$ }
+        set_variable = { name = tca_retirement_candidate_request_emperor value = top_liege }
+        set_variable = { name = tca_retirement_candidate_request_country value = top_liege.primary_title }
+        set_variable = { name = tca_retirement_candidate_request_level value = merit_level }
+        set_variable = { name = tca_retirement_candidate_request_date value = current_date }
+        save_scope_as = tca_rs_applicant
+        # 凭据随事件冻结；旧事件不能以送达时的新serial答复后来的申请。
+        save_scope_value_as = { name = tca_rs_request_serial value = var:tca_retirement_candidate_request_serial }
+        if = { limit = { NOT = { has_character_flag = tca_retirement_candidate_hold_reply } } top_liege = { trigger_event = { id = tca_retirement_state.9002 days = 2 } } }
+    }
+}
+# 人物作用域；EMPEROR是实际答复者scope、SERIAL是所答复请求的凭据，ACCEPT为yes/no。
+# 每次答复复验请求、君主、国家、官品与期限；失败只结案，不扣款。重复旧答复无副作用。
+tca_retirement_candidate_resolve_effect = {
+    # 已故人物变量由原生释放，先在外层拒绝，避免访问失效请求字段。
+    if = { limit = { is_alive = yes }
+    if = {
+        limit = { has_variable = tca_retirement_candidate_request_kind var:tca_retirement_candidate_request_serial = $SERIAL$ }
+        if = {
+            limit = {
+                is_alive = yes tca_retirement_candidate_can_resume_trigger = yes
+                var:tca_retirement_candidate_request_emperor = $EMPEROR$
+                top_liege = $EMPEROR$
+                top_liege.primary_title = var:tca_retirement_candidate_request_country
+                merit_level = var:tca_retirement_candidate_request_level
+                tca_retirement_candidate_request_age_value <= 30
+            }
+            if = { limit = { always = $ACCEPT$ } tca_retirement_candidate_resume_effect = yes }
+            else = { add_character_flag = { flag = tca_retirement_candidate_request_denied days = 365 } }
+            set_variable = { name = tca_retirement_candidate_request_result value = 1 }
+        }
+        else = { set_variable = { name = tca_retirement_candidate_request_result value = -1 } }
+        remove_variable = tca_retirement_candidate_request_kind
+        remove_variable = tca_retirement_candidate_request_emperor
+        remove_variable = tca_retirement_candidate_request_country
+        remove_variable = tca_retirement_candidate_request_level
+        remove_variable = tca_retirement_candidate_request_date
+    }
+    }
+}
+
+# 人物作用域；仅验证一次致仕授品的原生上限／双账归一化技术，不冒充普通年度成功。
+# APPROVE为皇帝是否加恩；四品以下自动、一二三品需按约定分流；0级不初授。
+# 候选调用必须在正式退出后；pending防同链重入，processed只在隔日真实等级核对后写入。
+tca_retirement_candidate_honor_effect = {
+    if = {
+        limit = {
+            debug_only = yes tca_retirement_candidate_is_exited_trigger = yes
+            has_trait = tca_retirement_probe_retired
+            NOT = { has_character_flag = tca_retirement_candidate_honor_processed }
+            NOT = { has_variable = tca_retirement_candidate_honor_target }
+            NOT = { has_variable = tca_merit_grant_phase }
+        }
+        set_variable = { name = tca_retirement_candidate_honor_source value = merit_level }
+        if = {
+            limit = { merit_level >= 1 merit_level < 9 OR = { merit_level < 7 always = $APPROVE$ } }
+            set_variable = { name = tca_retirement_candidate_honor_target value = { value = merit_level add = 1 max = 9 } }
+            add_character_flag = tca_merit_grant_suppress
+            set_merit_level = 0
+            set_merit_level = var:tca_retirement_candidate_honor_source
+            set_variable = { name = tca_merit_approved_level value = var:tca_retirement_candidate_honor_target }
+            add_character_flag = tca_merit_active
+            tca_merit_refresh_cap_effect = yes
+            set_merit_level = var:tca_retirement_candidate_honor_target
+            if = { limit = { var:tca_retirement_candidate_honor_target = 2 } change_merit_no_experience = { value = merit_level_2_value subtract = merit } }
+            else_if = { limit = { var:tca_retirement_candidate_honor_target = 3 } change_merit_no_experience = { value = merit_level_3_value subtract = merit } }
+            else_if = { limit = { var:tca_retirement_candidate_honor_target = 4 } change_merit_no_experience = { value = merit_level_4_value subtract = merit } }
+            else_if = { limit = { var:tca_retirement_candidate_honor_target = 5 } change_merit_no_experience = { value = merit_level_5_value subtract = merit } }
+            else_if = { limit = { var:tca_retirement_candidate_honor_target = 6 } change_merit_no_experience = { value = merit_level_6_value subtract = merit } }
+            else_if = { limit = { var:tca_retirement_candidate_honor_target = 7 } change_merit_no_experience = { value = merit_level_7_value subtract = merit } }
+            else_if = { limit = { var:tca_retirement_candidate_honor_target = 8 } change_merit_no_experience = { value = merit_level_8_value subtract = merit } }
+            else_if = { limit = { var:tca_retirement_candidate_honor_target = 9 } change_merit_no_experience = { value = merit_level_9_value subtract = merit } }
+            remove_character_flag = tca_merit_grant_suppress
+            trigger_event = { id = tca_retirement_state.9001 days = 1 }
+        }
+        else = { add_character_flag = tca_retirement_candidate_honor_processed remove_variable = tca_retirement_candidate_honor_source }
+    }
+}

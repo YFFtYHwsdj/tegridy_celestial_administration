@@ -1,0 +1,24 @@
+﻿# 退休头衔的死亡与真实失衔生命周期；不主动扫描世界。
+on_death = { on_actions = { tca_retirement_title_death } }
+on_title_lost = { on_actions = { tca_retirement_title_lost } }
+
+# 死亡回调时人物仍有效；先封闭维护，再清本人对象，避免销毁回调重建。
+tca_retirement_title_death = {
+    trigger = { OR = { has_variable = tca_retirement_title tca_retirement_is_exited_trigger = yes } }
+    effect = {
+        add_character_flag = tca_retirement_terminal
+        add_character_flag = tca_retirement_maintaining
+        tca_retirement_release_title_effect = yes
+        tca_retirement_clear_request_effect = yes
+    }
+}
+# 正式主动回收在维护锁中完成；外部撤销或真实任免之后跨日读取最终持有结构。
+tca_retirement_title_lost = {
+    trigger = { tca_retirement_is_exited_trigger = yes NOT = { has_character_flag = tca_retirement_maintaining } NOT = { has_character_flag = tca_retirement_terminal } }
+    effect = {
+        if = { limit = { NOT = { has_character_flag = tca_retirement_income_sync_pending } }
+            add_character_flag = tca_retirement_income_sync_pending
+            trigger_event = { id = tca_retirement.93 days = 2 }
+        }
+    }
+}

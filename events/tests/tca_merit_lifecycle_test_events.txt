@@ -441,8 +441,10 @@ tca_merit_lifecycle_test.3 = {
         remove_character_flag = tca_test_case_failed
         if = {
             limit = { debug_only = yes is_alive = yes title:h_china.holder = root }
-            tca_test_create_merit_probe_character_effect = { CHARACTER = tca_ml_direct_retirement_actor GOVERNMENT = celestial_government }
+            tca_test_create_merit_interface_character_effect = { CHARACTER = tca_ml_direct_retirement_actor GOVERNMENT = celestial_government }
             scope:tca_ml_direct_retirement_actor = {
+                set_age = 90
+                add_trait = infirm add_trait_xp = { trait = infirm value = 75 }
                 tca_test_add_native_merit_probe_exams_effect = yes
                 add_trait = education_stewardship_1
                 # 只保留本次新建家门；阻断等待期间的初始补位和议会招聘，不借用任命超时识别退出。
@@ -456,9 +458,9 @@ tca_merit_lifecycle_test.3 = {
             else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_direct_retirement 1" }
             # 本例无前任/继任者；显示回退人物显式取报告者，避免读取其它用例遗留或缺失的scope。
             save_scope_as = new_governor
-            scope:tca_ml_direct_retirement_actor = { trigger_event = ep3_decisions_event.4090 }
+            scope:tca_ml_direct_retirement_actor = { trigger_event = { id = tca_retirement_formal_test.92 days = 2 } }
             add_character_flag = tca_test_delayed_case_active
-            trigger_event = { id = tca_merit_lifecycle_test.3001 days = 3 }
+            trigger_event = { id = tca_merit_lifecycle_test.3001 days = 7 }
         }
         else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_merit_direct_retirement" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_continue_delayed_effect = yes }
     }
@@ -470,17 +472,17 @@ tca_merit_lifecycle_test.3001 = {
         tca_test_validate_environment_effect = yes
         if = {
             limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
-            # 本例原超时为零；确认分支写三年，三日等待后应准确剩余1092日。
-            if = { limit = { scope:tca_ml_direct_retirement_actor = { has_character_modifier = ep3_renounced_governorship_merit has_character_flag = tca_merit_retired tca_merit_population_trigger = no appointment_timeout_days = 1092 } scope:tca_ml_direct_retirement_family.holder = scope:tca_ml_direct_retirement_actor } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_direct_retirement 2" }
+            # 天朝确认事件现进入正式退休；两种合法选择均退出，家门仍保留。
+            if = { limit = { scope:tca_ml_direct_retirement_actor = { tca_retirement_is_exited_trigger = yes tca_merit_population_trigger = no appointment_timeout_days > 36500 NOT = { has_character_modifier = ep3_renounced_governorship_merit } } scope:tca_ml_direct_retirement_family.holder = scope:tca_ml_direct_retirement_actor } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_direct_retirement 2" }
             else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_direct_retirement 2" }
             scope:tca_ml_direct_retirement_actor = { if = { limit = { can_execute_decision = tgp_resume_appointments_decision } execute_decision = tgp_resume_appointments_decision } }
-            if = { limit = { scope:tca_ml_direct_retirement_actor = { appointment_timeout_days = 0 NOT = { has_character_flag = tca_merit_retired } tca_merit_population_trigger = yes has_character_modifier = ep3_renounced_governorship_merit is_civilian_candidate_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_direct_retirement 3" }
+            if = { limit = { scope:tca_ml_direct_retirement_actor = { appointment_timeout_days > 36500 tca_retirement_is_exited_trigger = yes tca_merit_population_trigger = no NOT = { can_execute_decision = tgp_resume_appointments_decision } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_direct_retirement 3" }
             else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_direct_retirement 3" }
-            # 恢复后再参加考试，与未恢复退休的共享修正不能混为退出原因。
-            scope:tca_ml_direct_retirement_actor = { set_appointment_timeout = { months = 6 desc = appointment_timeout_desc_examinations } }
-            if = { limit = { scope:tca_ml_direct_retirement_actor = { appointment_timeout_days > 0 appointment_timeout_days < 365 tca_merit_population_trigger = yes has_character_modifier = ep3_renounced_governorship_merit is_civilian_candidate_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_direct_retirement 4" }
+            # 即便外部入口清空共享超时，也不能抹掉独立退休身份。
+            scope:tca_ml_direct_retirement_actor = { clear_appointment_timeout = yes }
+            if = { limit = { scope:tca_ml_direct_retirement_actor = { appointment_timeout_days = 0 tca_merit_population_trigger = no tca_retirement_is_exited_trigger = yes NOT = { can_execute_decision = tgp_resume_appointments_decision } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_direct_retirement 4" }
             else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_direct_retirement 4" }
-            scope:tca_ml_direct_retirement_actor = { remove_character_modifier = ep3_renounced_governorship_merit tca_merit_leave_celestial_effect = yes tca_test_cleanup_merit_probe_character_effect = yes }
+            scope:tca_ml_direct_retirement_actor = { tca_merit_leave_celestial_effect = yes tca_test_cleanup_retirement_formal_effect = yes }
             # 退出正式身份并隔离夹具，清理不触及真实官职；家门仍归这名一次性人物。
             if = { limit = { scope:tca_ml_direct_retirement_actor = { NOT = { has_character_flag = tca_merit_active } NOT = { has_variable = tca_merit_approved_level } NOT = { has_character_modifier = tca_merit_approved_base_modifier } NOT = { has_character_modifier = tca_merit_approved_reduction_modifier } NOT = { has_character_modifier = tca_merit_probe_stasis_modifier } has_character_flag = tca_merit_interface_probe } scope:tca_ml_direct_retirement_family.holder = scope:tca_ml_direct_retirement_actor } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_direct_retirement 5" }
             else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_direct_retirement 5" }

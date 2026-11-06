@@ -6,6 +6,7 @@ tca_merit_interface_probe_trigger = {
     has_character_flag = tca_merit_interface_probe
 }
 tca_merit_population_trigger = {
+    NOT = { tca_retirement_excludes_appointment_trigger = yes }
     NOT = { tca_merit_interface_probe_trigger = yes }
     is_alive = yes
     # 人物池里的人可能没有最高领主；exists维持拒绝语义，?=只避免空scope报错。
@@ -49,6 +50,7 @@ tca_merit_ordinary_candidate_trigger = {
 # 两种都可从SOURCE=0一次授到实际职位目标，但普通竞争仍由population拒绝零级。
 # 这里只做准入；落账前由commit trigger重新读取实际头衔、议会职位与退出标记。
 tca_merit_central_zero_source_trigger = {
+    NOT = { tca_retirement_excludes_appointment_trigger = yes }
     NOT = { tca_merit_interface_probe_trigger = yes }
     is_alive = yes
     merit_level = 0
@@ -81,6 +83,7 @@ tca_merit_central_zero_source_commit_trigger = {
 # 当前已退出者由active识别；未接管的迁入分支由当前最高领主识别。
 tca_merit_realm_change_relevant_trigger = {
     OR = {
+        tca_retirement_is_exited_trigger = yes
         has_character_flag = tca_merit_active
         government_has_flag = government_is_celestial
         AND = { exists = top_liege top_liege ?= { government_has_flag = government_is_celestial } }
@@ -92,6 +95,7 @@ tca_merit_realm_change_relevant_trigger = {
 # 原生进出宫廷回调；保留离境者及新旧雇主涉及天朝的移动，其余不排延迟事件。
 tca_merit_court_change_relevant_trigger = {
     OR = {
+        tca_retirement_is_exited_trigger = yes
         has_character_flag = tca_merit_active
         AND = { exists = top_liege top_liege ?= { government_has_flag = government_is_celestial } }
         AND = { exists = scope:old_employer.top_liege scope:old_employer.top_liege ?= { government_has_flag = government_is_celestial } }

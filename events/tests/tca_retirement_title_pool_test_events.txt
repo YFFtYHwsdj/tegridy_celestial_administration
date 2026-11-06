@@ -1,0 +1,226 @@
+﻿# 宫观选择接口回归：使用真实个人头衔占位，只直接调用正式 choose_palace，不复制选择算法。
+# 高品池直接提供grade输入，因此不代替高品真实官品稳定、申请资格或完整退休流程验收。
+# 同链执行，无延迟；新建248人（隔离国家锚1、池演员246、正式同步演员1），不改历史人物。
+namespace = tca_retirement_title_pool_test
+
+tca_retirement_title_pool_test.1 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { has_character_flag = tca_test_delayed_case_active } debug_log = "TCA_TEST CASE_BUSY" }
+        else = {
+            debug_log = "TCA_TEST BEGIN tca_retirement_title_pool_test.1 tca_test_retirement_title_pool"
+            remove_character_flag = tca_test_case_failed
+            if = { limit = { debug_only = yes is_alive = yes title:h_china.holder = root exists = capital_county }
+                # 唯一新建家门仅作为country键隔离既有占位，不声称它是真实退休国家。
+                tca_test_create_merit_probe_character_effect = { CHARACTER = tca_pool_anchor GOVERNMENT = celestial_government }
+                scope:tca_pool_anchor.primary_title = { save_scope_as = tca_pool_country }
+                clear_variable_list = tca_pool_actors
+                set_variable = { name = tca_pool_grade value = 3 }
+                while = {
+                    limit = { var:tca_pool_grade >= 1 }
+                    set_variable = { name = tca_pool_capacity value = 2 }
+                    set_variable = { name = tca_pool_total value = 32 }
+                    if = { limit = { var:tca_pool_grade = 2 }
+                        set_variable = { name = tca_pool_capacity value = 5 }
+                        set_variable = { name = tca_pool_total value = 80 }
+                    }
+                    else_if = { limit = { var:tca_pool_grade = 1 }
+                        set_variable = { name = tca_pool_capacity value = 8 }
+                        set_variable = { name = tca_pool_total value = 128 }
+                    }
+                    set_variable = { name = tca_pool_index value = 0 }
+                    set_variable = { name = tca_pool_last value = { value = var:tca_pool_total add = 2 } }
+                    while = {
+                        limit = { var:tca_pool_index < var:tca_pool_last }
+                        change_variable = { name = tca_pool_index add = 1 }
+                        # 最后一个演员进入前，只释放本档第一宫观的一个真实对象。
+                        if = { limit = { var:tca_pool_index = var:tca_pool_last }
+                            clear_saved_scope = tca_pool_vacating
+                            every_in_list = {
+                                variable = tca_pool_actors
+                                if = { limit = {
+                                    var:tca_retirement_title_grade ?= root.var:tca_pool_grade
+                                    var:tca_retirement_palace ?= 1
+                                    NOT = { exists = scope:tca_pool_vacating }
+                                } save_scope_as = tca_pool_vacating }
+                            }
+                            scope:tca_pool_vacating ?= { tca_retirement_release_title_effect = yes }
+                        }
+                        create_character = {
+                            age = 40 gender_female_chance = 0 random_traits = no dynasty = none
+                            employer = root culture = root.culture faith = root.faith rite = root.rite
+                            save_scope_as = tca_pool_actor
+                        }
+                        add_to_variable_list = { name = tca_pool_actors target = scope:tca_pool_actor }
+                        scope:tca_pool_actor = {
+                            tca_test_protect_character_effect = yes
+                            add_character_flag = ai_will_not_convert
+                            add_character_flag = tca_retirement_maintaining
+                            add_trait = tca_fengci
+                            set_variable = { name = tca_retirement_country value = scope:tca_pool_country }
+                            set_variable = { name = tca_retirement_title_kind value = 1 }
+                            set_variable = { name = tca_retirement_title_grade value = root.var:tca_pool_grade }
+                            set_variable = { name = tca_retirement_palace value = 0 }
+                            save_scope_as = tca_rt_actor
+                            save_scope_value_as = { name = tca_rt_grade value = var:tca_retirement_title_grade }
+                            tca_retirement_choose_palace_effect = yes
+                            # 构造选择入口所要求的真实双向绑定；不预设被选宫观，不调用业务算法副本。
+                            create_dynamic_title = { tier = duchy name = tca_retirement_title_generic adj = tca_retirement_title_generic_adj }
+                            scope:new_title = {
+                                save_scope_as = tca_pool_new_title
+                                set_capital_county = root.capital_county
+                                set_landless_title = yes
+                                set_delete_on_destroy = yes
+                                set_destroy_on_succession = yes
+                                set_no_automatic_claims = yes
+                                set_variable = { name = tca_retirement_title value = yes }
+                                set_variable = { name = tca_retirement_owner value = scope:tca_pool_actor }
+                            }
+                            set_variable = { name = tca_retirement_title value = scope:tca_pool_new_title }
+                            create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_pool_grant }
+                            scope:tca_pool_new_title = { change_title_holder = { holder = scope:tca_pool_actor change = scope:tca_pool_grant } }
+                            resolve_title_and_vassal_change = scope:tca_pool_grant
+                            add_to_global_variable_list = { name = tca_retirement_title_holders target = this }
+                            tca_retirement_refresh_title_name_effect = yes
+                        }
+                        # 填满时逐处核对，不用总人数掩盖一个宫观超额和另一个欠额。
+                        if = { limit = { var:tca_pool_index = var:tca_pool_total }
+                            remove_character_flag = tca_pool_distribution_bad
+                            set_variable = { name = tca_pool_palace_index value = 1 }
+                            while = {
+                                limit = { var:tca_pool_palace_index <= 16 }
+                                set_variable = { name = tca_pool_count value = 0 }
+                                every_in_list = {
+                                    variable = tca_pool_actors
+                                    if = { limit = {
+                                        var:tca_retirement_title_grade ?= root.var:tca_pool_grade
+                                        var:tca_retirement_palace ?= root.var:tca_pool_palace_index
+                                        exists = var:tca_retirement_title
+                                        var:tca_retirement_title = { holder = prev var:tca_retirement_owner ?= prev has_variable = tca_retirement_title }
+                                    } root = { change_variable = { name = tca_pool_count add = 1 } } }
+                                }
+                                if = { limit = { NOT = { var:tca_pool_count = var:tca_pool_capacity } } add_character_flag = tca_pool_distribution_bad }
+                                change_variable = { name = tca_pool_palace_index add = 1 }
+                            }
+                            if = { limit = { NOT = { has_character_flag = tca_pool_distribution_bad } }
+                                if = { limit = { var:tca_pool_grade = 3 } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_title_pool 1" }
+                                else_if = { limit = { var:tca_pool_grade = 2 } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_title_pool 4" }
+                                else = { debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_title_pool 7" }
+                            }
+                            else = {
+                                add_character_flag = tca_test_case_failed
+                                if = { limit = { var:tca_pool_grade = 3 } debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_title_pool 1" }
+                                else_if = { limit = { var:tca_pool_grade = 2 } debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_title_pool 4" }
+                                else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_title_pool 7" }
+                            }
+                        }
+                        else_if = { limit = { var:tca_pool_index < var:tca_pool_last var:tca_pool_index > var:tca_pool_total }
+                            if = { limit = { scope:tca_pool_actor = { var:tca_retirement_palace = 0 } }
+                                if = { limit = { var:tca_pool_grade = 3 } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_title_pool 2" }
+                                else_if = { limit = { var:tca_pool_grade = 2 } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_title_pool 5" }
+                                else = { debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_title_pool 8" }
+                            }
+                            else = {
+                                add_character_flag = tca_test_case_failed
+                                if = { limit = { var:tca_pool_grade = 3 } debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_title_pool 2" }
+                                else_if = { limit = { var:tca_pool_grade = 2 } debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_title_pool 5" }
+                                else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_title_pool 8" }
+                            }
+                        }
+                        else_if = { limit = { var:tca_pool_index = var:tca_pool_last }
+                            if = { limit = {
+                                exists = scope:tca_pool_vacating
+                                scope:tca_pool_vacating = { NOT = { has_variable = tca_retirement_title } NOT = { any_held_title = { has_variable = tca_retirement_title } } NOT = { is_target_in_global_variable_list = { name = tca_retirement_title_holders target = this } } }
+                                scope:tca_pool_actor = { var:tca_retirement_palace = 1 }
+                            }
+                                if = { limit = { var:tca_pool_grade = 3 } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_title_pool 3" }
+                                else_if = { limit = { var:tca_pool_grade = 2 } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_title_pool 6" }
+                                else = { debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_title_pool 9" }
+                            }
+                            else = {
+                                add_character_flag = tca_test_case_failed
+                                if = { limit = { var:tca_pool_grade = 3 } debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_title_pool 3" }
+                                else_if = { limit = { var:tca_pool_grade = 2 } debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_title_pool 6" }
+                                else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_title_pool 9" }
+                            }
+                        }
+                    }
+                    change_variable = { name = tca_pool_grade subtract = 1 }
+                }
+                # 池接口夹具先全部清理；外层维护锁保留到移除trait后，防止归属回调重建。
+                every_in_list = {
+                    variable = tca_pool_actors
+                    tca_retirement_release_title_effect = yes
+                    remove_trait = tca_fengci
+                    remove_variable = tca_retirement_country
+                    remove_character_flag = tca_retirement_maintaining
+                    remove_character_flag = ai_will_not_convert
+                    tca_test_restore_character_effect = yes
+                }
+                # 正式sync幂等另用真实零级人物，避免把高品set_merit_level同链写入当成稳定品级。
+                tca_test_create_merit_probe_character_effect = { CHARACTER = tca_pool_sync_actor GOVERNMENT = celestial_government }
+                scope:tca_pool_sync_actor = {
+                    add_character_flag = tca_retirement_maintaining
+                    add_trait = tca_fengci
+                    set_variable = { name = tca_retirement_country value = root.primary_title }
+                    tca_retirement_sync_title_effect = yes
+                    var:tca_retirement_title ?= { save_scope_as = tca_pool_sync_title }
+                }
+                if = { limit = { scope:tca_pool_sync_actor = { merit_level = 0 exists = var:tca_retirement_title var:tca_retirement_title_grade = 1 } }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_title_pool 10"
+                }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_title_pool 10" }
+                scope:tca_pool_sync_actor = {
+                    # 明确构造已经存在的通用头衔，不声称本处通过正式满额申请生成。
+                    set_variable = { name = tca_retirement_palace value = 0 }
+                    tca_retirement_refresh_title_name_effect = yes
+                    tca_retirement_sync_title_effect = yes
+                    tca_retirement_sync_title_effect = yes
+                }
+                if = { limit = { exists = scope:tca_pool_sync_title scope:tca_pool_sync_actor = { var:tca_retirement_title ?= scope:tca_pool_sync_title var:tca_retirement_palace = 0 } }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_title_pool 11"
+                }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_title_pool 11" }
+                scope:tca_pool_sync_actor = { tca_test_cleanup_retirement_formal_effect = yes }
+                scope:tca_pool_anchor = { tca_test_cleanup_merit_probe_character_effect = yes }
+                remove_character_flag = tca_pool_cleanup_bad
+                every_in_list = {
+                    variable = tca_pool_actors
+                    if = { limit = { OR = {
+                        has_variable = tca_retirement_title has_variable = tca_retirement_palace
+                        has_variable = tca_retirement_title_grade has_variable = tca_retirement_title_kind
+                        has_trait = tca_test_death_protection
+                        any_held_title = { has_variable = tca_retirement_title }
+                        is_target_in_global_variable_list = { name = tca_retirement_title_holders target = this }
+                    } } root = { add_character_flag = tca_pool_cleanup_bad } }
+                }
+                if = { limit = { NOT = { has_character_flag = tca_pool_cleanup_bad } scope:tca_pool_sync_actor = {
+                    NOT = { has_variable = tca_retirement_title }
+                    NOT = { any_held_title = { has_variable = tca_retirement_title } }
+                    NOT = { is_target_in_global_variable_list = { name = tca_retirement_title_holders target = this } }
+                    NOT = { has_trait = tca_test_death_protection }
+                } scope:tca_pool_anchor = { NOT = { has_trait = tca_test_death_protection } } }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_title_pool 12"
+                }
+                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_title_pool 12" }
+                clear_variable_list = tca_pool_actors
+                remove_variable = tca_pool_grade remove_variable = tca_pool_capacity remove_variable = tca_pool_total
+                remove_variable = tca_pool_index remove_variable = tca_pool_last remove_variable = tca_pool_count remove_variable = tca_pool_palace_index
+                remove_character_flag = tca_pool_distribution_bad remove_character_flag = tca_pool_cleanup_bad
+                if = { limit = { has_character_flag = tca_test_case_failed }
+                    debug_log = "TCA_TEST FAIL tca_test_retirement_title_pool"
+                    if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+                }
+                else = {
+                    debug_log = "TCA_TEST PASS tca_test_retirement_title_pool"
+                    if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } }
+                }
+                remove_character_flag = tca_test_case_failed
+            }
+            else = {
+                debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_retirement_title_pool"
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+            }
+        }
+    }
+}

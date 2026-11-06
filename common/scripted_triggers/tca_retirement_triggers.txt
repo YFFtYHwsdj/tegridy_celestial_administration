@@ -1,0 +1,157 @@
+﻿# 正式退休资格；共享法律与健康判断，不把压力作为准入资格。
+# 人物作用域；年龄使用原生retirement_age_current_value读取真实最高领主法律。
+tca_retirement_has_office_trigger = {
+    OR = {
+        tgp_is_any_minister = yes
+        any_held_title = { OR = { has_variable = tca_tongpan_title has_variable = tca_judicial_title } }
+        AND = { is_governor_or_admin_count = yes any_held_title = { is_noble_family_title = no is_landless_type_title = no tier >= tier_county NOT = { has_variable = tca_retirement_title } } }
+    }
+}
+tca_retirement_has_seniority_trigger = {
+    OR = { tca_retirement_has_office_trigger = yes merit_level >= 4 has_trait = tca_fengci }
+}
+# TRAIT为原生衰老特质键，XP为最低经验。显式核对持有特质，避免空经验被当有效状态。
+tca_retirement_ailment_track_trigger = {
+    has_trait = $TRAIT$
+    has_trait_xp = { trait = $TRAIT$ value >= $XP$ }
+}
+tca_retirement_ailment_mid_trigger = {
+    OR = {
+        tca_retirement_ailment_track_trigger = { TRAIT = infirm XP = 50 }
+        tca_retirement_ailment_track_trigger = { TRAIT = withering_mind XP = 50 }
+        tca_retirement_ailment_track_trigger = { TRAIT = clouded_eyes XP = 50 }
+        tca_retirement_ailment_track_trigger = { TRAIT = faltering_heart XP = 50 }
+        tca_retirement_ailment_track_trigger = { TRAIT = fragile_bones XP = 50 }
+    }
+}
+tca_retirement_ailment_severe_trigger = {
+    OR = {
+        tca_retirement_ailment_track_trigger = { TRAIT = infirm XP = 75 }
+        tca_retirement_ailment_track_trigger = { TRAIT = withering_mind XP = 75 }
+        tca_retirement_ailment_track_trigger = { TRAIT = clouded_eyes XP = 75 }
+        tca_retirement_ailment_track_trigger = { TRAIT = faltering_heart XP = 75 }
+        tca_retirement_ailment_track_trigger = { TRAIT = fragile_bones XP = 75 }
+    }
+}
+tca_retirement_extreme_health_trigger = {
+    OR = { is_incapable = yes has_trait = blind health < 1 }
+}
+# 年龄通道与衰病／健康提前通道分开判定，要求区各占一行，任一满足即可申请。
+tca_retirement_fengci_age_trigger = {
+    OR = {
+        AND = { retirement_age_current_value > 0 age >= { value = retirement_age_current_value subtract = 10 } }
+        AND = { retirement_age_current_value = 0 age >= tca_retirement_no_fixed_fengci_age_value }
+    }
+}
+tca_retirement_retire_age_trigger = {
+    OR = {
+        AND = { retirement_age_current_value > 0 age >= retirement_age_current_value }
+        # 年龄本身是独立准入，兼容高龄开局人物尚无衰老特质。
+        AND = { retirement_age_current_value = 0 age >= tca_retirement_no_fixed_retire_age_value }
+    }
+}
+# 奉祠接受中度衰病或极端健康；致仕须重度衰病，仅无固定年龄时保留六十岁中度衰病的提前路径。
+tca_retirement_fengci_health_trigger = {
+    OR = {
+        tca_retirement_ailment_mid_trigger = yes
+        tca_retirement_extreme_health_trigger = yes
+    }
+}
+tca_retirement_retire_health_trigger = {
+    OR = {
+        tca_retirement_ailment_severe_trigger = yes
+        AND = { retirement_age_current_value = 0 age >= tca_retirement_no_fixed_fengci_age_value tca_retirement_ailment_mid_trigger = yes }
+        tca_retirement_extreme_health_trigger = yes
+    }
+}
+# 复合判定保留给脚本调用；正式决议要求区改用上面的分项，避免一行混装三个条件。
+tca_retirement_fengci_age_health_trigger = {
+    OR = { tca_retirement_fengci_age_trigger = yes tca_retirement_fengci_health_trigger = yes }
+}
+tca_retirement_retire_age_health_trigger = {
+    OR = { tca_retirement_retire_age_trigger = yes tca_retirement_retire_health_trigger = yes }
+}
+tca_retirement_can_fengci_trigger = {
+    # 保留授品保护的原条件，仅以玩家提示替代内部变量和旗标名。
+    custom_tooltip = {
+        text = tca_retirement_rank_settled_tt
+        NOT = { has_variable = tca_merit_grant_phase }
+        NOT = { has_character_flag = tca_merit_grant_suppress }
+    }
+    is_alive = yes is_adult = yes this != top_liege
+    exists = top_liege top_liege = { government_has_flag = government_is_celestial }
+    custom_tooltip = { text = tca_retirement_seniority_tt tca_retirement_has_seniority_trigger = yes }
+    OR = {
+        custom_tooltip = { text = tca_retirement_fengci_age_tt tca_retirement_fengci_age_trigger = yes }
+        custom_tooltip = { text = tca_retirement_fengci_health_tt tca_retirement_fengci_health_trigger = yes }
+    }
+    NOT = { tca_retirement_is_exited_trigger = yes }
+}
+tca_retirement_can_retire_trigger = {
+    # 保留授品保护的原条件，仅以玩家提示替代内部变量和旗标名。
+    custom_tooltip = {
+        text = tca_retirement_rank_settled_tt
+        NOT = { has_variable = tca_merit_grant_phase }
+        NOT = { has_character_flag = tca_merit_grant_suppress }
+    }
+    is_alive = yes is_adult = yes this != top_liege
+    exists = top_liege top_liege = { government_has_flag = government_is_celestial }
+    custom_tooltip = { text = tca_retirement_seniority_tt tca_retirement_has_seniority_trigger = yes }
+    OR = {
+        custom_tooltip = { text = tca_retirement_retire_age_tt tca_retirement_retire_age_trigger = yes }
+        custom_tooltip = { text = tca_retirement_retire_health_tt tca_retirement_retire_health_trigger = yes }
+    }
+    NOT = { has_trait = tca_retired }
+}
+
+# 身份与国家／超时独立；双特质异常也一律退出正常任用。
+tca_retirement_is_exited_trigger = { OR = { has_trait = tca_fengci has_trait = tca_retired } }
+# 无地廷臣以真实最高领主判断，不能要求其自身具有家门政体。
+tca_retirement_income_valid_trigger = {
+    is_alive = yes
+    tca_retirement_is_exited_trigger = yes
+    exists = top_liege
+    this != top_liege
+    top_liege = { government_has_flag = government_is_celestial }
+    OR = { is_ruler = no government_has_flag = government_is_celestial }
+}
+tca_retirement_can_resume_trigger = {
+    tca_retirement_income_valid_trigger = yes
+    has_trait = tca_fengci
+    NOT = { has_trait = tca_retired }
+    is_adult = yes
+    is_incapable = no
+    NOT = { has_trait = blind }
+    NOT = { tca_retirement_ailment_severe_trigger = yes }
+    # 剔除奉祠固定健康加成，避免靠待遇解除极低健康限制。
+    health >= 1.2
+    influence >= tca_retirement_resume_cost_value
+    has_variable = tca_retirement_prior_timeout
+    has_variable = tca_retirement_entered_date
+    NOT = { has_character_flag = tca_retirement_request_denied }
+    NOT = { has_variable = tca_retirement_honor_target }
+    NOT = { has_character_flag = tca_retirement_honor_failed }
+}
+# 传家不指定长子；当前真实家门继承人必须存活、成年并属于同一家门。
+tca_retirement_can_transfer_trigger = {
+    tca_retirement_is_exited_trigger = yes
+    is_alive = yes
+    NOT = { tca_retirement_has_office_trigger = yes }
+    any_held_title = {
+        is_noble_family_title = yes
+        exists = current_heir
+        current_heir = { is_alive = yes is_adult = yes this != prev.holder house = prev.holder.house }
+    }
+    NOT = { has_variable = tca_retirement_honor_target }
+    NOT = { has_character_flag = tca_retirement_honor_failed }
+    # 共用事务守卫：原版决议、退休询问和AI均不能在奏请／授品未结时交接。
+    NOT = { has_variable = tca_retirement_request_kind }
+    NOT = { has_variable = tca_merit_grant_phase }
+}
+# 高品在任的退闲，以及所有高品起复，需要皇帝决定。
+tca_retirement_needs_approval_trigger = { merit_level >= 7 tca_retirement_has_office_trigger = yes }
+
+# 正常任用共同守卫。技术探针仍由显式debug标记隔离，不从超时反推退休。
+tca_retirement_excludes_appointment_trigger = {
+    OR = { tca_retirement_is_exited_trigger = yes tca_retirement_candidate_is_exited_trigger = yes }
+}

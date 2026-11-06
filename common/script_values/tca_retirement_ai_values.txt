@@ -1,0 +1,125 @@
+﻿# AI退闲权重唯一维护处；均为即时脚本值，不写入人物，不代替正式资格复验。
+# 下列年龄增幅与保持现状权重为首版暂定值，不解释为季度或年度概率。
+# 人物作用域；无固定年龄使用自愿申请参考值，不产生强制退休。
+tca_retirement_ai_fengci_reference_age_value = {
+    value = retirement_age_current_value
+    subtract = 10
+    if = { limit = { retirement_age_current_value = 0 } value = tca_retirement_no_fixed_fengci_age_value }
+}
+tca_retirement_ai_retire_reference_age_value = {
+    value = retirement_age_current_value
+    if = { limit = { retirement_age_current_value = 0 } value = tca_retirement_no_fixed_retire_age_value }
+}
+# 人物作用域；日期差转为天数后比较，current_date触发器不接受内联数值块。
+tca_retirement_ai_days_since_entry_value = {
+    value = 0
+    if = { limit = { has_variable = tca_retirement_entered_date }
+        value = current_date
+        subtract = var:tca_retirement_entered_date
+    }
+}
+# 人物作用域；保持现状始终有正权重，年龄与健康只影响AI意愿。
+tca_retirement_ai_keep_weight_value = {
+    value = 100
+    if = { limit = { age >= tca_retirement_ai_retire_reference_age_value } multiply = 0.75 }
+    if = { limit = { age >= { value = tca_retirement_ai_retire_reference_age_value add = 10 } } multiply = 0.5 }
+    if = { limit = { age >= { value = tca_retirement_ai_retire_reference_age_value add = 20 } } multiply = 0.5 }
+    if = { limit = { tca_retirement_ailment_mid_trigger = yes } multiply = 0.6 }
+    if = { limit = { tca_retirement_ailment_severe_trigger = yes } multiply = 0.5 }
+    if = { limit = { tca_retirement_extreme_health_trigger = yes } multiply = 0.1 }
+    min = 1
+}
+tca_retirement_ai_fengci_weight_value = {
+    value = 0
+    if = { limit = { tca_retirement_can_fengci_trigger = yes tca_retirement_ai_request_available_trigger = yes }
+        value = 5
+        add = { value = age subtract = tca_retirement_ai_fengci_reference_age_value min = 0 max = 20 }
+        if = { limit = { tca_retirement_ailment_mid_trigger = yes } add = 15 }
+        if = { limit = { tca_retirement_extreme_health_trigger = yes } add = 40 }
+        if = { limit = { has_trait = content } add = 15 }
+        if = { limit = { has_trait = lazy } add = 15 }
+        if = { limit = { has_trait = ambitious } subtract = 20 }
+        if = { limit = { has_trait = diligent } subtract = 10 }
+        min = 0
+        # 致仕可行时降低而不抹掉奉祠，保留原生选项间竞争。
+        if = { limit = { tca_retirement_can_retire_trigger = yes } multiply = 0.5 }
+        if = { limit = { has_character_flag = tca_retirement_recent_resume } multiply = 0.1 }
+    }
+}
+tca_retirement_ai_retire_weight_value = {
+    value = 0
+    if = { limit = { tca_retirement_can_retire_trigger = yes tca_retirement_ai_request_available_trigger = yes }
+        value = 2
+        if = { limit = { age >= tca_retirement_ai_retire_reference_age_value } add = 15 }
+        add = { value = age subtract = tca_retirement_ai_retire_reference_age_value min = 0 max = 20 multiply = 2 }
+        if = { limit = { tca_retirement_ailment_severe_trigger = yes } add = 30 }
+        if = { limit = { tca_retirement_extreme_health_trigger = yes } add = 60 }
+        if = { limit = { has_trait = tca_fengci } add = 10 }
+        if = { limit = { has_trait = content } add = 10 }
+        if = { limit = { has_trait = ambitious } subtract = 20 }
+        min = 0
+        if = { limit = { has_character_flag = tca_retirement_recent_resume } multiply = 0.1 }
+    }
+}
+tca_retirement_ai_resume_weight_value = {
+    value = 0
+    if = { limit = { tca_retirement_can_resume_trigger = yes tca_retirement_ai_request_available_trigger = yes }
+        value = 2
+        if = { limit = { has_trait = ambitious } add = 20 }
+        if = { limit = { has_trait = diligent } add = 10 }
+        if = { limit = { gold < 10 } add = 3 }
+        if = { limit = { has_trait = content } subtract = 15 }
+        if = { limit = { has_trait = lazy } subtract = 10 }
+        if = { limit = { tca_retirement_ailment_mid_trigger = yes } subtract = 20 }
+        min = 0
+        # 仅降低AI刚奉祠或年高时的主动起复；玩家无最低奉祠年限。
+        if = { limit = { age >= tca_retirement_ai_retire_reference_age_value } multiply = 0.1 }
+        if = { limit = { tca_retirement_ai_days_since_entry_value < 365 } multiply = 0.1 }
+    }
+}
+# 皇帝人物作用域；scope:tca_retirement_applicant是原申请者。好感方向为皇帝对申请者。
+# 批准与加恩分开评分，纯加恩请求不能否决已经完成的退出。
+tca_retirement_ai_approve_weight_value = {
+    value = 50
+    if = { limit = { exists = scope:tca_retirement_applicant }
+        if = { limit = { opinion = { target = scope:tca_retirement_applicant value >= 50 } } add = 10 }
+        if = { limit = { opinion = { target = scope:tca_retirement_applicant value <= -50 } } subtract = 10 }
+        if = { limit = { scope:tca_retirement_applicant = { var:tca_retirement_request_kind ?= 3 } }
+            if = { limit = { scope:tca_retirement_applicant = { stewardship >= 15 } } add = 15 }
+        }
+        else = {
+            if = { limit = { scope:tca_retirement_applicant = { age >= tca_retirement_ai_retire_reference_age_value } } add = 15 }
+            if = { limit = { scope:tca_retirement_applicant = { tca_retirement_extreme_health_trigger = yes } } add = 40 }
+        }
+    }
+    min = 1
+}
+tca_retirement_ai_deny_weight_value = {
+    value = 25
+    if = { limit = { exists = scope:tca_retirement_applicant }
+        if = { limit = { scope:tca_retirement_applicant = { NOT = { var:tca_retirement_request_kind ?= 3 } } }
+            if = { limit = { scope:tca_retirement_applicant = { age >= tca_retirement_ai_retire_reference_age_value } } multiply = 0.5 }
+            if = { limit = { scope:tca_retirement_applicant = { tca_retirement_extreme_health_trigger = yes } } multiply = 0.2 }
+        }
+    }
+    min = 1
+}
+tca_retirement_ai_honor_weight_value = {
+    value = 40
+    if = { limit = { exists = scope:tca_retirement_applicant opinion = { target = scope:tca_retirement_applicant value >= 50 } } add = 20 }
+}
+tca_retirement_ai_no_honor_weight_value = 50
+# 传家人物作用域；继承资格由正式trigger保证。能力及关系只给较轻的修正。
+tca_retirement_ai_transfer_weight_value = {
+    value = 0
+    if = { limit = { tca_retirement_can_transfer_trigger = yes }
+        value = 25
+        if = { limit = { tca_retirement_extreme_health_trigger = yes } add = 50 }
+        if = { limit = { age >= 70 } add = 20 }
+        if = { limit = { any_held_title = { is_noble_family_title = yes current_heir = { stewardship >= prev.holder.stewardship } } } add = 10 }
+        if = { limit = { any_held_title = { is_noble_family_title = yes holder = { opinion = { target = prev.current_heir value >= 50 } } } } add = 5 }
+        if = { limit = { any_held_title = { is_noble_family_title = yes holder = { opinion = { target = prev.current_heir value <= -50 } } } } subtract = 5 }
+        min = 0
+    }
+}
+tca_retirement_ai_keep_family_weight_value = 75

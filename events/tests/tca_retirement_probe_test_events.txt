@@ -1,0 +1,300 @@
+﻿# 闲退接口探针；只用可丢弃人物与原生接口，不实现正式身份、审批或付款替代品。
+# .1反向哨兵：仅加奉祠／致仕特质不得建立退休契约或发薪；正式待遇由头衔与独立契约承担。
+namespace = tca_retirement_probe
+
+tca_retirement_probe.1 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_retirement_probe.1 tca_test_retirement_salary"
+        remove_character_flag = tca_test_case_failed
+        if = {
+            limit = { debug_only = yes is_alive = yes title:h_china.holder = root }
+            tca_test_create_merit_interface_character_with_age_effect = { CHARACTER = tca_rp_actor GOVERNMENT = celestial_government AGE = 65 }
+            scope:tca_rp_actor = {
+                primary_title = { save_scope_as = tca_rp_family }
+                domicile = { save_scope_as = tca_rp_estate }
+                # 先保持零品隔离官品基数，之后另测原生六品。
+                set_merit_level = 0
+                create_character = { age = 30 gender_female_chance = 0 random_traits = no dynasty = this.dynasty father = this employer = this culture = this.culture faith = this.faith rite = this.rite save_scope_as = tca_rp_child }
+            }
+            scope:tca_rp_child = { set_house = scope:tca_rp_actor.house tca_test_protect_character_effect = yes add_character_flag = ai_will_not_convert add_character_flag = tca_merit_interface_probe set_appointment_timeout = { years = 150 desc = appointment_timeout_desc_refusing } }
+            add_character_flag = tca_test_delayed_case_active
+            trigger_event = { id = tca_retirement_probe.1001 days = 35 }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_retirement_salary" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_continue_delayed_effect = yes }
+    }
+}
+
+tca_retirement_probe.1001 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_rp_actor = { primary_title = scope:tca_rp_family government_has_flag = government_is_celestial merit_level = 0 domicile = scope:tca_rp_estate } scope:tca_rp_child.father = scope:tca_rp_actor } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_salary 1" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_salary 1" }
+            debug_log = "TCA_RETIREMENT STAGE baseline"
+            scope:tca_rp_actor = {
+                trigger_event = tca_retirement_probe.90
+                set_variable = { name = tca_rp_baseline value = monthly_character_income }
+                add_trait = tca_retirement_probe_fengci
+            }
+            trigger_event = { id = tca_retirement_probe.1002 days = 35 }
+        }
+    }
+}
+
+tca_retirement_probe.1002 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            debug_log = "TCA_RETIREMENT STAGE trait_only_fengci"
+            scope:tca_rp_actor = { trigger_event = tca_retirement_probe.90 }
+            # 现行待遇由退休头衔与独立契约承担；仅加特质不得自行建立契约或发薪。
+            if = { limit = { scope:tca_rp_actor = {
+                has_trait = tca_retirement_probe_fengci
+                monthly_character_income = var:tca_rp_baseline
+                NOT = { has_variable = tca_retirement_title }
+                NOT = { vassal_contract_has_flag = tca_fengci_salary_active }
+                NOT = { vassal_contract_has_flag = tca_zhishi_salary_active }
+                NOT = { vassal_contract_has_flag = tca_retirement_merit_half }
+            } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_salary 2" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_salary 2" }
+            scope:tca_rp_actor = { remove_trait = tca_retirement_probe_fengci add_trait = tca_retirement_probe_retired }
+            trigger_event = { id = tca_retirement_probe.1003 days = 35 }
+        }
+    }
+}
+
+tca_retirement_probe.1003 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            debug_log = "TCA_RETIREMENT STAGE trait_only_retired"
+            scope:tca_rp_actor = { trigger_event = tca_retirement_probe.90 }
+            if = { limit = { scope:tca_rp_actor = {
+                has_trait = tca_retirement_probe_retired
+                monthly_character_income = var:tca_rp_baseline
+                NOT = { has_variable = tca_retirement_title }
+                NOT = { vassal_contract_has_flag = tca_fengci_salary_active }
+                NOT = { vassal_contract_has_flag = tca_zhishi_salary_active }
+                NOT = { vassal_contract_has_flag = tca_retirement_merit_half }
+            } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_salary 3" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_salary 3" }
+            scope:tca_rp_actor = { remove_trait = tca_retirement_probe_retired tca_test_cleanup_merit_probe_character_effect = yes }
+            scope:tca_rp_child = { tca_test_cleanup_merit_probe_character_effect = yes }
+            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_retirement_salary" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_retirement_salary" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            remove_character_flag = tca_test_case_failed
+            remove_character_flag = tca_test_delayed_case_active
+            tca_test_continue_delayed_effect = yes
+        }
+    }
+}
+
+# 人物作用域，输出诊断变量只用于本探针；同时记录国库收入与实际金币／国库余额。
+tca_retirement_probe.90 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = tca_retirement_probe_diagnostic
+    }
+}
+
+# 借用一位路官的州／路头衔，原生退职后检查家门与庄园保留，最后精确交还原持有人。
+# 不调用退休决议，所以本例只验证底层退职接口，不代表审批或玩家流程。
+tca_retirement_probe.2 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_retirement_probe.2 tca_test_retirement_stepdown"
+        remove_character_flag = tca_test_case_failed
+        if = { limit = { debug_only = yes is_alive = yes title:h_china.holder = root }
+            tca_test_create_local_domain_actor_effect = { ACTOR = tca_rp_governor LEVEL = celestial_province_standard }
+            if = { limit = { exists = scope:tca_rp_governor }
+                scope:tca_rp_governor = {
+                    random_held_title = { limit = { is_noble_family_title = yes } save_scope_as = tca_rp_governor_family }
+                    domicile ?= { save_scope_as = tca_rp_governor_estate }
+                }
+                add_character_flag = tca_test_delayed_case_active
+                trigger_event = { id = tca_retirement_probe.2001 days = 2 }
+            }
+            else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_retirement_stepdown" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_continue_delayed_effect = yes }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_retirement_stepdown" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_continue_delayed_effect = yes }
+    }
+}
+
+tca_retirement_probe.2001 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_rp_governor = { is_landed = yes highest_held_title_tier = tier_kingdom any_held_title = { is_noble_family_title = yes } exists = domicile } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_stepdown 1" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_stepdown 1" }
+            scope:tca_rp_governor = {
+                add_trait = tca_retirement_probe_fengci
+                force_step_down_landed_titles = yes
+            }
+            trigger_event = { id = tca_retirement_probe.2002 days = 3 }
+        }
+    }
+}
+
+tca_retirement_probe.2002 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_rp_governor = { is_landed = no NOT = { any_held_title = { is_noble_family_title = no } } } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_stepdown 2" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_stepdown 2" }
+            if = { limit = { scope:tca_rp_governor_family.holder = scope:tca_rp_governor scope:tca_rp_governor = { domicile = scope:tca_rp_governor_estate has_trait = tca_retirement_probe_fengci NOT = { has_trait = devoted } } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_stepdown 3" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_stepdown 3" }
+            if = { limit = { scope:tca_rp_governor = { var:tca_domain_test_county = { exists = holder NOT = { holder = scope:tca_rp_governor } } var:tca_domain_test_circuit = { exists = holder NOT = { holder = scope:tca_rp_governor } } } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_stepdown 4" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_stepdown 4" }
+            scope:tca_rp_governor = { remove_trait = tca_retirement_probe_fengci tca_test_restore_local_domain_actor_effect = yes }
+            if = { limit = { scope:tca_rp_governor = { var:tca_domain_test_county.holder = var:tca_domain_test_old_county_holder var:tca_domain_test_circuit.holder = var:tca_domain_test_old_circuit_holder } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_stepdown 5" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_stepdown 5" }
+            scope:tca_rp_governor = { tca_test_cleanup_merit_probe_character_effect = yes }
+            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_retirement_stepdown" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_retirement_stepdown" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            remove_character_flag = tca_test_case_failed
+            remove_character_flag = tca_test_delayed_case_active
+            tca_test_continue_delayed_effect = yes
+        }
+    }
+}
+
+# 当前接口基线：特质待遇本身不会排除补位，超时也不会替代正式退出标记。
+# 预期保留原版恢复能力，目的是确认正式实现必须封堵的入口，不宣称永久致仕已完成。
+tca_retirement_probe.3 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_retirement_probe.3 tca_test_retirement_exit_interfaces"
+        remove_character_flag = tca_test_case_failed
+        if = { limit = { debug_only = yes is_alive = yes title:h_china.holder = root }
+            tca_test_create_merit_probe_character_effect = { CHARACTER = tca_rp_exit GOVERNMENT = celestial_government }
+            save_scope_as = tca_tp_liege
+            save_scope_as = tca_tp_sovereign
+            scope:tca_rp_exit = {
+                add_trait = education_stewardship_1
+                set_merit_level = 1
+                change_merit_no_experience = { value = 12345 subtract = merit }
+                change_influence = 500
+                clear_appointment_timeout = yes
+                tca_merit_initialize_character_effect = yes
+            }
+            if = { limit = { scope:tca_rp_exit = { tca_merit_ordinary_candidate_trigger = yes tca_is_initial_tongpan_candidate_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_exit_interfaces 1" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_exit_interfaces 1" }
+            scope:tca_rp_exit = { add_trait = tca_retirement_probe_retired set_appointment_timeout = { years = 150 desc = appointment_timeout_desc_refusing } }
+            if = { limit = { scope:tca_rp_exit = { tca_merit_ordinary_candidate_trigger = yes tca_is_initial_tongpan_candidate_trigger = yes can_execute_decision = tgp_resume_appointments_decision } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_exit_interfaces 2" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_exit_interfaces 2" }
+            scope:tca_rp_exit = { tca_merit_mark_retired_effect = yes }
+            if = { limit = { scope:tca_rp_exit = { tca_merit_population_trigger = no tca_merit_ordinary_candidate_trigger = no tca_is_initial_tongpan_candidate_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_exit_interfaces 3" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_exit_interfaces 3" }
+            scope:tca_rp_exit = { if = { limit = { can_execute_decision = tgp_resume_appointments_decision } execute_decision = tgp_resume_appointments_decision } }
+            if = { limit = { scope:tca_rp_exit = { appointment_timeout_days = 0 tca_merit_ordinary_candidate_trigger = yes has_trait = tca_retirement_probe_retired NOT = { has_character_flag = tca_merit_retired } } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_exit_interfaces 4" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_exit_interfaces 4" }
+            scope:tca_rp_exit = { remove_trait = tca_retirement_probe_retired tca_merit_leave_celestial_effect = yes tca_test_cleanup_merit_probe_character_effect = yes }
+            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_retirement_exit_interfaces" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_retirement_exit_interfaces" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_retirement_exit_interfaces" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } }
+        remove_character_flag = tca_test_case_failed
+    }
+}
+
+# 已有实职与稳定契约的放大输入对照；仅加／移除探针特质及临时保护，不转移历史头衔。
+tca_retirement_probe.4 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_retirement_probe.4 tca_test_retirement_salary_control"
+        remove_character_flag = tca_test_case_failed
+        if = { limit = { debug_only = yes is_alive = yes title:h_china.holder = root }
+            clear_saved_scope = tca_rp_active
+            random_vassal_or_below = {
+                limit = { is_governor = yes is_landed = yes liege = root highest_held_title_tier = tier_kingdom government_has_flag = government_is_celestial }
+                save_scope_as = tca_rp_active
+            }
+            if = { limit = { exists = scope:tca_rp_active }
+                scope:tca_rp_active = { tca_test_protect_character_effect = yes }
+                add_character_flag = tca_test_delayed_case_active
+                trigger_event = { id = tca_retirement_probe.4001 days = 35 }
+            }
+            else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_retirement_salary_control" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_continue_delayed_effect = yes }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_retirement_salary_control" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_continue_delayed_effect = yes }
+    }
+}
+tca_retirement_probe.4001 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_rp_active = { is_governor = yes is_landed = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_salary_control 1" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_salary_control 1" }
+            debug_log = "TCA_RETIREMENT STAGE active_baseline"
+            scope:tca_rp_active = {
+                save_scope_as = tca_rp_actor
+                trigger_event = tca_retirement_probe.90
+                set_variable = { name = tca_rp_active_gold_income value = monthly_character_income }
+                set_variable = { name = tca_rp_active_treasury_income value = monthly_character_treasury_income }
+                add_trait = tca_retirement_probe_salary_control
+            }
+            trigger_event = { id = tca_retirement_probe.4002 days = 35 }
+        }
+    }
+}
+tca_retirement_probe.4002 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            debug_log = "TCA_RETIREMENT STAGE active_fengci"
+            scope:tca_rp_active = { trigger_event = tca_retirement_probe.90 }
+            if = { limit = { scope:tca_rp_active = { has_trait = tca_retirement_probe_salary_control OR = { monthly_character_income > var:tca_rp_active_gold_income monthly_character_treasury_income > var:tca_rp_active_treasury_income } } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_salary_control 2" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_salary_control 2" }
+            scope:tca_rp_active = {
+                set_variable = { name = tca_rp_control_with_trait value = monthly_character_income }
+                remove_trait = tca_retirement_probe_salary_control
+            }
+            trigger_event = { id = tca_retirement_probe.4003 days = 35 }
+        }
+    }
+}
+
+# 同一官员移除特质并真实跨月等待，避免缓存未刷新或自然税收变动造成误判。
+# 两日读数曾与移除前完全相同并失败，不能据此删掉反向断言。
+tca_retirement_probe.4003 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            debug_log = "TCA_RETIREMENT STAGE active_removed"
+            scope:tca_rp_active = { trigger_event = tca_retirement_probe.90 }
+            if = { limit = { scope:tca_rp_active = { monthly_character_income < var:tca_rp_control_with_trait NOT = { has_trait = tca_retirement_probe_salary_control } } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_salary_control 3" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_salary_control 3" }
+            scope:tca_rp_active = { tca_test_restore_character_effect = yes }
+            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_retirement_salary_control" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_retirement_salary_control" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            remove_character_flag = tca_test_case_failed
+            remove_character_flag = tca_test_delayed_case_active
+            tca_test_continue_delayed_effect = yes
+        }
+    }
+}
+
+# 临时只读门槛诊断；读取原生字段，不写候选、付款或框架结果。
+tca_retirement_probe.92 = {
+    type = character_event hidden = yes
+    immediate = {
+        save_scope_as = tca_retirement_diag_actor
+        debug_log = tca_retirement_generic_diagnostic
+        if = { limit = { is_independent_ruler = yes } debug_log = "TCA_RDIAG INDEPENDENT" }
+        if = { limit = { has_treasury = yes } debug_log = "TCA_RDIAG HAS_TREASURY" }
+        if = { limit = { government_has_flag = government_is_celestial } debug_log = "TCA_RDIAG CELESTIAL" }
+        if = { limit = { tca_retirement_candidate_has_seniority_trigger = yes } debug_log = "TCA_RDIAG SENIOR" }
+        if = { limit = { tca_retirement_candidate_can_fengci_trigger = yes } debug_log = "TCA_RDIAG CAN_FENGCI" }
+        if = { limit = { has_variable = tca_retirement_probe_country } debug_log = "TCA_RDIAG PAYMENT_REGISTERED" }
+        if = { limit = { has_character_flag = tca_merit_active } debug_log = "TCA_RDIAG MERIT_ACTIVE" }
+    }
+}

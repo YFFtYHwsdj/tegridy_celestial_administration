@@ -1,0 +1,172 @@
+﻿# 原版家主让位决议适配；仅奉祠／致仕走保留个人退休头衔的正式传家事务。
+# 普通人物保留原版事件、资格、费用和AI逻辑；本覆盖不授予退休身份或额外恩荫。
+renounce_noble_family_title_decision = {
+	picture = {
+		reference = "gfx/interface/illustrations/event_scenes/tgp_asia_estate.dds"
+	}
+	sort_order = 85
+
+	desc = {
+		first_valid = {
+			triggered_desc = {
+				trigger = { tca_retirement_is_exited_trigger = yes }
+				desc = tca_retirement_native_transfer_desc
+			}
+			triggered_desc = {
+				trigger = {
+					any_held_title = {
+						is_noble_family_title = yes
+						exists = current_heir
+					}
+				}
+				desc = renounce_noble_family_title_decision_desc
+			}
+			desc = renounce_noble_family_title_decision_no_heir_desc
+		}
+	}
+	selection_tooltip = {
+		first_valid = {
+			triggered_desc = { trigger = { tca_retirement_is_exited_trigger = yes } desc = tca_retirement_transfer_tooltip }
+			desc = renounce_noble_family_title_decision_tooltip
+		}
+	}
+	decision_group_type = admin
+
+	is_shown = {
+		any_held_title = { is_noble_family_title = yes }
+		# 普通佛教家主仍沿用原版出家入口；奉祠／致仕传家不授devoted，故可使用本决议。
+		OR = { tca_retirement_is_exited_trigger = yes NOT = { religion = religion:buddhism_religion } }
+		NOT = { top_liege = root } # 原版不作为独立君主的通用退位决议
+		is_house_head = yes
+		is_playable_character = yes
+		has_tgp_dlc_trigger = yes
+	}
+
+	is_valid = {
+		trigger_if = {
+			limit = { tca_retirement_is_exited_trigger = yes }
+			custom_tooltip = { text = tca_retirement_transfer_ready_tt tca_retirement_can_transfer_trigger = yes }
+		}
+		custom_tooltip = {
+			text = renounce_noble_family_title_decision_tt.title
+			any_held_title = { is_noble_family_title = yes }
+		}
+		custom_tooltip = {
+			text = renounce_noble_family_title_decision_tt.heir
+			any_held_title = {
+				is_noble_family_title = yes
+				current_heir ?= { is_available_ai_adult = yes }
+			}
+		}
+	}
+
+	is_valid_showing_failures_only = {
+		is_available_adult = yes
+		is_at_war_with_liege = no
+		trigger_if = {
+			limit = {
+				has_realm_law_flag = celestial_retirement_law
+			}
+			tgp_is_above_retirement_age_trigger = { REALM_OWNER = root }
+		}
+	}
+
+	effect = {
+		if = {
+			limit = { tca_retirement_is_exited_trigger = yes }
+			# 退休公国只归本人；不调用会清退全部非家门头衔的原版隐退事件。
+			custom_tooltip = tca_retirement_transfer_effect_tt
+			hidden_effect = { tca_retirement_transfer_effect = yes }
+		}
+		else = {
+			if = {
+				limit = { is_ai = no }
+				random_held_title = {
+					limit = { is_noble_family_title = yes }
+					current_heir = {  save_scope_as = new_player }
+				}
+			}
+			show_as_tooltip = {
+				add_character_modifier = { modifier = ep3_renounced_estate }
+				custom_tooltip = renounce_noble_family_title_decision_tt
+				if = {
+					limit = { exists = scope:new_player }
+					house = { set_house_head = scope:new_player }
+					set_player_character = scope:new_player
+				}
+				tgp_step_down_title_recipient_tooltip_effect = yes
+			}
+			trigger_event = tgp_dynastic_cycle_decision_event.0101
+		}
+		close_view = {
+			view = decisions
+			player = root
+		}
+	}
+
+	cost = {
+		influence = {
+			value = 0
+			if = {
+				limit = { government_has_flag = government_has_influence }
+				add = minor_influence_value
+			}
+		}
+		prestige = {
+			value = 0
+			if = {
+				limit = {
+					NOT = { government_has_flag = government_has_influence }
+				}
+				add = minor_prestige_value
+			}
+		}
+	}
+
+	ai_check_interval = 0
+
+	ai_potential = {
+		# 退休AI由既有年度入口权衡，不在原版入口重复考虑。
+		NOT = { tca_retirement_is_exited_trigger = yes }
+		is_at_war = no
+		# 原版家门保护：需有其他家族任官者，或同家门继承现有非家门头衔
+		OR = {
+			house ?= {
+				any_house_member = {
+					is_governor = yes
+					top_liege = root.top_liege
+				}
+			}
+			any_held_title = {
+				tier = root.highest_held_title_tier
+				is_noble_family_title = no
+				current_heir.house = root.house
+			}
+		}
+		tgp_is_above_retirement_age_trigger = { REALM_OWNER = root }
+	}
+
+	ai_will_do = {
+		base = -10
+		modifier = {
+			add = 10
+			has_trait = lazy
+		}
+		modifier = {
+			add = 10
+			has_trait = humble
+		}
+		modifier = {
+			add = 10
+			has_trait = content
+		}
+		modifier = {
+			add = -100
+			OR = {
+				has_trait = ambitious
+				has_trait = greedy
+				has_trait = arrogant
+			}
+		}
+	}
+}

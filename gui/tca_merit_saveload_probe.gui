@@ -25,7 +25,7 @@ widget = {
         # 重载可能保留观察者，不能以君主是否人类识别新进程。
         # UI会话变量不随存档恢复；`tca_merit_saveload_saved`是脚本变量，保存前写入并存进存档。
         # 因此阶段2且带该存档标记即为续局；首次进程的阶段2此时还没有标记，不跳过保存。
-        on_start = "[ExecuteConsoleCommand(Select_CString(And(EqualTo_CFixedPoint(Title.MakeScope.Var('tca_merit_saveload_phase').GetValue, '(CFixedPoint)2'), EqualTo_CFixedPoint(Title.MakeScope.Var('tca_merit_saveload_saved').GetValue, '(CFixedPoint)1')), 'effect title:h_china = { if = { limit = { var:tca_merit_saveload_phase = 2 } set_variable = { name = tca_merit_saveload_phase value = 4 } } }', 'effect title:h_china = { if = { limit = { var:tca_merit_saveload_phase = 1 } set_variable = { name = tca_merit_saveload_phase value = 2 } } }'))]"
+        on_start = "[ExecuteConsoleCommand(Select_CString(And(EqualTo_CFixedPoint(Title.MakeScope.Var('tca_merit_saveload_phase').GetValue, '(CFixedPoint)2'), EqualTo_CFixedPoint(Title.MakeScope.Var('tca_merit_saveload_saved').GetValue, '(CFixedPoint)1')), 'effect title:h_china = { if = { limit = { var:tca_merit_saveload_phase = 2 } set_variable = { name = tca_merit_saveload_phase value = 4 } holder = { tca_test_merit_saveload_early_transaction_effect = yes tca_test_retirement_saveload_early_check_effect = yes } } }', 'effect title:h_china = { if = { limit = { var:tca_merit_saveload_phase = 1 } set_variable = { name = tca_merit_saveload_phase value = 2 } } }'))]"
         duration = 0.1
         next = "tca_merit_slow"
     }
@@ -51,7 +51,7 @@ widget = {
     }
     state = {
         name = "tca_merit_corrupt"
-        on_start = "[ExecuteConsoleCommand('effect title:h_china = { if = { limit = { var:tca_merit_saveload_phase = 2 } set_variable = { name = tca_merit_saveload_phase value = 3 } var:tca_merit_saveload_actor = { set_variable = { name = tca_merit_saveload_sentinel value = 54321 } change_merit_no_experience = { value = 7 subtract = merit } } clear_variable_list = tca_merit_saveload_candidates var:tca_merit_saveload_transaction = { set_variable = { name = tca_mtx_phase value = 99 } set_variable = { name = tca_mtx_target value = 9 } set_variable = { name = tca_merit_saveload_transaction_sentinel value = 54321 } change_merit_no_experience = { value = 7 subtract = merit } } var:tca_merit_saveload_formal_actor = { set_variable = { name = tca_merit_grant_phase value = 99 } set_variable = { name = tca_merit_grant_target value = 9 } set_variable = { name = tca_merit_grant_token value = 99 } set_variable = { name = tca_merit_saveload_formal_sentinel value = 54321 } change_merit_no_experience = { value = 7 subtract = merit } } holder = { trigger_event = tca_merit_saveload_probe_test.9001 } set_variable = { name = tca_cli_ready value = 0 } } }')]"
+        on_start = "[ExecuteConsoleCommand('effect title:h_china = { if = { limit = { var:tca_merit_saveload_phase = 2 } set_variable = { name = tca_merit_saveload_phase value = 3 } var:tca_merit_saveload_actor = { set_variable = { name = tca_merit_saveload_sentinel value = 54321 } change_merit_no_experience = { value = 7 subtract = merit } } clear_variable_list = tca_merit_saveload_candidates var:tca_merit_saveload_transaction = { set_variable = { name = tca_mtx_phase value = 99 } set_variable = { name = tca_mtx_target value = 9 } set_variable = { name = tca_merit_saveload_transaction_sentinel value = 54321 } change_merit_no_experience = { value = 7 subtract = merit } } var:tca_merit_saveload_formal_actor = { set_variable = { name = tca_merit_grant_phase value = 99 } set_variable = { name = tca_merit_grant_target value = 9 } set_variable = { name = tca_merit_grant_token value = 99 } set_variable = { name = tca_merit_saveload_formal_sentinel value = 54321 } change_merit_no_experience = { value = 7 subtract = merit } } tca_test_corrupt_retirement_saveload_effect = yes holder = { trigger_event = tca_merit_saveload_probe_test.9001 } set_variable = { name = tca_cli_ready value = 0 } } }')]"
     }
 
 }
@@ -69,8 +69,8 @@ widget = {
     state = { name = "tca_merit_cleanup_phase" on_start = "[ExecuteConsoleCommand('effect title:h_china = { remove_variable = tca_merit_saveload_phase }')]" }
 }
 
-# 检查点停靠：关闭CLI自动取消暂停后，再使用已确认的原生暂停接口。
-# 只有本轮已破坏状态且尚未暂停才执行；暂停后条件立即变假，不循环切换。
+# 检查点停靠：必须等9001事件处理完并写下RELOAD_SAVE标记后再暂停；
+# 同时要求阶段3：重载后阶段4仍保留reload_ready，不能再次暂停卡住60日续接。
 widget = {
     name = "tca_merit_saveload_manual_pause"
     size = { 1 1 }
@@ -78,7 +78,7 @@ widget = {
     alpha = 0
     visible_at_creation = no
     datacontext = "[GetTitleByKey('h_china')]"
-    visible = "[And(InDebugMode, And(IsInGame, And(EqualTo_CFixedPoint(Title.MakeScope.Var('tca_merit_saveload_phase').GetValue, '(CFixedPoint)3'), Not(IsManuallyPaused))))]"
+    visible = "[And(InDebugMode, And(IsInGame, And(EqualTo_CFixedPoint(Title.MakeScope.Var('tca_merit_saveload_phase').GetValue, '(CFixedPoint)3'), And(EqualTo_CFixedPoint(Title.MakeScope.Var('tca_merit_saveload_reload_ready').GetValue, '(CFixedPoint)1'), Not(IsManuallyPaused)))))]"
     state = { name = _show on_start = "[OnPause]" }
 }
 

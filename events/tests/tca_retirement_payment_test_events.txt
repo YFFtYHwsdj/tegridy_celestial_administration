@@ -1,0 +1,349 @@
+﻿# 闲退替代付款接口验证；金额为人物冻结绝对额，不代表原生预算公式或最终待遇。
+# 每例新建付款国家，不清空或跨日回滚真实皇帝国库；仅在可丢弃debug局运行。
+namespace = tca_retirement_payment_test
+
+# 同日精确账：付款改变金币、国库或防重行为的回归都会使本例失败。
+tca_retirement_payment_test.1 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_retirement_payment_test.1 tca_test_retirement_payment"
+        remove_character_flag = tca_test_case_failed
+        if = { limit = { debug_only = yes is_alive = yes title:h_china.holder = root }
+            tca_test_create_retirement_payment_country_effect = { RULER = tca_pay_country TITLE = tca_pay_title }
+            tca_test_create_retirement_payment_recipient_effect = { ACTOR = tca_pay_actor PAYER = tca_pay_country }
+            tca_test_create_retirement_payment_recipient_effect = { ACTOR = tca_pay_other PAYER = tca_pay_country }
+            tca_test_create_retirement_payment_recipient_effect = { ACTOR = tca_pay_dead PAYER = tca_pay_country }
+            add_character_flag = tca_test_delayed_case_active
+            trigger_event = { id = tca_retirement_payment_test.1001 days = 2 }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_retirement_payment" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_continue_delayed_effect = yes }
+    }
+}
+# 先等真实两日核对独立付款国及封臣归属，再登记并开始同日守恒断言。
+tca_retirement_payment_test.1001 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            scope:tca_pay_country = { tca_test_set_retirement_payment_balance_effect = { BALANCE = 100 } }
+            scope:tca_pay_actor = {
+                set_variable = { name = tca_retirement_probe_due value = 9 }
+                tca_retirement_candidate_register_effect = yes
+                tca_retirement_candidate_register_effect = yes
+                tca_test_capture_retirement_payment_effect = yes
+                tca_retirement_candidate_settle_effect = yes
+            }
+            if = { limit = { scope:tca_pay_actor = { liege = scope:tca_pay_country top_liege = scope:tca_pay_country var:tca_retirement_probe_country = scope:tca_pay_title var:tca_retirement_probe_last_paid = 9 gold = { value = var:tca_pay_before_gold add = 9 } treasury = var:tca_pay_before_treasury } scope:tca_pay_country = { is_independent_ruler = yes has_any_landed_title_trigger = yes treasury = 91 } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_payment 1"
+            } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_payment 1" }
+            scope:tca_pay_actor = { tca_retirement_candidate_settle_effect = yes }
+            if = { limit = { scope:tca_pay_actor = { gold = { value = var:tca_pay_before_gold add = 9 } treasury = var:tca_pay_before_treasury } scope:tca_pay_country = { treasury = 91 } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_payment 2"
+            } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_payment 2" }
+            # 新人物和不同特质使用独立冻结额，不能由特质隐式生成金币。
+            scope:tca_pay_other = {
+                remove_trait = tca_retirement_probe_fengci add_trait = tca_retirement_probe_retired
+                set_variable = { name = tca_retirement_probe_due value = 3 }
+                tca_retirement_candidate_register_effect = yes
+                tca_test_capture_retirement_payment_effect = yes
+                tca_retirement_candidate_settle_effect = yes
+            }
+            if = { limit = { scope:tca_pay_other = { var:tca_retirement_probe_last_paid = 3 gold = { value = var:tca_pay_before_gold add = 3 } treasury = var:tca_pay_before_treasury } scope:tca_pay_country = { treasury = 88 } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_payment 3"
+            } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_payment 3" }
+            # 以下每段仍在同日，仅重置本例新建人物的防重日期以隔离余额边界。
+            scope:tca_pay_country = { tca_test_set_retirement_payment_balance_effect = { BALANCE = 2 } }
+            scope:tca_pay_other = { remove_variable = tca_retirement_probe_attempted tca_test_capture_retirement_payment_effect = yes tca_retirement_candidate_settle_effect = yes }
+            if = { limit = { scope:tca_pay_other = { var:tca_retirement_probe_last_paid = 2 gold = { value = var:tca_pay_before_gold add = 2 } treasury = var:tca_pay_before_treasury } scope:tca_pay_country = { treasury = 0 } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_payment 4"
+            } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_payment 4" }
+            scope:tca_pay_other = { remove_variable = tca_retirement_probe_attempted tca_test_capture_retirement_payment_effect = yes tca_retirement_candidate_settle_effect = yes }
+            if = { limit = { scope:tca_pay_other = { var:tca_retirement_probe_last_paid = 0 var:tca_retirement_probe_attempted = current_date gold = var:tca_pay_before_gold treasury = var:tca_pay_before_treasury } scope:tca_pay_country = { treasury = 0 } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_payment 5"
+            } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_payment 5" }
+            scope:tca_pay_country = { add_treasury = 10 }
+            scope:tca_pay_other = { tca_retirement_candidate_settle_effect = yes }
+            if = { limit = { scope:tca_pay_other = { var:tca_retirement_probe_last_paid = 0 gold = var:tca_pay_before_gold } scope:tca_pay_country = { treasury = 10 } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_payment 6"
+            } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_payment 6" }
+            scope:tca_pay_country = { tca_test_set_retirement_payment_balance_effect = { BALANCE = -4 } }
+            scope:tca_pay_other = { remove_variable = tca_retirement_probe_attempted tca_test_capture_retirement_payment_effect = yes tca_retirement_candidate_settle_effect = yes }
+            if = { limit = { scope:tca_pay_other = { var:tca_retirement_probe_last_paid = 0 var:tca_retirement_probe_attempted = current_date gold = var:tca_pay_before_gold treasury = var:tca_pay_before_treasury } scope:tca_pay_country = { treasury = -4 } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_payment 7"
+            } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_payment 7" }
+            scope:tca_pay_country = { tca_test_set_retirement_payment_balance_effect = { BALANCE = 100 } }
+            scope:tca_pay_other = { remove_variable = tca_retirement_probe_attempted set_variable = { name = tca_retirement_probe_due value = -3 } tca_test_capture_retirement_payment_effect = yes tca_retirement_candidate_settle_effect = yes }
+            if = { limit = { scope:tca_pay_other = { var:tca_retirement_probe_last_paid = 0 var:tca_retirement_probe_attempted = current_date gold = var:tca_pay_before_gold treasury = var:tca_pay_before_treasury } scope:tca_pay_country = { treasury = 100 } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_payment 8"
+            } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_payment 8" }
+            # 双闸：只有特质、没有显式启用标记不得付款。
+            scope:tca_pay_other = { remove_variable = tca_retirement_probe_attempted set_variable = { name = tca_retirement_probe_due value = 3 } remove_character_flag = tca_retirement_candidate_enabled tca_retirement_candidate_settle_effect = yes }
+            if = { limit = { scope:tca_pay_other = { NOT = { has_variable = tca_retirement_probe_attempted } gold = var:tca_pay_before_gold } scope:tca_pay_country = { treasury = 100 } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_payment 9"
+            } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_payment 9" }
+            scope:tca_pay_other = { add_character_flag = tca_retirement_candidate_enabled remove_trait = tca_retirement_probe_retired tca_retirement_candidate_settle_effect = yes }
+            if = { limit = { scope:tca_pay_other = { NOT = { has_variable = tca_retirement_probe_attempted } gold = var:tca_pay_before_gold } scope:tca_pay_country = { treasury = 100 } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_payment 10"
+            } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_payment 10" }
+            scope:tca_pay_other = { add_trait = tca_retirement_probe_retired set_variable = { name = tca_retirement_probe_due value = 0 } tca_retirement_candidate_settle_effect = yes }
+            if = { limit = { scope:tca_pay_other = { var:tca_retirement_probe_last_paid = 0 var:tca_retirement_probe_attempted = current_date gold = var:tca_pay_before_gold treasury = var:tca_pay_before_treasury } scope:tca_pay_country = { treasury = 100 } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_payment 11"
+            } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_payment 11" }
+            # 无头衔的一次性廷臣死亡，不触碰家门继承或真实人物的死亡保护。
+            create_character = { age = 70 gender_female_chance = 0 random_traits = no dynasty = none employer = scope:tca_pay_country culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_pay_dead }
+            scope:tca_pay_dead = {
+                add_character_flag = tca_merit_interface_probe add_character_flag = tca_retirement_candidate_enabled
+                add_trait = tca_retirement_probe_retired set_variable = { name = tca_retirement_probe_due value = 3 }
+                tca_retirement_candidate_register_effect = yes
+                death = { death_reason = death_natural_causes }
+                tca_retirement_candidate_settle_effect = yes
+            }
+            # 死者变量已被原生释放；核对死亡、国库未付款及从国家持有名单真实清退。
+            tca_retirement_candidate_monthly_effect = yes
+            if = { limit = { scope:tca_pay_dead = { is_alive = no } scope:tca_pay_country = { treasury = 100 } scope:tca_pay_title = { NOT = { is_target_in_variable_list = { name = tca_retirement_probe_recipients target = scope:tca_pay_dead } } } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_payment 12"
+            } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_payment 12" }
+            scope:tca_pay_actor = { tca_test_cleanup_retirement_payment_recipient_effect = yes }
+            scope:tca_pay_other = { tca_test_cleanup_retirement_payment_recipient_effect = yes }
+            scope:tca_pay_country = { tca_test_restore_retirement_payment_country_effect = yes }
+            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_retirement_payment" }
+            else = { debug_log = "TCA_TEST PASS tca_test_retirement_payment" }
+            tca_test_finish_retirement_payment_effect = yes
+        } else = {
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_retirement_payment"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+        }
+    }
+}
+
+# 自备家门和同家门子嗣；转交后等待真实原生月脉冲，不直接调用月结工作器。
+tca_retirement_payment_test.2 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_retirement_payment_test.2 tca_test_retirement_payment_courtier"
+        remove_character_flag = tca_test_case_failed
+        if = { limit = { debug_only = yes is_alive = yes title:h_china.holder = root }
+            tca_test_create_retirement_payment_country_effect = { RULER = tca_pay_country TITLE = tca_pay_title }
+            tca_test_create_retirement_payment_recipient_effect = { ACTOR = tca_pay_actor PAYER = tca_pay_country }
+            scope:tca_pay_actor = {
+                primary_title = { save_scope_as = tca_pay_family }
+                domicile = { save_scope_as = tca_pay_estate }
+                create_character = { age = 30 gender_female_chance = 0 random_traits = no dynasty = this.dynasty father = this employer = this culture = this.culture faith = this.faith rite = this.rite save_scope_as = tca_pay_child }
+                set_variable = { name = tca_retirement_probe_due value = 7 }
+                tca_retirement_candidate_register_effect = yes
+            }
+            scope:tca_pay_child = { set_house = scope:tca_pay_actor.house tca_test_protect_character_effect = yes add_character_flag = ai_will_not_convert add_character_flag = tca_merit_interface_probe set_appointment_timeout = { years = 150 desc = appointment_timeout_desc_refusing } }
+            create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_pay_transfer }
+            scope:tca_pay_family = { change_title_holder = { holder = scope:tca_pay_child change = scope:tca_pay_transfer } }
+            resolve_title_and_vassal_change = scope:tca_pay_transfer
+            scope:tca_pay_actor.house = { if = { limit = { NOT = { house_head = scope:tca_pay_child } } set_house_head = scope:tca_pay_child } }
+            scope:tca_pay_child = {
+                change_government = celestial_government
+                create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_pay_child_fealty }
+                change_liege = { liege = scope:tca_pay_country change = scope:tca_pay_child_fealty }
+                resolve_title_and_vassal_change = scope:tca_pay_child_fealty
+            }
+            add_character_flag = tca_test_delayed_case_active
+            trigger_event = { id = tca_retirement_payment_test.2001 days = 2 }
+        } else = {
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_retirement_payment_courtier"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+            tca_test_continue_delayed_effect = yes
+        }
+    }
+}
+tca_retirement_payment_test.2001 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_pay_actor = { NOT = { is_courtier_of = scope:tca_pay_child } } } scope:tca_pay_child = { add_courtier = scope:tca_pay_actor } }
+            if = { limit = { scope:tca_pay_actor = { is_ruler = no is_courtier_of = scope:tca_pay_child top_liege = scope:tca_pay_country has_trait = tca_retirement_probe_fengci } scope:tca_pay_child = { domicile = scope:tca_pay_estate liege = scope:tca_pay_country } scope:tca_pay_country = { is_independent_ruler = yes has_any_landed_title_trigger = yes } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_payment_courtier 1"
+            } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_payment_courtier 1" }
+            scope:tca_pay_country = { tca_test_set_retirement_payment_balance_effect = { BALANCE = 100 } }
+            # 不比较跨月总余额；月脉冲留下的同一效果块原生前后差值才是付款凭据。
+            scope:tca_pay_actor = { tca_retirement_candidate_register_effect = yes remove_variable = tca_retirement_probe_attempted remove_variable = tca_retirement_probe_last_paid remove_variable = tca_retirement_probe_receipt_date }
+            trigger_event = { id = tca_retirement_payment_test.2002 days = 35 }
+        }
+    }
+}
+tca_retirement_payment_test.2002 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_pay_actor = { has_variable = tca_retirement_probe_receipt_date var:tca_retirement_probe_last_paid = 7 var:tca_retirement_probe_gold_delta = 7 var:tca_retirement_probe_payer_delta = 7 var:tca_retirement_probe_treasury_delta = 0 var:tca_retirement_probe_last_payer = scope:tca_pay_country } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_payment_courtier 2"
+            } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_payment_courtier 2" }
+            if = { limit = { scope:tca_pay_actor = { is_ruler = no is_courtier_of = scope:tca_pay_child has_trait = tca_retirement_probe_fengci } scope:tca_pay_child = { NOT = { has_trait = tca_retirement_probe_fengci } } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_payment_courtier 3"
+            } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_payment_courtier 3" }
+            scope:tca_pay_actor = { tca_test_cleanup_retirement_payment_recipient_effect = yes }
+            scope:tca_pay_child = { tca_test_cleanup_merit_probe_character_effect = yes }
+            scope:tca_pay_country = { tca_test_restore_retirement_payment_country_effect = yes }
+            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_retirement_payment_courtier" }
+            else = { debug_log = "TCA_TEST PASS tca_test_retirement_payment_courtier" }
+            tca_test_finish_retirement_payment_effect = yes
+        }
+    }
+}
+
+# 两国迁移保留人物防重日期；旧朝名单不能继续付款，新朝不能立即重复领款。
+tca_retirement_payment_test.3 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_retirement_payment_test.3 tca_test_retirement_payment_migration"
+        remove_character_flag = tca_test_case_failed
+        if = { limit = { debug_only = yes is_alive = yes title:h_china.holder = root }
+            tca_test_create_retirement_payment_country_effect = { RULER = tca_pay_country TITLE = tca_pay_title }
+            tca_test_create_retirement_payment_country_effect = { RULER = tca_pay_second TITLE = tca_pay_second_title }
+            tca_test_create_retirement_payment_recipient_effect = { ACTOR = tca_pay_actor PAYER = tca_pay_country }
+            add_character_flag = tca_test_delayed_case_active
+            trigger_event = { id = tca_retirement_payment_test.3000 days = 2 }
+        } else = {
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_retirement_payment_migration"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+            tca_test_continue_delayed_effect = yes
+        }
+    }
+}
+
+# 每次真实迁国后都让原生回调完成，不把同链的中间归属当成国家切换验收。
+tca_retirement_payment_test.3000 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            scope:tca_pay_country = { tca_test_set_retirement_payment_balance_effect = { BALANCE = 100 } }
+            scope:tca_pay_second = { tca_test_set_retirement_payment_balance_effect = { BALANCE = 100 } }
+            scope:tca_pay_actor = {
+                set_variable = { name = tca_retirement_probe_due value = 5 }
+                tca_retirement_candidate_register_effect = yes
+                create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_pay_migration }
+                change_liege = { liege = scope:tca_pay_second change = scope:tca_pay_migration }
+                resolve_title_and_vassal_change = scope:tca_pay_migration
+            }
+            trigger_event = { id = tca_retirement_payment_test.3010 days = 2 }
+        }
+    }
+}
+tca_retirement_payment_test.3010 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            scope:tca_pay_country = { tca_test_set_retirement_payment_balance_effect = { BALANCE = 100 } }
+            scope:tca_pay_second = { tca_test_set_retirement_payment_balance_effect = { BALANCE = 100 } }
+            scope:tca_pay_actor = {
+                tca_test_capture_retirement_payment_effect = yes
+                # 尚无防重日期，旧朝拒付必须真正依赖所属国家检查。
+                tca_retirement_candidate_settle_effect = yes
+            }
+            if = { limit = { scope:tca_pay_actor = { liege = scope:tca_pay_second top_liege = scope:tca_pay_second var:tca_retirement_probe_country = scope:tca_pay_title NOT = { has_variable = tca_retirement_probe_attempted } gold = var:tca_pay_before_gold treasury = var:tca_pay_before_treasury } scope:tca_pay_country = { is_independent_ruler = yes treasury = 100 } scope:tca_pay_second = { is_independent_ruler = yes treasury = 100 } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_payment_migration 1"
+            } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_payment_migration 1" }
+            scope:tca_pay_actor = {
+                # 返回途中暂时注销，避免自然月脉冲抢先领第一笔；回国后显式重登不清个人日期。
+                tca_retirement_candidate_unregister_effect = yes
+                create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_pay_return }
+                change_liege = { liege = scope:tca_pay_country change = scope:tca_pay_return }
+                resolve_title_and_vassal_change = scope:tca_pay_return
+            }
+            trigger_event = { id = tca_retirement_payment_test.3020 days = 2 }
+        }
+    }
+}
+tca_retirement_payment_test.3020 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            scope:tca_pay_country = { tca_test_set_retirement_payment_balance_effect = { BALANCE = 100 } }
+            remove_character_flag = tca_pay_first_payment_conserved
+            scope:tca_pay_actor = {
+                # 真正回到原登记国家后领取首笔，立即核对双边精确账，再次迁国。
+                tca_retirement_candidate_register_effect = yes
+                tca_test_capture_retirement_payment_effect = yes
+                tca_retirement_candidate_settle_effect = yes
+                set_variable = { name = tca_pay_migration_origin_date value = var:tca_retirement_probe_attempted }
+            }
+            if = { limit = { scope:tca_pay_actor = { liege = scope:tca_pay_country top_liege = scope:tca_pay_country gold = { value = var:tca_pay_before_gold add = 5 } treasury = var:tca_pay_before_treasury var:tca_retirement_probe_last_paid = 5 var:tca_retirement_probe_payer_delta = 5 } scope:tca_pay_country = { treasury = 95 } }
+                add_character_flag = tca_pay_first_payment_conserved
+            }
+            scope:tca_pay_actor = {
+                create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_pay_second_migration }
+                change_liege = { liege = scope:tca_pay_second change = scope:tca_pay_second_migration }
+                resolve_title_and_vassal_change = scope:tca_pay_second_migration
+            }
+            trigger_event = { id = tca_retirement_payment_test.3030 days = 2 }
+        }
+    }
+}
+tca_retirement_payment_test.3030 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            scope:tca_pay_second = { tca_test_set_retirement_payment_balance_effect = { BALANCE = 100 } }
+            scope:tca_pay_actor = {
+                tca_retirement_candidate_register_effect = yes
+                tca_test_capture_retirement_payment_effect = yes
+                tca_retirement_candidate_settle_effect = yes
+            }
+            if = { limit = { has_character_flag = tca_pay_first_payment_conserved scope:tca_pay_actor = { liege = scope:tca_pay_second top_liege = scope:tca_pay_second var:tca_retirement_probe_country = scope:tca_pay_second_title var:tca_retirement_probe_attempted = var:tca_pay_migration_origin_date gold = var:tca_pay_before_gold treasury = var:tca_pay_before_treasury } scope:tca_pay_second = { is_independent_ruler = yes treasury = 100 } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_payment_migration 2"
+            } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_payment_migration 2" }
+            # 原朝支付至今已过2日，再等27日才是第29日；日期仍是原人物原日期。
+            trigger_event = { id = tca_retirement_payment_test.3001 days = 27 }
+        }
+    }
+}
+tca_retirement_payment_test.3001 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            scope:tca_pay_actor = { tca_test_capture_retirement_payment_effect = yes tca_retirement_candidate_settle_effect = yes }
+            if = { limit = { scope:tca_pay_actor = { gold = var:tca_pay_before_gold var:tca_retirement_probe_last_payer = scope:tca_pay_country } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_payment_migration 3"
+            } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_payment_migration 3" }
+            trigger_event = { id = tca_retirement_payment_test.3002 days = 1 }
+        }
+    }
+}
+tca_retirement_payment_test.3002 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            # 当日自然月脉冲可能先结算；无论执行次序均核对实际收据，而非强迫第二笔。
+            scope:tca_pay_actor = { tca_retirement_candidate_settle_effect = yes }
+            if = { limit = { scope:tca_pay_actor = { var:tca_retirement_probe_attempted = current_date var:tca_retirement_probe_last_payer = scope:tca_pay_second var:tca_retirement_probe_last_paid = 5 var:tca_retirement_probe_gold_delta = 5 var:tca_retirement_probe_payer_delta = 5 var:tca_retirement_probe_treasury_delta = 0 } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_payment_migration 4"
+            } else = {
+                add_character_flag = tca_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_payment_migration 4"
+                # 分项诊断只记录失败现场，不改变组合断言。
+                scope:tca_pay_actor = {
+                    debug_log = "TCA_RETIREMENT_PAYMENT C4 attempted=[THIS.Char.MakeScope.Var('tca_retirement_probe_attempted').GetValue] last_paid=[THIS.Char.MakeScope.Var('tca_retirement_probe_last_paid').GetValue] gold_delta=[THIS.Char.MakeScope.Var('tca_retirement_probe_gold_delta').GetValue] payer_delta=[THIS.Char.MakeScope.Var('tca_retirement_probe_payer_delta').GetValue] treasury_delta=[THIS.Char.MakeScope.Var('tca_retirement_probe_treasury_delta').GetValue]"
+                    if = { limit = { var:tca_retirement_probe_last_payer = scope:tca_pay_second } debug_log = "TCA_RETIREMENT_PAYMENT C4 PAYER_SECOND" }
+                    else = { debug_log = "TCA_RETIREMENT_PAYMENT C4 PAYER_OTHER" }
+                }
+            }
+            # 改制停发：只改本例新建付款国，不影响真实朝廷。
+            scope:tca_pay_second = { change_government = feudal_government }
+            scope:tca_pay_actor = { remove_variable = tca_retirement_probe_attempted tca_test_capture_retirement_payment_effect = yes tca_retirement_candidate_settle_effect = yes }
+            if = { limit = { scope:tca_pay_actor = { NOT = { has_variable = tca_retirement_probe_attempted } gold = var:tca_pay_before_gold } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_payment_migration 5"
+            } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_payment_migration 5" }
+            scope:tca_pay_actor = { tca_test_cleanup_retirement_payment_recipient_effect = yes }
+            scope:tca_pay_country = { tca_test_restore_retirement_payment_country_effect = yes }
+            scope:tca_pay_second = { tca_test_restore_retirement_payment_country_effect = yes }
+            remove_character_flag = tca_pay_first_payment_conserved
+            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_retirement_payment_migration" }
+            else = { debug_log = "TCA_TEST PASS tca_test_retirement_payment_migration" }
+            tca_test_finish_retirement_payment_effect = yes
+        }
+    }
+}

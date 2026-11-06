@@ -16,6 +16,26 @@ tca_test_create_local_domain_actor_effect = {
             set_variable = { name = tca_domain_test_old_circuit_holder value = scope:tca_domain_test_circuit.holder }
             set_variable = { name = tca_domain_test_old_county_holder value = scope:tca_domain_test_county.holder }
         }
+        # 原持有人可能在长时间等待、保存重载或自然年中被抽取死亡；借出期间由本夹具保护，
+        # 否则清理事务会向死者交还头衔。只记录并撤销本夹具添加的保护。
+        scope:tca_domain_test_circuit.holder = {
+            if = { limit = { NOT = { has_character_flag = tca_local_domain_original_protected } }
+                add_character_flag = tca_local_domain_original_protected
+                if = { limit = { NOT = { has_trait = tca_test_death_protection } }
+                    add_character_flag = tca_local_domain_original_owns_protection
+                    add_trait = tca_test_death_protection
+                }
+            }
+        }
+        scope:tca_domain_test_county.holder = {
+            if = { limit = { NOT = { has_character_flag = tca_local_domain_original_protected } }
+                add_character_flag = tca_local_domain_original_protected
+                if = { limit = { NOT = { has_trait = tca_test_death_protection } }
+                    add_character_flag = tca_local_domain_original_owns_protection
+                    add_trait = tca_test_death_protection
+                }
+            }
+        }
         create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_domain_test_grant }
         scope:tca_domain_test_county = { change_title_holder = { holder = scope:$ACTOR$ change = scope:tca_domain_test_grant } }
         scope:tca_domain_test_circuit = { change_title_holder = { holder = scope:$ACTOR$ change = scope:tca_domain_test_grant } }
@@ -53,17 +73,42 @@ tca_test_prepare_local_domain_effect = {
 tca_test_restore_local_domain_actor_effect = {
     save_scope_as = tca_domain_test_restoring
     create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_domain_test_restore }
-    var:tca_domain_test_county = { change_title_holder = { holder = scope:tca_domain_test_restoring.var:tca_domain_test_old_county_holder change = scope:tca_domain_test_restore } }
-    var:tca_domain_test_circuit = { change_title_holder = { holder = scope:tca_domain_test_restoring.var:tca_domain_test_old_circuit_holder change = scope:tca_domain_test_restore } }
+    # 先确认原持有人仍可接收；死者不能作为change_title_holder目标。
+    # 存活时照常精确归还；死亡时保留明确诊断，不能静默跳过。
+    if = { limit = { var:tca_domain_test_old_county_holder = { is_alive = yes } }
+        var:tca_domain_test_county = { change_title_holder = { holder = scope:tca_domain_test_restoring.var:tca_domain_test_old_county_holder change = scope:tca_domain_test_restore } }
+    }
+    else = { debug_log = "TCA_LOCAL_DOMAIN_RESTORE_DEAD county" }
+    if = { limit = { var:tca_domain_test_old_circuit_holder = { is_alive = yes } }
+        var:tca_domain_test_circuit = { change_title_holder = { holder = scope:tca_domain_test_restoring.var:tca_domain_test_old_circuit_holder change = scope:tca_domain_test_restore } }
+    }
+    else = { debug_log = "TCA_LOCAL_DOMAIN_RESTORE_DEAD circuit" }
     resolve_title_and_vassal_change = scope:tca_domain_test_restore
     # 原路只从帝直属长官取样。独立场景后，退任家门可能不再直属原皇帝；
     # 仅交还头衔不会恢复领属，必须另做真实归附事务，避免后续用例失去可用路。
+    if = { limit = { var:tca_domain_test_old_circuit_holder = { is_alive = yes } }
+        var:tca_domain_test_old_circuit_holder = {
+            if = {
+                limit = { NOT = { liege = root } }
+                create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_domain_test_restore_fealty }
+                change_liege = { liege = root change = scope:tca_domain_test_restore_fealty }
+                resolve_title_and_vassal_change = scope:tca_domain_test_restore_fealty
+            }
+        }
+    }
+    # 只撤销本夹具在原持有人身上添加的死亡保护。
+    var:tca_domain_test_old_county_holder = {
+        if = { limit = { has_character_flag = tca_local_domain_original_protected }
+            if = { limit = { has_character_flag = tca_local_domain_original_owns_protection } remove_trait = tca_test_death_protection }
+            remove_character_flag = tca_local_domain_original_owns_protection
+            remove_character_flag = tca_local_domain_original_protected
+        }
+    }
     var:tca_domain_test_old_circuit_holder = {
-        if = {
-            limit = { NOT = { liege = root } }
-            create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_domain_test_restore_fealty }
-            change_liege = { liege = root change = scope:tca_domain_test_restore_fealty }
-            resolve_title_and_vassal_change = scope:tca_domain_test_restore_fealty
+        if = { limit = { has_character_flag = tca_local_domain_original_protected }
+            if = { limit = { has_character_flag = tca_local_domain_original_owns_protection } remove_trait = tca_test_death_protection }
+            remove_character_flag = tca_local_domain_original_owns_protection
+            remove_character_flag = tca_local_domain_original_protected
         }
     }
     remove_character_modifier = tca_test_local_domain_capacity

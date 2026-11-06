@@ -1,0 +1,63 @@
+﻿# 致仕一次性授品；人物作用域；APPROVE=皇帝是否加恩。
+# 已提交普通事务必须先完成自己的审计；本接口不清旧phase、不占年度成功数。
+# pending防同链重入；只有真实品级与核定值一致后才写processed。
+tca_retirement_honor_effect = {
+    if = {
+        limit = {
+            tca_retirement_is_exited_trigger = yes
+            has_trait = tca_retired
+            NOT = { has_character_flag = tca_retirement_honor_processed }
+            NOT = { has_variable = tca_retirement_honor_target }
+            NOT = { has_variable = tca_merit_grant_phase }
+        }
+        set_variable = { name = tca_retirement_honor_source value = merit_level }
+        if = {
+            limit = { merit_level >= 1 merit_level < 9 OR = { merit_level < 7 always = $APPROVE$ } }
+            set_variable = { name = tca_retirement_honor_target value = { value = merit_level add = 1 max = 9 } }
+            add_character_flag = tca_merit_grant_suppress
+            add_character_flag = tca_retirement_honor_owns_suppress
+            set_merit_level = 0
+            set_merit_level = var:tca_retirement_honor_source
+            set_variable = { name = tca_merit_approved_level value = var:tca_retirement_honor_target }
+            add_character_flag = tca_merit_active
+            tca_merit_refresh_cap_effect = yes
+            set_merit_level = var:tca_retirement_honor_target
+            if = { limit = { var:tca_retirement_honor_target = 2 } change_merit_no_experience = { value = merit_level_2_value subtract = merit } }
+            else_if = { limit = { var:tca_retirement_honor_target = 3 } change_merit_no_experience = { value = merit_level_3_value subtract = merit } }
+            else_if = { limit = { var:tca_retirement_honor_target = 4 } change_merit_no_experience = { value = merit_level_4_value subtract = merit } }
+            else_if = { limit = { var:tca_retirement_honor_target = 5 } change_merit_no_experience = { value = merit_level_5_value subtract = merit } }
+            else_if = { limit = { var:tca_retirement_honor_target = 6 } change_merit_no_experience = { value = merit_level_6_value subtract = merit } }
+            else_if = { limit = { var:tca_retirement_honor_target = 7 } change_merit_no_experience = { value = merit_level_7_value subtract = merit } }
+            else_if = { limit = { var:tca_retirement_honor_target = 8 } change_merit_no_experience = { value = merit_level_8_value subtract = merit } }
+            else_if = { limit = { var:tca_retirement_honor_target = 9 } change_merit_no_experience = { value = merit_level_9_value subtract = merit } }
+            # 等真实等级审计后再释放保护，防异步回调重复奖励。
+            set_variable = { name = tca_retirement_honor_attempts value = 0 }
+            trigger_event = { id = tca_retirement.91 days = 1 }
+        }
+        else = { add_character_flag = tca_retirement_honor_processed remove_variable = tca_retirement_honor_source }
+    }
+}
+
+# 人物作用域，真实跨日审计最多五次；失败保留target并标明未结案，不虚报成功。
+tca_retirement_audit_honor_effect = {
+    if = { limit = { has_variable = tca_retirement_honor_target }
+        change_variable = { name = tca_retirement_honor_attempts add = 1 }
+        if = { limit = { merit_level = var:tca_retirement_honor_target var:tca_merit_approved_level = var:tca_retirement_honor_target }
+            add_character_flag = tca_retirement_honor_processed
+            remove_variable = tca_retirement_honor_target
+            remove_variable = tca_retirement_honor_source
+            remove_variable = tca_retirement_honor_attempts
+            if = { limit = { has_character_flag = tca_retirement_honor_owns_suppress } remove_character_flag = tca_retirement_honor_owns_suppress remove_character_flag = tca_merit_grant_suppress }
+            # 真实等级审计通过后才刷新待遇，不能保留退出时的原品scale快照。
+            tca_retirement_sync_income_effect = yes
+            tca_retirement_offer_transfer_effect = yes
+        }
+        else_if = { limit = { var:tca_retirement_honor_attempts < 5 } trigger_event = { id = tca_retirement.91 days = 1 } }
+        else = {
+            add_character_flag = tca_retirement_honor_failed
+            debug_log = "TCA_RETIREMENT HONOR_AUDIT_FAILED"
+            if = { limit = { is_ai = no } trigger_event = tca_retirement.92 }
+            if = { limit = { has_character_flag = tca_retirement_honor_owns_suppress } remove_character_flag = tca_retirement_honor_owns_suppress remove_character_flag = tca_merit_grant_suppress }
+        }
+    }
+}

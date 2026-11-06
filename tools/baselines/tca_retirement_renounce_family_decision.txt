@@ -1,0 +1,146 @@
+renounce_noble_family_title_decision = {
+	picture = {
+		reference = "gfx/interface/illustrations/event_scenes/tgp_asia_estate.dds"
+	}
+	sort_order = 85
+
+	desc = {
+		first_valid = {
+			triggered_desc = {
+				trigger = {
+					any_held_title = {
+						is_noble_family_title = yes
+						exists = current_heir
+					}
+				}
+				desc = renounce_noble_family_title_decision_desc
+			}
+			desc = renounce_noble_family_title_decision_no_heir_desc
+		}
+	}
+	selection_tooltip = renounce_noble_family_title_decision_tooltip
+	decision_group_type = admin
+
+	is_shown = {
+		any_held_title = { is_noble_family_title = yes }
+		NOT = { religion = religion:buddhism_religion } # Uses tgp_japan_become_a_monk_decision
+		NOT = { top_liege = root } #This is not a general abdication decision
+		is_house_head = yes
+		is_playable_character = yes
+		has_tgp_dlc_trigger = yes
+	}
+
+	is_valid = {
+		custom_tooltip = {
+			text = renounce_noble_family_title_decision_tt.title
+			any_held_title = { is_noble_family_title = yes }
+		}
+		custom_tooltip = {
+			text = renounce_noble_family_title_decision_tt.heir
+			any_held_title = {
+				is_noble_family_title = yes
+				current_heir ?= { is_available_ai_adult = yes }
+			}
+		}
+	}
+
+	is_valid_showing_failures_only = {
+		is_available_adult = yes
+		is_at_war_with_liege = no
+		trigger_if = {
+			limit = {
+				has_realm_law_flag = celestial_retirement_law
+			}
+			tgp_is_above_retirement_age_trigger = { REALM_OWNER = root }
+		}
+	}
+
+	effect = {
+		if = {
+			limit = { is_ai = no }
+			random_held_title = {
+				limit = { is_noble_family_title = yes }
+				current_heir = {  save_scope_as = new_player }
+			}
+		}
+		show_as_tooltip = {
+			add_character_modifier = { modifier = ep3_renounced_estate }
+			custom_tooltip = renounce_noble_family_title_decision_tt
+			if = {
+				limit = { exists = scope:new_player }
+				house = { set_house_head = scope:new_player }
+				set_player_character = scope:new_player
+			}
+			tgp_step_down_title_recipient_tooltip_effect = yes
+		}
+		trigger_event = tgp_dynastic_cycle_decision_event.0101
+		close_view = {
+			view = decisions
+			player = root
+		}
+	}
+
+	cost = {
+		influence = {
+			value = 0
+			if = {
+				limit = { government_has_flag = government_has_influence }
+				add = minor_influence_value
+			}
+		}
+		prestige = {
+			value = 0
+			if = {
+				limit = {
+					NOT = { government_has_flag = government_has_influence }
+				}
+				add = minor_prestige_value
+			}
+		}
+	}
+
+	ai_check_interval = 0
+
+	ai_potential = {
+		is_at_war = no
+		# Don't step down freely if you don't have any other house members holding a noble_family_title or inherit any held noble_family_title
+		OR = {
+			house ?= {
+				any_house_member = {
+					is_governor = yes
+					top_liege = root.top_liege
+				}
+			}
+			any_held_title = {
+				tier = root.highest_held_title_tier
+				is_noble_family_title = no
+				current_heir.house = root.house
+			}
+		}
+		tgp_is_above_retirement_age_trigger = { REALM_OWNER = root }
+	}
+
+	ai_will_do = {
+		base = -10
+		modifier = {
+			add = 10
+			has_trait = lazy
+		}
+		modifier = {
+			add = 10
+			has_trait = humble
+		}
+		modifier = {
+			add = 10
+			has_trait = content
+		}
+		modifier = {
+			add = -100
+			OR = {
+				has_trait = ambitious
+				has_trait = greedy
+				has_trait = arrogant
+			}
+		}
+	}
+}

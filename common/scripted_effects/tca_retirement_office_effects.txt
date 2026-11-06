@@ -1,0 +1,75 @@
+﻿# 正式卸职；人物作用域，必须先设置退休身份。
+# 官署保留辖区绑定／经费，真实继任者无效时交回实际上级等待原维护补位。
+tca_retirement_step_down_effect = {
+    # 首次退休与误授纠正都覆盖完整卸职阶段，阻止中途回调切回退休主头衔。
+    add_character_flag = tca_retirement_exit_pending
+    # 调用前必须已进入退休身份，防止补位再次选回本人。
+    set_appointment_timeout = { years = 150 desc = appointment_timeout_desc_refusing }
+    save_scope_as = tca_retirement_office_retiring
+    every_held_title = {
+        limit = { OR = { has_variable = tca_tongpan_title has_variable = tca_judicial_title } }
+        save_scope_as = tca_retirement_office_title
+        holder.liege = { save_scope_as = tca_retirement_office_liege }
+        clear_saved_scope = tca_retirement_office_heir
+        current_heir ?= {
+            if = {
+                limit = {
+                    is_alive = yes is_adult = yes is_available = yes is_landed = no
+                    this != scope:tca_retirement_office_retiring
+                    appointment_timeout_days = 0
+                    NOT = { tca_retirement_excludes_appointment_trigger = yes }
+                    NOT = { any_held_title = { is_noble_family_title = no } }
+                }
+                save_scope_as = tca_retirement_office_heir
+            }
+        }
+        if = { limit = { has_variable = tca_tongpan_title } tca_stop_tongpan_diarchy_effect = yes }
+        if = {
+            limit = { exists = scope:tca_retirement_office_heir }
+            scope:tca_retirement_office_heir = {
+                create_title_and_vassal_change = { type = appointment add_claim_on_loss = no save_scope_as = tca_retirement_office_change }
+                scope:tca_retirement_office_title = { change_title_holder = { holder = scope:tca_retirement_office_heir change = scope:tca_retirement_office_change } }
+                resolve_title_and_vassal_change = scope:tca_retirement_office_change
+            }
+        }
+        else = {
+            scope:tca_retirement_office_liege = {
+                create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_retirement_office_change }
+                scope:tca_retirement_office_title = { change_title_holder = { holder = scope:tca_retirement_office_liege change = scope:tca_retirement_office_change } }
+                resolve_title_and_vassal_change = scope:tca_retirement_office_change
+            }
+        }
+    }
+    # 普通行政头衔与中央职位使用已验证原生接口；家门和庄园保留。
+    if = { limit = { is_ruler = yes } force_step_down_landed_titles = yes }
+    if = { limit = { tgp_is_any_minister = yes }
+        liege = { save_scope_as = councillor_liege }
+        # 直接授职纠正可能仍携带原任命上下文，不能让原生换席守卫跳过退休移交。
+        clear_saved_scope = new_councillor
+        clear_saved_scope = swapped_position
+        if = {
+            limit = { exists = primary_title.current_heir primary_title.current_heir = { is_alive = yes NOT = { tca_retirement_excludes_appointment_trigger = yes } this != scope:tca_retirement_office_retiring } }
+            if = { limit = { debug_only = yes } debug_log = "TCA_RETIREMENT_CENTRAL NATIVE_HEIR" }
+            # 从真实解雇入口派发原生职位回调，让新旧议会作用域由引擎建立。
+            scope:councillor_liege = { always_fire_councillor = scope:tca_retirement_office_retiring }
+        }
+        else = {
+            if = { limit = { debug_only = yes } debug_log = "TCA_RETIREMENT_CENTRAL VACANCY" }
+            # 与原生无继任者分支相同；不能把已退出的current_heir重新授回原职。
+            switch = {
+                trigger = primary_title
+                title:e_minister_chancellor = { destroy_and_fire_minister_effect = { MINISTER = e_minister_chancellor } }
+                title:e_minister_censor = { destroy_and_fire_minister_effect = { MINISTER = e_minister_censor } }
+                title:e_minister_grand_marshal = { destroy_and_fire_minister_effect = { MINISTER = e_minister_grand_marshal } }
+                title:e_minister_of_personnel = { destroy_and_fire_minister_effect = { MINISTER = e_minister_of_personnel } }
+                title:e_minister_of_revenue = { destroy_and_fire_minister_effect = { MINISTER = e_minister_of_revenue } }
+                title:e_minister_of_rites = { destroy_and_fire_minister_effect = { MINISTER = e_minister_of_rites } }
+                title:e_minister_of_war = { destroy_and_fire_minister_effect = { MINISTER = e_minister_of_war } }
+                title:e_minister_of_justice = { destroy_and_fire_minister_effect = { MINISTER = e_minister_of_justice } }
+                title:e_minister_of_works = { destroy_and_fire_minister_effect = { MINISTER = e_minister_of_works } }
+            }
+        }
+    }
+    remove_character_flag = tca_retirement_exit_pending
+    tca_retirement_sync_income_effect = yes
+}

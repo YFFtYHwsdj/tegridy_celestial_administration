@@ -1,0 +1,64 @@
+﻿# 闲退资格候选接口，仅debug技术探针调用；不接正常决议或AI。
+# 人物作用域；年龄使用原生retirement_age_current_value读取真实最高领主法律。
+tca_retirement_candidate_has_office_trigger = {
+    OR = { is_governor_or_admin_count = yes tgp_is_any_minister = yes tca_is_landless_official_trigger = yes }
+}
+tca_retirement_candidate_has_seniority_trigger = {
+    OR = { tca_retirement_candidate_has_office_trigger = yes merit_level >= 4 has_trait = tca_retirement_probe_fengci }
+}
+# TRAIT为原生衰老特质键，XP为最低经验。显式核对持有特质，避免空经验被当有效状态。
+tca_retirement_candidate_ailment_track_trigger = {
+    has_trait = $TRAIT$
+    has_trait_xp = { trait = $TRAIT$ value >= $XP$ }
+}
+tca_retirement_candidate_ailment_mid_trigger = {
+    OR = {
+        tca_retirement_candidate_ailment_track_trigger = { TRAIT = infirm XP = 50 }
+        tca_retirement_candidate_ailment_track_trigger = { TRAIT = withering_mind XP = 50 }
+        tca_retirement_candidate_ailment_track_trigger = { TRAIT = clouded_eyes XP = 50 }
+        tca_retirement_candidate_ailment_track_trigger = { TRAIT = faltering_heart XP = 50 }
+        tca_retirement_candidate_ailment_track_trigger = { TRAIT = fragile_bones XP = 50 }
+    }
+}
+tca_retirement_candidate_ailment_severe_trigger = {
+    OR = {
+        tca_retirement_candidate_ailment_track_trigger = { TRAIT = infirm XP = 75 }
+        tca_retirement_candidate_ailment_track_trigger = { TRAIT = withering_mind XP = 75 }
+        tca_retirement_candidate_ailment_track_trigger = { TRAIT = clouded_eyes XP = 75 }
+        tca_retirement_candidate_ailment_track_trigger = { TRAIT = faltering_heart XP = 75 }
+        tca_retirement_candidate_ailment_track_trigger = { TRAIT = fragile_bones XP = 75 }
+    }
+}
+tca_retirement_candidate_extreme_health_trigger = {
+    OR = { is_incapable = yes has_trait = blind health < 1 }
+}
+tca_retirement_candidate_fengci_age_health_trigger = {
+    OR = {
+        AND = { retirement_age_current_value > 0 age >= { value = retirement_age_current_value subtract = 10 } }
+        AND = { retirement_age_current_value = 0 age >= 60 has_trait_with_flag = age_related_ailment }
+        tca_retirement_candidate_ailment_mid_trigger = yes
+        tca_retirement_candidate_extreme_health_trigger = yes
+    }
+}
+tca_retirement_candidate_retire_age_health_trigger = {
+    OR = {
+        AND = { retirement_age_current_value > 0 age >= retirement_age_current_value }
+        AND = { retirement_age_current_value = 0 age >= 60 tca_retirement_candidate_ailment_mid_trigger = yes }
+        tca_retirement_candidate_ailment_severe_trigger = yes
+        tca_retirement_candidate_extreme_health_trigger = yes
+    }
+}
+tca_retirement_candidate_can_fengci_trigger = {
+    debug_only = yes is_alive = yes is_adult = yes this != top_liege
+    exists = top_liege top_liege = { government_has_flag = government_is_celestial }
+    tca_retirement_candidate_has_seniority_trigger = yes
+    tca_retirement_candidate_fengci_age_health_trigger = yes
+    NOT = { has_trait = tca_retirement_probe_retired }
+}
+tca_retirement_candidate_can_retire_trigger = {
+    debug_only = yes is_alive = yes is_adult = yes this != top_liege
+    exists = top_liege top_liege = { government_has_flag = government_is_celestial }
+    tca_retirement_candidate_has_seniority_trigger = yes
+    tca_retirement_candidate_retire_age_health_trigger = yes
+    NOT = { has_trait = tca_retirement_probe_retired }
+}

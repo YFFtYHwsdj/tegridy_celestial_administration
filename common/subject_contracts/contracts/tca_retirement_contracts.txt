@@ -1,0 +1,235 @@
+﻿# 奉祠与致仕分别显示单一法定待遇；scope:subject为退休人物，玩家不可协商改档。
+# 原生官品权重M已计入预算：奉祠补最低基数0.05，致仕补0.025并由隐藏官品契约扣回M/2。
+# 两类不领取公务发展资金，不授军事／部院预算；卸任前差遣与头衔等级不参与待遇。
+tca_fengci_salary = {
+    display_mode = tree
+    defaults_to_highest_valid_level = yes
+    is_shown = { scope:subject = { has_trait = tca_fengci NOT = { has_trait = tca_retired } } }
+    can_be_changed = { scope:subject = { has_character_flag = tca_retirement_updating_contract } }
+    obligation_levels = {
+        # 默认档必须始终可见；只由契约级 is_shown 控制整项是否显示。
+        tca_fengci_salary_none = {
+            default = yes
+            position = { 0 0 }
+            ai_liege_desire = 0
+            ai_subject_desire = 0
+            score = 0
+        }
+        tca_fengci_salary_active = {
+            parent = tca_fengci_salary_none
+            position = { 1 0 }
+            flag = tca_retirement_salary_active
+            flag = tca_fengci_salary_active
+            is_valid = { scope:subject = {
+                has_trait = tca_fengci NOT = { has_trait = tca_retired }
+                tca_retirement_income_valid_trigger = yes
+                has_variable = tca_retirement_title
+                NOT = { has_character_flag = tca_retirement_terminal }
+            } }
+            subject_modifier = {
+                monthly_treasury_from_salary_budget_base = 0.05
+                monthly_treasury_from_liege_mult = -1
+            }
+            ai_liege_desire = 0
+            ai_subject_desire = 0
+            score = 0
+        }
+    }
+}
+
+tca_zhishi_salary = {
+    display_mode = tree
+    defaults_to_highest_valid_level = yes
+    is_shown = { scope:subject = { has_trait = tca_retired } }
+    can_be_changed = { scope:subject = { has_character_flag = tca_retirement_updating_contract } }
+    obligation_levels = {
+        # 默认档必须始终可见；只由契约级 is_shown 控制整项是否显示。
+        tca_zhishi_salary_none = {
+            default = yes
+            position = { 0 0 }
+            ai_liege_desire = 0
+            ai_subject_desire = 0
+            score = 0
+        }
+        tca_zhishi_salary_active = {
+            parent = tca_zhishi_salary_none
+            position = { 1 0 }
+            flag = tca_retirement_salary_active
+            flag = tca_zhishi_salary_active
+            is_valid = { scope:subject = {
+                has_trait = tca_retired
+                tca_retirement_income_valid_trigger = yes
+                has_variable = tca_retirement_title
+                NOT = { has_character_flag = tca_retirement_terminal }
+            } }
+            subject_modifier = {
+                monthly_treasury_from_salary_budget_base = 0.025
+                monthly_treasury_from_liege_mult = -1
+            }
+            ai_liege_desire = 0
+            ai_subject_desire = 0
+            score = 0
+        }
+    }
+}
+
+# 原生官品M不会因退出实职而消失；此隐藏契约只负责致仕折半，不能再添加全份M。
+# 正式同步按真实官品设置；未入品与九品共用零折半档，停发或非致仕回到空默认档。
+tca_retirement_merit_salary = {
+    display_mode = hidden
+    defaults_to_highest_valid_level = yes
+    can_be_changed = { scope:subject = { has_character_flag = tca_retirement_updating_contract } }
+    obligation_levels = {
+        tca_retirement_merit_salary_none = {
+            default = yes
+            position = { 0 0 }
+            ai_liege_desire = 0
+            ai_subject_desire = 0
+            score = 0
+        }
+        tca_retirement_merit_salary_1 = {
+            parent = tca_retirement_merit_salary_none
+            position = { 1 1 }
+            flag = tca_retirement_merit_half
+            is_valid = { scope:subject = {
+                has_trait = tca_retired
+                tca_retirement_income_valid_trigger = yes
+                has_variable = tca_retirement_title
+                NOT = { has_character_flag = tca_retirement_terminal }
+                var:tca_retirement_merit_salary_level ?= 1
+            } }
+            subject_modifier = { monthly_treasury_from_salary_budget_base = 0 }
+            ai_liege_desire = 0
+            ai_subject_desire = 0
+            score = 0
+        }
+        tca_retirement_merit_salary_2 = {
+            parent = tca_retirement_merit_salary_none
+            position = { 2 1 }
+            flag = tca_retirement_merit_half
+            is_valid = { scope:subject = {
+                has_trait = tca_retired
+                tca_retirement_income_valid_trigger = yes
+                has_variable = tca_retirement_title
+                NOT = { has_character_flag = tca_retirement_terminal }
+                var:tca_retirement_merit_salary_level ?= 2
+            } }
+            subject_modifier = { monthly_treasury_from_salary_budget_base = -0.025 }
+            ai_liege_desire = 0
+            ai_subject_desire = 0
+            score = 0
+        }
+        tca_retirement_merit_salary_3 = {
+            parent = tca_retirement_merit_salary_none
+            position = { 3 1 }
+            flag = tca_retirement_merit_half
+            is_valid = { scope:subject = {
+                has_trait = tca_retired
+                tca_retirement_income_valid_trigger = yes
+                has_variable = tca_retirement_title
+                NOT = { has_character_flag = tca_retirement_terminal }
+                var:tca_retirement_merit_salary_level ?= 3
+            } }
+            subject_modifier = { monthly_treasury_from_salary_budget_base = -0.05 }
+            ai_liege_desire = 0
+            ai_subject_desire = 0
+            score = 0
+        }
+        tca_retirement_merit_salary_4 = {
+            parent = tca_retirement_merit_salary_none
+            position = { 4 1 }
+            flag = tca_retirement_merit_half
+            is_valid = { scope:subject = {
+                has_trait = tca_retired
+                tca_retirement_income_valid_trigger = yes
+                has_variable = tca_retirement_title
+                NOT = { has_character_flag = tca_retirement_terminal }
+                var:tca_retirement_merit_salary_level ?= 4
+            } }
+            subject_modifier = { monthly_treasury_from_salary_budget_base = -0.075 }
+            ai_liege_desire = 0
+            ai_subject_desire = 0
+            score = 0
+        }
+        tca_retirement_merit_salary_5 = {
+            parent = tca_retirement_merit_salary_none
+            position = { 5 1 }
+            flag = tca_retirement_merit_half
+            is_valid = { scope:subject = {
+                has_trait = tca_retired
+                tca_retirement_income_valid_trigger = yes
+                has_variable = tca_retirement_title
+                NOT = { has_character_flag = tca_retirement_terminal }
+                var:tca_retirement_merit_salary_level ?= 5
+            } }
+            subject_modifier = { monthly_treasury_from_salary_budget_base = -0.1 }
+            ai_liege_desire = 0
+            ai_subject_desire = 0
+            score = 0
+        }
+        tca_retirement_merit_salary_6 = {
+            parent = tca_retirement_merit_salary_none
+            position = { 6 1 }
+            flag = tca_retirement_merit_half
+            is_valid = { scope:subject = {
+                has_trait = tca_retired
+                tca_retirement_income_valid_trigger = yes
+                has_variable = tca_retirement_title
+                NOT = { has_character_flag = tca_retirement_terminal }
+                var:tca_retirement_merit_salary_level ?= 6
+            } }
+            subject_modifier = { monthly_treasury_from_salary_budget_base = -0.125 }
+            ai_liege_desire = 0
+            ai_subject_desire = 0
+            score = 0
+        }
+        tca_retirement_merit_salary_7 = {
+            parent = tca_retirement_merit_salary_none
+            position = { 7 1 }
+            flag = tca_retirement_merit_half
+            is_valid = { scope:subject = {
+                has_trait = tca_retired
+                tca_retirement_income_valid_trigger = yes
+                has_variable = tca_retirement_title
+                NOT = { has_character_flag = tca_retirement_terminal }
+                var:tca_retirement_merit_salary_level ?= 7
+            } }
+            subject_modifier = { monthly_treasury_from_salary_budget_base = -0.15 }
+            ai_liege_desire = 0
+            ai_subject_desire = 0
+            score = 0
+        }
+        tca_retirement_merit_salary_8 = {
+            parent = tca_retirement_merit_salary_none
+            position = { 8 1 }
+            flag = tca_retirement_merit_half
+            is_valid = { scope:subject = {
+                has_trait = tca_retired
+                tca_retirement_income_valid_trigger = yes
+                has_variable = tca_retirement_title
+                NOT = { has_character_flag = tca_retirement_terminal }
+                var:tca_retirement_merit_salary_level ?= 8
+            } }
+            subject_modifier = { monthly_treasury_from_salary_budget_base = -0.25 }
+            ai_liege_desire = 0
+            ai_subject_desire = 0
+            score = 0
+        }
+        tca_retirement_merit_salary_9 = {
+            parent = tca_retirement_merit_salary_none
+            position = { 9 1 }
+            flag = tca_retirement_merit_half
+            is_valid = { scope:subject = {
+                has_trait = tca_retired
+                tca_retirement_income_valid_trigger = yes
+                has_variable = tca_retirement_title
+                NOT = { has_character_flag = tca_retirement_terminal }
+                var:tca_retirement_merit_salary_level ?= 9
+            } }
+            subject_modifier = { monthly_treasury_from_salary_budget_base = -0.375 }
+            ai_liege_desire = 0
+            ai_subject_desire = 0
+            score = 0
+        }
+    }
+}

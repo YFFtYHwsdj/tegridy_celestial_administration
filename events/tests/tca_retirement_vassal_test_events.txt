@@ -1,0 +1,146 @@
+﻿# 退休公国的领属与封臣上限回归；调用正式退休入口，不另造与正式维护冲突的实验公国。
+# 同一新建家主依次仅持家门、兼持无地公国、传家而保留公国；每步记录即时及跨日计数。
+namespace = tca_retirement_vassal_test
+
+tca_retirement_vassal_test.1 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_retirement_vassal_test.1 tca_test_retirement_vassal_limit"
+        remove_character_flag = tca_test_case_failed
+        if = { limit = { debug_only = yes is_alive = yes title:h_china.holder = root }
+            add_character_flag = tca_test_delayed_case_active
+            trigger_event = { id = tca_retirement_vassal_test.1000 days = 5 }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_retirement_vassal_limit" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_continue_delayed_effect = yes }
+    }
+}
+tca_retirement_vassal_test.1000 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            tca_test_retirement_vassal_snapshot_effect = { STAGE = before_family }
+            set_variable = { name = tca_rv_direct_before value = var:tca_rv_direct }
+            tca_test_create_merit_interface_character_with_age_effect = { CHARACTER = tca_rv_actor GOVERNMENT = celestial_government AGE = 65 }
+            scope:tca_rv_actor = {
+                primary_title = { save_scope_as = tca_rv_family }
+                domicile = { save_scope_as = tca_rv_estate }
+                add_character_flag = tca_merit_grant_suppress
+                create_character = { age = 30 gender_female_chance = 0 random_traits = no dynasty = this.dynasty father = this employer = this culture = this.culture faith = this.faith rite = this.rite save_scope_as = tca_rv_heir }
+            }
+            scope:tca_rv_heir = { set_house = scope:tca_rv_actor.house tca_test_protect_character_effect = yes add_character_flag = ai_will_not_convert add_character_flag = tca_merit_interface_probe add_character_flag = tca_merit_grant_suppress set_appointment_timeout = { years = 150 desc = appointment_timeout_desc_refusing } }
+            tca_test_retirement_vassal_snapshot_effect = { STAGE = after_family }
+            change_variable = { name = tca_rv_direct_before add = 1 }
+            if = { limit = { var:tca_rv_direct = var:tca_rv_direct_before scope:tca_rv_actor = { liege = root is_landless_ruler = yes primary_title = scope:tca_rv_family } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_vassal_limit 1"
+            }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_vassal_limit 1" }
+            trigger_event = { id = tca_retirement_vassal_test.1001 days = 3 }
+        }
+    }
+}
+tca_retirement_vassal_test.1001 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            # 先验证仅持家门的结构；身份在同链加入，不跨日暴露半成品给正式头衔维护。
+            scope:tca_rv_actor = { add_trait = tca_fengci }
+            tca_test_retirement_vassal_snapshot_effect = { STAGE = stable_family }
+            if = { limit = { scope:tca_rv_actor = { liege = root is_landless_ruler = yes tca_retirement_can_transfer_trigger = yes } scope:tca_rv_family.current_heir = scope:tca_rv_heir }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_vassal_limit 2"
+            }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_vassal_limit 2" }
+            set_variable = { name = tca_rv_direct_before value = var:tca_rv_direct }
+            set_variable = { name = tca_rv_script_before value = vassal_count }
+            # 使用正式入口建成唯一退休公国，仍核对同一对象、家门、领属及即时计数。
+            # 原夹具另造未绑定公国，正式回调会合法增建宫观，无法作为唯一退休对象的阳性。
+            scope:tca_rv_actor = {
+                tca_retirement_finish_effect = { KIND = 1 APPROVE = no }
+                var:tca_retirement_title = { save_scope_as = tca_rv_title }
+            }
+            tca_test_retirement_vassal_snapshot_effect = { STAGE = after_duchy }
+            if = { limit = { var:tca_rv_direct = var:tca_rv_direct_before scope:tca_rv_actor = { liege = root is_landless_ruler = yes has_title = scope:tca_rv_title has_title = scope:tca_rv_family } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_vassal_limit 3"
+            }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_vassal_limit 3" }
+            trigger_event = { id = tca_retirement_vassal_test.1002 days = 3 }
+        }
+    }
+}
+tca_retirement_vassal_test.1002 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            tca_test_retirement_vassal_snapshot_effect = { STAGE = stable_duchy }
+            scope:tca_rv_actor = {
+                debug_log = "TCA_RETIREMENT_VASSAL stable_primary=[THIS.Char.GetPrimaryTitle.GetNameNoTier]"
+                if = { limit = { has_variable = tca_retirement_title } debug_log = "TCA_RETIREMENT_VASSAL FORMAL_TITLE_CREATED" }
+            }
+            if = { limit = { scope:tca_rv_actor = { liege = root is_landless_ruler = yes primary_title = scope:tca_rv_title has_title = scope:tca_rv_family } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_vassal_limit 4"
+            }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_vassal_limit 4" }
+            scope:tca_rv_actor = {
+                if = { limit = { tca_retirement_can_transfer_trigger = yes } debug_log = "TCA_RETIREMENT_VASSAL current_transfer=available" }
+                else = { debug_log = "TCA_RETIREMENT_VASSAL current_transfer=blocked" }
+                # 本例隔离领属与上限计数，显式转交真实家门；正式传家入口另有独立回归。
+                # 不调用正式传家worker，也不声称验证了玩家切换或迁廷路径。
+                create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_rv_transfer }
+                scope:tca_rv_family = { change_title_holder = { holder = scope:tca_rv_heir change = scope:tca_rv_transfer } }
+                resolve_title_and_vassal_change = scope:tca_rv_transfer
+                house = { if = { limit = { NOT = { house_head = scope:tca_rv_heir } } set_house_head = scope:tca_rv_heir } }
+            }
+            scope:tca_rv_heir = {
+                if = { limit = { NOT = { liege = root } }
+                    create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_rv_heir_fealty }
+                    change_liege = { liege = root change = scope:tca_rv_heir_fealty }
+                    resolve_title_and_vassal_change = scope:tca_rv_heir_fealty
+                }
+            }
+            tca_test_retirement_vassal_snapshot_effect = { STAGE = after_transfer }
+            trigger_event = { id = tca_retirement_vassal_test.1003 days = 3 }
+        }
+    }
+}
+tca_retirement_vassal_test.1003 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            tca_test_retirement_vassal_snapshot_effect = { STAGE = stable_transfer }
+            scope:tca_rv_actor = { debug_log = "TCA_RETIREMENT_VASSAL parent=[THIS.Char.GetID] liege=[THIS.Char.GetLiege.GetID] primary=[THIS.Char.GetPrimaryTitle.GetNameNoTier]" }
+            scope:tca_rv_heir = { debug_log = "TCA_RETIREMENT_VASSAL heir=[THIS.Char.GetID] liege=[THIS.Char.GetLiege.GetID] primary=[THIS.Char.GetPrimaryTitle.GetNameNoTier]" }
+            if = { limit = { scope:tca_rv_actor = { liege = root is_landless_ruler = yes has_title = scope:tca_rv_title NOT = { has_title = scope:tca_rv_family } } scope:tca_rv_heir = { liege = root has_title = scope:tca_rv_family domicile = scope:tca_rv_estate } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_vassal_limit 5"
+            }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_vassal_limit 5" }
+            # 身份切为致仕，验证同一无地结构不会因退休特质变化而改变领属。
+            scope:tca_rv_actor = { remove_trait = tca_fengci add_trait = tca_retired }
+            tca_test_retirement_vassal_snapshot_effect = { STAGE = retired_duchy }
+            trigger_event = { id = tca_retirement_vassal_test.1004 days = 3 }
+        }
+    }
+}
+tca_retirement_vassal_test.1004 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            tca_test_retirement_vassal_snapshot_effect = { STAGE = stable_retired }
+            if = { limit = { scope:tca_rv_actor = { liege = root is_landless_ruler = yes has_title = scope:tca_rv_title has_trait = tca_retired } scope:tca_rv_heir = { liege = root has_title = scope:tca_rv_family } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_vassal_limit 6"
+            }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_vassal_limit 6" }
+            scope:tca_rv_actor = { destroy_title = scope:tca_rv_title }
+            scope:tca_rv_actor = { remove_character_flag = tca_merit_grant_suppress tca_test_cleanup_retirement_formal_effect = yes }
+            scope:tca_rv_heir = { remove_character_flag = tca_merit_grant_suppress tca_test_cleanup_merit_probe_character_effect = yes }
+            tca_test_retirement_vassal_snapshot_effect = { STAGE = after_cleanup }
+            remove_variable = tca_rv_direct remove_variable = tca_rv_script remove_variable = tca_rv_direct_before remove_variable = tca_rv_script_before
+            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_retirement_vassal_limit" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_retirement_vassal_limit" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            remove_character_flag = tca_test_case_failed remove_character_flag = tca_test_delayed_case_active tca_test_continue_delayed_effect = yes
+        }
+    }
+}

@@ -42,6 +42,11 @@ tca_merit_saveload_probe_test.1000 = {
         tca_test_validate_environment_effect = yes
         if = {
             limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+                # 主模组GUI读取CLI适配器变量；此处声明默认值，满足可执行脚本契约。
+                # CLI/人类适配器已先写入1或0时不会覆盖。
+                title:h_china = { if = { limit = { NOT = { has_variable = tca_cli_ready } } set_variable = { name = tca_cli_ready value = 0 } } }
+                title:h_china = { remove_variable = tca_msl_transaction_restore_checked remove_variable = tca_msl_transaction_restore_valid }
+                tca_test_prepare_retirement_saveload_effect = yes
                 tca_test_create_merit_interface_character_effect = { CHARACTER = tca_msl_actor GOVERNMENT = celestial_government }
                 scope:tca_msl_actor = {
                     add_character_modifier = { modifier = tca_merit_probe_lock_modifier }
@@ -127,6 +132,16 @@ tca_merit_saveload_probe_test.1001 = {
                 tca_merit_prepare_grant_effect = { SOURCE = 1 TARGET = 2 MODE = 1 YEAR = current_year }
                 save_scope_value_as = { name = tca_msl_formal_token value = var:tca_merit_grant_token }
             }
+            # 闲退原生六品准备也须跨日刷新后再核定、加恩；沿同一保存检查点运行。
+            scope:tca_rsl_retired = { tca_merit_initialize_character_effect = yes tca_retirement_candidate_honor_effect = { APPROVE = no } tca_retirement_candidate_register_effect = yes tca_retirement_candidate_settle_effect = yes set_variable = { name = tca_rsl_payment_first_date value = var:tca_retirement_probe_attempted } }
+            scope:tca_rsl_fengci = {
+                tca_retirement_candidate_request_effect = { KIND = 3 }
+                set_variable = { name = tca_rsl_expected_request_date value = var:tca_retirement_candidate_request_date }
+                set_variable = { name = tca_rsl_expected_request_level value = merit_level }
+                tca_retirement_candidate_register_effect = yes tca_retirement_candidate_settle_effect = yes
+                set_variable = { name = tca_rsl_payment_first_date value = var:tca_retirement_probe_attempted }
+            }
+            tca_test_freeze_retirement_saveload_effect = yes
             # GUI 的保存／破坏按真实时间执行，不能与30个游戏日赛跑；延长到60日，
             # 让保存、现场破坏与 TCA_CLI RELOAD_SAVE 先发生，续接事件仍由原存档恢复。
             debug_log = "TCA_TEST WAIT tca_test_merit_saveload_contract 60 days"
@@ -147,6 +162,7 @@ tca_merit_saveload_probe_test.1002 = {
         tca_test_validate_environment_effect = yes
         if = {
             limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            trigger_event = tca_retirement_saveload_probe.1002
             # 保存后曾真实改回量才兼领；续局必须恢复文臣专领、冷却及从属限制。
             if = { limit = { has_realm_law = tca_local_domain_civil_law has_variable = tca_local_domain_reform_cooldown scope:tca_domain_civil = { domain_limit = 1 has_realm_law = tca_local_domain_restricted_law } scope:tca_domain_military = { domain_limit > 1 has_realm_law = tca_local_domain_unrestricted_law } }
                 debug_log = "TCA_TEST CHECK_PASS tca_test_merit_saveload_contract 24" }
@@ -163,19 +179,28 @@ tca_merit_saveload_probe_test.1002 = {
             else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 6" }
             if = { limit = { title:h_china = { has_variable_list = tca_merit_saveload_candidates any_in_list = { variable = tca_merit_saveload_candidates count = 1 this = scope:tca_msl_actor } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_saveload_contract 7" }
             else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 7" }
-            # 原事件保存的scope与持久引用必须一致；GUI已在首进程实际破坏这些字段。
+            # 原事件scope仍须与持久引用相同，阶段／双账／回调也不得改变。
+            # 精确30000余额在重载首帧只读核对；60日后允许正常奖励增长，不把它误当存档丢失。
+            scope:tca_msl_transaction = {
+                debug_log = "TCA_MSL11 id=[THIS.Char.GetID] level=[THIS.Char.GetMeritLevel] merit=[THIS.Char.MakeScope.ScriptValue('tca_retirement_test_merit_value')] phase=[THIS.Char.MakeScope.Var('tca_mtx_phase').GetValue] source=[THIS.Char.MakeScope.Var('tca_mtx_source').GetValue] target=[THIS.Char.MakeScope.Var('tca_mtx_target').GetValue] base=[THIS.Char.MakeScope.Var('tca_mtx_base').GetValue] approved=[THIS.Char.MakeScope.Var('tca_merit_probe_approved').GetValue] gain=[THIS.Char.MakeScope.Var('tca_merit_reset_probe_gain_count').GetValue] loss=[THIS.Char.MakeScope.Var('tca_merit_reset_probe_loss_count').GetValue] sentinel=[THIS.Char.MakeScope.Var('tca_merit_saveload_transaction_sentinel').GetValue]"
+                if = { limit = { top_liege = var:tca_mtx_liege } debug_log = "TCA_MSL11 LIEGE_MATCH" }
+                if = { limit = { has_character_flag = tca_merit_reset_probe_suppress } debug_log = "TCA_MSL11 SUPPRESSED" }
+            }
+            if = { limit = { scope:tca_msl_transaction = title:h_china.var:tca_merit_saveload_transaction } debug_log = "TCA_MSL11 POINTER_MATCH" }
             if = { limit = {
                 exists = scope:tca_msl_transaction
                 scope:tca_msl_transaction = title:h_china.var:tca_merit_saveload_transaction
+                title:h_china = { var:tca_msl_transaction_restore_valid = 1 }
                 scope:tca_msl_transaction = {
                     var:tca_mtx_phase = 1 var:tca_mtx_source = 1 var:tca_mtx_target = 2 var:tca_mtx_base = 1000
-                    var:tca_merit_saveload_transaction_sentinel = 12345 merit = 30000 merit_level = 1
+                    var:tca_merit_saveload_transaction_sentinel = 12345 merit_level = 1
                     var:tca_merit_probe_approved = 1 top_liege = var:tca_mtx_liege
                     var:tca_merit_reset_probe_gain_count = 0 var:tca_merit_reset_probe_loss_count = 0
                     NOT = { has_character_flag = tca_merit_reset_probe_suppress }
                 }
             } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_saveload_contract 11" }
             else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 11" }
+            debug_log = "TCA_MSL11 TRACE_END"
             # 正式核准队列及原scope token必须由原排队事件从存档恢复，不允许重新prepare。
             if = { limit = {
                 exists = scope:tca_msl_formal
@@ -300,6 +325,8 @@ tca_merit_saveload_probe_test.9001 = {
                     var:tca_merit_saveload_formal_sentinel = 54321 merit = 7
                 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_saveload_contract 16" }
                 else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 16" }
+                trigger_event = tca_retirement_saveload_probe.9001
+                title:h_china = { set_variable = { name = tca_merit_saveload_reload_ready value = 1 } }
                 debug_log = "TCA_CLI RELOAD_SAVE tca_merit_saveload_probe"
             }
         }
@@ -313,6 +340,8 @@ tca_merit_saveload_probe_test.1004 = {
         tca_test_validate_environment_effect = yes
         if = {
             limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            # 在清理其他夹具改变预算分母前冻结同次原生基准率，报告者明确取当前天子。
+            title:h_china.holder = { save_scope_value_as = { name = tca_rt_native_salary_rate value = tca_retirement_test_salary_rate_value } debug_log = "TCA_RETIREMENT_SAVELOAD native_rate=[THIS.Char.MakeScope.ScriptValue('tca_retirement_test_salary_rate_value')]" }
             if = { limit = { scope:tca_msl_formal = {
                 merit_level = 2 merit = 1000 var:tca_merit_approved_level = 2
                 var:tca_merit_grant_token = scope:tca_msl_formal_token
@@ -386,6 +415,15 @@ tca_merit_saveload_probe_test.1004 = {
                 remove_variable = tca_merit_feedback_band_pop_1_1
                 remove_variable = tca_merit_feedback_band_target_1_1
             }
+            # 正式预算人物真实重载后继续到账，并核对快照、公国、独立合同与普通rank排除；不是固定金币。
+            title:h_china.var:tca_rsf_actor = { debug_log = "TCA_RETIREMENT_SAVELOAD late income=[THIS.Char.MakeScope.ScriptValue('tca_retirement_probe_monthly_gold_value')] weight=[THIS.Char.MakeScope.ScriptValue('tca_retirement_salary_weight_value')] gold=[THIS.Char.GetGold] before=[THIS.Char.MakeScope.Var('tca_rsf_gold_before').GetValue]" }
+            if = { limit = { title:h_china.var:tca_rsf_actor = { merit_level = 5 has_trait = tca_fengci NOT = { has_perk = war_profiteer_perk } is_ruler = yes liege = title:h_china.holder has_variable = tca_retirement_title primary_title = var:tca_retirement_title var:tca_retirement_title = { holder = title:h_china.var:tca_rsf_actor tier = tier_duchy is_landless_type_title = yes has_variable = tca_retirement_title } vassal_contract_has_flag = tca_retirement_salary_active vassal_contract_obligation_level:celestial_salary_rank = 0 monthly_character_treasury_income = 0 monthly_character_treasury_variable_income = 0 NOT = { vassal_contract_has_flag = tca_retirement_merit_half } tca_retirement_salary_weight_value = 0.25 vassal_contract_has_flag = tca_fengci_salary_active monthly_character_income >= { value = scope:tca_rt_native_salary_rate multiply = 0.25 subtract = 0.0002 } monthly_character_income < { value = scope:tca_rt_native_salary_rate multiply = 0.25 add = 0.0002 } gold > var:tca_rsf_gold_before monthly_character_income > 0 NOT = { has_variable = tca_retirement_probe_country } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_saveload_contract 41" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 41" }
+            title:h_china.var:tca_rsg_actor = { debug_log = "TCA_RETIREMENT_SAVELOAD late income=[THIS.Char.MakeScope.ScriptValue('tca_retirement_probe_monthly_gold_value')] weight=[THIS.Char.MakeScope.ScriptValue('tca_retirement_salary_weight_value')] gold=[THIS.Char.GetGold] before=[THIS.Char.MakeScope.Var('tca_rsg_gold_before').GetValue]" }
+            if = { limit = { title:h_china.var:tca_rsg_actor = { merit_level = 5 has_trait = tca_retired NOT = { has_perk = war_profiteer_perk } is_ruler = yes liege = title:h_china.holder has_variable = tca_retirement_title primary_title = var:tca_retirement_title var:tca_retirement_title = { holder = title:h_china.var:tca_rsg_actor tier = tier_duchy is_landless_type_title = yes has_variable = tca_retirement_title } vassal_contract_has_flag = tca_retirement_salary_active vassal_contract_obligation_level:celestial_salary_rank = 0 monthly_character_treasury_income = 0 monthly_character_treasury_variable_income = 0 vassal_contract_has_flag = tca_retirement_merit_half tca_retirement_salary_weight_value = 0.125 vassal_contract_has_flag = tca_zhishi_salary_active monthly_character_income >= { value = scope:tca_rt_native_salary_rate multiply = 0.125 subtract = 0.0002 } monthly_character_income < { value = scope:tca_rt_native_salary_rate multiply = 0.125 add = 0.0002 } gold > var:tca_rsg_gold_before monthly_character_income > 0 NOT = { has_variable = tca_retirement_probe_country } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_saveload_contract 43" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 43" }
+            title:h_china = { remove_variable = tca_msl_transaction_restore_checked remove_variable = tca_msl_transaction_restore_valid }
+            tca_test_cleanup_retirement_saveload_effect = yes
             if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_merit_saveload_contract" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
             else = { debug_log = "TCA_TEST PASS tca_test_merit_saveload_contract" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
             remove_character_flag = tca_test_case_failed

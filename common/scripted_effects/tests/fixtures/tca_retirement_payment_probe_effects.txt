@@ -1,0 +1,195 @@
+﻿# 闲退最小替代付款候选，只供独立debug探针；不挂接正常人物或最终待遇公式。
+# 双闸要求显式启用标记和现有闲退探针特质；旧原生付款失败用例不会自动进入此通道。
+
+# 收款人物作用域；注销付款国头衔列表及反向指针，保留个人尝试日期，防迁国叠领。
+# 空国家从全局小表移除；不扫描世界，不改变人物身份／特质／冻结金额。
+tca_retirement_candidate_unregister_effect = {
+    # 死者不再支持变量；其登记只能由持有列表的国家在月脉冲清退。
+    if = { limit = { is_alive = yes }
+        save_scope_as = tca_pay_unregister_actor
+        var:tca_retirement_probe_country ?= {
+            remove_list_variable = { name = tca_retirement_probe_recipients target = scope:tca_pay_unregister_actor }
+            if = {
+                limit = { NOT = { has_variable_list = tca_retirement_probe_recipients } }
+                remove_list_global_variable = { name = tca_retirement_probe_countries target = this }
+            }
+        }
+        remove_variable = tca_retirement_probe_country
+    }
+}
+
+# 收款人物作用域；根据真实top_liege绑定当前付款国主头衔，幂等登记。
+# 前置为存活、双闸、冻结金额变量和有国库的独立天朝；迁国时仅换登记，不重置日期。
+# 输出人物反向指针、国家收款列表与全局国家索引；无实际付款。
+tca_retirement_candidate_register_effect = {
+    if = {
+        limit = {
+            debug_only = yes is_alive = yes has_character_flag = tca_retirement_candidate_enabled
+            OR = { has_trait = tca_retirement_probe_fengci has_trait = tca_retirement_probe_retired }
+            has_variable = tca_retirement_probe_due
+            top_liege = { is_independent_ruler = yes government_has_flag = government_is_celestial has_treasury = yes }
+        }
+        save_scope_as = tca_pay_register_actor
+        top_liege.primary_title = { save_scope_as = tca_pay_register_country }
+        if = {
+            limit = { NOT = { var:tca_retirement_probe_country ?= scope:tca_pay_register_country } }
+            tca_retirement_candidate_unregister_effect = yes
+        }
+        set_variable = { name = tca_retirement_probe_country value = scope:tca_pay_register_country }
+        scope:tca_pay_register_country = {
+            if = { limit = { NOT = { is_target_in_variable_list = { name = tca_retirement_probe_recipients target = scope:tca_pay_register_actor } } }
+                add_to_variable_list = { name = tca_retirement_probe_recipients target = scope:tca_pay_register_actor }
+            }
+            if = { limit = { NOT = { is_target_in_global_variable_list = { name = tca_retirement_probe_countries target = this } } }
+                add_to_global_variable_list = { name = tca_retirement_probe_countries target = this }
+            }
+        }
+    }
+}
+
+# 收款人物作用域；仅向登记仍与真实当前国家相同的人物付款，死亡／离境／改制直接拒绝。
+# 输入var:tca_retirement_probe_due为每期冻结绝对金额，不读取或仿造原生俸禄预算。
+# 30日防重日期属于人物，零额也记录尝试，无欠款、追补或因迁国重开周期。
+# 余额上限取实时国库且最低零；仅正额调用原生Treasury→Gold，收据记录真实双边差值。
+tca_retirement_candidate_settle_effect = {
+    if = {
+        limit = {
+            debug_only = yes is_alive = yes has_character_flag = tca_retirement_candidate_enabled
+            OR = { has_trait = tca_retirement_probe_fengci has_trait = tca_retirement_probe_retired }
+            has_variable = tca_retirement_probe_due
+            exists = var:tca_retirement_probe_country.holder
+            top_liege = var:tca_retirement_probe_country.holder
+            top_liege = { is_independent_ruler = yes government_has_flag = government_is_celestial has_treasury = yes }
+            tca_retirement_payment_probe_age_value >= 30
+        }
+        save_scope_as = tca_pay_recipient
+        top_liege = { save_scope_as = tca_pay_payer }
+        save_scope_value_as = { name = tca_pay_amount value = var:tca_retirement_probe_due }
+        if = { limit = { scope:tca_pay_payer = { treasury < scope:tca_pay_amount } } save_scope_value_as = { name = tca_pay_amount value = scope:tca_pay_payer.treasury } }
+        if = { limit = { scope:tca_pay_amount < 0 } save_scope_value_as = { name = tca_pay_amount value = 0 } }
+        set_variable = { name = tca_retirement_probe_attempted value = current_date }
+        set_variable = { name = tca_retirement_probe_last_paid value = scope:tca_pay_amount }
+        set_variable = { name = tca_retirement_probe_last_payer value = scope:tca_pay_payer }
+        save_scope_value_as = { name = tca_pay_gold_before value = gold }
+        save_scope_value_as = { name = tca_pay_treasury_before value = treasury }
+        save_scope_value_as = { name = tca_pay_payer_before value = scope:tca_pay_payer.treasury }
+        if = {
+            limit = { scope:tca_pay_amount > 0 }
+            scope:tca_pay_payer = { pay_treasury_to_gold = { target = scope:tca_pay_recipient value = scope:tca_pay_amount } }
+        }
+        set_variable = { name = tca_retirement_probe_receipt_date value = current_date }
+        set_variable = { name = tca_retirement_probe_gold_delta value = { value = gold subtract = scope:tca_pay_gold_before } }
+        set_variable = { name = tca_retirement_probe_treasury_delta value = { value = treasury subtract = scope:tca_pay_treasury_before } }
+        set_variable = { name = tca_retirement_probe_payer_delta value = { value = scope:tca_pay_payer_before subtract = scope:tca_pay_payer.treasury } }
+    }
+}
+
+# 原生局势月脉冲的独立追加入口；只遍历显式登记国家及其收款人。
+# 无自动识别闲退身份、世界扫描或正常玩法接入；失效人物在结算前清退，死亡不付款。
+tca_retirement_candidate_monthly_effect = {
+    if = { limit = { debug_only = yes }
+        every_in_global_list = {
+            variable = tca_retirement_probe_countries
+            save_scope_as = tca_pay_monthly_country
+            every_in_list = {
+                variable = tca_retirement_probe_recipients
+                if = {
+                    limit = { is_alive = yes has_character_flag = tca_retirement_candidate_enabled OR = { has_trait = tca_retirement_probe_fengci has_trait = tca_retirement_probe_retired } }
+                    tca_retirement_candidate_settle_effect = yes
+                }
+                else = {
+                    # 由列表持有者清理，不读取已故人物变量；也不依赖失效反向指针。
+                    save_scope_as = tca_pay_monthly_invalid
+                    scope:tca_pay_monthly_country = { remove_list_variable = { name = tca_retirement_probe_recipients target = scope:tca_pay_monthly_invalid } }
+                    if = { limit = { is_alive = yes } remove_variable = tca_retirement_probe_country }
+                }
+            }
+            if = {
+                limit = { NOT = { has_variable_list = tca_retirement_probe_recipients } }
+                remove_list_global_variable = { name = tca_retirement_probe_countries target = this }
+            }
+        }
+    }
+}
+
+# 皇帝报告者作用域；RULER、TITLE为输出saved scopes，复用已验证的直属路／县借还夹具。
+# 帝国授予本身仍可能沿袭宋朝霸权封臣关系，因此必须显式执行独立事务。
+# 本例只借可恢复的直属长官，所有原持有人引用由原生夹具存于新付款人。
+tca_test_create_retirement_payment_country_effect = {
+    tca_test_create_local_domain_actor_effect = { ACTOR = $RULER$ LEVEL = celestial_province_standard }
+    create_dynamic_title = { tier = empire name = tca_test_arrest_office_name }
+    scope:new_title = { save_scope_as = $TITLE$ set_capital_county = scope:$RULER$.capital_county set_destroy_on_succession = no }
+    scope:$RULER$ = { set_variable = { name = tca_pay_country_title value = scope:$TITLE$ } }
+    create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_pay_country_grant }
+    scope:$TITLE$ = { change_title_holder = { holder = scope:$RULER$ change = scope:tca_pay_country_grant } }
+    resolve_title_and_vassal_change = scope:tca_pay_country_grant
+    scope:$RULER$ = {
+        create_title_and_vassal_change = { type = independency add_claim_on_loss = no save_scope_as = tca_pay_independence }
+        becomes_independent = { change = scope:tca_pay_independence }
+        resolve_title_and_vassal_change = scope:tca_pay_independence
+        change_government = celestial_government
+        add_character_flag = tca_merit_interface_probe
+    }
+}
+
+# 新付款国人物作用域；沿原生已验证夹具精确归还路／县及原直属领主，再销毁动态帝国。
+# 不回滚跨日经济，不处理其他人物的家门或额外头衔。
+tca_test_restore_retirement_payment_country_effect = {
+    tca_test_restore_local_domain_actor_effect = yes
+    destroy_title = var:tca_pay_country_title
+    tca_test_cleanup_merit_probe_character_effect = yes
+}
+
+# 皇帝报告者作用域；ACTOR输出临时家主，PAYER为已建独立国家saved scope。
+# 正式共用人物夹具提供保护／家门，随后真实迁国；此处才显式启用付款候选双闸。
+tca_test_create_retirement_payment_recipient_effect = {
+    tca_test_create_merit_interface_character_with_age_effect = { CHARACTER = $ACTOR$ GOVERNMENT = celestial_government AGE = 65 }
+    scope:$ACTOR$ = {
+        create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_pay_actor_fealty }
+        change_liege = { liege = scope:$PAYER$ change = scope:tca_pay_actor_fealty }
+        resolve_title_and_vassal_change = scope:tca_pay_actor_fealty
+        change_government = celestial_government
+        add_character_flag = tca_retirement_candidate_enabled
+        add_trait = tca_retirement_probe_fengci
+    }
+}
+
+# 收款人物作用域；记录同日断言用原生余额，不跨日回滚金币或国库。
+tca_test_capture_retirement_payment_effect = {
+    set_variable = { name = tca_pay_before_gold value = gold }
+    set_variable = { name = tca_pay_before_treasury value = treasury }
+}
+
+# 一次性付款国作用域；BALANCE为目标余额，差额按符号选原生增减效果，零差额不调用。
+# 禁止用于真实朝廷或跨日回滚自然经济；负余额仅用来构造显式停付边界。
+tca_test_set_retirement_payment_balance_effect = {
+    save_scope_value_as = { name = tca_pay_balance_delta value = { value = $BALANCE$ subtract = treasury } }
+    if = { limit = { scope:tca_pay_balance_delta > 0 } add_treasury = scope:tca_pay_balance_delta }
+    else_if = { limit = { scope:tca_pay_balance_delta < 0 } remove_treasury = { value = scope:tca_pay_balance_delta multiply = -1 } }
+}
+
+# 临时收款人物作用域；注销候选并清特质，不影响旧raw探针人物。
+tca_test_cleanup_retirement_payment_recipient_effect = {
+    tca_retirement_candidate_unregister_effect = yes
+    remove_character_flag = tca_retirement_candidate_enabled
+    remove_trait = tca_retirement_probe_fengci
+    remove_trait = tca_retirement_probe_retired
+    tca_test_cleanup_merit_probe_character_effect = yes
+}
+
+# 报告者作用域；调用事件先输出自己的字面量PASS/FAIL，本入口只维护统计。
+# 仅持有延迟用例活动标记时继续原生串行链；即时用例由框架调度自身返回。
+tca_test_finish_retirement_payment_effect = {
+    if = { limit = { has_character_flag = tca_test_case_failed }
+        if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+    }
+    else = {
+        if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } }
+    }
+    remove_character_flag = tca_test_case_failed
+    if = {
+        limit = { has_character_flag = tca_test_delayed_case_active }
+        remove_character_flag = tca_test_delayed_case_active
+        tca_test_continue_delayed_effect = yes
+    }
+}

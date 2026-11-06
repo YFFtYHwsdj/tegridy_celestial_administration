@@ -1,0 +1,251 @@
+﻿# 原版辞官决议：仅封闭天朝AI重复入口，并在扣费前复验天朝资格。
+renounce_governorship_decision = {
+	picture = {
+		trigger = {
+			government_allows = merit
+		}
+		reference = "gfx/interface/illustrations/decisions/tgp_retire.dds"
+	}
+	picture = {
+		trigger = {
+			government_is_japanese_trigger = yes
+		}
+		reference = "gfx/interface/illustrations/decisions/tgp_house_fief.dds"
+	}
+	picture = {
+		reference = "gfx/interface/illustrations/decisions/decision_dynasty_house.dds"
+	}
+	sort_order = 85
+	ai_check_interval_by_tier = {
+		barony = 0
+		county = 120
+		duchy = 120
+		kingdom = 120
+		empire = 120
+		hegemony = 0
+	}
+	title = {
+		first_valid = {
+			triggered_desc = {
+				trigger = {
+					tgp_is_any_minister = yes
+				}
+				desc = renounce_ministership_decision
+			}
+			desc = renounce_governorship_decision
+		}
+	}
+	desc = {
+		first_valid = {
+			triggered_desc = {
+				trigger = {
+					government_allows = merit
+				}
+				desc = renounce_governorship_decision_desc_merit
+			}
+			triggered_desc = {
+				trigger = {
+					government_is_japanese_trigger = yes
+				}
+				desc = renounce_governorship_decision_desc_japan
+			}
+			desc = renounce_governorship_decision_desc
+		}
+	}
+	selection_tooltip = {
+		first_valid = {
+			triggered_desc = {
+				trigger = {
+					tgp_is_any_minister = yes
+				}
+				desc = renounce_ministership_decision_tooltip
+			}
+			desc = renounce_governorship_decision_tooltip
+		}
+	}
+	decision_group_type = admin
+
+	is_shown = {
+		is_playable_character = yes
+		OR = {
+			is_governor_or_admin_count = yes
+			tgp_is_any_minister = yes
+		}
+	}
+
+	is_valid_showing_failures_only = {
+        # 天朝在原版费用扣除前核对正式退休资格；其他制度保留原条件。
+        trigger_if = {
+            limit = { exists = top_liege top_liege = { government_has_flag = government_is_celestial } }
+            tca_retirement_ai_request_available_trigger = yes
+            OR = { tca_retirement_can_fengci_trigger = yes tca_retirement_can_retire_trigger = yes }
+        }
+		is_available_adult = yes
+		is_at_war_with_liege = no
+		custom_tooltip = {
+			text = renounce_governorship_family_title_tt
+			any_held_title = { # 保留家门，避免退职导致游戏结束
+				is_noble_family_title = yes
+			}
+		}
+	}
+
+	effect = {
+		if = {
+			limit = {
+				exists = top_liege top_liege = { government_has_flag = government_is_celestial }
+			}
+			# 天朝不再预览原版三年超时／十五年修正；正式奉祠或致仕由下一事件选择。
+			custom_tooltip = tca_retirement_native_decision_effect_tt
+			add_character_flag = { flag = tca_retirement_native_decision_path days = 1 }
+		}
+		else = {
+			if = {
+				limit = {
+					tgp_is_any_minister = yes
+				}
+				custom_tooltip = renounce_ministership_decision_effect_tt
+			}
+			else = {
+				custom_tooltip = renounce_governorship_decision_effect_tt
+			}
+			show_as_tooltip = {
+				tgp_step_down_title_recipient_tooltip_effect = yes
+				if = {
+					limit = {
+						government_allows = merit
+					}
+					add_character_modifier = {
+						modifier = ep3_renounced_governorship_merit
+						years = 15
+					}
+					set_appointment_timeout = {
+						years = 3
+						desc = appointment_timeout_desc_retired_governor
+					}
+				}
+				else_if = {
+					limit = {
+						government_is_japanese_trigger = yes
+					}
+					add_gold = major_gold_value
+					change_influence = major_influence_value
+					add_character_modifier = {
+						modifier = renounced_governorship_japan
+						years = 15
+					}
+				}
+				else = {
+					add_gold = massive_gold_value
+					add_character_modifier = {
+						modifier = ep3_renounced_governorship
+						years = 15
+					}
+				}
+				if = {
+					limit = {
+						tgp_is_any_minister = yes
+					}
+					liege = { save_scope_as = councillor_liege } # 原版解职效果需要此作用域
+					fired_minister_position_effect = yes
+				}
+			}
+		}
+		trigger_event = ep3_decisions_event.4090
+		close_view = {
+			view = decisions
+			player = root
+		}
+	}
+
+	cost = {
+		influence = minor_influence_value
+	}
+
+	ai_potential = {
+        # 天朝AI只走统一90日入口，不与原版120日辞官决议竞争。
+        NOT = { AND = { exists = top_liege top_liege = { government_has_flag = government_is_celestial } } }
+		is_at_war = no
+		highest_held_title_tier >= main_administrative_tier
+		# 原版家门保护：需有其他家族任官者，或同家门继承现有实职
+		OR = {
+			house ?= {
+				any_house_member = {
+					is_governor = yes
+					top_liege = root.top_liege
+				}
+			}
+			any_held_title = {
+				title_tier >= duchy
+				is_noble_family_title = no
+				current_heir.house = root.house
+			}
+		}
+	}
+
+	ai_will_do = {
+		base = 0
+		modifier = {
+			add = 5
+			has_trait = lazy
+			NOT = {
+				any_character_situation = {
+					situation_type = dynastic_cycle
+				}
+			}
+		}
+		modifier = {
+			add = 10
+			has_trait = humble
+			NOT = {
+				any_character_situation = {
+					situation_type = dynastic_cycle
+				}
+			}
+		}
+		modifier = {
+			add = 15
+			has_trait = content
+			NOT = {
+				any_character_situation = {
+					situation_type = dynastic_cycle
+				}
+			}
+		}
+		modifier = {
+			add = 50
+			OR = {
+				debt_level > 1
+				treasury_debt_level > 1
+			}
+		}
+		modifier = {
+			add = 5
+			OR = {
+				has_trait = ambitious
+				has_trait = greedy
+				has_trait = arrogant
+			}
+			any_character_situation = {
+				situation_type = dynastic_cycle
+			}
+		}
+		modifier = {
+			factor = 0
+			OR = {
+				has_trait = ambitious
+				has_trait = greedy
+				has_trait = arrogant
+			}
+			NOT = {
+				any_character_situation = {
+					situation_type = dynastic_cycle
+				}
+			}
+		}
+		modifier = {
+			factor = 0 # 原版已通过会试者不主动辞官应试
+			has_character_flag = passed_metropolitan_exam
+		}
+	}
+}

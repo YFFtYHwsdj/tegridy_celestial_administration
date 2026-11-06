@@ -1,0 +1,100 @@
+﻿# 资格边界真实读取原生年龄、健康与五类衰老经验，不使用Python业务规则。
+namespace = tca_retirement_formal_eligibility
+tca_retirement_formal_eligibility.1 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_retirement_formal_eligibility.1 tca_test_retirement_formal_eligibility"
+        remove_character_flag = tca_test_case_failed
+        if = { limit = { debug_only = yes is_alive = yes title:h_china.holder = root }
+            save_scope_value_as = { name = tca_rq_old_age value = retirement_age_current_value }
+            tca_test_create_merit_interface_character_effect = { CHARACTER = tca_rq_actor GOVERNMENT = celestial_government }
+            scope:tca_rq_actor = { tca_test_add_native_merit_probe_exams_effect = yes add_trait = education_stewardship_1 set_merit_level = 4 }
+            add_character_flag = tca_test_delayed_case_active
+            trigger_event = { id = tca_retirement_formal_eligibility.1001 days = 2 }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_retirement_formal_eligibility" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_continue_delayed_effect = yes }
+    }
+}
+# 原生等级缓存跨日后才判断资格，不能把set_merit_level同链读数当作目标品级。
+tca_retirement_formal_eligibility.1001 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            scope:tca_rq_actor = { trigger_event = tca_retirement_probe.92 }
+            tca_test_retirement_formal_age_boundaries_effect = { LAW = celestial_retirement_law_0 FENGCI_BEFORE = 39 FENGCI_AT = 40 RETIRE_BEFORE = 49 RETIRE_AT = 50 }
+            if = { limit = { var:tca_rq_age_ok = yes } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_formal_eligibility 1" } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_formal_eligibility 1" }
+            tca_test_retirement_formal_age_boundaries_effect = { LAW = celestial_retirement_law_1 FENGCI_BEFORE = 49 FENGCI_AT = 50 RETIRE_BEFORE = 59 RETIRE_AT = 60 }
+            if = { limit = { var:tca_rq_age_ok = yes } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_formal_eligibility 2" } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_formal_eligibility 2" }
+            tca_test_retirement_formal_age_boundaries_effect = { LAW = celestial_retirement_law_2 FENGCI_BEFORE = 59 FENGCI_AT = 60 RETIRE_BEFORE = 69 RETIRE_AT = 70 }
+            if = { limit = { var:tca_rq_age_ok = yes } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_formal_eligibility 3" } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_formal_eligibility 3" }
+            tca_test_retirement_formal_age_boundaries_effect = { LAW = celestial_retirement_law_3 FENGCI_BEFORE = 69 FENGCI_AT = 70 RETIRE_BEFORE = 79 RETIRE_AT = 80 }
+            if = { limit = { var:tca_rq_age_ok = yes } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_formal_eligibility 4" } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_formal_eligibility 4" }
+            tca_test_retirement_formal_age_boundaries_effect = { LAW = celestial_retirement_law_4 FENGCI_BEFORE = 79 FENGCI_AT = 80 RETIRE_BEFORE = 89 RETIRE_AT = 90 }
+            if = { limit = { var:tca_rq_age_ok = yes } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_formal_eligibility 5" } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_formal_eligibility 5" }
+            # 无固定年龄同样覆盖无衰老特质的59/60与69/70岁边界，模拟开局高龄人物。
+            tca_test_retirement_formal_age_boundaries_effect = { LAW = celestial_retirement_law_5 FENGCI_BEFORE = 59 FENGCI_AT = 60 RETIRE_BEFORE = 69 RETIRE_AT = 70 }
+            if = { limit = { var:tca_rq_age_ok = yes } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_formal_eligibility 6" } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_formal_eligibility 6" }
+            scope:tca_rq_actor = { set_age = 60 add_trait = infirm }
+            if = { limit = { scope:tca_rq_actor = { tca_retirement_can_fengci_trigger = yes tca_retirement_can_retire_trigger = no } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_formal_eligibility 7" } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_formal_eligibility 7" }
+            scope:tca_rq_actor = { add_trait_xp = { trait = infirm value = 50 } }
+            if = { limit = { scope:tca_rq_actor = { tca_retirement_can_retire_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_formal_eligibility 8" } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_formal_eligibility 8" }
+            scope:tca_rq_actor = { remove_trait = infirm set_age = 40 }
+            tca_test_retirement_formal_ailment_boundaries_effect = { TRAIT = infirm }
+            if = { limit = { var:tca_rq_xp_ok = yes } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_formal_eligibility 9" } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_formal_eligibility 9" }
+            tca_test_retirement_formal_ailment_boundaries_effect = { TRAIT = withering_mind }
+            if = { limit = { var:tca_rq_xp_ok = yes } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_formal_eligibility 10" } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_formal_eligibility 10" }
+            tca_test_retirement_formal_ailment_boundaries_effect = { TRAIT = clouded_eyes }
+            if = { limit = { var:tca_rq_xp_ok = yes } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_formal_eligibility 11" } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_formal_eligibility 11" }
+            tca_test_retirement_formal_ailment_boundaries_effect = { TRAIT = faltering_heart }
+            if = { limit = { var:tca_rq_xp_ok = yes } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_formal_eligibility 12" } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_formal_eligibility 12" }
+            tca_test_retirement_formal_ailment_boundaries_effect = { TRAIT = fragile_bones }
+            if = { limit = { var:tca_rq_xp_ok = yes } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_formal_eligibility 13" } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_formal_eligibility 13" }
+            scope:tca_rq_actor = { add_trait = incapable }
+            if = { limit = { scope:tca_rq_actor = { tca_retirement_can_fengci_trigger = yes tca_retirement_can_retire_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_formal_eligibility 14" } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_formal_eligibility 14" }
+            scope:tca_rq_actor = { remove_trait = incapable set_merit_level = 3 }
+            add_realm_law_skip_effects = celestial_retirement_law_0
+            if = { limit = { scope:tca_rq_actor = { tca_retirement_can_fengci_trigger = no } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_formal_eligibility 15" } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_formal_eligibility 15" }
+            scope:tca_rq_actor = { set_merit_level = 4 }
+            if = { limit = { scope:tca_rq_actor = { tca_retirement_can_fengci_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_formal_eligibility 16" } else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_formal_eligibility 16" }
+            # 开局75岁却尚未获得自然衰老特质，仍可走年龄通道；授品保护保持独立有效。
+            add_realm_law_skip_effects = celestial_retirement_law_5
+            scope:tca_rq_actor = { set_age = 75 }
+            if = { limit = { scope:tca_rq_actor = { NOT = { has_trait_with_flag = age_related_ailment } tca_retirement_can_fengci_trigger = yes tca_retirement_can_retire_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_formal_eligibility 17" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_formal_eligibility 17" }
+            scope:tca_rq_actor = { set_variable = { name = tca_merit_grant_phase value = 1 } }
+            if = { limit = { scope:tca_rq_actor = { tca_retirement_can_fengci_trigger = no tca_retirement_can_retire_trigger = no } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_formal_eligibility 18" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_formal_eligibility 18" }
+            scope:tca_rq_actor = { remove_variable = tca_merit_grant_phase add_character_flag = tca_merit_grant_suppress }
+            if = { limit = { scope:tca_rq_actor = { tca_retirement_can_fengci_trigger = no tca_retirement_can_retire_trigger = no } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_formal_eligibility 19" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_formal_eligibility 19" }
+            scope:tca_rq_actor = { remove_character_flag = tca_merit_grant_suppress }
+            if = { limit = { scope:tca_rq_actor = { tca_retirement_can_fengci_trigger = yes tca_retirement_can_retire_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_formal_eligibility 20" }
+            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_formal_eligibility 20" }
+            if = { limit = { scope:tca_rq_old_age = 50 } add_realm_law_skip_effects = celestial_retirement_law_0 }
+            else_if = { limit = { scope:tca_rq_old_age = 60 } add_realm_law_skip_effects = celestial_retirement_law_1 }
+            else_if = { limit = { scope:tca_rq_old_age = 70 } add_realm_law_skip_effects = celestial_retirement_law_2 }
+            else_if = { limit = { scope:tca_rq_old_age = 80 } add_realm_law_skip_effects = celestial_retirement_law_3 }
+            else_if = { limit = { scope:tca_rq_old_age = 90 } add_realm_law_skip_effects = celestial_retirement_law_4 }
+            # 高龄无特质检查已切至无固定年龄；恢复原法律时不能重复添加同一条法律。
+            else_if = { limit = { NOT = { has_realm_law = celestial_retirement_law_5 } } add_realm_law_skip_effects = celestial_retirement_law_5 }
+            scope:tca_rq_actor = { tca_test_cleanup_merit_probe_character_effect = yes }
+            remove_variable = tca_rq_age_ok
+            remove_variable = tca_rq_xp_ok
+            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_retirement_formal_eligibility" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_retirement_formal_eligibility" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_retirement_formal_eligibility" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } }
+        remove_character_flag = tca_test_case_failed
+        remove_character_flag = tca_test_delayed_case_active
+        tca_test_continue_delayed_effect = yes
+    }
+}
+
+
+# 健康与待遇数值探针；不复测.1拥有的五类衰老XP分档。
+# 原版依据：20_health_triggers使用health，00_stress_values与00_stress_effects使用add_stress，
+# elder_events.脚本亦用内联数值；本例只读取已确认的health/stress，不猜压力倍率getter。
+# 未确认接口：stress_gain_mult/stress_loss_mult直接脚本getter。改用同一无随机人格人物的
+# 真实add_stress增减及移除后恢复作因果对照；不声称覆盖自然活动、压力崩溃或长期健康。
+# 十个人物、当前法律和原生状态均由本例自备；三品、教育、资历与原生回调隔离保持相同。

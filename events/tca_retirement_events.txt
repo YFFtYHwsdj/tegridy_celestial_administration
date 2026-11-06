@@ -1,0 +1,207 @@
+﻿# 正式退休审批与自愿传家。事件只展示选择，事务复验均在共享效果。
+namespace = tca_retirement
+
+tca_retirement.10 = {
+    type = character_event
+    title = tca_retirement.10.t
+    desc = {
+        first_valid = {
+            triggered_desc = { trigger = { scope:tca_retirement_applicant = { var:tca_retirement_request_kind ?= 1 } } desc = tca_retirement.10.fengci }
+            triggered_desc = { trigger = { scope:tca_retirement_applicant = { var:tca_retirement_request_kind ?= 2 } } desc = tca_retirement.10.retire }
+            triggered_desc = { trigger = { scope:tca_retirement_applicant = { var:tca_retirement_request_kind ?= 3 } } desc = tca_retirement.10.resume }
+            triggered_desc = { trigger = { scope:tca_retirement_applicant = { var:tca_retirement_request_kind ?= 4 } } desc = tca_retirement.10.honor_only }
+            desc = tca_retirement.10.desc
+        }
+    }
+    theme = administrative
+    left_portrait = scope:tca_retirement_applicant
+    option = {
+        name = tca_retirement.10.honor
+        trigger = { is_ai = no exists = scope:tca_retirement_applicant scope:tca_retirement_applicant = { is_alive = yes var:tca_retirement_request_serial ?= scope:tca_retirement_token OR = { var:tca_retirement_request_kind ?= 2 var:tca_retirement_request_kind ?= 4 } merit_level >= 7 merit_level < 9 } }
+        scope:tca_retirement_applicant = { tca_retirement_resolve_effect = { EMPEROR = root SERIAL = scope:tca_retirement_token ACCEPT = yes HONOR = yes } }
+        ai_chance = { base = 0 modifier = { add = tca_retirement_ai_honor_weight_value } }
+    }
+    option = {
+        name = tca_retirement.10.approve
+        trigger = { exists = scope:tca_retirement_applicant scope:tca_retirement_applicant = { is_alive = yes has_variable = tca_retirement_request_kind var:tca_retirement_request_serial ?= scope:tca_retirement_token } }
+        tca_retirement_ai_approve_effect = yes
+        ai_chance = { base = 0 modifier = { add = tca_retirement_ai_approve_weight_value } }
+    }
+    option = {
+        name = tca_retirement.10.deny
+        trigger = { exists = scope:tca_retirement_applicant scope:tca_retirement_applicant = { is_alive = yes has_variable = tca_retirement_request_kind var:tca_retirement_request_serial ?= scope:tca_retirement_token NOT = { var:tca_retirement_request_kind ?= 4 } } }
+        scope:tca_retirement_applicant = { tca_retirement_resolve_effect = { EMPEROR = root SERIAL = scope:tca_retirement_token ACCEPT = no HONOR = no } }
+        ai_chance = { base = 0 modifier = { add = tca_retirement_ai_deny_weight_value } }
+    }
+    option = {
+        name = tca_retirement.10.expired
+        trigger = { NOT = { AND = { exists = scope:tca_retirement_applicant scope:tca_retirement_applicant = { is_alive = yes has_variable = tca_retirement_request_kind var:tca_retirement_request_serial ?= scope:tca_retirement_token } } } }
+    }
+}
+# 超时清理使用原凭据，不能终止后来申请；纯加恩按原品结案。
+tca_retirement.11 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { is_alive = yes has_variable = tca_retirement_request_kind var:tca_retirement_request_serial ?= scope:tca_retirement_token }
+            # 超时只按原品结案，不再按当前品级走自动加恩，防止过期高品请求降品后误授。
+            if = { limit = { var:tca_retirement_request_kind = 4 }
+                add_character_flag = tca_retirement_honor_processed
+                tca_retirement_offer_transfer_effect = yes
+            }
+            set_variable = { name = tca_retirement_request_result value = -1 }
+            tca_retirement_clear_request_effect = yes
+            # 请求结案后再给传家邀请；共用资格禁止未结事务交家门。
+            tca_retirement_offer_transfer_effect = yes
+            if = { limit = { is_ai = no } trigger_event = tca_retirement.12 }
+        }
+    }
+}
+tca_retirement.12 = {
+    type = character_event
+    title = tca_retirement.12.t
+    desc = {
+        first_valid = {
+            triggered_desc = { trigger = { var:tca_retirement_request_result ?= 1 } desc = tca_retirement.12.approved }
+            triggered_desc = { trigger = { var:tca_retirement_request_result ?= 0 } desc = tca_retirement.12.denied }
+            desc = tca_retirement.12.invalid
+        }
+    }
+    theme = administrative
+    option = { name = tca_retirement.continue }
+}
+tca_retirement.20 = {
+    type = character_event
+    title = tca_retirement.20.t
+    desc = tca_retirement.20.desc
+    theme = administrative
+    option = {
+        name = tca_retirement.20.transfer
+        trigger = { tca_retirement_can_transfer_trigger = yes }
+        if = { limit = { debug_only = yes is_ai = yes } debug_log = "TCA_RETIREMENT_AI TRANSFER id=[THIS.Char.GetID]" }
+        custom_tooltip = tca_retirement_transfer_effect_tt
+        hidden_effect = { tca_retirement_transfer_effect = yes }
+        ai_chance = { base = 0 modifier = { add = tca_retirement_ai_transfer_weight_value } }
+    }
+    option = {
+        name = tca_retirement.20.keep
+        custom_tooltip = tca_retirement.20.keep_tt
+        # debug日志确认真实AI选项已处理，不写人物状态或改变自然权重。
+        if = { limit = { debug_only = yes is_ai = yes } debug_log = "TCA_RETIREMENT_AI KEEP_FAMILY id=[THIS.Char.GetID]" }
+        ai_chance = { base = 0 modifier = { add = tca_retirement_ai_keep_family_weight_value } }
+    }
+}
+tca_retirement.21 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { is_alive = yes has_variable = tca_retirement_transfer_heir var:tca_retirement_transfer_heir = { is_alive = yes is_ruler = yes } is_ruler = no }
+            if = { limit = { NOT = { employer ?= var:tca_retirement_transfer_heir } }
+                var:tca_retirement_transfer_heir = { add_courtier = root }
+            }
+        }
+        remove_variable = tca_retirement_transfer_heir
+        tca_retirement_sync_income_effect = yes
+    }
+}
+# 直接授职异常次日纠正，不撤销合法家门。身份同时继续排除年度与正常候选。
+tca_retirement.90 = {
+    type = character_event hidden = yes
+    immediate = {
+        remove_character_flag = tca_retirement_office_cleanup_pending
+        if = { limit = { tca_retirement_is_exited_trigger = yes tca_retirement_has_office_trigger = yes top_liege = { government_has_flag = government_is_celestial } } tca_retirement_step_down_effect = yes }
+        tca_retirement_sync_income_effect = yes
+    }
+}
+tca_retirement.91 = { type = character_event hidden = yes immediate = { tca_retirement_audit_honor_effect = yes } }
+
+# 授品审计未结案只告知玩家，不提示授品成功，也不重复发起事务。
+# 失败后保留重试入口；目标与核定账仍在，成功后才释放传家与待遇同步。
+tca_retirement.92 = {
+    type = character_event
+    title = tca_retirement.92.t
+    desc = tca_retirement.92.desc
+    theme = administrative
+    option = {
+        name = tca_retirement.92.retry
+        trigger = { has_variable = tca_retirement_honor_target has_character_flag = tca_retirement_honor_failed }
+        remove_character_flag = tca_retirement_honor_failed
+        set_variable = { name = tca_retirement_honor_attempts value = 0 }
+        trigger_event = { id = tca_retirement.91 days = 1 }
+    }
+    option = { name = tca_retirement.continue }
+}
+
+# 合并原生升降品回调；使用当前人物真实等级，非当前国家或继承人官品。
+tca_retirement.93 = {
+    type = character_event hidden = yes
+    immediate = {
+        remove_character_flag = tca_retirement_income_sync_pending
+        tca_retirement_sync_income_effect = yes
+    }
+}
+
+# 仅由AI原生90日决议投递；选项复验当前资格，不保存分数或抽签结果。
+tca_retirement.30 = {
+    type = character_event
+    title = tca_retirement.30.t
+    desc = tca_retirement.30.desc
+    theme = administrative
+    trigger = { is_ai = yes }
+    option = {
+        name = tca_retirement.30.keep
+        if = { limit = { debug_only = yes is_ai = yes } debug_log = "TCA_RETIREMENT_AI KEEP id=[THIS.Char.GetID]" }
+        ai_chance = { base = 0 modifier = { add = tca_retirement_ai_keep_weight_value } }
+    }
+    option = {
+        name = tca_fengci_decision
+        trigger = { is_ai = yes tca_retirement_can_fengci_trigger = yes tca_retirement_ai_request_available_trigger = yes }
+        tca_retirement_apply_effect = { KIND = 1 }
+        ai_chance = { base = 0 modifier = { add = tca_retirement_ai_fengci_weight_value } }
+    }
+    option = {
+        name = tca_retire_decision
+        trigger = { is_ai = yes tca_retirement_can_retire_trigger = yes tca_retirement_ai_request_available_trigger = yes }
+        tca_retirement_apply_effect = { KIND = 2 }
+        ai_chance = { base = 0 modifier = { add = tca_retirement_ai_retire_weight_value } }
+    }
+    option = {
+        name = tca_resume_decision
+        trigger = { is_ai = yes tca_retirement_can_resume_trigger = yes tca_retirement_ai_request_available_trigger = yes }
+        tca_retirement_apply_effect = { KIND = 3 }
+        ai_chance = { base = 0 modifier = { add = tca_retirement_ai_resume_weight_value } }
+    }
+}
+# 皇帝AI已选择准许后，独立决定是否加恩；原凭据与快照仍由resolve完整复验。
+tca_retirement.14 = {
+    type = character_event
+    title = tca_retirement.14.t
+    desc = tca_retirement.14.desc
+    theme = administrative
+    left_portrait = scope:tca_retirement_applicant
+    option = {
+        name = tca_retirement.10.honor
+        trigger = { exists = scope:tca_retirement_applicant scope:tca_retirement_applicant = {
+            is_alive = yes var:tca_retirement_request_serial ?= scope:tca_retirement_token
+            OR = { var:tca_retirement_request_kind ?= 2 var:tca_retirement_request_kind ?= 4 }
+            merit_level >= 7 merit_level < 9
+        } }
+        scope:tca_retirement_applicant = { tca_retirement_resolve_effect = { EMPEROR = root SERIAL = scope:tca_retirement_token ACCEPT = yes HONOR = yes } }
+        ai_chance = { base = 0 modifier = { add = tca_retirement_ai_honor_weight_value } }
+    }
+    option = {
+        name = tca_retirement.10.approve
+        trigger = { exists = scope:tca_retirement_applicant scope:tca_retirement_applicant = {
+            is_alive = yes var:tca_retirement_request_serial ?= scope:tca_retirement_token
+            OR = { var:tca_retirement_request_kind ?= 2 var:tca_retirement_request_kind ?= 4 }
+        } }
+        scope:tca_retirement_applicant = { tca_retirement_resolve_effect = { EMPEROR = root SERIAL = scope:tca_retirement_token ACCEPT = yes HONOR = no } }
+        ai_chance = { base = 0 modifier = { add = tca_retirement_ai_no_honor_weight_value } }
+    }
+    option = {
+        name = tca_retirement.10.expired
+        trigger = { NOT = { AND = { exists = scope:tca_retirement_applicant scope:tca_retirement_applicant = {
+            is_alive = yes var:tca_retirement_request_serial ?= scope:tca_retirement_token
+            OR = { var:tca_retirement_request_kind ?= 2 var:tca_retirement_request_kind ?= 4 }
+        } } } }
+        ai_chance = { base = 100 }
+    }
+}

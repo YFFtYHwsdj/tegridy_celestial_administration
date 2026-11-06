@@ -184,6 +184,7 @@ tca_merit_candidate_probe.3 = {
             cp:minister_justice = { save_scope_as = tca_merit_retirement_original }
             tca_test_create_merit_interface_character_effect = { CHARACTER = tca_merit_retirement_actor GOVERNMENT = celestial_government }
             scope:tca_merit_retirement_actor = {
+                set_age = 90
                 tca_test_add_native_merit_probe_exams_effect = yes
                 add_trait = education_stewardship_1
                 change_merit = 24000
@@ -191,12 +192,13 @@ tca_merit_candidate_probe.3 = {
                 clear_appointment_timeout = yes
             }
             assign_councillor_type = { type = minister_justice target = scope:tca_merit_retirement_actor fire_on_actions = yes remove_existing_councillor = yes }
+            scope:tca_merit_retirement_actor = { set_merit_level = 0 set_merit_level = 6 add_trait = infirm add_trait_xp = { trait = infirm value = 75 } }
             if = { limit = { cp:minister_justice = scope:tca_merit_retirement_actor scope:tca_merit_retirement_actor = { has_title = title:e_minister_of_justice can_execute_decision = renounce_governorship_decision } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_real_retirement 1" }
             else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_real_retirement 1" }
-            # 原生刚授职有五年冷却；退休三年不会覆盖已有更长超时，须保存真实前值。
-            scope:tca_merit_retirement_actor = { save_scope_value_as = { name = tca_merit_retirement_timeout value = appointment_timeout_days } if = { limit = { can_execute_decision = renounce_governorship_decision } execute_decision = renounce_governorship_decision } }
+            # 走真实退休决议／统一事件；低品资格不依赖随机皇帝答复。
+            scope:tca_merit_retirement_actor = { trigger_event = { id = tca_retirement_formal_test.91 days = 2 } }
             add_character_flag = tca_test_delayed_case_active
-            trigger_event = { id = tca_merit_candidate_probe.3001 days = 3 }
+            trigger_event = { id = tca_merit_candidate_probe.3001 days = 7 }
         }
         else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_merit_real_retirement" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_continue_delayed_effect = yes }
     }
@@ -208,16 +210,16 @@ tca_merit_candidate_probe.3001 = {
         tca_test_validate_environment_effect = yes
         if = {
             limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
-            if = { limit = { scope:tca_merit_retirement_actor = { NOT = { has_title = title:e_minister_of_justice } has_character_modifier = ep3_renounced_governorship_merit has_character_flag = tca_merit_retired appointment_timeout_days = { value = scope:tca_merit_retirement_timeout subtract = 3 } } NOT = { cp:minister_justice = scope:tca_merit_retirement_actor } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_real_retirement 2" }
+            if = { limit = { scope:tca_merit_retirement_actor = { NOT = { has_title = title:e_minister_of_justice } tca_retirement_is_exited_trigger = yes appointment_timeout_days > 36500 NOT = { has_character_modifier = ep3_renounced_governorship_merit } } NOT = { cp:minister_justice = scope:tca_merit_retirement_actor } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_real_retirement 2" }
             else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_real_retirement 2" }
             scope:tca_merit_retirement_actor = { if = { limit = { can_execute_decision = tgp_resume_appointments_decision } execute_decision = tgp_resume_appointments_decision } }
-            if = { limit = { scope:tca_merit_retirement_actor = { appointment_timeout_days = 0 has_character_modifier = ep3_renounced_governorship_merit is_civilian_candidate_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_real_retirement 3" }
+            if = { limit = { scope:tca_merit_retirement_actor = { appointment_timeout_days > 36500 tca_retirement_is_exited_trigger = yes NOT = { can_execute_decision = tgp_resume_appointments_decision } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_real_retirement 3" }
             else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_real_retirement 3" }
-            # 恢复后再参加考试，与未恢复退休的共享修正不能混为退出原因。
-            scope:tca_merit_retirement_actor = { set_appointment_timeout = { months = 6 desc = appointment_timeout_desc_examinations } }
-            if = { limit = { scope:tca_merit_retirement_actor = { appointment_timeout_days > 0 appointment_timeout_days < 365 has_character_modifier = ep3_renounced_governorship_merit is_civilian_candidate_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_real_retirement 4" }
+            # 独立身份不能由考试／外部清超时绕过。
+            scope:tca_merit_retirement_actor = { clear_appointment_timeout = yes }
+            if = { limit = { scope:tca_merit_retirement_actor = { appointment_timeout_days = 0 tca_retirement_is_exited_trigger = yes NOT = { can_execute_decision = tgp_resume_appointments_decision } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_real_retirement 4" }
             else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_real_retirement 4" }
-            scope:tca_merit_retirement_actor = { remove_character_modifier = ep3_renounced_governorship_merit tca_test_cleanup_merit_probe_character_effect = yes }
+            scope:tca_merit_retirement_actor = { tca_test_cleanup_retirement_formal_effect = yes }
             assign_councillor_type = { type = minister_justice target = scope:tca_merit_retirement_original fire_on_actions = yes remove_existing_councillor = yes }
             if = { limit = { cp:minister_justice = scope:tca_merit_retirement_original title:e_minister_of_justice.holder = scope:tca_merit_retirement_original } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_real_retirement 5" }
             else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_real_retirement 5" }

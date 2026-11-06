@@ -1,0 +1,28 @@
+﻿# 仅CLI debug显式阶段触发，普通游玩没有自动接管玩家动作。
+widget = {
+ name = "tca_retirement_session_play"
+ size = { 1 1 }
+ alwaystransparent = yes
+ alpha = 0
+ visible_at_creation = no
+ datacontext = "[GetTitleByKey('h_china')]"
+ visible = "[And(InDebugMode, And(IsInGame, EqualTo_CFixedPoint(Title.MakeScope.Var('tca_retirement_session_phase').GetValue, '(CFixedPoint)1')))]"
+ state = { name = _show on_start = "[SetGameSpeed('(int32)1')]" duration = 1 next = tca_retirement_session_claim }
+ # Character.GetID 返回 uint32（原版以 EqualTo_uint32 比较），必须使用 UIntToString。
+ # 动态 play 必须在 debug.log 留下 Running console command: play <ID>，否则不成立。
+ state = { name = tca_retirement_session_claim on_start = "[ExecuteConsoleCommand(Select_CString(GetVariableSystem.HasValue('tca_retirement_session_claimed', 'yes'), '', Concatenate('play ', UIntToString(Title.MakeScope.Var('tca_retirement_session_actor').Char.GetID))))]" on_start = "[GetVariableSystem.Set('tca_retirement_session_claimed', 'yes')]" duration = 1 next = tca_retirement_session_identity }
+ state = { name = tca_retirement_session_identity on_start = "[ExecuteConsoleCommand(Select_CString(EqualTo_uint32(GetPlayer.GetID, Title.MakeScope.Var('tca_retirement_session_actor').Char.GetID), 'effect title:h_china.holder = { debug_log = TCA_GUI_PLAYER_MATCH }', 'effect title:h_china.holder = { debug_log = TCA_GUI_PLAYER_MISMATCH }'))]" duration = 1 next = tca_retirement_session_transfer }
+ state = { name = tca_retirement_session_transfer on_start = "[ExecuteConsoleCommand('effect title:h_china.holder = { tca_retirement_session_gui_transfer_effect = yes }')]" }
+}
+widget = {
+ name = "tca_retirement_session_observe"
+ size = { 1 1 }
+ alwaystransparent = yes
+ alpha = 0
+ visible_at_creation = no
+ datacontext = "[GetTitleByKey('h_china')]"
+ visible = "[And(InDebugMode, And(IsInGame, EqualTo_CFixedPoint(Title.MakeScope.Var('tca_retirement_session_phase').GetValue, '(CFixedPoint)3')))]"
+ # 原生 .1003 已排续接；此处只真实回观察者，避免同一状态多个控制台动作重入。
+ state = { name = _show on_start = "[ExecuteConsoleCommand('observe')]" duration = 1 next = tca_retirement_session_resume }
+ state = { name = tca_retirement_session_resume on_start = "[SetGameSpeed('(int32)4')]" }
+}

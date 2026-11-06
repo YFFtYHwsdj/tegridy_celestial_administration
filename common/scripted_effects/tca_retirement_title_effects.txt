@@ -1,0 +1,257 @@
+﻿# 退休个人头衔模块。公开入口均为人物作用域，无参数；外层负责 tca_retirement_maintaining 防重入。
+# sync 只在卸职结束后调用，输入退出特质、真实官品及 tca_retirement_country 国家主头衔。
+# 输出本人唯一动态无地公国、四项对象字段及互斥称谓标记；不改请求、官品或家门。
+# 本文件的 tca_rt_* saved scopes 与 scope values 为同链工作数据，调用方不得依赖。
+tca_retirement_sync_title_effect = {
+    if = {
+        limit = {
+            is_alive = yes
+            tca_retirement_is_exited_trigger = yes
+            exists = top_liege
+            this != top_liege
+            top_liege = { government_has_flag = government_is_celestial exists = capital_county }
+            top_liege.primary_title ?= var:tca_retirement_country
+        }
+        save_scope_as = tca_rt_actor
+        top_liege = { save_scope_as = tca_rt_emperor }
+        save_scope_value_as = { name = tca_rt_kind value = 1 }
+        if = { limit = { has_trait = tca_retired } save_scope_value_as = { name = tca_rt_kind value = 2 } }
+        save_scope_value_as = { name = tca_rt_grade value = 1 }
+        if = { limit = { merit_level >= 7 } save_scope_value_as = { name = tca_rt_grade value = 3 } }
+        else_if = { limit = { merit_level >= 4 } save_scope_value_as = { name = tca_rt_grade value = 2 } }
+        # 对象有效性与称谓分档分开；只有失去本人绑定或对象结构损坏时才回收重建。
+        if = { limit = { NOT = { AND = {
+            exists = var:tca_retirement_title
+            var:tca_retirement_title = {
+                has_variable = tca_retirement_title holder = scope:tca_rt_actor
+                var:tca_retirement_owner ?= scope:tca_rt_actor
+                tier = tier_duchy is_landless_type_title = yes
+            }
+        } } }
+            tca_retirement_release_title_effect = yes
+        }
+        # 跨档重新分配宫观名额，但保留人物的头衔、领属与统治身份；转致仕仅释放占位。
+        # 先清旧宫观再写新分档，避免旧占位被计入新池；同档维护不重抽通用兜底。
+        if = { limit = { NOT = { AND = {
+            var:tca_retirement_title_kind ?= scope:tca_rt_kind
+            var:tca_retirement_title_grade ?= scope:tca_rt_grade
+            has_variable = tca_retirement_palace
+        } } }
+            set_variable = { name = tca_retirement_palace value = 0 }
+            set_variable = { name = tca_retirement_title_kind value = scope:tca_rt_kind }
+            set_variable = { name = tca_retirement_title_grade value = scope:tca_rt_grade }
+            if = { limit = { scope:tca_rt_kind = 1 } tca_retirement_choose_palace_effect = yes }
+        }
+        if = { limit = { NOT = { exists = var:tca_retirement_title } }
+            create_dynamic_title = { tier = duchy name = tca_retirement_title_generic adj = tca_retirement_title_generic_adj }
+            scope:new_title = {
+                save_scope_as = tca_rt_new_title
+                # 先给有效首都，再声明无地，遵循本模组已用的原生设置顺序。
+                set_capital_county = scope:tca_rt_emperor.capital_county
+                set_landless_title = yes
+                set_coa = scope:tca_rt_emperor.capital_county
+                set_no_automatic_claims = yes
+                set_can_be_named_after_dynasty = no
+                set_can_use_nomadic_naming = no
+                set_delete_on_destroy = yes
+                set_destroy_on_succession = yes
+                set_variable = { name = tca_retirement_title value = yes }
+                set_variable = { name = tca_retirement_owner value = scope:tca_rt_actor }
+            }
+            set_variable = { name = tca_retirement_title value = scope:tca_rt_new_title }
+            create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_rt_grant }
+            scope:tca_rt_new_title = { change_title_holder = { holder = scope:tca_rt_actor change = scope:tca_rt_grant } }
+            resolve_title_and_vassal_change = scope:tca_rt_grant
+        }
+        # 合法对象也跟随当前朝廷首都；改变位置不重抽宫观、不重建对象。
+        var:tca_retirement_title = {
+            set_capital_county = scope:tca_rt_emperor.capital_county
+            set_landless_title = yes
+        }
+        # 授予可以短暂独立，必须使用授予前冻结的天子，不重新解析过渡中的 top_liege。
+        if = { limit = { NOT = { government_has_flag = government_is_celestial } } change_government = celestial_government }
+        if = { limit = { NOT = { liege ?= scope:tca_rt_emperor } }
+            create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_rt_fealty }
+            change_liege = { liege = scope:tca_rt_emperor change = scope:tca_rt_fealty }
+            resolve_title_and_vassal_change = scope:tca_rt_fealty
+        }
+        # 退休对象作为主头衔承载称谓；只在完整卸职后执行，不应覆盖仍在处理的中央职务。
+        if = { limit = { NOT = { primary_title ?= var:tca_retirement_title } } set_primary_title_to = var:tca_retirement_title }
+        if = { limit = { NOT = { is_target_in_global_variable_list = { name = tca_retirement_title_holders target = this } } }
+            add_to_global_variable_list = { name = tca_retirement_title_holders target = this }
+        }
+        tca_retirement_refresh_title_name_effect = yes
+    }
+    else = { tca_retirement_release_title_effect = yes }
+}
+
+# 人物作用域，可在 on_death 死亡前调用；不要求已经死亡或仍具退出特质。
+# 先断开索引和双向绑定，再销毁本人对象（含外部转授的原对象）；重入屏障由调用方持有，不动家门／实职／国家。
+tca_retirement_release_title_effect = {
+    remove_character_flag = tca_retirement_fengci_names
+    remove_character_flag = tca_retirement_retired_names
+    clear_saved_scope = tca_rt_releasing_title
+    save_scope_as = tca_rt_releasing_actor
+    if = {
+        limit = { exists = var:tca_retirement_title var:tca_retirement_title = {
+            has_variable = tca_retirement_title var:tca_retirement_owner ?= scope:tca_rt_releasing_actor
+        } }
+        var:tca_retirement_title = { save_scope_as = tca_rt_releasing_title remove_variable = tca_retirement_owner }
+    }
+    remove_list_global_variable = { name = tca_retirement_title_holders target = this }
+    remove_variable = tca_retirement_title
+    remove_variable = tca_retirement_palace
+    remove_variable = tca_retirement_title_grade
+    remove_variable = tca_retirement_title_kind
+    if = { limit = { exists = scope:tca_rt_releasing_title }
+        # 外部转授后从实际持有人回收，不能对原人物销毁已不属于他的头衔。
+        if = { limit = { exists = scope:tca_rt_releasing_title.holder }
+            scope:tca_rt_releasing_title.holder = { destroy_title = scope:tca_rt_releasing_title }
+        }
+        else = { destroy_title = scope:tca_rt_releasing_title }
+    }
+    clear_saved_scope = tca_rt_releasing_title
+}
+
+# 人物作用域；只遍历登记持有人，不扫描世界人口。每宫观只计同国、同档、活着且双向绑定有效的奉祠者。
+# 临时计数仅存在本次选择同链，末尾清除；申请未决与通用头衔均不占具名名额。
+tca_retirement_choose_palace_effect = {
+    save_scope_value_as = { name = tca_rt_capacity value = 8 }
+    if = { limit = { scope:tca_rt_grade = 2 } save_scope_value_as = { name = tca_rt_capacity value = 5 } }
+    else_if = { limit = { scope:tca_rt_grade = 3 } save_scope_value_as = { name = tca_rt_capacity value = 2 } }
+    save_scope_value_as = { name = tca_rt_minimum value = scope:tca_rt_capacity }
+    set_variable = { name = tca_rt_count_1 value = 0 }
+    set_variable = { name = tca_rt_count_2 value = 0 }
+    set_variable = { name = tca_rt_count_3 value = 0 }
+    set_variable = { name = tca_rt_count_4 value = 0 }
+    set_variable = { name = tca_rt_count_5 value = 0 }
+    set_variable = { name = tca_rt_count_6 value = 0 }
+    set_variable = { name = tca_rt_count_7 value = 0 }
+    set_variable = { name = tca_rt_count_8 value = 0 }
+    set_variable = { name = tca_rt_count_9 value = 0 }
+    set_variable = { name = tca_rt_count_10 value = 0 }
+    set_variable = { name = tca_rt_count_11 value = 0 }
+    set_variable = { name = tca_rt_count_12 value = 0 }
+    set_variable = { name = tca_rt_count_13 value = 0 }
+    set_variable = { name = tca_rt_count_14 value = 0 }
+    set_variable = { name = tca_rt_count_15 value = 0 }
+    set_variable = { name = tca_rt_count_16 value = 0 }
+    every_in_global_list = {
+        variable = tca_retirement_title_holders
+        limit = {
+            is_alive = yes
+            NOT = { this = scope:tca_rt_actor }
+            has_trait = tca_fengci
+            NOT = { has_trait = tca_retired }
+            var:tca_retirement_title_kind ?= 1
+            var:tca_retirement_country ?= scope:tca_rt_actor.var:tca_retirement_country
+            var:tca_retirement_title_grade ?= scope:tca_rt_grade
+            exists = var:tca_retirement_title
+            var:tca_retirement_title = { has_variable = tca_retirement_title holder = prev var:tca_retirement_owner ?= prev }
+        }
+        if = { limit = { var:tca_retirement_palace ?= 1 } scope:tca_rt_actor = { change_variable = { name = tca_rt_count_1 add = 1 } } }
+        if = { limit = { var:tca_retirement_palace ?= 2 } scope:tca_rt_actor = { change_variable = { name = tca_rt_count_2 add = 1 } } }
+        if = { limit = { var:tca_retirement_palace ?= 3 } scope:tca_rt_actor = { change_variable = { name = tca_rt_count_3 add = 1 } } }
+        if = { limit = { var:tca_retirement_palace ?= 4 } scope:tca_rt_actor = { change_variable = { name = tca_rt_count_4 add = 1 } } }
+        if = { limit = { var:tca_retirement_palace ?= 5 } scope:tca_rt_actor = { change_variable = { name = tca_rt_count_5 add = 1 } } }
+        if = { limit = { var:tca_retirement_palace ?= 6 } scope:tca_rt_actor = { change_variable = { name = tca_rt_count_6 add = 1 } } }
+        if = { limit = { var:tca_retirement_palace ?= 7 } scope:tca_rt_actor = { change_variable = { name = tca_rt_count_7 add = 1 } } }
+        if = { limit = { var:tca_retirement_palace ?= 8 } scope:tca_rt_actor = { change_variable = { name = tca_rt_count_8 add = 1 } } }
+        if = { limit = { var:tca_retirement_palace ?= 9 } scope:tca_rt_actor = { change_variable = { name = tca_rt_count_9 add = 1 } } }
+        if = { limit = { var:tca_retirement_palace ?= 10 } scope:tca_rt_actor = { change_variable = { name = tca_rt_count_10 add = 1 } } }
+        if = { limit = { var:tca_retirement_palace ?= 11 } scope:tca_rt_actor = { change_variable = { name = tca_rt_count_11 add = 1 } } }
+        if = { limit = { var:tca_retirement_palace ?= 12 } scope:tca_rt_actor = { change_variable = { name = tca_rt_count_12 add = 1 } } }
+        if = { limit = { var:tca_retirement_palace ?= 13 } scope:tca_rt_actor = { change_variable = { name = tca_rt_count_13 add = 1 } } }
+        if = { limit = { var:tca_retirement_palace ?= 14 } scope:tca_rt_actor = { change_variable = { name = tca_rt_count_14 add = 1 } } }
+        if = { limit = { var:tca_retirement_palace ?= 15 } scope:tca_rt_actor = { change_variable = { name = tca_rt_count_15 add = 1 } } }
+        if = { limit = { var:tca_retirement_palace ?= 16 } scope:tca_rt_actor = { change_variable = { name = tca_rt_count_16 add = 1 } } }
+    }
+    if = { limit = { var:tca_rt_count_1 < scope:tca_rt_minimum } save_scope_value_as = { name = tca_rt_minimum value = var:tca_rt_count_1 } }
+    if = { limit = { var:tca_rt_count_2 < scope:tca_rt_minimum } save_scope_value_as = { name = tca_rt_minimum value = var:tca_rt_count_2 } }
+    if = { limit = { var:tca_rt_count_3 < scope:tca_rt_minimum } save_scope_value_as = { name = tca_rt_minimum value = var:tca_rt_count_3 } }
+    if = { limit = { var:tca_rt_count_4 < scope:tca_rt_minimum } save_scope_value_as = { name = tca_rt_minimum value = var:tca_rt_count_4 } }
+    if = { limit = { var:tca_rt_count_5 < scope:tca_rt_minimum } save_scope_value_as = { name = tca_rt_minimum value = var:tca_rt_count_5 } }
+    if = { limit = { var:tca_rt_count_6 < scope:tca_rt_minimum } save_scope_value_as = { name = tca_rt_minimum value = var:tca_rt_count_6 } }
+    if = { limit = { var:tca_rt_count_7 < scope:tca_rt_minimum } save_scope_value_as = { name = tca_rt_minimum value = var:tca_rt_count_7 } }
+    if = { limit = { var:tca_rt_count_8 < scope:tca_rt_minimum } save_scope_value_as = { name = tca_rt_minimum value = var:tca_rt_count_8 } }
+    if = { limit = { var:tca_rt_count_9 < scope:tca_rt_minimum } save_scope_value_as = { name = tca_rt_minimum value = var:tca_rt_count_9 } }
+    if = { limit = { var:tca_rt_count_10 < scope:tca_rt_minimum } save_scope_value_as = { name = tca_rt_minimum value = var:tca_rt_count_10 } }
+    if = { limit = { var:tca_rt_count_11 < scope:tca_rt_minimum } save_scope_value_as = { name = tca_rt_minimum value = var:tca_rt_count_11 } }
+    if = { limit = { var:tca_rt_count_12 < scope:tca_rt_minimum } save_scope_value_as = { name = tca_rt_minimum value = var:tca_rt_count_12 } }
+    if = { limit = { var:tca_rt_count_13 < scope:tca_rt_minimum } save_scope_value_as = { name = tca_rt_minimum value = var:tca_rt_count_13 } }
+    if = { limit = { var:tca_rt_count_14 < scope:tca_rt_minimum } save_scope_value_as = { name = tca_rt_minimum value = var:tca_rt_count_14 } }
+    if = { limit = { var:tca_rt_count_15 < scope:tca_rt_minimum } save_scope_value_as = { name = tca_rt_minimum value = var:tca_rt_count_15 } }
+    if = { limit = { var:tca_rt_count_16 < scope:tca_rt_minimum } save_scope_value_as = { name = tca_rt_minimum value = var:tca_rt_count_16 } }
+    # 至少一个具名宫观未满才抽；同样最少的宫观均为权重一，全部满则保留通用零号。
+    if = { limit = { scope:tca_rt_minimum < scope:tca_rt_capacity }
+        random_list = {
+            1 = { trigger = { var:tca_rt_count_1 = scope:tca_rt_minimum } set_variable = { name = tca_retirement_palace value = 1 } }
+            1 = { trigger = { var:tca_rt_count_2 = scope:tca_rt_minimum } set_variable = { name = tca_retirement_palace value = 2 } }
+            1 = { trigger = { var:tca_rt_count_3 = scope:tca_rt_minimum } set_variable = { name = tca_retirement_palace value = 3 } }
+            1 = { trigger = { var:tca_rt_count_4 = scope:tca_rt_minimum } set_variable = { name = tca_retirement_palace value = 4 } }
+            1 = { trigger = { var:tca_rt_count_5 = scope:tca_rt_minimum } set_variable = { name = tca_retirement_palace value = 5 } }
+            1 = { trigger = { var:tca_rt_count_6 = scope:tca_rt_minimum } set_variable = { name = tca_retirement_palace value = 6 } }
+            1 = { trigger = { var:tca_rt_count_7 = scope:tca_rt_minimum } set_variable = { name = tca_retirement_palace value = 7 } }
+            1 = { trigger = { var:tca_rt_count_8 = scope:tca_rt_minimum } set_variable = { name = tca_retirement_palace value = 8 } }
+            1 = { trigger = { var:tca_rt_count_9 = scope:tca_rt_minimum } set_variable = { name = tca_retirement_palace value = 9 } }
+            1 = { trigger = { var:tca_rt_count_10 = scope:tca_rt_minimum } set_variable = { name = tca_retirement_palace value = 10 } }
+            1 = { trigger = { var:tca_rt_count_11 = scope:tca_rt_minimum } set_variable = { name = tca_retirement_palace value = 11 } }
+            1 = { trigger = { var:tca_rt_count_12 = scope:tca_rt_minimum } set_variable = { name = tca_retirement_palace value = 12 } }
+            1 = { trigger = { var:tca_rt_count_13 = scope:tca_rt_minimum } set_variable = { name = tca_retirement_palace value = 13 } }
+            1 = { trigger = { var:tca_rt_count_14 = scope:tca_rt_minimum } set_variable = { name = tca_retirement_palace value = 14 } }
+            1 = { trigger = { var:tca_rt_count_15 = scope:tca_rt_minimum } set_variable = { name = tca_retirement_palace value = 15 } }
+            1 = { trigger = { var:tca_rt_count_16 = scope:tca_rt_minimum } set_variable = { name = tca_retirement_palace value = 16 } }
+        }
+    }
+    remove_variable = tca_rt_count_1
+    remove_variable = tca_rt_count_2
+    remove_variable = tca_rt_count_3
+    remove_variable = tca_rt_count_4
+    remove_variable = tca_rt_count_5
+    remove_variable = tca_rt_count_6
+    remove_variable = tca_rt_count_7
+    remove_variable = tca_rt_count_8
+    remove_variable = tca_rt_count_9
+    remove_variable = tca_rt_count_10
+    remove_variable = tca_rt_count_11
+    remove_variable = tca_rt_count_12
+    remove_variable = tca_rt_count_13
+    remove_variable = tca_rt_count_14
+    remove_variable = tca_rt_count_15
+    remove_variable = tca_rt_count_16
+}
+
+# 人物作用域；更新当前对象名称与本人显示标记，不改对象、占位或官品。
+tca_retirement_refresh_title_name_effect = {
+    # 宫、观及荣衔本身已有完整名称，避免再拼出“崇福宫宫观”或“致仕荣衔荣衔”。
+    var:tca_retirement_title = { set_definitive_form = yes }
+    # 名称只描述宫观／荣衔；人物官称由独立本地化读取本人官品。
+    # 标记供原生 flavorization 使用，起复／回收时统一清除；界面按主头衔的退休标记选用短姓名。
+    remove_character_flag = tca_retirement_fengci_names
+    remove_character_flag = tca_retirement_retired_names
+    if = {
+        limit = { has_trait = tca_retired }
+        add_character_flag = tca_retirement_retired_names
+        var:tca_retirement_title = { set_title_name = tca_retirement_retired_title }
+    }
+    else = {
+        add_character_flag = tca_retirement_fengci_names
+        if = { limit = { var:tca_retirement_palace = 0 } var:tca_retirement_title = { set_title_name = tca_retirement_palace_name_0 } }
+        else_if = { limit = { var:tca_retirement_palace = 1 } var:tca_retirement_title = { set_title_name = tca_retirement_palace_name_1 } }
+        else_if = { limit = { var:tca_retirement_palace = 2 } var:tca_retirement_title = { set_title_name = tca_retirement_palace_name_2 } }
+        else_if = { limit = { var:tca_retirement_palace = 3 } var:tca_retirement_title = { set_title_name = tca_retirement_palace_name_3 } }
+        else_if = { limit = { var:tca_retirement_palace = 4 } var:tca_retirement_title = { set_title_name = tca_retirement_palace_name_4 } }
+        else_if = { limit = { var:tca_retirement_palace = 5 } var:tca_retirement_title = { set_title_name = tca_retirement_palace_name_5 } }
+        else_if = { limit = { var:tca_retirement_palace = 6 } var:tca_retirement_title = { set_title_name = tca_retirement_palace_name_6 } }
+        else_if = { limit = { var:tca_retirement_palace = 7 } var:tca_retirement_title = { set_title_name = tca_retirement_palace_name_7 } }
+        else_if = { limit = { var:tca_retirement_palace = 8 } var:tca_retirement_title = { set_title_name = tca_retirement_palace_name_8 } }
+        else_if = { limit = { var:tca_retirement_palace = 9 } var:tca_retirement_title = { set_title_name = tca_retirement_palace_name_9 } }
+        else_if = { limit = { var:tca_retirement_palace = 10 } var:tca_retirement_title = { set_title_name = tca_retirement_palace_name_10 } }
+        else_if = { limit = { var:tca_retirement_palace = 11 } var:tca_retirement_title = { set_title_name = tca_retirement_palace_name_11 } }
+        else_if = { limit = { var:tca_retirement_palace = 12 } var:tca_retirement_title = { set_title_name = tca_retirement_palace_name_12 } }
+        else_if = { limit = { var:tca_retirement_palace = 13 } var:tca_retirement_title = { set_title_name = tca_retirement_palace_name_13 } }
+        else_if = { limit = { var:tca_retirement_palace = 14 } var:tca_retirement_title = { set_title_name = tca_retirement_palace_name_14 } }
+        else_if = { limit = { var:tca_retirement_palace = 15 } var:tca_retirement_title = { set_title_name = tca_retirement_palace_name_15 } }
+        else_if = { limit = { var:tca_retirement_palace = 16 } var:tca_retirement_title = { set_title_name = tca_retirement_palace_name_16 } }
+    }
+}

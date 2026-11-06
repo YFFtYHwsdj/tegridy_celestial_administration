@@ -5,6 +5,7 @@
 - [考证规范](standards.md)：证据等级、核验状态、引用和采用规则。
 - [共用史料目录](sources.md)：稳定来源编号及版本、核验限制。
 - [条目模板](templates/claim.md)：新问题的基本格式；未知项明写未知。
+- [宫观纹章题材](song/retirement_coa/README.md)：十六处宫观的地景、奉祀与传说线索，区分直接记载、转引、候选与同名问题；不把美术设计当作历史原徽。
 - [通判、提刑的职掌与选官侧重](song/office_appointment/README.md)：选官设计的职责依据与时期、映射限制。
 - [转运司副贰：转运副使与转运判官](song/transport_commission/README.md)：副贰官称的先后、资序依据与时期限制。
 - [1066开局提点刑狱公事](song/1066_tidian_xingyu/README.md)：含三军路的18路判断、证据、异说与归档。

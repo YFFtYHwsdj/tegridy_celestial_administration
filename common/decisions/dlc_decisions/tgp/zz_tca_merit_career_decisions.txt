@@ -11,6 +11,7 @@ tgp_refuse_appointments_decision = {
 	sort_order = 75
 
 	is_shown = {
+        NOT = { tca_retirement_excludes_appointment_trigger = yes }
 		government_has_flag = government_has_merit
 		this != top_liege
 		custom_tooltip = {
@@ -32,6 +33,8 @@ tgp_refuse_appointments_decision = {
 	}
 
 	effect = {
+        if = { limit = { NOT = { tca_retirement_excludes_appointment_trigger = yes } }
+
 		custom_tooltip = {
 			text = tgp_refuse_appointments_decision_refuse_desc
 			set_appointment_timeout = {
@@ -42,8 +45,10 @@ tgp_refuse_appointments_decision = {
 	
 		# 仅真实天朝行为维护离散退出，不从共享超时时长反推原因。
 		if = { limit = { government_has_flag = government_is_celestial } tca_merit_mark_refused_effect = yes }
-	}
 	
+        }
+	}
+
 	ai_check_interval = 0
 	
 	ai_potential = { always = no }
@@ -61,6 +66,7 @@ tgp_resume_appointments_decision = {
 	sort_order = 75
 
 	is_shown = {
+		NOT = { tca_retirement_excludes_appointment_trigger = yes }
 		government_has_flag = government_has_merit
 		appointment_timeout_days > 0
 		has_tgp_dlc_trigger = yes
@@ -68,6 +74,7 @@ tgp_resume_appointments_decision = {
 	}
 
 	is_valid_showing_failures_only = {
+		NOT = { tca_retirement_excludes_appointment_trigger = yes }
 		is_adult = yes
 		is_available = yes
 	}
@@ -76,18 +83,21 @@ tgp_resume_appointments_decision = {
 	}
 
 	effect = {
-		custom_tooltip = {
-			text = tgp_refuse_appointments_decision_accept_desc
-			clear_appointment_timeout = yes
+		# 直接execute同样复验，避免跨政体或绕过决议条件清空正式或候选退休冷却。
+		if = { limit = { NOT = { tca_retirement_excludes_appointment_trigger = yes } }
+			custom_tooltip = {
+				text = tgp_refuse_appointments_decision_accept_desc
+				clear_appointment_timeout = yes
+			}
+
+			# 恢复决议在贤能制也可执行：必须按真实入口清除跨制度的辞谢/退休标记。
+			# 若仅在当前天朝清理，天朝辞谢→贤能制→恢复→返天朝会残留永久辞谢标记，
+			# 冷却已清后恢复决议隐藏，人物继续被年度候选排除。
+			tca_merit_restore_participation_effect = yes
 		}
-	
-		# 恢复决议在贤能制也可执行：必须按真实入口清除跨制度的辞谢/退休标记。
-		# 若仅在当前天朝清理，天朝辞谢→贤能制→恢复→返天朝会残留永久辞谢标记，
-		# 冷却已清后恢复决议隐藏，人物继续被年度候选排除。
-		tca_merit_restore_participation_effect = yes
 	}
-	
+
 	ai_check_interval = 0
-	
+
 	ai_potential = { always = no }
 }

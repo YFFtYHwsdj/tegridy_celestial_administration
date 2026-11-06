@@ -1,0 +1,118 @@
+﻿# 独立退休卸职技术探针；仅在可丢弃 debug 局由皇帝报告者调用。
+# 前置：tca_ro_office 为有效官署，tca_ro_original 为真实原任。
+# 输出：tca_ro_actor、tca_ro_family、tca_ro_liege；只暂借该官署，不触碰辖区头衔。
+# 原任和原领主受临时死亡保护；临时人物由已有夹具建立合法家门与天朝附庸关系。
+tca_test_prepare_retirement_office_actor_effect = {
+    scope:tca_ro_original = {
+        tca_test_protect_character_effect = yes
+        # 原任暂离实职的70日内不能被首次补位选作第二官署，归还资格由夹具负责保留。
+        # 两职初始池明确读取此旗标；只撤销本例添加的部分，不改真实历史人物标记。
+        if = { limit = { NOT = { has_character_flag = tca_history_defined_character } }
+            add_character_flag = tca_ro_history_owned
+            add_character_flag = tca_history_defined_character
+        }
+    }
+    scope:tca_ro_office.holder.liege = {
+        save_scope_as = tca_ro_liege
+        # 借出与归还相隔105日；原领主死亡后不得再向其执行效忠事务。
+        # 使用独立所有权，避免撤掉框架或其他夹具已持有的保护。
+        if = { limit = { NOT = { has_trait = tca_test_death_protection } }
+            add_character_flag = tca_ro_liege_protection_owned
+            add_trait = tca_test_death_protection
+        }
+    }
+    tca_test_create_merit_interface_character_effect = { CHARACTER = tca_ro_actor GOVERNMENT = celestial_government }
+    scope:tca_ro_actor = {
+        tca_test_add_native_merit_probe_exams_effect = yes
+        add_trait = education_stewardship_1
+        change_merit = 24000
+        scope:tca_merit_probe_new_family = { save_scope_as = tca_ro_family }
+        create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_ro_change }
+        scope:tca_ro_office = { change_title_holder = { holder = scope:tca_ro_actor change = scope:tca_ro_change } }
+        resolve_title_and_vassal_change = scope:tca_ro_change
+        create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_ro_fealty }
+        change_liege = { liege = scope:tca_ro_liege change = scope:tca_ro_fealty }
+        resolve_title_and_vassal_change = scope:tca_ro_fealty
+        change_government = celestial_government
+        tca_ensure_official_contract_effect = yes
+    }
+}
+
+# 皇帝报告者作用域；不用于证明自然继任，仅在全部业务检查后精确交还借用头衔。
+# 输出：原任重新持有 tca_ro_office；原生头衔回调负责分权与契约，调用者须真实等候。
+# 若卸职接口没有交出官署，仍执行相同归还，不把失败留给后续用例。
+tca_test_restore_retirement_office_effect = {
+    if = { limit = { scope:tca_ro_original = { is_alive = yes } scope:tca_ro_liege = { is_alive = yes } }
+        scope:tca_ro_original = {
+            if = { limit = { has_character_flag = tca_ro_history_owned }
+                remove_character_flag = tca_history_defined_character
+                remove_character_flag = tca_ro_history_owned
+            }
+            create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_ro_restore }
+            scope:tca_ro_office = { change_title_holder = { holder = scope:tca_ro_original change = scope:tca_ro_restore } }
+            resolve_title_and_vassal_change = scope:tca_ro_restore
+            create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_ro_restore_fealty }
+            change_liege = { liege = scope:tca_ro_liege change = scope:tca_ro_restore_fealty }
+            resolve_title_and_vassal_change = scope:tca_ro_restore_fealty
+        }
+    }
+    else = {
+        add_character_flag = tca_test_case_failed
+        debug_log = "TCA_RETIREMENT_OFFICE RESTORE_DEAD_PARTICIPANT"
+    }
+    scope:tca_ro_liege = {
+        if = { limit = { is_alive = yes has_character_flag = tca_ro_liege_protection_owned }
+            remove_trait = tca_test_death_protection
+            remove_character_flag = tca_ro_liege_protection_owned
+        }
+    }
+    scope:tca_ro_actor = { tca_test_cleanup_retirement_exit_actor_effect = yes }
+}
+
+# 候选技术事务，尚非正式退休实现。人物作用域，必须为实际在任者。
+# 先封闭自己继任，再逐署读取真实 current_heir；不自行评分、生成继任者或调用维护 worker。
+# 真实继承人有效时使用原生 appointment 事务；否则显式 granted 回交实际领主，
+# 由头衔回调自然排队补位。回交上级不是已完成合法继任，调用者须等待并检查最终状态。
+# 通判复用正式旧分权解除接口，保留官署双向绑定与经费档位；提刑不销毁官署。
+# 输出：tca_ro_candidate_heir／tca_ro_candidate_liege 是最后处理官署的真实快照。
+tca_retirement_candidate_step_down_offices_effect = {
+    # 身份先退出，防止交回上级后的首次纠错补位再次选回本人。
+    tca_retirement_candidate_enter_effect = { TRAIT = tca_retirement_probe_fengci }
+    set_appointment_timeout = { years = 150 desc = appointment_timeout_desc_refusing }
+    save_scope_as = tca_ro_candidate_retiring
+    every_held_title = {
+        limit = { OR = { has_variable = tca_tongpan_title has_variable = tca_judicial_title } }
+        save_scope_as = tca_ro_candidate_title
+        holder.liege = { save_scope_as = tca_ro_candidate_liege }
+        clear_saved_scope = tca_ro_candidate_heir
+        current_heir ?= {
+            if = {
+                limit = {
+                    is_alive = yes is_adult = yes is_available = yes is_landed = no
+                    this != scope:tca_ro_candidate_retiring
+                    appointment_timeout_days = 0
+                    NOT = { any_held_title = { is_noble_family_title = no } }
+                }
+                save_scope_as = tca_ro_candidate_heir
+            }
+        }
+        if = { limit = { has_variable = tca_tongpan_title } tca_stop_tongpan_diarchy_effect = yes }
+        if = {
+            limit = { exists = scope:tca_ro_candidate_heir }
+            scope:tca_ro_candidate_heir = {
+                create_title_and_vassal_change = { type = appointment add_claim_on_loss = no save_scope_as = tca_ro_candidate_change }
+                scope:tca_ro_candidate_title = { change_title_holder = { holder = scope:tca_ro_candidate_heir change = scope:tca_ro_candidate_change } }
+                resolve_title_and_vassal_change = scope:tca_ro_candidate_change
+            }
+            debug_log = "TCA_RETIREMENT_OFFICE CANDIDATE_NATIVE_HEIR"
+        }
+        else = {
+            scope:tca_ro_candidate_liege = {
+                create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_ro_candidate_change }
+                scope:tca_ro_candidate_title = { change_title_holder = { holder = scope:tca_ro_candidate_liege change = scope:tca_ro_candidate_change } }
+                resolve_title_and_vassal_change = scope:tca_ro_candidate_change
+            }
+            debug_log = "TCA_RETIREMENT_OFFICE CANDIDATE_RETURN_TO_LIEGE"
+        }
+    }
+}

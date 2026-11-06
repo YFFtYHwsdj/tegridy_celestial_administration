@@ -11,9 +11,15 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def expected_cases(root=ROOT):
-    """读取直接维护的原生事件，绝不生成或运行游戏脚本。"""
+    """读取直接维护的原生事件及GUI同步调用的测试夹具，绝不生成或运行游戏脚本。"""
     entries = {}
     checks = {}
+
+    def record_check(name, step, source):
+        if int(step) in checks.setdefault(name, set()):
+            raise ValueError(f'{source}: duplicate assertion {name} {step}')
+        checks[name].add(int(step))
+
     for path in sorted((root / 'events').rglob('tca_*test*_events.txt')):
         for event, body in definitions(path.read_text(encoding='utf-8-sig')).items():
             if '.' in event and not 0 <= int(event.rsplit('.', 1)[1]) < 10000:
@@ -30,10 +36,17 @@ def expected_cases(root=ROOT):
                         raise ValueError(f'{path.name}: duplicate or mismatched BEGIN {name}')
                     entries[name] = event
                 if check:
-                    name, step = check.groups()
-                    if int(step) in checks.setdefault(name, set()):
-                        raise ValueError(f'{name}: duplicate assertion {step}')
-                    checks[name].add(int(step))
+                    record_check(*check.groups(), path.name)
+    # GUI重载首帧无法等待角色事件，检查放在同步夹具中；这仍是正式断言，不另造孤立占位事件。
+    for path in sorted((root / 'common' / 'scripted_effects' / 'tests').rglob('*.txt')):
+        for _effect, body in definitions(path.read_text(encoding='utf-8-sig')).items():
+            for index, token in enumerate(body[:-2]):
+                if token != 'debug_log' or body[index + 1] != '=':
+                    continue
+                message = body[index + 2].strip('"')
+                check = re.fullmatch(r'TCA_TEST CHECK_PASS (tca_test_\S+) (\d+)', message)
+                if check:
+                    record_check(*check.groups(), path.name)
     if not entries or entries.keys() != checks.keys():
         raise ValueError('Test entries and assertion names must be nonempty and match')
     for name, steps in checks.items():
@@ -76,6 +89,9 @@ def inspect_engine_errors(errors):
             findings['TCA GUI property failure'] += 1
         elif 'Invalid actor & recipient' in entry and 'modify_vassal_contract interface' in entry:
             findings['TCA native contract window rejected participants'] += 1
+        elif 'is marked as default but has an is_shown trigger' in entry:
+            # 默认契约档必须始终可见；隐藏默认档会让整次运行的错误证据失效。
+            findings['TCA contract default level visibility failure'] += 1
         elif 'can not be used in event target links' in entry:
             findings['TCA invalid event target scope link'] += 1
         elif 'Value of wrong type' in entry:

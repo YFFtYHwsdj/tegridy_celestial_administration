@@ -64,7 +64,7 @@ effect tca_run_observer_tests_effect = yes
 
 真实等待写成原生trigger_event的days参数，由后续角色事件检查。续接事件保留上下文，所选延迟用例串行运行，不以直接调用正式worker替代自然触发。请求角色死亡、事件丢失或退出游戏时，无最终结果就是未完成。
 
-新增用例在所属`tca_test_modules_*_effects.txt`中以`EVENT`、唯一`CASE`日志名称及`DELAYED = yes/no`登记。仅新增模块时调整`common/scripted_effects/tests/framework/tca_test_catalog_effects.txt`的模块顺序；即时顺序和延迟顺序分别维护。不要手工更新总数量或分配全局阶段编号。日志工具交叉检查原生登记、正式用例、连续断言编号和冻结计划；没有生成步骤。即时用例当场完成，延迟用例自行撤销active标记再调用正式续接效果。共享夹具说明前置、修改对象、清理和环境损坏条件。
+新增用例在所属`tca_test_modules_*_effects.txt`中以`EVENT`、唯一`CASE`日志名称及`DELAYED = yes/no`登记。仅新增模块时调整`common/scripted_effects/tests/framework/tca_test_catalog_effects.txt`的模块顺序；即时顺序和延迟顺序分别维护。不要手工更新总数量或分配全局阶段编号。日志工具交叉检查原生登记、正式用例、连续断言编号和冻结计划；GUI重载首帧等无法等待角色事件的同步断言仍维护在测试夹具效果中，静态索引同时扫描`common/scripted_effects/tests/`，不另造孤立占位事件。没有生成步骤。即时用例当场完成，延迟用例自行撤销active标记再调用正式续接效果。共享夹具说明前置、修改对象、清理和环境损坏条件。
 
 检查命令：`python3 -m unittest discover -s tools -p 'test_*.py'`；游戏运行后用`python3 tools/check_test_run.py`，并审阅同次error.log。源码及静态通过不能当作引擎结果。
 

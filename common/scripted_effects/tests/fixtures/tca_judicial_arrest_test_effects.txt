@@ -90,6 +90,10 @@ tca_test_prepare_native_arrest_effect = {
             create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_test_arrest_governor_change }
             scope:tca_test_law_circuit = { change_title_holder = { holder = scope:tca_test_arrest_actor change = scope:tca_test_arrest_governor_change } }
             resolve_title_and_vassal_change = scope:tca_test_arrest_governor_change
+            # 新授路职须成为主头衔；否则临时长官仍以家门伯爵领为最高头衔，无法接收提刑公国。
+            if = { limit = { scope:tca_test_arrest_actor = { has_title = scope:tca_test_law_circuit NOT = { primary_title = scope:tca_test_law_circuit } } }
+                scope:tca_test_arrest_actor = { set_primary_title_to = scope:tca_test_law_circuit }
+            }
         }
         tca_test_log_native_arrest_fixture_effect = { STAGE = AFTER_APPOINTMENT }
         if = {
@@ -159,7 +163,16 @@ tca_test_prepare_native_arrest_effect = {
             limit = { always = $IMPERIAL$ }
             change_liege = { liege = scope:tca_test_law_sovereign change = scope:tca_test_arrest_target_liege_change }
         }
-        else = { change_liege = { liege = scope:tca_test_arrest_actor change = scope:tca_test_arrest_target_liege_change } }
+        else_if = {
+            limit = { scope:tca_test_arrest_actor = { highest_held_title_tier > scope:tca_test_arrest_target.highest_held_title_tier } }
+            change_liege = { liege = scope:tca_test_arrest_actor change = scope:tca_test_arrest_target_liege_change }
+        }
+        else = {
+            # 临时长官头衔未成功高于提刑公国时，不提交非法附庸事务；保留失败诊断交由用例核对。
+            add_character_flag = tca_test_arrest_fixture_tier_bad
+            debug_log = "TCA_ARREST FIXTURE_TIER_MISMATCH"
+            change_liege = { liege = scope:tca_test_law_sovereign change = scope:tca_test_arrest_target_liege_change }
+        }
         resolve_title_and_vassal_change = scope:tca_test_arrest_target_liege_change
         tca_test_normalize_judicial_score_target_effect = yes
         remove_trait = confucian_education

@@ -1,0 +1,80 @@
+﻿# 正式退休状态接口。人物作用域；KIND=1奉祠／2致仕。
+# 资格／审批由上层申请接口负责，本入口在卸职前封闭候选；不能降回奉祠。
+# 原生150年超时仅服务任命继承，真正身份以特质为准。
+tca_retirement_enter_effect = {
+    save_scope_value_as = { name = tca_retirement_enter_kind value = $KIND$ }
+    if = {
+        limit = { is_alive = yes is_adult = yes NOT = { has_trait = tca_retired } OR = { scope:tca_retirement_enter_kind = 1 scope:tca_retirement_enter_kind = 2 } }
+        if = {
+            limit = { NOT = { tca_retirement_is_exited_trigger = yes } }
+            set_variable = { name = tca_retirement_prior_timeout value = appointment_timeout_days }
+            set_variable = { name = tca_retirement_entered_date value = current_date }
+        }
+        tca_retirement_record_country_effect = yes
+        add_character_flag = tca_retirement_exit_pending
+        remove_trait = tca_fengci
+        if = { limit = { scope:tca_retirement_enter_kind = 2 } add_trait = tca_retired }
+        else = { add_trait = tca_fengci }
+        remove_character_flag = tca_merit_central_await_entry
+        # 未提交事务以后会被硬资格拒绝；已提交事务仍须完成原审计，不删phase伪装成功。
+        remove_character_flag = tca_merit_central_pending
+        set_appointment_timeout = { years = 150 desc = appointment_timeout_desc_refusing }
+        tca_retirement_sync_income_effect = yes
+    }
+}
+# 人物作用域；归属、身份、官品和头衔回调共享的幂等同步入口。
+# 卸职未完成时不造公国，避免提前改变中央主头衔；maintaining阻止原生回调重入。
+tca_retirement_sync_income_effect = {
+    if = { limit = { is_alive = yes NOT = { has_character_flag = tca_retirement_maintaining } NOT = { has_character_flag = tca_retirement_exit_pending } }
+        add_character_flag = tca_retirement_maintaining
+        if = { limit = { tca_retirement_income_valid_trigger = yes NOT = { has_character_flag = tca_retirement_terminal } }
+            if = { limit = { has_variable = tca_retirement_country NOT = { top_liege.primary_title = var:tca_retirement_country } }
+                # 收回最后一个公国可能转为廷臣；先冻结新朝天子，不能从卸衔后的过渡状态重新推断国家。
+                save_scope_as = tca_retirement_migrating_actor
+                top_liege = { save_scope_as = tca_retirement_new_emperor }
+                top_liege.primary_title = { save_scope_as = tca_retirement_new_country }
+                tca_retirement_release_title_effect = yes
+                if = { limit = { is_ruler = no NOT = { employer ?= scope:tca_retirement_new_emperor } }
+                    scope:tca_retirement_new_emperor = { add_courtier = scope:tca_retirement_migrating_actor }
+                }
+                set_variable = { name = tca_retirement_country value = scope:tca_retirement_new_country }
+            }
+            tca_retirement_record_country_effect = yes
+            tca_retirement_sync_title_effect = yes
+        }
+        else_if = { limit = { has_variable = tca_retirement_title OR = { NOT = { has_trait = tca_retired } has_character_flag = tca_retirement_terminal is_alive = no } }
+            # 外国迁属后收回最后一个公国会使人物变成廷臣；保留已取得的外国宫廷归属。
+            clear_saved_scope = tca_retirement_foreign_host
+            save_scope_as = tca_retirement_displaced_actor
+            if = { limit = { exists = top_liege this != top_liege top_liege = { is_alive = yes is_ruler = yes NOT = { government_has_flag = government_is_celestial } } }
+                top_liege = { save_scope_as = tca_retirement_foreign_host }
+            }
+            tca_retirement_release_title_effect = yes
+            if = { limit = { is_ruler = no exists = scope:tca_retirement_foreign_host NOT = { employer ?= scope:tca_retirement_foreign_host } }
+                scope:tca_retirement_foreign_host = { add_courtier = scope:tca_retirement_displaced_actor }
+            }
+        }
+        tca_retirement_sync_salary_effect = yes
+        remove_character_flag = tca_retirement_maintaining
+    }
+}
+# 人物作用域；只在正式批准／低品自行起复后调用。费用成功才扣，重复执行无效。
+# 原冷却快照不随奉祠转致仕覆盖；未知外部模组改写原生超时不在本接口保证范围。
+tca_retirement_resume_effect = {
+    if = {
+        limit = { tca_retirement_can_resume_trigger = yes }
+        change_influence = { value = tca_retirement_resume_cost_value multiply = -1 }
+        add_character_flag = tca_retirement_maintaining
+        tca_retirement_release_title_effect = yes
+        remove_trait = tca_fengci
+        remove_character_flag = tca_retirement_exit_pending
+        remove_variable = tca_retirement_country
+        remove_character_flag = tca_retirement_maintaining
+        clear_appointment_timeout = yes
+        if = { limit = { tca_retirement_remaining_timeout_value > 0 } set_appointment_timeout = { days = tca_retirement_remaining_timeout_value } }
+        remove_variable = tca_retirement_prior_timeout
+        remove_variable = tca_retirement_entered_date
+        tca_retirement_sync_income_effect = yes
+        add_character_flag = { flag = tca_retirement_recent_resume days = 365 }
+    }
+}

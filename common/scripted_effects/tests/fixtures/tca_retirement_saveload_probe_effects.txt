@@ -1,0 +1,252 @@
+﻿# 闲退持久化夹具；只扩展既有一次保存／破坏／原生重载，不另存档或重派发业务事件。
+# 皇帝报告者作用域；输出tca_rsl_country/title、fengci/retired、family/heir，并在h_china保存GUI引用。
+# 新人物各自保存真实原生冷却快照；付款用冻结绝对额，独立国家余额不来自真实皇帝。
+tca_test_prepare_retirement_saveload_effect = {
+    # 新退休契约另用独立无地公国人物，与旧转账人物及原断言隔离，共用真实保存／破坏／重载。
+    tca_test_create_merit_interface_character_with_age_effect = { CHARACTER = tca_rsf_actor GOVERNMENT = celestial_government AGE = 65 }
+    scope:tca_rsf_actor = {
+        tca_test_protect_character_effect = yes
+        add_character_flag = ai_will_not_convert
+        add_character_flag = tca_merit_interface_probe
+        primary_title = { save_scope_as = tca_rsf_family }
+        create_character = { age = 30 gender_female_chance = 0 random_traits = no dynasty = this.dynasty father = this employer = this culture = this.culture faith = this.faith rite = this.rite save_scope_as = tca_rsf_heir }
+        clear_appointment_timeout = yes
+        set_appointment_timeout = { days = 120 desc = appointment_timeout_desc_refusing }
+        set_focus = diplomacy_family_focus
+        tca_test_retirement_salary_baseline_effect = yes
+        tca_test_add_native_merit_probe_exams_effect = yes
+        add_trait = education_stewardship_1
+        tca_retirement_finish_effect = { KIND = 1 APPROVE = no }
+        set_variable = { name = tca_rsf_expected_title value = var:tca_retirement_title }
+        set_variable = { name = tca_rsf_expected_palace value = var:tca_retirement_palace }
+        # 入闲退后真实升到五品，正式等级回调刷新官品预算贡献；不直接同步造结果。
+        set_merit_level = 5
+        set_variable = { name = tca_rsf_original_date value = var:tca_retirement_entered_date }
+        set_variable = { name = tca_rsf_gold_before value = gold }
+    }
+    scope:tca_rsf_heir = { set_house = scope:tca_rsf_actor.house tca_test_protect_character_effect = yes add_character_flag = ai_will_not_convert add_character_flag = tca_merit_interface_probe set_appointment_timeout = { years = 150 desc = appointment_timeout_desc_refusing } }
+    title:h_china = { set_variable = { name = tca_rsf_actor value = scope:tca_rsf_actor } set_variable = { name = tca_rsf_heir value = scope:tca_rsf_heir } }
+
+
+    # 致仕人物与奉祠独立，共享同一次真实保存／现场破坏／重载。
+    tca_test_create_merit_interface_character_with_age_effect = { CHARACTER = tca_rsg_actor GOVERNMENT = celestial_government AGE = 65 }
+    scope:tca_rsg_actor = {
+        tca_test_protect_character_effect = yes
+        add_character_flag = ai_will_not_convert
+        add_character_flag = tca_merit_interface_probe
+        primary_title = { save_scope_as = tca_rsg_family }
+        create_character = { age = 30 gender_female_chance = 0 random_traits = no dynasty = this.dynasty father = this employer = this culture = this.culture faith = this.faith rite = this.rite save_scope_as = tca_rsg_heir }
+        clear_appointment_timeout = yes
+        set_appointment_timeout = { days = 120 desc = appointment_timeout_desc_refusing }
+        set_focus = diplomacy_family_focus
+        tca_test_retirement_salary_baseline_effect = yes
+        tca_test_add_native_merit_probe_exams_effect = yes
+        add_trait = education_stewardship_1
+        tca_retirement_enter_effect = { KIND = 2 } tca_retirement_step_down_effect = yes
+        set_variable = { name = tca_rsg_expected_title value = var:tca_retirement_title }
+        set_variable = { name = tca_rsg_expected_palace value = var:tca_retirement_palace }
+        # 入闲退后真实升到五品，正式等级回调刷新官品预算贡献；不直接同步造结果。
+        set_merit_level = 5
+        set_variable = { name = tca_rsg_original_date value = var:tca_retirement_entered_date }
+        set_variable = { name = tca_rsg_gold_before value = gold }
+    }
+    scope:tca_rsg_heir = { set_house = scope:tca_rsg_actor.house tca_test_protect_character_effect = yes add_character_flag = ai_will_not_convert add_character_flag = tca_merit_interface_probe set_appointment_timeout = { years = 150 desc = appointment_timeout_desc_refusing } }
+    title:h_china = { set_variable = { name = tca_rsg_actor value = scope:tca_rsg_actor } set_variable = { name = tca_rsg_heir value = scope:tca_rsg_heir } }
+
+    tca_test_create_retirement_payment_country_effect = { RULER = tca_rsl_country TITLE = tca_rsl_title }
+    scope:tca_rsl_country = { tca_test_set_retirement_payment_balance_effect = { BALANCE = 1000 } }
+    tca_test_create_retirement_payment_recipient_effect = { ACTOR = tca_rsl_fengci PAYER = tca_rsl_country }
+    scope:tca_rsl_fengci = {
+        remove_character_flag = tca_retirement_candidate_enabled remove_trait = tca_retirement_probe_fengci
+        clear_appointment_timeout = yes set_appointment_timeout = { days = 120 desc = appointment_timeout_desc_refusing }
+        set_variable = { name = tca_rsl_expected_timeout value = appointment_timeout_days }
+        tca_retirement_candidate_enter_effect = { TRAIT = tca_retirement_probe_fengci }
+        set_variable = { name = tca_rsl_expected_entered value = var:tca_retirement_candidate_entered_date }
+        set_variable = { name = tca_rsl_identity_sentinel value = 12345 }
+        change_influence = 1000
+        add_character_flag = tca_retirement_candidate_hold_reply
+        set_variable = { name = tca_retirement_probe_due value = 7 }
+        primary_title = { save_scope_as = tca_rsl_family }
+        create_character = { age = 30 gender_female_chance = 0 random_traits = no dynasty = this.dynasty father = this employer = this culture = this.culture faith = this.faith rite = this.rite save_scope_as = tca_rsl_heir }
+    }
+    scope:tca_rsl_heir = { set_house = scope:tca_rsl_fengci.house tca_test_protect_character_effect = yes add_character_flag = ai_will_not_convert add_character_flag = tca_merit_interface_probe set_appointment_timeout = { years = 150 desc = appointment_timeout_desc_refusing } }
+    scope:tca_rsl_family = { set_variable = { name = tca_rsl_family_heir value = scope:tca_rsl_heir } }
+    tca_test_create_retirement_payment_recipient_effect = { ACTOR = tca_rsl_retired PAYER = tca_rsl_country }
+    scope:tca_rsl_retired = {
+        remove_character_flag = tca_retirement_candidate_enabled remove_trait = tca_retirement_probe_fengci
+        tca_test_add_native_merit_probe_exams_effect = yes add_trait = education_stewardship_1
+        set_merit_level = 6
+        clear_appointment_timeout = yes set_appointment_timeout = { days = 240 desc = appointment_timeout_desc_refusing }
+        set_variable = { name = tca_rsl_expected_timeout value = appointment_timeout_days }
+        tca_retirement_candidate_enter_effect = { TRAIT = tca_retirement_probe_retired }
+        set_variable = { name = tca_rsl_expected_entered value = var:tca_retirement_candidate_entered_date }
+        set_variable = { name = tca_rsl_identity_sentinel value = 12345 }
+        set_variable = { name = tca_retirement_probe_due value = 3 }
+    }
+    title:h_china = {
+        set_variable = { name = tca_rsl_country value = scope:tca_rsl_country }
+        set_variable = { name = tca_rsl_country_title value = scope:tca_rsl_title }
+        set_variable = { name = tca_rsl_fengci value = scope:tca_rsl_fengci }
+        set_variable = { name = tca_rsl_retired value = scope:tca_rsl_retired }
+        set_variable = { name = tca_rsl_family value = scope:tca_rsl_family }
+        set_variable = { name = tca_rsl_heir value = scope:tca_rsl_heir }
+    }
+}
+
+# h_china头衔作用域，仅由原GUI已保存后的corrupt阶段追加调用。
+# 真实破坏身份／原冷却／官品加恩／待审批请求／付款索引和个人防重字段；不改变旧探针动作。
+# 首进程现场断言之后只请求既有一次重载，不在脚本修复任何这些字段。
+tca_test_corrupt_retirement_saveload_effect = {
+    var:tca_rsf_actor = {
+        add_character_flag = tca_retirement_updating_contract
+        vassal_contract_set_obligation_level = { type = tca_fengci_salary level = tca_fengci_salary_none }
+        remove_character_flag = tca_retirement_updating_contract
+        remove_trait = tca_fengci
+
+        remove_variable = tca_retirement_title
+        remove_variable = tca_retirement_palace
+        remove_variable = tca_retirement_country
+        set_variable = { name = tca_retirement_prior_timeout value = 999 }
+        set_variable = { name = tca_retirement_entered_date value = 0 }
+    }
+
+    var:tca_rsg_actor = {
+        add_character_flag = tca_retirement_updating_contract
+        vassal_contract_set_obligation_level = { type = tca_zhishi_salary level = tca_zhishi_salary_none }
+        vassal_contract_set_obligation_level = { type = tca_retirement_merit_salary level = tca_retirement_merit_salary_none }
+        remove_character_flag = tca_retirement_updating_contract
+        remove_trait = tca_retired
+
+        remove_variable = tca_retirement_title
+        remove_variable = tca_retirement_palace
+        remove_variable = tca_retirement_country
+        set_variable = { name = tca_retirement_prior_timeout value = 999 }
+        set_variable = { name = tca_retirement_entered_date value = 0 }
+    }
+
+    var:tca_rsl_fengci = {
+        remove_trait = tca_retirement_probe_fengci remove_character_flag = tca_retirement_candidate_enabled
+        set_variable = { name = tca_rsl_identity_sentinel value = 54321 }
+        set_variable = { name = tca_retirement_candidate_prior_timeout value = 999 }
+        set_variable = { name = tca_retirement_candidate_entered_date value = 0 }
+        set_variable = { name = tca_retirement_candidate_request_kind value = 99 }
+        set_variable = { name = tca_retirement_candidate_request_serial value = 99 }
+        set_variable = { name = tca_retirement_candidate_request_emperor value = this }
+        set_variable = { name = tca_retirement_candidate_request_date value = 0 }
+        remove_variable = tca_retirement_probe_country
+        set_variable = { name = tca_retirement_probe_due value = 99 }
+        set_variable = { name = tca_retirement_probe_attempted value = 0 }
+        set_variable = { name = tca_retirement_probe_last_paid value = 99 }
+    }
+    var:tca_rsl_retired = {
+        remove_trait = tca_retirement_probe_retired remove_character_flag = tca_retirement_candidate_enabled
+        remove_character_flag = tca_retirement_candidate_honor_processed
+        set_variable = { name = tca_rsl_identity_sentinel value = 54321 }
+        set_variable = { name = tca_retirement_candidate_prior_timeout value = 999 }
+        set_merit_level = 0 set_variable = { name = tca_merit_approved_level value = 0 }
+        remove_variable = tca_retirement_probe_country
+        set_variable = { name = tca_retirement_probe_due value = 99 }
+        set_variable = { name = tca_retirement_probe_attempted value = 0 }
+        set_variable = { name = tca_retirement_probe_last_paid value = 99 }
+    }
+    var:tca_rsl_family = { set_variable = { name = tca_rsl_family_heir value = title:h_china.var:tca_rsl_country } }
+    var:tca_rsl_country_title = {
+        clear_variable_list = tca_retirement_probe_recipients
+        remove_list_global_variable = { name = tca_retirement_probe_countries target = this }
+    }
+}
+
+# 报告者作用域；所有恢复断言完成后才注销临时人物和付款国家，绝不用于修复待验状态。
+tca_test_cleanup_retirement_saveload_effect = {
+    title:h_china.var:tca_rsf_actor = { tca_test_cleanup_retirement_formal_effect = yes }
+    title:h_china.var:tca_rsg_actor = { tca_test_cleanup_retirement_formal_effect = yes }
+    title:h_china.var:tca_rsg_heir = { tca_test_cleanup_merit_probe_character_effect = yes }
+    title:h_china = { remove_variable = tca_rsg_actor remove_variable = tca_rsg_heir }
+    title:h_china.var:tca_rsf_heir = { tca_test_cleanup_merit_probe_character_effect = yes }
+    title:h_china = { remove_variable = tca_rsf_actor remove_variable = tca_rsf_heir }
+
+    scope:tca_rsl_fengci = { tca_retirement_candidate_unregister_effect = yes remove_character_flag = tca_retirement_candidate_hold_reply tca_test_cleanup_retirement_exit_actor_effect = yes }
+    scope:tca_rsl_retired = { tca_retirement_candidate_unregister_effect = yes tca_merit_leave_celestial_effect = yes tca_test_cleanup_retirement_exit_actor_effect = yes }
+    scope:tca_rsl_heir = { tca_test_cleanup_merit_probe_character_effect = yes }
+    scope:tca_rsl_family = { remove_variable = tca_rsl_family_heir }
+    scope:tca_rsl_country = { tca_test_restore_retirement_payment_country_effect = yes }
+    title:h_china = {
+        remove_variable = tca_rsl_check39_done
+        remove_variable = tca_merit_saveload_reload_ready
+        remove_variable = tca_rsl_country remove_variable = tca_rsl_country_title
+        remove_variable = tca_rsl_fengci remove_variable = tca_rsl_retired
+        remove_variable = tca_rsl_family remove_variable = tca_rsl_heir
+    }
+}
+
+# 报告者作用域；GUI重载首帧真实调用，不重新准备或修复业务状态。
+# 重载首帧直接读取，不排队角色事件；GUI控制台同步执行，避免同帧事件丢失。
+# 报告者是h_china.holder；变量tca_rsl_check39_done保证切换帧重复调用只记一次断言。
+tca_test_retirement_saveload_early_check_effect = {
+    tca_test_validate_environment_effect = yes
+    if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } NOT = { title:h_china = { has_variable = tca_rsl_check39_done } } }
+        title:h_china = { set_variable = { name = tca_rsl_check39_done value = 1 } }
+        debug_log = "TCA_RSL CHECK39_EFFECT"
+        title:h_china.var:tca_rsf_actor = { debug_log = "TCA_RETIREMENT_SAVELOAD early actor=[THIS.Char.GetID] rank=[THIS.Char.GetMeritLevel] weight=[THIS.Char.MakeScope.ScriptValue('tca_retirement_salary_weight_value')]" }
+        title:h_china.var:tca_rsf_actor = {
+            if = { limit = { var:tca_retirement_title = var:tca_rsf_expected_title var:tca_retirement_palace = var:tca_rsf_expected_palace } debug_log = "TCA_RETIREMENT_SAVELOAD objects_restored" }
+            if = { limit = { var:tca_retirement_country = title:h_china liege = title:h_china.holder } debug_log = "TCA_RETIREMENT_SAVELOAD allegiance_restored" }
+            if = { limit = { vassal_contract_obligation_level:celestial_salary_rank = 0 vassal_contract_has_flag = tca_retirement_salary_active } debug_log = "TCA_RETIREMENT_SAVELOAD salary_restored" }
+            if = { limit = { var:tca_retirement_prior_timeout = 120 var:tca_retirement_entered_date = var:tca_rsf_original_date } debug_log = "TCA_RETIREMENT_SAVELOAD dates_restored" }
+        }
+        if = { limit = { title:h_china.var:tca_rsf_actor = { merit_level = 5 has_trait = tca_fengci vassal_contract_has_flag = tca_retirement_salary_active
+            var:tca_retirement_title = var:tca_rsf_expected_title var:tca_retirement_palace = var:tca_rsf_expected_palace
+            var:tca_retirement_country = title:h_china liege = title:h_china.holder
+            vassal_contract_obligation_level:celestial_salary_rank = 0 tca_retirement_salary_weight_value = 0.25
+            var:tca_retirement_prior_timeout = 120 var:tca_retirement_entered_date = var:tca_rsf_original_date } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_saveload_contract 40" }
+        else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 40" }
+
+
+        title:h_china.var:tca_rsg_actor = {
+            debug_log = "TCA_RETIREMENT_SAVELOAD retired_early actor=[THIS.Char.GetID] rank=[THIS.Char.GetMeritLevel] weight=[THIS.Char.MakeScope.ScriptValue('tca_retirement_salary_weight_value')]"
+            if = { limit = { var:tca_retirement_title = var:tca_rsg_expected_title var:tca_retirement_palace = var:tca_rsg_expected_palace } debug_log = "TCA_RETIREMENT_SAVELOAD RETIRED_OBJECTS_OK" } else = { debug_log = "TCA_RETIREMENT_SAVELOAD RETIRED_OBJECTS_BAD" }
+            if = { limit = { vassal_contract_has_flag = tca_zhishi_salary_active } debug_log = "TCA_RETIREMENT_SAVELOAD RETIRED_SALARY_OK" } else = { debug_log = "TCA_RETIREMENT_SAVELOAD RETIRED_SALARY_BAD" }
+            if = { limit = { vassal_contract_obligation_level:tca_retirement_merit_salary = 5 } debug_log = "TCA_RETIREMENT_SAVELOAD RETIRED_HALF_5_OK" } else = { debug_log = "TCA_RETIREMENT_SAVELOAD RETIRED_HALF_5_BAD" }
+            if = { limit = { var:tca_retirement_prior_timeout = 120 var:tca_retirement_entered_date = var:tca_rsg_original_date } debug_log = "TCA_RETIREMENT_SAVELOAD RETIRED_DATES_OK" } else = { debug_log = "TCA_RETIREMENT_SAVELOAD RETIRED_DATES_BAD" }
+        }
+        if = { limit = { title:h_china.var:tca_rsg_actor = { merit_level = 5 has_trait = tca_retired NOT = { has_trait = tca_fengci }
+            var:tca_retirement_title = var:tca_rsg_expected_title var:tca_retirement_palace = var:tca_rsg_expected_palace var:tca_retirement_palace = 0
+            var:tca_retirement_title = { var:tca_retirement_owner = title:h_china.var:tca_rsg_actor }
+            is_target_in_global_variable_list = { name = tca_retirement_title_holders target = this }
+            var:tca_retirement_country = title:h_china liege = title:h_china.holder
+            vassal_contract_has_flag = tca_zhishi_salary_active vassal_contract_has_flag = tca_retirement_merit_half
+            vassal_contract_obligation_level:celestial_salary_rank = 0 tca_retirement_salary_weight_value = 0.125
+            var:tca_retirement_prior_timeout = 120 var:tca_retirement_entered_date = var:tca_rsg_original_date } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_saveload_contract 42" }
+        else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 42" }
+
+        if = { limit = {
+            title:h_china.var:tca_rsl_fengci = { var:tca_retirement_probe_attempted = var:tca_rsl_payment_first_date var:tca_retirement_probe_receipt_date = var:tca_rsl_payment_first_date tca_retirement_payment_probe_age_value < 30 }
+            title:h_china.var:tca_rsl_retired = { var:tca_retirement_probe_attempted = var:tca_rsl_payment_first_date var:tca_retirement_probe_receipt_date = var:tca_rsl_payment_first_date tca_retirement_payment_probe_age_value < 30 }
+        } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_saveload_contract 39" }
+        else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 39" }
+    }
+}
+
+# 报告者作用域；跨日官品稳定后、GUI保存前才冻结真实对象，不修复重载状态。
+# 原人物真实传家以排除庄园收入；先前M0主管会在M5变为提点，不能冻结已被替换的初始对象。
+tca_test_freeze_retirement_saveload_effect = {
+    title:h_china.var:tca_rsf_actor = {
+        tca_test_retirement_salary_baseline_effect = yes
+        tca_retirement_transfer_effect = yes
+        set_variable = { name = tca_rsf_expected_title value = var:tca_retirement_title }
+        set_variable = { name = tca_rsf_expected_palace value = var:tca_retirement_palace }
+        remove_short_term_gold = gold
+        set_variable = { name = tca_rsf_gold_before value = gold }
+    }
+    title:h_china.var:tca_rsg_actor = {
+        tca_test_retirement_salary_baseline_effect = yes
+        tca_retirement_transfer_effect = yes
+        # 保存前记录隐藏官品契约的实际档位与持久选择器，用于区分“从未同步”和“重载丢失”。
+        if = { limit = { vassal_contract_obligation_level:tca_retirement_merit_salary = 5 } debug_log = "TCA_RETIREMENT_SAVELOAD PRE_SAVE_HALF_5_OK" }
+        else = { debug_log = "TCA_RETIREMENT_SAVELOAD PRE_SAVE_HALF_5_BAD level=[THIS.Char.MakeScope.Var('tca_retirement_merit_salary_level').GetValue]" }
+        set_variable = { name = tca_rsg_expected_title value = var:tca_retirement_title }
+        set_variable = { name = tca_rsg_expected_palace value = var:tca_retirement_palace }
+        remove_short_term_gold = gold
+        set_variable = { name = tca_rsg_gold_before value = gold }
+    }
+}

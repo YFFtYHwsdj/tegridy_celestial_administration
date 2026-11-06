@@ -1,0 +1,44 @@
+﻿# 独立人类会话适配器；只恢复开局暂停、处理开局可见事件，不进入观察者。
+# 真实人类身份和传家控制权仍由主模组原生断言复验。
+# 读档后可能仍带观察者/CLI变量；启动时显式归零，避免主模组CLI保存重载界面误启动。
+
+# 只执行一次：先关闭会暂停游戏的开局教程，再用原生暂停切换恢复。
+# 每个控制台动作放在独立状态，避免同一帧连续入队被引擎拒绝。
+widget = {
+    name = "tca_retirement_player_unpause"
+    size = { 1 1 } alwaystransparent = yes alpha = 0 visible_at_creation = no
+    datacontext = "[GetTitleByKey('h_china')]"
+    visible = "[And(InDebugMode, And(IsInGame, And(IsGamePaused, EqualTo_CFixedPoint(Title.MakeScope.Var('tca_retirement_human_run').GetValue, '(CFixedPoint)1'))))]"
+    state = { name = _show duration = 5 next = tca_retirement_player_tutorial_off }
+    state = { name = tca_retirement_player_tutorial_off on_start = "[ExecuteConsoleCommand('tutorial.disable')]" duration = 2 next = tca_retirement_player_unpause_now }
+    state = { name = tca_retirement_player_unpause_now on_start = "[OnPause]" }
+}
+
+# 独立适配器显式启动；真实人类身份由原生事件复验。
+widget = {
+    name = "tca_retirement_player_boot"
+    size = { 1 1 } alwaystransparent = yes alpha = 0 visible_at_creation = no
+    visible = "[And(InDebugMode, IsInGame)]"
+    state = { name = _show on_start = "[SetGameSpeed('(int32)4')]" duration = 2 next = tca_retirement_player_boot_now }
+    state = { name = tca_retirement_player_boot_now on_start = "[ExecuteConsoleCommand('effect title:h_china = { set_variable = { name = tca_cli_ready value = 0 } set_variable = { name = tca_retirement_human_run value = 1 } holder = { trigger_event = tca_retirement_player_boot.1 } }')]" }
+}
+
+# 开局可见事件会阻止日期推进；只选择实际存在且有效的首个选项，不改暂停标记或日期。
+widget = {
+    name = "tca_retirement_player_startup_event"
+    size = { 1 1 } alwaystransparent = yes alpha = 0 visible_at_creation = no
+    datacontext = "[EventWindow.AccessEventWindowData]"
+    visible = "[And(InDebugMode, And(IsInGame, IsPausedByEvent))]"
+    fixedgridbox = {
+        addcolumn = 1 addrow = 1
+        datamodel = "[DataModelFirst(EventWindowData.GetOptions, '(int32)1')]"
+        item = {
+            widget = {
+                size = { 1 1 } visible_at_creation = no
+                visible = "[EventOption.IsValid]"
+                state = { name = _show duration = 1 next = tca_retirement_player_event_continue }
+                state = { name = tca_retirement_player_event_continue on_start = "[EventOption.Select]" }
+            }
+        }
+    }
+}

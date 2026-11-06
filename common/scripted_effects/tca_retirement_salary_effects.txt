@@ -1,0 +1,52 @@
+﻿# 人物作用域；首次进入或重新取得有效归属时记录国家主头衔，不保存实职待遇快照。
+tca_retirement_record_country_effect = {
+    if = { limit = { NOT = { has_variable = tca_retirement_country } exists = top_liege this != top_liege top_liege = { government_has_flag = government_is_celestial } }
+        set_variable = { name = tca_retirement_country value = top_liege.primary_title }
+    }
+}
+# 人物作用域；前置为已持退休头衔且直属有效天朝；同步身份与真实官品，不直接发金币。
+# 进入时将原生可协商待遇恢复中档，避免隐藏的旧高／低俸禄倍率或发展金档位继续影响法定待遇。
+# 空默认档不会自行升级；升降品／加恩回调共用本入口，重复调用不叠领、不保存差遣或倍率快照。
+tca_retirement_sync_salary_effect = {
+    if = { limit = { tca_retirement_income_valid_trigger = yes has_variable = tca_retirement_title NOT = { has_character_flag = tca_retirement_terminal } }
+        add_character_flag = tca_retirement_salary_active
+        add_character_flag = tca_retirement_updating_contract
+        vassal_contract_set_obligation_level = { type = celestial_salary level = celestial_salary_medium }
+        vassal_contract_set_obligation_level = { type = celestial_treasury level = celestial_treasury_medium }
+        if = { limit = { has_trait = tca_retired }
+            # 隐藏官品契约的档位优先读取这个持久变量，而不是在重载首帧重新求值官品。
+            # set_merit_level 的跨日刷新可能晚于读档首帧，直接依赖 merit_level 会把
+            # 已保存的五档误判为无效并回落到默认档，致仕实收因此按全份 M 计。
+            if = { limit = { merit_level <= 1 } set_variable = { name = tca_retirement_merit_salary_level value = 1 } }
+            else = { set_variable = { name = tca_retirement_merit_salary_level value = merit_level } }
+            vassal_contract_set_obligation_level = { type = tca_fengci_salary level = tca_fengci_salary_none }
+            vassal_contract_set_obligation_level = { type = tca_zhishi_salary level = tca_zhishi_salary_active }
+            if = { limit = { merit_level <= 1 } vassal_contract_set_obligation_level = { type = tca_retirement_merit_salary level = tca_retirement_merit_salary_1 } }
+            else_if = { limit = { merit_level = 2 } vassal_contract_set_obligation_level = { type = tca_retirement_merit_salary level = tca_retirement_merit_salary_2 } }
+            else_if = { limit = { merit_level = 3 } vassal_contract_set_obligation_level = { type = tca_retirement_merit_salary level = tca_retirement_merit_salary_3 } }
+            else_if = { limit = { merit_level = 4 } vassal_contract_set_obligation_level = { type = tca_retirement_merit_salary level = tca_retirement_merit_salary_4 } }
+            else_if = { limit = { merit_level = 5 } vassal_contract_set_obligation_level = { type = tca_retirement_merit_salary level = tca_retirement_merit_salary_5 } }
+            else_if = { limit = { merit_level = 6 } vassal_contract_set_obligation_level = { type = tca_retirement_merit_salary level = tca_retirement_merit_salary_6 } }
+            else_if = { limit = { merit_level = 7 } vassal_contract_set_obligation_level = { type = tca_retirement_merit_salary level = tca_retirement_merit_salary_7 } }
+            else_if = { limit = { merit_level = 8 } vassal_contract_set_obligation_level = { type = tca_retirement_merit_salary level = tca_retirement_merit_salary_8 } }
+            else_if = { limit = { merit_level = 9 } vassal_contract_set_obligation_level = { type = tca_retirement_merit_salary level = tca_retirement_merit_salary_9 } }
+        }
+        else = {
+            set_variable = { name = tca_retirement_merit_salary_level value = 0 }
+            vassal_contract_set_obligation_level = { type = tca_zhishi_salary level = tca_zhishi_salary_none }
+            vassal_contract_set_obligation_level = { type = tca_retirement_merit_salary level = tca_retirement_merit_salary_none }
+            vassal_contract_set_obligation_level = { type = tca_fengci_salary level = tca_fengci_salary_active }
+        }
+        remove_character_flag = tca_retirement_updating_contract
+    }
+    else_if = { limit = { has_character_flag = tca_retirement_salary_active is_alive = yes is_ruler = yes exists = liege government_has_flag = government_is_celestial liege = { government_has_flag = government_is_celestial } }
+        add_character_flag = tca_retirement_updating_contract
+        # 停付时把持久档位归零；隐藏契约回到默认档，不再继续折半。
+        set_variable = { name = tca_retirement_merit_salary_level value = 0 }
+        vassal_contract_set_obligation_level = { type = tca_fengci_salary level = tca_fengci_salary_none }
+        vassal_contract_set_obligation_level = { type = tca_zhishi_salary level = tca_zhishi_salary_none }
+        vassal_contract_set_obligation_level = { type = tca_retirement_merit_salary level = tca_retirement_merit_salary_none }
+        remove_character_flag = tca_retirement_salary_active
+        remove_character_flag = tca_retirement_updating_contract
+    }
+}

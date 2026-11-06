@@ -1,0 +1,47 @@
+﻿# 人物作用域；成功退休后的一次性邀请仅面向玩家，AI由原生年度决议重新评估。
+# honour待审计时不提前交家门，避免改变基数打断授品；完成审计后再次进入本接口。
+tca_retirement_offer_transfer_effect = {
+    if = { limit = { is_ai = no tca_retirement_can_transfer_trigger = yes NOT = { has_character_flag = tca_retirement_transfer_offered } }
+        add_character_flag = tca_retirement_transfer_offered
+        trigger_event = { id = tca_retirement.20 days = 2 }
+    }
+}
+# 人物作用域；从当前家门重新解析真实继承人，绝不使用过期事件scope强行交接。
+# 事务前冻结玩家归属，事务后控制权交接；不转金币、官品、退休身份或请求。
+tca_retirement_transfer_effect = {
+    if = { limit = { tca_retirement_can_transfer_trigger = yes }
+        save_scope_as = tca_retirement_parent
+        # 从真实持有列表解析唯一有效家门；随机候选必须与资格检查同样具备合法继承人，
+        # 不能抽中无 current_heir 的另一家门后把空 scope 交给头衔事务。
+        random_held_title = {
+            limit = {
+                is_noble_family_title = yes
+                exists = current_heir
+                current_heir = { is_alive = yes is_adult = yes this != prev.holder house = prev.holder.house }
+            }
+            save_scope_as = tca_retirement_family
+            current_heir = { save_scope_as = tca_retirement_heir }
+        }
+        top_liege = { save_scope_as = tca_retirement_transfer_emperor }
+        remove_character_flag = tca_retirement_transfer_was_player
+        if = { limit = { is_ai = no } add_character_flag = tca_retirement_transfer_was_player }
+        create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_retirement_transfer }
+        scope:tca_retirement_family = { change_title_holder = { holder = scope:tca_retirement_heir change = scope:tca_retirement_transfer } }
+        resolve_title_and_vassal_change = scope:tca_retirement_transfer
+        house = { if = { limit = { NOT = { house_head = scope:tca_retirement_heir } } set_house_head = scope:tca_retirement_heir } }
+        if = { limit = { has_character_flag = tca_retirement_transfer_was_player } set_player_character = scope:tca_retirement_heir }
+        remove_character_flag = tca_retirement_transfer_was_player
+        # 家门交接可能先让新家主挂在退休父母下面；两者均须平行直属原天子。
+        scope:tca_retirement_heir = {
+            if = { limit = { NOT = { liege = scope:tca_retirement_transfer_emperor } }
+                create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_retirement_heir_fealty }
+                change_liege = { liege = scope:tca_retirement_transfer_emperor change = scope:tca_retirement_heir_fealty }
+                resolve_title_and_vassal_change = scope:tca_retirement_heir_fealty
+            }
+        }
+        tca_retirement_sync_income_effect = yes
+        # 迁廷在头衔事务完成后的次日处理，避免向已有相同雇主的人重复add_courtier。
+        set_variable = { name = tca_retirement_transfer_heir value = scope:tca_retirement_heir }
+        trigger_event = { id = tca_retirement.21 days = 1 }
+    }
+}
