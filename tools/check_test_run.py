@@ -1,13 +1,26 @@
 #!/usr/bin/env python3
 """核对最新测试组覆盖，以及本次游戏启动全程的模组相关错误。"""
 import argparse
-import json
 from collections import Counter
+from itertools import chain
+import json
 from pathlib import Path
 import re
 from check_upstream_overrides import definitions
 
 ROOT = Path(__file__).resolve().parents[1]
+
+# 全量运行的调试日志可达数百 MB，解析统一按行或按时间戳顺序流式完成：
+# 只做一到两遍扫描，不再对整段日志按用例重复正则搜索。
+_TIMESTAMP = re.compile(r'\[\d{2}:\d{2}:\d{2}\]')
+# 与原先逐行 re.search 完全一致：每行只取第一个断言结果。
+_RESULT = re.compile(r'TCA_TEST (BEGIN|PASS|FAIL|PRECONDITION_FAIL|CHECK_PASS|CHECK_FAIL) (\S+)(?: (\S+))?')
+# 逐项统计允许同一行重复出现，故单独扫描且只消费到首个词，避免把后续标记当成参数吞掉。
+_CASE_RESULT = re.compile(r'TCA_TEST (BEGIN|PASS|FAIL|PRECONDITION_FAIL|CHECK_PASS|CHECK_FAIL) (\S+)')
+_CASE_ARGUMENT = re.compile(r' (\S+)')
+_CASE_STEP = re.compile(r' (\d+)(?:\s|$)')
+_DISPATCH = 'TCA_TEST SUITE_DISPATCH'
+_STRICT_MARK = 'native Tongpan appointment differs from pre-death title preview head'
 
 
 def expected_cases(root=ROOT):
@@ -55,8 +68,26 @@ def expected_cases(root=ROOT):
     return {name: len(checks[name]) for name in entries}
 
 
-def inspect_engine_errors(errors):
-    """纳入已审阅的整文件 GUI 覆盖，即使错误中没有 tca_ 标识。"""
+def _engine_entries(text):
+    """流式复现 re.split(r'(?=\\[\\d{2}:\\d{2}:\\d{2}\\])', text) 的错误条目分段。"""
+    start = -1
+    for match in _TIMESTAMP.finditer(text):
+        position = match.start()
+        if start < 0:
+            if position:
+                yield text[:position]
+        elif position > start:
+            yield text[start:position]
+        start = position
+    if start < 0:
+        if text:
+            yield text
+    elif start < len(text):
+        yield text[start:]
+
+
+def _inspect_engine_entries(entries):
+    """逐条分类启动期引擎错误，返回顺序与原文逐条扫描一致。"""
     registry = json.loads((ROOT / 'tools/upstream_overrides.json').read_text(encoding='utf-8'))
     owned_paths = {entry['mod'] for section in ('overrides', 'file_overrides')
                    for entry in registry.get(section, [])}
@@ -64,7 +95,7 @@ def inspect_engine_errors(errors):
                       for key in entry.get('diagnostic_localization_keys', [])}
     # 即使测试运行期间没有错误，启动阶段失败也必须计入。
     findings = Counter()
-    for entry in re.split(r'(?=\[\d{2}:\d{2}:\d{2}\])', errors):
+    for entry in entries:
         if 'is not a valid event ID, has to be < 10000' in entry:
             findings['Invalid numeric event ID'] += 1
             continue
@@ -123,66 +154,164 @@ def inspect_engine_errors(errors):
     return [f'Engine error ({count}): {label}' for label, count in findings.items()]
 
 
-def inspect_run(debug, errors, expected, strict_title_heir=False):
+def inspect_engine_errors(errors):
+    """纳入已审阅的整文件 GUI 覆盖，即使错误中没有 tca_ 标识。"""
+    return _inspect_engine_entries(_engine_entries(errors))
+
+
+def _debug_error_entries(debug, logged_errors):
+    """流式收集调试日志中以 `[时间][E]` 开头的多行条目，并按 error.log 分块去重。"""
+    start = -1
+    for match in _TIMESTAMP.finditer(debug):
+        position = match.start()
+        if start >= 0 and position > start:
+            entry = debug[start:position]
+            if entry not in logged_errors:
+                yield entry
+        start = position if debug.startswith('[E]', match.end()) else -1
+    if start >= 0 and start < len(debug):
+        entry = debug[start:]
+        if entry not in logged_errors:
+            yield entry
+
+
+class _LatestScan:
+    """最新一次 SUITE_DISPATCH 之后的解析结果，供断言核对与逐项状态共用。"""
+
+    __slots__ = ('dispatched', 'results', 'checks', 'assertion_results',
+                 'strict_hit', 'aborted', 'all_passed', 'observer_last',
+                 'case_begins', 'case_passes', 'case_check_passes',
+                 'case_preconditions', 'case_failures')
+
+    def __init__(self):
+        self.dispatched = False
+        self.results = Counter()
+        self.checks = Counter()
+        self.assertion_results = Counter()
+        self.strict_hit = False
+        self.aborted = False
+        self.all_passed = False
+        self.observer_last = None
+        self.case_begins = Counter()
+        self.case_passes = Counter()
+        self.case_check_passes = Counter()
+        self.case_preconditions = set()
+        self.case_failures = set()
+
+
+def _scan_latest(debug, strict_title_heir=False):
+    """单遍解析最新派发之后的日志，替代原先的多轮整段扫描。"""
+    scan = _LatestScan()
     lines = debug.splitlines()
-    starts = [i for i, line in enumerate(lines) if 'TCA_TEST SUITE_DISPATCH' in line]
-    if not starts:
-        return ['No suite dispatch found'], Counter()
-    results = Counter()
-    checks = Counter()
-    assertion_results = Counter()
-    for line in lines[starts[-1]:]:
-        match = re.search(r'TCA_TEST (BEGIN|PASS|FAIL|PRECONDITION_FAIL|CHECK_PASS|CHECK_FAIL) (\S+)(?: (\S+))?', line)
-        if not match:
+    dispatch = -1
+    dispatch_column = 0
+    for index, line in enumerate(lines):
+        if 'TCA_TEST' in line and _DISPATCH in line:
+            dispatch = index
+            dispatch_column = line.rfind(_DISPATCH)
+    if dispatch < 0:
+        return scan
+    scan.dispatched = True
+    results = scan.results
+    checks = scan.checks
+    assertions = scan.assertion_results
+    begins = scan.case_begins
+    passes = scan.case_passes
+    case_checks = scan.case_check_passes
+    preconditions = scan.case_preconditions
+    failures = scan.case_failures
+    for index in range(dispatch, len(lines)):
+        line = lines[index]
+        if strict_title_heir and not scan.strict_hit and _STRICT_MARK in line:
+            scan.strict_hit = True
+        if 'TCA_TEST' not in line:
             continue
-        kind, first, second = match.groups()
-        if kind.startswith('CHECK_'):
-            checks[kind] += 1
-            assertion_results[kind, first, second] += 1
-        else:
-            name = second if kind == 'BEGIN' else first
-            results[kind, name] += 1
+        if not scan.aborted and 'TCA_TEST SUITE_ABORTED' in line:
+            scan.aborted = True
+        if not scan.all_passed and 'TCA_TEST SUITE_ALL_PASSED' in line:
+            scan.all_passed = True
+        if index > dispatch and ('TCA_TEST OBSERVER_ENTRY_REJECTED' in line
+                                 or 'TCA_TEST OBSERVER_ENTRY_DISPATCH' in line):
+            scan.observer_last = line
+        match = _RESULT.search(line)
+        if match:
+            kind, first, second = match.groups()
+            if kind.startswith('CHECK_'):
+                checks[kind] += 1
+                assertions[kind, first, second] += 1
+            else:
+                name = second if kind == 'BEGIN' else first
+                results[kind, name] += 1
+        # 逐项统计从派发行内最后一次派发位置之后开始，允许一行出现多条结果。
+        case_line = line[dispatch_column:] if index == dispatch else line
+        for mark in _CASE_RESULT.finditer(case_line):
+            kind, first = mark.groups()
+            if kind == 'BEGIN':
+                argument = _CASE_ARGUMENT.match(case_line, mark.end())
+                if argument:
+                    begins[argument.group(1)] += 1
+            elif kind == 'PASS':
+                passes[first] += 1
+            elif kind == 'PRECONDITION_FAIL':
+                preconditions.add(first)
+            elif kind in ('FAIL', 'CHECK_FAIL'):
+                failures.add(first)
+            else:  # CHECK_PASS
+                step = _CASE_STEP.match(case_line, mark.end())
+                if step:
+                    case_checks[first, step.group(1)] += 1
+    return scan
+
+
+def _inspect_scan(scan, debug, errors, expected):
+    """由单遍解析结果生成问题列表与结果汇总；文本、顺序与计数保持原样。"""
+    if not scan.dispatched:
+        return ['No suite dispatch found'], Counter()
     issues = []
-    if strict_title_heir and any('native Tongpan appointment differs from pre-death title preview head' in line for line in lines[starts[-1]:]):
+    if scan.strict_hit:
         issues.append('Strict title succession failed: appointed officer differs from preview head')
-    if any('TCA_TEST SUITE_ABORTED' in line for line in lines[starts[-1]:]):
+    if scan.aborted:
         issues.append('Suite aborted: test environment invalid')
     # 较新的观察者尝试不能静默继承旧测试组的通过结果。
-    observer_attempts = [line for line in lines[starts[-1] + 1:]
-                         if 'TCA_TEST OBSERVER_ENTRY_REJECTED' in line
-                         or 'TCA_TEST OBSERVER_ENTRY_DISPATCH' in line]
-    if observer_attempts:
-        if 'OBSERVER_ENTRY_REJECTED' in observer_attempts[-1]:
-            issues.append('Latest observer entry rejected: ' + observer_attempts[-1].split('OBSERVER_ENTRY_REJECTED', 1)[1].strip())
+    if scan.observer_last is not None:
+        if 'OBSERVER_ENTRY_REJECTED' in scan.observer_last:
+            issues.append('Latest observer entry rejected: ' +
+                          scan.observer_last.split('OBSERVER_ENTRY_REJECTED', 1)[1].strip())
         else:
             issues.append('No suite dispatch after latest observer entry')
     for name in sorted(expected):
-        if results['BEGIN', name] != 1 or results['PASS', name] != 1:
-            issues.append(f'{name}: begin={results["BEGIN", name]}, pass={results["PASS", name]}')
+        if scan.results['BEGIN', name] != 1 or scan.results['PASS', name] != 1:
+            issues.append(f'{name}: begin={scan.results["BEGIN", name]}, pass={scan.results["PASS", name]}')
     if isinstance(expected, dict):
         for name, total in expected.items():
             for step in range(1, total + 1):
-                if assertion_results['CHECK_PASS', name, str(step)] != 1:
+                if scan.assertion_results['CHECK_PASS', name, str(step)] != 1:
                     issues.append(f'{name}: assertion {step} missing or duplicated')
-        for (kind, name, step), count in assertion_results.items():
+        for (kind, name, step), count in scan.assertion_results.items():
             if name not in expected or step not in {str(i) for i in range(1, expected.get(name, 0) + 1)}:
                 issues.append(f'Unexpected assertion: {kind} {name} {step}')
-    for (kind, name), count in results.items():
+    for (kind, name), count in scan.results.items():
         if name not in expected or kind in {'FAIL', 'PRECONDITION_FAIL'}:
             issues.append(f'{kind} {name}: {count}')
-    if checks['CHECK_FAIL']:
-        issues.append(f'Failed assertions: {checks["CHECK_FAIL"]}')
-    if not any('TCA_TEST SUITE_ALL_PASSED' in line for line in lines[starts[-1]:]):
+    if scan.checks['CHECK_FAIL']:
+        issues.append(f'Failed assertions: {scan.checks["CHECK_FAIL"]}')
+    if not scan.all_passed:
         issues.append('No SUITE_ALL_PASSED completion')
     # 原生窗口错误可能只写debug日志；保留多行上下文，并与error日志去重。
-    logged_errors = set(re.split(r'(?=\[\d{2}:\d{2}:\d{2}\])', errors))
-    debug_errors = [entry for entry in re.split(r'(?=\[\d{2}:\d{2}:\d{2}\])', debug)
-                    if re.match(r'\[\d{2}:\d{2}:\d{2}\]\[E\]', entry) and entry not in logged_errors]
-    issues.extend(inspect_engine_errors(errors + '\n' + '\n'.join(debug_errors)))
-    summary = Counter({kind: sum(count for (k, _), count in results.items() if k == kind)
+    error_entries = list(_engine_entries(errors))
+    logged_errors = set(error_entries)
+    issues.extend(_inspect_engine_entries(
+        chain(error_entries, _debug_error_entries(debug, logged_errors))))
+    summary = Counter({kind: sum(count for (k, _), count in scan.results.items() if k == kind)
                        for kind in ['BEGIN', 'PASS', 'FAIL', 'PRECONDITION_FAIL']})
-    summary.update(checks)
+    summary.update(scan.checks)
     return issues, summary
+
+
+def inspect_run(debug, errors, expected, strict_title_heir=False):
+    """核对一次运行：单遍解析最新派发，再逐条检查引擎错误。"""
+    scan = _scan_latest(debug, strict_title_heir)
+    return _inspect_scan(scan, debug, errors, expected)
 
 
 def selected_case_expectations(entry, root=ROOT):
@@ -197,26 +326,30 @@ def selected_case_expectations(entry, root=ROOT):
     raise ValueError(f'Unknown native test entry: {entry}')
 
 
-def case_outcomes(debug, expected):
+def _case_states(scan, expected):
     """只统计最新派发轮；完整断言及唯一结果齐备才显示单项通过。"""
-    starts = list(re.finditer('TCA_TEST SUITE_DISPATCH', debug))
-    latest = debug[starts[-1].start():] if starts else ''
     states = {}
     for name, total in expected.items():
-        escaped = re.escape(name)
-        if re.search(r'TCA_TEST PRECONDITION_FAIL ' + escaped + r'(?:\s|$)', latest):
+        if name in scan.case_preconditions:
             state = 'PRECONDITION_FAIL'
-        elif re.search(r'TCA_TEST (?:FAIL|CHECK_FAIL) ' + escaped + r'(?:\s|$)', latest):
+        elif name in scan.case_failures:
             state = 'FAIL'
-        elif not re.search(r'TCA_TEST BEGIN \S+ ' + escaped + r'(?:\s|$)', latest):
+        elif not scan.case_begins.get(name):
             state = 'NOT_RUN'
         else:
-            passed = len(re.findall(r'TCA_TEST PASS ' + escaped + r'(?:\s|$)', latest))
-            begins = len(re.findall(r'TCA_TEST BEGIN \S+ ' + escaped + r'(?:\s|$)', latest))
-            checks = Counter(re.findall(r'TCA_TEST CHECK_PASS ' + escaped + r' (\d+)(?:\s|$)', latest))
-            state = 'PASS' if passed == begins == 1 and checks == Counter({str(i): 1 for i in range(1, total + 1)}) else 'NOT_VERIFIED'
+            passed = scan.case_passes.get(name, 0)
+            begins = scan.case_begins[name]
+            checks = Counter({step: count for (case, step), count in scan.case_check_passes.items()
+                              if case == name})
+            state = 'PASS' if passed == begins == 1 and checks == Counter(
+                {str(i): 1 for i in range(1, total + 1)}) else 'NOT_VERIFIED'
         states[name] = state
     return states
+
+
+def case_outcomes(debug, expected):
+    """只统计最新派发轮；完整断言及唯一结果齐备才显示单项通过。"""
+    return _case_states(_scan_latest(debug), expected)
 
 
 def main():
@@ -247,8 +380,9 @@ def main():
     else:
         raise ValueError('Invalid selection plan')
     debug = (args.logs / 'debug.log').read_text(encoding='utf-8', errors='replace') if (args.logs / 'debug.log').is_file() else ''
-    issues, counts = inspect_run(debug,
-                                (args.logs / 'error.log').read_text(encoding='utf-8', errors='replace') if (args.logs / 'error.log').is_file() else '', expected, args.strict_title_heir)
+    errors = (args.logs / 'error.log').read_text(encoding='utf-8', errors='replace') if (args.logs / 'error.log').is_file() else ''
+    scan = _scan_latest(debug, args.strict_title_heir)
+    issues, counts = _inspect_scan(scan, debug, errors, expected)
     if (args.logs.parent / 'source_manifest.json').is_file():
         from run_game_tests import verify_snapshot
         issues.extend(verify_snapshot(args.logs.parent))
@@ -260,7 +394,7 @@ def main():
     if len(issues) > 30:
         print(f'... {len(issues) - 30} further issues')
     scope = plan.get('scope', 'legacy selection') if plan else 'selected case' if args.case else 'all current cases'
-    cases = case_outcomes(debug, expected)
+    cases = _case_states(scan, expected)
     (args.logs.parent / 'verification.json').write_text(json.dumps(
         {'scope': scope, 'cases': cases, 'counts': dict(counts), 'issues': issues,
          'verification_exit': int(bool(issues))}, ensure_ascii=False, indent=2) + '\n')

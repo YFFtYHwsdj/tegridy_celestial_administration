@@ -12,6 +12,8 @@ import sys
 import tempfile
 import time
 
+from collections import deque
+
 from check_upstream_overrides import definitions
 from platform_paths import default_game_dir, default_settings, game_executable
 from testing.runtime import engine_lock, aggregate_runs
@@ -21,6 +23,9 @@ DEFAULT_GAME = default_game_dir()
 DEFAULT_SETTINGS = default_settings()
 SUMMARY_MARKERS = ('TCA_TEST SUITE_ALL_PASSED', 'TCA_TEST SUITE_NOT_ALL_PASSED',
                    'TCA_TEST SUITE_ABORTED')
+# 增量轮询每次最多读取的块大小，以及无换行长行的内存上限；避免日志膨胀后单轮轮询过大。
+READ_CHUNK = 1 << 20
+MAX_LINE_BYTES = 1 << 20
 
 
 def write_json(path, data):
@@ -230,6 +235,208 @@ def clone_run(base, run_root, rows):
     return run
 
 
+def decode_log_line(data):
+    # 只有凑齐换行才解码整行，跨轮询截断的多字节字符因此不会被替换字符污染。
+    return data.decode('utf-8', errors='replace').rstrip('\r')
+
+
+class LogTailReader:
+    """增量日志读取器：只读上次偏移之后的新增字节，按完整行返回文本。
+
+    文件未创建时返回空；文件被替换、截断或 logs/ 目录重建时自动重置偏移。
+    无换行的超长单行按上限分段返回，保证轮询期间内存有界。
+    """
+
+    def __init__(self, path):
+        self.path = Path(path)
+        self.offset = 0
+        self.bytes_read = 0
+        self._handle = None
+        self._pending = b''
+
+    def poll(self):
+        """返回本轮新增的完整行；不读取整份文件。"""
+        if not self._sync():
+            return []
+        try:
+            size = os.fstat(self._handle.fileno()).st_size
+        except OSError:
+            self.reset()
+            return []
+        lines = []
+        # 以轮询开始时的文件大小为准，单轮读取量有界；轮询期间追加的字节留到下一轮。
+        remaining = max(0, size - self.offset)
+        try:
+            while remaining > 0:
+                chunk = self._handle.read(min(READ_CHUNK, remaining))
+                if not chunk:
+                    break
+                self.offset += len(chunk)
+                self.bytes_read += len(chunk)
+                remaining -= len(chunk)
+                self._feed(chunk, lines)
+        except OSError:
+            self.reset()
+        return lines
+
+    def flush(self):
+        """进程退出后补齐未带换行的末行；文件轮转或截断时丢弃旧尾部。"""
+        if not self._pending:
+            return []
+        line = decode_log_line(self._pending)
+        self._pending = b''
+        return [line]
+
+    def reset(self):
+        # 只重置偏移与未成行缓冲；bytes_read 保留为本次运行的累计读取量。
+        if self._handle is not None:
+            try:
+                self._handle.close()
+            finally:
+                self._handle = None
+        self.offset = 0
+        self._pending = b''
+
+    def close(self):
+        self.reset()
+
+    def _feed(self, chunk, lines):
+        data = self._pending + chunk if self._pending else chunk
+        parts = data.split(b'\n')
+        self._pending = parts.pop()
+        lines.extend(decode_log_line(part) for part in parts)
+        if len(self._pending) >= MAX_LINE_BYTES:
+            # 无换行的超长单行分段送出；行内标记仍可在当前片段中匹配。
+            lines.append(decode_log_line(self._pending))
+            self._pending = b''
+
+    def _sync(self):
+        """确认句柄仍指向当前日志文件；文件轮转、截断或消失时重置偏移。"""
+        try:
+            info = self.path.stat()
+        except OSError:
+            self.reset()
+            return False
+        if self._handle is not None:
+            try:
+                opened = os.fstat(self._handle.fileno())
+            except OSError:
+                self.reset()
+                return False
+            # 目录重建会换 inode；同一 inode 下文件变短则是就地截断。
+            if self._identity(opened) != self._identity(info) or info.st_size < self.offset:
+                self.reset()
+        if self._handle is None:
+            try:
+                self._handle = self.path.open('rb')
+            except OSError:
+                return False
+        return True
+
+    @staticmethod
+    def _identity(info):
+        # 部分 Windows 文件系统不提供 inode；此时退回按文件大小判断截断。
+        return (info.st_dev, info.st_ino) if info.st_ino else None
+
+
+class RunLogMonitor:
+    """运行期增量进度：跨 phase 累计通过数、标记与观察者确认，不保留历史全文。
+
+    每轮只消费新增完整行；phase 归档后调用 next_phase() 重置字节偏移并记录本阶段
+    观察者确认。progress()/terminal_condition() 与模块级同名函数语义一致。
+    """
+
+    def __init__(self, path):
+        self.tail = LogTailReader(path)
+        self._pass_count = 0
+        self._markers = deque(maxlen=8)
+        self._summary = False
+        self._entry_rejected = False
+        self._not_observer = False
+        self._phase_confirmed = []
+        self._observer = False
+        self._reload_lines = []
+
+    @property
+    def pass_count(self):
+        return self._pass_count
+
+    @property
+    def markers(self):
+        return list(self._markers)
+
+    @property
+    def observer_confirmed(self):
+        # 每个实际运行过的 phase 都要独立确认；续局重新确认前保持 false。
+        return all(self._phase_confirmed + [self._observer])
+
+    @property
+    def bytes_read(self):
+        return self.tail.bytes_read
+
+    @property
+    def offset(self):
+        return self.tail.offset
+
+    def poll(self):
+        lines = self.tail.poll()
+        self._consume(lines)
+        return lines
+
+    def flush(self):
+        lines = self.tail.flush()
+        self._consume(lines)
+        return lines
+
+    def progress(self, elapsed, running):
+        # 字段与 progress() 完全一致，供 progress.json 与 terminal.json 沿用。
+        return {'seconds': round(elapsed, 1), 'running': running, 'pass_count': self._pass_count,
+                'observer_confirmed': self.observer_confirmed, 'markers': list(self._markers)}
+
+    def terminal_condition(self, process_code):
+        # 顺序必须与 terminal_condition() 一致：汇总 > 入口拒绝 > 非观察者 > 进程退出。
+        if self._summary:
+            return 'summary'
+        if self._entry_rejected:
+            return 'entry_rejected'
+        if self._not_observer:
+            return 'not_observer'
+        if process_code is not None:
+            return 'process_exit'
+        return None
+
+    def reload_log(self):
+        """只回放检查点相关行，供既有 reload_request(log, run) 校验。"""
+        return '\n'.join(self._reload_lines)
+
+    def next_phase(self):
+        """归档并重建 logs/ 目录后进入下一阶段；偏移与检查点证据按阶段重置。"""
+        self._phase_confirmed.append(self._observer)
+        self._observer = False
+        self._reload_lines = []
+        self.tail.reset()
+
+    def close(self):
+        self.tail.close()
+
+    def _consume(self, lines):
+        for line in lines:
+            if 'TCA_TEST PASS ' in line:
+                self._pass_count += 1
+            if 'TCA_CLI' in line or 'TCA_TEST SUITE_' in line:
+                self._markers.append(line)
+            if 'console_success: Going to observe mode' in line:
+                self._observer = True
+            if any(marker in line for marker in SUMMARY_MARKERS):
+                self._summary = True
+            if 'TCA_TEST OBSERVER_ENTRY_REJECTED' in line:
+                self._entry_rejected = True
+            if 'TCA_CLI NOT_OBSERVER' in line:
+                self._not_observer = True
+            if 'TCA_CLI RELOAD_SAVE' in line or 'console_success: Game saved to ' in line:
+                self._reload_lines.append(line)
+
+
 def progress(log, elapsed, running):
     lines = log.splitlines()
     return {'seconds': round(elapsed, 1), 'running': running,
@@ -360,8 +567,10 @@ def run_game(args, run):
     env = os.environ.copy()
     env['SteamAppId'] = '1158310'
     start = time.monotonic()
-    condition, log, last = None, '', None
-    phase, prefix = 1, ''
+    condition, last = None, None
+    phase = 1
+    # 轮询只读取日志新增字节；跨 phase 的累计状态由监视器保存，不拼接旧阶段全文。
+    monitor = RunLogMonitor(run / 'logs/debug.log')
     with (run / 'stdout.txt').open('w', encoding='utf-8') as stdout:
         process = subprocess.Popen(command, cwd=args.game_dir / 'binaries', env=env,
                                    stdout=stdout, stderr=subprocess.STDOUT)
@@ -371,21 +580,22 @@ def run_game(args, run):
                        'seed': getattr(args, 'seed', None), 'strict_title_heir': getattr(args, 'strict_title_heir', False)})
             print(f'Started isolated CK3 PID {process.pid}', flush=True)
             while time.monotonic() - start < args.timeout:
-                debug = run / 'logs/debug.log'
-                current_log = debug.read_text(encoding='utf-8', errors='replace') if debug.exists() else ''
-                log = prefix + current_log
-                state = progress(log, time.monotonic() - start, process.poll() is None)
-                state['observer_confirmed'] = state['observer_confirmed'] and 'console_success: Going to observe mode' in current_log
+                exited = process.poll()
+                monitor.poll()
+                if exited is not None:
+                    # 进程退出后补齐未换行的末行，避免漏掉最终汇总标记。
+                    monitor.flush()
+                state = monitor.progress(time.monotonic() - start, exited is None)
                 write_json(run / 'progress.json', state)
                 current = (state['markers'][-1:] or ['Initializing'], state['pass_count'] // 20)
                 if current != last:
                     print(f"{state['seconds']}s; PASS {state['pass_count']}; {current[0][0]}", flush=True)
                     last = current
-                condition = terminal_condition(log, process.poll())
+                condition = monitor.terminal_condition(exited)
                 if condition:
                     break
                 try:
-                    save_name = reload_request(current_log, run)
+                    save_name = reload_request(monitor.reload_log(), run)
                     if save_name and phase != 1:
                         raise ValueError('A checkpoint may only reload once per run')
                 except ValueError as error:
@@ -402,8 +612,10 @@ def run_game(args, run):
                         break
                     write_json(run / 'phase_terminal.json', {'condition': 'requested_checkpoint_stop',
                                'process_exit': process.returncode})
+                    # 归档会移动 logs/ 目录；先释放读取句柄，避免 Windows 上目录无法重命名。
+                    monitor.close()
                     archive_phase_logs(run, phase)
-                    prefix = (run / 'phases/1/logs/debug.log').read_text(encoding='utf-8', errors='replace')
+                    monitor.next_phase()
                     phase += 1
                     command = game_command(args, run, save_name=save_name)
                     try:
@@ -423,6 +635,7 @@ def run_game(args, run):
             condition = 'interrupted'
         finally:
             stop_owned_process(process)
+            monitor.close()
     if phase > 1:
         write_json(run / 'phase_terminal.json', {'condition': condition or 'timeout',
                    'process_exit': None if condition == 'reload_launch_failed' else process.returncode})
@@ -466,6 +679,14 @@ def run_game(args, run):
     print(f"Terminal: {condition}; observer confirmed: {state['observer_confirmed']}", flush=True)
     print(checker.stdout + checker.stderr, end='', flush=True)
     return code
+
+
+def timeout_warning(scope, timeout):
+    """全量运行使用过短超时时给出中文提示；只提示，不改变执行与退出逻辑。"""
+    if scope == 'full' and timeout < 1200:
+        return ('警告：全量测试通常需要 1200–1800 秒，当前 --timeout 可能提前终止；'
+                '超时只计单次游戏运行，不包含 engine lock 排队与 checker 验收时间。')
+    return None
 
 
 def main(argv=None):
@@ -518,6 +739,9 @@ def main(argv=None):
             print(f'Frozen run: {run}', flush=True)
         if args.prepare_only:
             return 0
+        warning = timeout_warning(task['scope'], args.timeout)
+        if warning:
+            print(warning, file=sys.stderr, flush=True)
         task['state'] = 'queued'
         write_json(base / 'task.json', task)
         with engine_lock(task_id=base.name):

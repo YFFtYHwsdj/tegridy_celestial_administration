@@ -1,7 +1,8 @@
 import unittest
 import tempfile
 from pathlib import Path
-from check_test_run import inspect_run, expected_cases, selected_case_expectations
+from check_test_run import (inspect_run, inspect_engine_errors, case_outcomes,
+                            expected_cases, selected_case_expectations)
 
 
 class RunEvidenceTests(unittest.TestCase):
@@ -298,6 +299,174 @@ class RunEvidenceTests(unittest.TestCase):
     def test_complete_assertion_sequence(self):
         issues, _ = inspect_run(self.run_log(), '', {'tca_test_example': 1})
         self.assertEqual(issues, [])
+
+    # 以下用例固定单遍/流式解析的等价语义：最新派发边界、逐行首个结果、
+    # 逐项重复结果、错误条目分块与去重，均须与原先整段正则扫描逐字一致。
+
+    def case_log(self, lines):
+        return 'TCA_TEST SUITE_DISPATCH\n' + '\n'.join(lines) + '\nTCA_TEST SUITE_ALL_PASSED'
+
+    def test_no_dispatch_skips_engine_errors(self):
+        # 没有派发时即使 error.log 有模组错误也只报告缺少派发，保持原返回。
+        issues, counts = inspect_run('', '[10:00:00][E]: Event tca_x.1 is orphaned', {'tca_test_example': 1})
+        self.assertEqual(issues, ['No suite dispatch found'])
+        self.assertEqual(dict(counts), {})
+        self.assertEqual(case_outcomes('', {'tca_test_example': 1}), {'tca_test_example': 'NOT_RUN'})
+
+    def test_summary_keeps_zero_result_kinds(self):
+        # 汇总始终包含四类原生结果键，便于 verification.json 计数稳定。
+        _, counts = inspect_run(self.run_log(), '', {'tca_test_example': 1})
+        self.assertEqual(dict(counts), {'BEGIN': 1, 'PASS': 1, 'FAIL': 0,
+                                        'PRECONDITION_FAIL': 0, 'CHECK_PASS': 1})
+
+    def test_case_outcomes_ignores_text_before_dispatch_substring(self):
+        # 逐项状态从最近一次派发子串处起算；同一行派发之前的旧结果不得沿用。
+        name = 'tca_test_example'
+        log = (f'TCA_TEST PASS {name} TCA_TEST SUITE_DISPATCH\n'
+               f'TCA_TEST BEGIN tca_a.1 {name}\n'
+               f'TCA_TEST CHECK_PASS {name} 1\n'
+               'TCA_TEST SUITE_ALL_PASSED')
+        self.assertEqual(case_outcomes(log, {name: 1}), {name: 'NOT_VERIFIED'})
+        # 断言核对按整行解析最新派发行，因此该行的 PASS 仍被计入。
+        issues, counts = inspect_run(log, '', {name: 1})
+        self.assertEqual(issues, [])
+        self.assertEqual(counts['PASS'], 1)
+
+    def test_case_outcomes_uses_last_dispatch_on_same_line(self):
+        name = 'tca_test_example'
+        log = (f'TCA_TEST SUITE_DISPATCH TCA_TEST BEGIN tca_a.1 {name} TCA_TEST SUITE_DISPATCH\n'
+               f'TCA_TEST CHECK_PASS {name} 1\nTCA_TEST PASS {name}\nTCA_TEST SUITE_ALL_PASSED')
+        self.assertEqual(case_outcomes(log, {name: 1}), {name: 'NOT_RUN'})
+        self.assertEqual(inspect_run(log, '', {name: 1})[0], [])
+
+    def test_case_outcomes_counts_repeated_results_on_one_line(self):
+        name = 'tca_test_example'
+        log = self.case_log([f'TCA_TEST BEGIN tca_a.1 {name}',
+                             f'TCA_TEST CHECK_PASS {name} 1',
+                             f'TCA_TEST PASS {name} TCA_TEST PASS {name}'])
+        self.assertEqual(case_outcomes(log, {name: 1}), {name: 'NOT_VERIFIED'})
+
+    def test_inspect_run_counts_first_result_per_line_only(self):
+        name = 'tca_test_example'
+        log = ('TCA_TEST SUITE_DISPATCH\n'
+               f'TCA_TEST BEGIN tca_a.1 {name} TCA_TEST PASS {name}\n'
+               'TCA_TEST SUITE_ALL_PASSED')
+        issues, counts = inspect_run(log, '', {name: 1})
+        self.assertEqual(issues, [f'{name}: begin=1, pass=0',
+                                  f'{name}: assertion 1 missing or duplicated'])
+        self.assertEqual(counts['BEGIN'], 1)
+
+    def test_case_outcomes_counts_all_assertions_on_one_line(self):
+        # 与断言核对不同，逐项统计允许同一行出现多条 CHECK_PASS，且不应吞掉后续标记。
+        name = 'tca_test_example'
+        log = ('TCA_TEST SUITE_DISPATCH\n'
+               f'TCA_TEST BEGIN tca_a.1 {name}\n'
+               f'TCA_TEST PASS {name}\n'
+               f'TCA_TEST CHECK_PASS {name} 1 TCA_TEST CHECK_PASS {name} 2\n'
+               'TCA_TEST SUITE_ALL_PASSED')
+        self.assertEqual(case_outcomes(log, {name: 2}), {name: 'PASS'})
+        # 逐行只取首个结果，故步骤 2 仍算缺失。
+        self.assertEqual(inspect_run(log, '', {name: 2})[0],
+                         [f'{name}: assertion 2 missing or duplicated'])
+
+    def test_case_outcomes_requires_token_boundaries(self):
+        name = 'tca_test_example'
+        prefixed = self.case_log([f'TCA_TEST BEGIN tca_a.1 {name}',
+                                  f'TCA_TEST CHECK_PASS {name} 1',
+                                  f'TCA_TEST PASS {name}2'])
+        self.assertEqual(case_outcomes(prefixed, {name: 1}), {name: 'NOT_VERIFIED'})
+        spaced = self.case_log([f'TCA_TEST BEGIN tca_a.1  {name}',
+                                f'TCA_TEST PASS {name}'])
+        self.assertEqual(case_outcomes(spaced, {name: 1}), {name: 'NOT_RUN'})
+        suffixed = self.case_log([f'TCA_TEST BEGIN tca_a.1 {name}',
+                                  f'TCA_TEST CHECK_PASS {name} 12x',
+                                  f'TCA_TEST PASS {name}'])
+        self.assertEqual(case_outcomes(suffixed, {name: 1}), {name: 'NOT_VERIFIED'})
+
+    def test_case_outcomes_begin_name_is_second_token(self):
+        name = 'tca_test_example'
+        log = self.case_log([f'TCA_TEST BEGIN tca_a.1 {name} trailing',
+                             f'TCA_TEST CHECK_PASS {name} 1',
+                             f'TCA_TEST PASS {name}'])
+        self.assertEqual(case_outcomes(log, {name: 1}), {name: 'PASS'})
+
+    def test_case_outcomes_failure_kinds_take_priority(self):
+        name = 'tca_test_example'
+        precondition = self.case_log([f'TCA_TEST BEGIN tca_a.1 {name}',
+                                      f'TCA_TEST PRECONDITION_FAIL {name}'])
+        self.assertEqual(case_outcomes(precondition, {name: 1}), {name: 'PRECONDITION_FAIL'})
+        check_fail = self.case_log([f'TCA_TEST CHECK_FAIL {name} 1'])
+        self.assertEqual(case_outcomes(check_fail, {name: 1}), {name: 'FAIL'})
+        both = self.case_log([f'TCA_TEST PRECONDITION_FAIL {name}',
+                              f'TCA_TEST CHECK_FAIL {name} 1'])
+        self.assertEqual(case_outcomes(both, {name: 1}), {name: 'PRECONDITION_FAIL'})
+
+    def test_case_outcomes_rejects_duplicate_assertion(self):
+        name = 'tca_test_example'
+        log = self.case_log([f'TCA_TEST BEGIN tca_a.1 {name}',
+                             f'TCA_TEST PASS {name}',
+                             f'TCA_TEST CHECK_PASS {name} 1 TCA_TEST CHECK_PASS {name} 1'])
+        self.assertEqual(case_outcomes(log, {name: 1}), {name: 'NOT_VERIFIED'})
+
+    def test_aborted_and_completion_markers_only_apply_after_latest_dispatch(self):
+        aborted = 'TCA_TEST SUITE_ABORTED\n' + self.run_log()
+        self.assertEqual(inspect_run(aborted, '', {'tca_test_example': 1})[0], [])
+        completed = 'TCA_TEST SUITE_ALL_PASSED\n' + self.run_log().replace('TCA_TEST SUITE_ALL_PASSED', '')
+        self.assertEqual(inspect_run(completed, '', {'tca_test_example': 1})[0],
+                         ['No SUITE_ALL_PASSED completion'])
+        rejected = 'TCA_TEST OBSERVER_ENTRY_REJECTED old stale reason\n' + self.run_log()
+        self.assertEqual(inspect_run(rejected, '', {'tca_test_example': 1})[0], [])
+
+    def test_engine_error_entries_keep_error_log_order_before_debug_only(self):
+        first = '[10:00:00][E]: Event tca_first.1 is orphaned'
+        second = '[10:01:00][E]: Event tca_second.1 is orphaned'
+        self.assertEqual(inspect_run(self.run_log(), first, {'tca_test_example': 1})[0],
+                         ['Engine error (1): Event tca_first.1 is orphaned'])
+        self.assertEqual(inspect_run(self.run_log() + '\n' + second, first, {'tca_test_example': 1})[0],
+                         ['Engine error (1): Event tca_first.1 is orphaned',
+                          'Engine error (1): Event tca_second.1 is orphaned'])
+
+    def test_debug_multiline_error_entry_keeps_context_and_requires_exact_dedupe(self):
+        error = ('[10:00:00][E]: Script system error!\n'
+                 '  Error: tca scope mismatch\n'
+                 '  Script location: file: common/scripted_effects/tca_x.txt line: 3\n')
+        self.assertEqual(inspect_run(self.run_log(), error, {'tca_test_example': 1})[0],
+                         ['Engine error (1): tca scope mismatch'])
+        # error.log 与 debug 记录同一条目时只计一次，不得重复计入。
+        self.assertEqual(inspect_run(self.run_log() + '\n' + error, error,
+                                     {'tca_test_example': 1})[0],
+                         ['Engine error (1): tca scope mismatch'])
+        # debug 条目多出续行即视为不同条目，不能按首行静默去重。
+        self.assertEqual(inspect_run(self.run_log() + '\n' + error + '  extra line\n', error,
+                                     {'tca_test_example': 1})[0],
+                         ['Engine error (2): tca scope mismatch'])
+
+    def test_debug_error_entries_require_severity_marker_at_entry_start(self):
+        log = self.run_log() + '\n[10:00:00][W]: tca_warning_only\n[10:00:01] plain tca_line'
+        self.assertEqual(inspect_run(log, '', {'tca_test_example': 1})[0], [])
+
+    def test_mid_line_timestamp_error_entry_is_captured(self):
+        log = self.run_log() + '\nmid[10:00:00][E]: Event tca_mid.1 is orphaned'
+        self.assertEqual(inspect_run(log, '', {'tca_test_example': 1})[0],
+                         ['Engine error (1): Event tca_mid.1 is orphaned'])
+
+    def test_repeated_debug_errors_are_counted_separately(self):
+        entry = '[10:00:00][E]: Event tca_dup.1 is orphaned'
+        log = self.run_log() + '\n' + entry + '\n' + entry
+        self.assertEqual(inspect_run(log, '', {'tca_test_example': 1})[0],
+                         ['Engine error (2): Event tca_dup.1 is orphaned'])
+
+    def test_error_entry_before_first_timestamp_is_still_classified(self):
+        issues, _ = inspect_run(self.run_log(), 'boot[10:00:00][E]: Event tca_p.1 is orphaned',
+                                {'tca_test_example': 1})
+        self.assertEqual(issues, ['Engine error (1): Event tca_p.1 is orphaned'])
+
+    def test_engine_error_inspection_api_stays_public(self):
+        # run_diarchy_ui_probe 直接复用该入口，签名与输出文本不得变化。
+        self.assertEqual(inspect_engine_errors('[10:00:00][E]: Event tca_api.1 is orphaned'),
+                         ['Engine error (1): Event tca_api.1 is orphaned'])
+        self.assertEqual(inspect_engine_errors('[10:00:00][E]: Event vanilla.1 is orphaned'), [])
+        self.assertEqual(inspect_engine_errors(''), [])
 
 
 if __name__ == '__main__':

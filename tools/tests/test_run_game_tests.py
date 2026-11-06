@@ -8,8 +8,9 @@ import unittest
 from unittest.mock import Mock, patch
 from types import SimpleNamespace
 
-from run_game_tests import (ROOT, game_command, descriptor, isolated_settings, outcome, prepare_run,
-                            progress, stop_owned_process, terminal_condition)
+from run_game_tests import (ROOT, LogTailReader, RunLogMonitor, game_command, descriptor, isolated_settings,
+                            outcome, prepare_run, progress, reload_request, stop_owned_process,
+                            terminal_condition, timeout_warning)
 from check_upstream_overrides import definitions
 
 
@@ -489,6 +490,176 @@ time.sleep(20)
         self.assertIn('path="/tmp/mod with spaces"', descriptor('TCA', Path('/tmp/mod with spaces')))
         with self.assertRaises(ValueError):
             descriptor('TCA', Path('/tmp/mod"bad'))
+
+
+class IncrementalLogTests(unittest.TestCase):
+    """增量日志监视器单测：只用临时文件，不启动游戏。"""
+
+    def _append(self, path, text):
+        with path.open('a', encoding='utf-8') as handle:
+            handle.write(text)
+
+    def test_tail_reads_only_appended_bytes_and_tracks_offset(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / 'debug.log'
+            reader = LogTailReader(path)
+            self.addCleanup(reader.close)
+            self.assertEqual(reader.poll(), [])
+            path.write_text('one\ntwo\n', encoding='utf-8')
+            self.assertEqual(reader.poll(), ['one', 'two'])
+            size = path.stat().st_size
+            self.assertEqual(reader.offset, size)
+            self.assertEqual(reader.bytes_read, size)
+            self.assertEqual(reader.poll(), [])
+            self.assertEqual(reader.bytes_read, size)
+            self._append(path, 'three\n')
+            self.assertEqual(reader.poll(), ['three'])
+            self.assertEqual(reader.bytes_read, size + len('three\n'))
+            self.assertEqual(reader.offset, path.stat().st_size)
+
+    def test_tail_buffers_partial_multibyte_and_crlf_lines(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / 'debug.log'
+            # 故意在“中”的多字节编码中间截断，验证下一轮补齐后才解码。
+            path.write_bytes(b'TCA_TEST PASS \xe4\xb8')
+            reader = LogTailReader(path)
+            self.addCleanup(reader.close)
+            self.assertEqual(reader.poll(), [])
+            with path.open('ab') as handle:
+                handle.write(b'\xad whole\r\n')
+            self.assertEqual(reader.poll(), ['TCA_TEST PASS 中 whole'])
+            path.write_bytes(b'no trailing newline')
+            reader.reset()
+            self.assertEqual(reader.poll(), [])
+            self.assertEqual(reader.flush(), ['no trailing newline'])
+            self.assertEqual(reader.poll(), [])
+
+    def test_tail_resets_after_log_rotation_and_truncation(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            path = root / 'debug.log'
+            path.write_text('old phase line\n', encoding='utf-8')
+            reader = LogTailReader(path)
+            self.addCleanup(reader.close)
+            self.assertEqual(reader.poll(), ['old phase line'])
+            replacement = root / 'replacement.log'
+            replacement.write_text('new phase line\n', encoding='utf-8')
+            try:
+                replacement.replace(path)
+            except OSError:
+                self.skipTest('当前平台不允许替换仍被读取的日志；运行器归档前会显式 close()')
+            # 目录重建后 inode 变化：重置偏移并从新文件开头读取。
+            self.assertEqual(reader.poll(), ['new phase line'])
+            self.assertEqual(reader.offset, path.stat().st_size)
+            # 同一 inode 下变短视为截断：重置偏移。
+            path.write_text('short\n', encoding='utf-8')
+            self.assertEqual(reader.poll(), ['short'])
+
+    def test_monitor_reconfirms_observer_and_accumulates_across_phases(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / 'logs/debug.log'
+            path.parent.mkdir()
+            path.write_text('console_success: Going to observe mode\n'
+                            'TCA_TEST PASS first\n'
+                            'TCA_TEST PASS second\n'
+                            'TCA_TEST SUITE_DISPATCH\n', encoding='utf-8')
+            monitor = RunLogMonitor(path)
+            self.addCleanup(monitor.close)
+            monitor.poll()
+            self.assertEqual(monitor.progress(1.24, True),
+                             {'seconds': 1.2, 'running': True, 'pass_count': 2,
+                              'observer_confirmed': True, 'markers': ['TCA_TEST SUITE_DISPATCH']})
+            # phase 切换：归档后 logs/ 目录重建，续局必须重新确认观察者。
+            monitor.next_phase()
+            path.unlink()
+            path.write_text('TCA_TEST PASS third\nTCA_TEST SUITE_ALL_PASSED\n', encoding='utf-8')
+            monitor.poll()
+            state = monitor.progress(12.0, True)
+            self.assertEqual(state['pass_count'], 3)
+            self.assertFalse(state['observer_confirmed'])
+            self.assertEqual(state['markers'], ['TCA_TEST SUITE_DISPATCH', 'TCA_TEST SUITE_ALL_PASSED'])
+            self._append(path, 'console_success: Going to observe mode\n')
+            monitor.poll()
+            self.assertTrue(monitor.observer_confirmed)
+
+    def test_monitor_reload_evidence_is_scoped_to_current_phase(self):
+        with tempfile.TemporaryDirectory() as temp:
+            run = Path(temp) / 'run'
+            (run / 'logs').mkdir(parents=True)
+            (run / 'save games').mkdir()
+            (run / 'save games/probe.ck3').write_bytes(b'SAV' + b'x'*100)
+            path = run / 'logs/debug.log'
+            path.write_text('console_success: Game saved to probe\nTCA_CLI RELOAD_SAVE probe\n',
+                            encoding='utf-8')
+            monitor = RunLogMonitor(path)
+            self.addCleanup(monitor.close)
+            monitor.poll()
+            self.assertEqual(reload_request(monitor.reload_log(), run), 'probe')
+            monitor.next_phase()
+            path.unlink()
+            path.write_text('TCA_CLI RELOAD_SAVE other\n', encoding='utf-8')
+            monitor.poll()
+            self.assertNotIn('probe', monitor.reload_log())
+            with self.assertRaises(ValueError):
+                reload_request(monitor.reload_log(), run)
+
+    def test_monitor_flush_picks_terminal_marker_without_trailing_newline(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / 'debug.log'
+            path.write_text('TCA_TEST SUITE_ALL_PASSED', encoding='utf-8')
+            monitor = RunLogMonitor(path)
+            self.addCleanup(monitor.close)
+            self.assertEqual(monitor.poll(), [])
+            self.assertEqual(monitor.flush(), ['TCA_TEST SUITE_ALL_PASSED'])
+            self.assertEqual(monitor.terminal_condition(None), 'summary')
+
+    def test_monitor_terminal_condition_matches_existing_priority(self):
+        cases = (
+            ('TCA_CLI NOT_OBSERVER\n', None, 'not_observer'),
+            ('TCA_CLI NOT_OBSERVER\nTCA_TEST OBSERVER_ENTRY_REJECTED\n', None, 'entry_rejected'),
+            ('TCA_TEST OBSERVER_ENTRY_REJECTED\nTCA_TEST SUITE_ALL_PASSED\n', None, 'summary'),
+            ('TCA_TEST SUITE_ABORTED death\n', 0, 'summary'),
+            ('', 0, 'process_exit'),
+            ('', None, None),
+        )
+        for text, process_code, expected in cases:
+            with tempfile.TemporaryDirectory() as temp:
+                path = Path(temp) / 'debug.log'
+                path.write_text(text, encoding='utf-8')
+                monitor = RunLogMonitor(path)
+                self.addCleanup(monitor.close)
+                monitor.poll()
+                self.assertEqual(monitor.terminal_condition(process_code), expected, text)
+
+    def test_large_log_poll_reads_only_new_bytes(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / 'debug.log'
+            line = 'x' * 99 + '\n'
+            with path.open('w', encoding='utf-8') as handle:
+                for _ in range(110_000):
+                    handle.write(line)
+            size = path.stat().st_size
+            self.assertGreaterEqual(size, 10 * 1024 * 1024)
+            monitor = RunLogMonitor(path)
+            self.addCleanup(monitor.close)
+            monitor.poll()
+            self.assertEqual(monitor.bytes_read, size)
+            self.assertEqual(monitor.offset, size)
+            # 第二轮没有新增，不应重读旧内容。
+            monitor.poll()
+            self.assertEqual(monitor.bytes_read, size)
+            self._append(path, 'TCA_TEST PASS large\n')
+            self.assertEqual(monitor.poll(), ['TCA_TEST PASS large'])
+            self.assertEqual(monitor.bytes_read, size + len('TCA_TEST PASS large\n'))
+            self.assertEqual(monitor.offset, path.stat().st_size)
+            self.assertEqual(monitor.pass_count, 1)
+
+    def test_timeout_warning_only_applies_to_short_full_runs(self):
+        warning = timeout_warning('full', 240)
+        self.assertIn('1200', warning)
+        self.assertIn('checker', warning)
+        self.assertIsNone(timeout_warning('full', 1200))
+        self.assertIsNone(timeout_warning('selection', 240))
 
 
 if __name__ == '__main__':
