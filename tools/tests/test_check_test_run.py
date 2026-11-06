@@ -249,6 +249,25 @@ class RunEvidenceTests(unittest.TestCase):
         issues, _ = inspect_run(self.run_log(), '[10:00:00][E]: Script system error!\nError: wrong scope\nfile: common/scripted_effects/tca_example.txt', {'tca_test_example'})
         self.assertTrue(any('wrong scope' in x for x in issues))
 
+    def test_interleaved_cohort_results_are_order_independent(self):
+        # 单实例并行下不同 lane 的 BEGIN/CHECK/PASS 会交错出现；验收按名字统计，不依赖先后。
+        first, second = 'tca_test_cohort_a', 'tca_test_cohort_b'
+        log = ('TCA_TEST SUITE_DISPATCH\n'
+               f'TCA_TEST BEGIN tca_cohort_test.1 {first}\n'
+               f'TCA_TEST BEGIN tca_cohort_test.2 {second}\n'
+               f'TCA_TEST CHECK_PASS {second} 2\n'
+               f'TCA_TEST CHECK_PASS {first} 1\n'
+               f'TCA_TEST CHECK_PASS {second} 1\n'
+               f'TCA_TEST PASS {second}\n'
+               f'TCA_TEST CHECK_PASS {first} 2\n'
+               f'TCA_TEST PASS {first}\n'
+               'TCA_TEST SUITE_ALL_PASSED')
+        expected = {first: 2, second: 2}
+        issues, counts = inspect_run(log, '', expected)
+        self.assertEqual(issues, [])
+        self.assertEqual(counts['PASS'], 2)
+        self.assertEqual(case_outcomes(log, expected), {first: 'PASS', second: 'PASS'})
+
     def test_only_latest_dispatch_counts(self):
         issues, counts = inspect_run(self.run_log() + '\n' + self.run_log(), '', {'tca_test_example'})
         self.assertEqual(issues, [])

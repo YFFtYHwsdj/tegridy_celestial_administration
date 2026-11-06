@@ -1,5 +1,5 @@
-﻿# 全组入口；模块自行登记，通用派发保留即时组先行、延迟组串行的运行方式。
-# 框架拥有计数、选择、派发及中断标记，业务用例只报告结果与请求续接。
+﻿# 全组入口；模块自行登记，通用派发保留即时组先行、延迟组按 lane 并发的运行方式。
+# 框架拥有计数、选择、派发及中断标记，业务用例只报告结果并请求 lane 结束。
 namespace = tca_tests
 
 tca_tests.1 = {
@@ -20,11 +20,25 @@ tca_tests.1 = {
                 limit = { NOT = { has_variable = tca_test_selected_run } }
                 set_variable = { name = tca_test_selected_run value = no }
             }
+            # 并发上限缺省 1；CLI 适配在入口前注入本局 K，手动运行未注入时保持串行。
+            if = {
+                limit = { NOT = { has_variable = tca_test_max_active } }
+                set_variable = { name = tca_test_max_active value = 1 }
+            }
+            else_if = {
+                limit = { var:tca_test_max_active < 1 }
+                set_variable = { name = tca_test_max_active value = 1 }
+            }
             set_variable = { name = tca_test_suite_expected value = 0 }
             set_variable = { name = tca_test_suite_passed value = 0 }
             set_variable = { name = tca_test_suite_failed value = 0 }
             set_variable = { name = tca_test_suite_skipped value = 0 }
             set_variable = { name = tca_test_dispatch_phase value = 0 }
+            # 阶段 0 前从零开始；lane flag 无法枚举，异常中断后要求新开测试局。
+            set_variable = { name = tca_test_active_count value = 0 }
+            set_variable = { name = tca_test_undispatched value = 0 }
+            remove_character_flag = tca_test_exclusive_active
+            remove_character_flag = tca_test_delayed_case_active
             tca_test_catalog_effect = yes
             if = {
                 limit = { debug_only = yes }
@@ -63,7 +77,8 @@ tca_tests.2 = {
     }
 }
 
-# 每次续接重新扫描登记；先认领再派发，防止同步前置失败续接导致重复执行。
+# 每次续接重新扫描登记；一次扫描按并发上限、lane 占用与独占限制连续认领。
+# 全部延迟用例已派发且在途计数归零后统一收尾。
 tca_tests.3 = {
     type = character_event
     hidden = yes
@@ -72,10 +87,13 @@ tca_tests.3 = {
         if = {
             limit = { NOT = { has_character_flag = tca_test_suite_aborted } has_character_flag = tca_test_suite_running }
             set_variable = { name = tca_test_dispatch_phase value = 2 }
-            remove_character_flag = tca_test_dispatch_claimed
             tca_test_catalog_effect = yes
             if = {
-                limit = { has_character_flag = tca_test_suite_running NOT = { has_character_flag = tca_test_dispatch_claimed } }
+                limit = {
+                    has_character_flag = tca_test_suite_running
+                    var:tca_test_undispatched = 0
+                    var:tca_test_active_count = 0
+                }
                 trigger_event = tca_tests.2
             }
         }

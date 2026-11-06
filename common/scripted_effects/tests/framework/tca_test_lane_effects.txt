@@ -1,0 +1,19 @@
+﻿# 延迟用例结束（完成、前置失败或环境清理）时在报告者作用域调用。
+# 释放本 GROUP 的 lane 与独占标记，在途计数归零后移除全局标记，最后放行下一轮扫描。
+tca_test_lane_end_effect = {
+    if = {
+        limit = { has_character_flag = tca_test_lane_$GROUP$_active }
+        remove_character_flag = tca_test_lane_$GROUP$_active
+        remove_character_flag = tca_test_exclusive_active
+        # 负值保护：只有确认有在途用例时才递减，避免重复结束破坏其它 lane 的计数。
+        if = {
+            limit = { var:tca_test_active_count > 0 }
+            change_variable = { name = tca_test_active_count subtract = 1 }
+        }
+        if = {
+            limit = { var:tca_test_active_count = 0 }
+            remove_character_flag = tca_test_delayed_case_active
+        }
+    }
+    tca_test_continue_delayed_effect = yes
+}

@@ -52,19 +52,25 @@ class JudicialLoadingTests(unittest.TestCase):
         self.assertFalse(list((ROOT / 'tests').glob('tca_*_tests.txt')))
 
     def test_serial_dispatch_claims_before_execution_and_resumes_through_catalog(self):
+        # 延迟属性以模块登记 DELAYED 为唯一来源；用例体改用 lane 结束效果。
         from testing.catalog import catalog
         rows = catalog(ROOT)
-        declared = set()
-        for path in (ROOT / 'events').rglob('tca_*test*_events.txt'):
-            for event, body in definitions(path.read_text(encoding='utf-8-sig')).items():
-                text = ' '.join(body)
-                if 'TCA_TEST BEGIN' in text and 'add_character_flag = tca_test_delayed_case_active' in text:
-                    declared.add(event)
-        self.assertEqual({row['event'] for row in rows if row['delayed']}, declared)
+        registered_delayed = set()
+        for path in (ROOT / 'common/scripted_effects/tests/modules').rglob('tca_test_modules_*_effects.txt'):
+            for _effect, body in definitions(path.read_text(encoding='utf-8-sig')).items():
+                for event, delayed in re.findall(r'EVENT = (\S+) CASE = \S+ DELAYED = (yes|no)',
+                                                 ' '.join(body)):
+                    if delayed == 'yes':
+                        registered_delayed.add(event)
+        self.assertTrue(registered_delayed)
+        self.assertEqual({row['event'] for row in rows if row['delayed']}, registered_delayed)
         dispatcher = definitions((ROOT / 'common/scripted_effects/tests/framework/tca_test_dispatch_effects.txt').read_text(encoding='utf-8-sig'))
         visit = ' '.join(dispatcher['tca_test_visit_case_effect'])
-        self.assertIn('NOT = { has_character_flag = tca_test_delayed_case_active }', visit)
-        self.assertIn('NOT = { has_character_flag = tca_test_dispatch_claimed }', visit)
+        # 并行认领条件：lane 占用、活跃计数上限与独占用例互斥，不再使用单一 claimed 标记。
+        self.assertIn('tca_test_lane_$GROUP$_active', visit)
+        self.assertIn('tca_test_max_active', visit)
+        self.assertIn('tca_test_active_count', visit)
+        self.assertNotIn('tca_test_dispatch_claimed', visit)
         self.assertLess(visit.index('add_character_flag = $CASE$_dispatched'), visit.index('trigger_event = $EVENT$'))
         continuation = (ROOT / 'common/scripted_effects/tests/framework/tca_test_delayed_dispatch_effects.txt').read_text(encoding='utf-8-sig')
         self.assertIn('tca_test_validate_environment_effect = yes', continuation)
@@ -73,7 +79,9 @@ class JudicialLoadingTests(unittest.TestCase):
         suite = definitions((ROOT / 'events/tests/tca_tests_events.txt').read_text(encoding='utf-8-sig'))
         scan = ' '.join(suite['tca_tests.3'])
         self.assertLess(scan.index('tca_test_catalog_effect'), scan.index('trigger_event = tca_tests.2'))
-        self.assertIn('NOT = { has_character_flag = tca_test_dispatch_claimed }', scan)
+        self.assertIn('tca_test_active_count', scan)
+        self.assertIn('tca_test_undispatched', scan)
+        self.assertNotIn('tca_test_dispatch_claimed', scan)
 
     def test_known_circuit_name_keys_resolve_without_transient_scopes(self):
         from check_upstream_overrides import localization_values

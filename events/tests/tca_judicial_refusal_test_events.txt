@@ -5,7 +5,7 @@ tca_judicial_refusal_test.1 = {
     type = character_event hidden = yes
     immediate = {
         debug_log = "TCA_TEST BEGIN tca_judicial_refusal_test.1 tca_test_imperial_refusal_war"
-        remove_character_flag = tca_test_case_failed
+        remove_character_flag = tca_test_tca_judicial_refusal_test_case_failed
         if = { limit = { tca_test_native_arrest_realm_ready_trigger = yes }
             tca_test_prepare_native_arrest_effect = { FAMILY = yes COMMISSIONER = no OFFICE = yes CONTROL = tca_test_arrest_force_approval CASE = tca_test_imperial_refusal IMPERIAL = yes }
             scope:tca_test_law_position = { save_scope_as = tca_test_rf_office holder = { save_scope_as = tca_test_rf_commissioner tca_test_protect_character_effect = yes } }
@@ -28,13 +28,12 @@ tca_judicial_refusal_test.1 = {
                 set_variable = { name = tca_test_direct_arrest_probe value = yes }
                 set_variable = { name = tca_test_direct_arrest_valid value = no }
             }
-            add_character_flag = tca_test_delayed_case_active
             trigger_event = { id = tca_judicial_refusal_test.1000 days = 1 }
         }
         else = {
             debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_imperial_refusal_war"
             if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
-            tca_test_continue_delayed_effect = yes
+            tca_test_lane_end_effect = { GROUP = tca_judicial_refusal_test }
         }
     }
 }
@@ -58,7 +57,7 @@ tca_judicial_refusal_test.1000 = {
                 scope:tca_test_rf_target = { is_landed = yes liege = root tca_judicial_identity_tier < 4 var:tca_test_arrest_case = flag:tca_test_imperial_refusal }
                 scope:tca_test_rf_commissioner = { var:tca_test_direct_arrest_valid = yes var:tca_test_direct_arrest_backer = root }
             } debug_log = "TCA_TEST CHECK_PASS tca_test_imperial_refusal_war 1" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_imperial_refusal_war 1" }
+            else = { add_character_flag = tca_test_tca_judicial_refusal_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_imperial_refusal_war 1" }
             trigger_event = { id = tca_judicial_refusal_test.1001 days = 12 }
         }
     }
@@ -77,7 +76,7 @@ tca_judicial_refusal_test.1001 = {
                 exists = scope:tca_test_rf_war
                 scope:tca_test_rf_target = { var:tca_pending_judicial_title = scope:tca_test_rf_office var:tca_pending_judicial_governor = root }
             } debug_log = "TCA_TEST CHECK_PASS tca_test_imperial_refusal_war 2" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_imperial_refusal_war 2" }
+            else = { add_character_flag = tca_test_tca_judicial_refusal_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_imperial_refusal_war 2" }
             # 通过原生防守方胜利结束实际战争，不用 imprison 替代。
             scope:tca_test_rf_war ?= { end_war = defender }
             trigger_event = { id = tca_judicial_refusal_test.1002 days = 2 }
@@ -93,7 +92,7 @@ tca_judicial_refusal_test.1002 = {
                 scope:tca_test_rf_target = { is_imprisoned_by = scope:tca_test_rf_commissioner var:tca_judicial_prison_title = scope:tca_test_rf_office NOT = { has_variable = tca_pending_judicial_title } NOT = { has_variable = tca_pending_judicial_governor } }
                 scope:tca_test_rf_office = { is_target_in_variable_list = { name = tca_judicial_prisoners target = scope:tca_test_rf_target } }
             } debug_log = "TCA_TEST CHECK_PASS tca_test_imperial_refusal_war 3" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_imperial_refusal_war 3" }
+            else = { add_character_flag = tca_test_tca_judicial_refusal_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_imperial_refusal_war 3" }
             scope:tca_test_rf_target = { if = { limit = { is_imprisoned = yes } release_from_prison = yes } }
             trigger_event = { id = tca_judicial_refusal_test.1003 days = 1 }
         }
@@ -108,21 +107,20 @@ tca_judicial_refusal_test.1003 = {
                 scope:tca_test_rf_target = { is_imprisoned = no NOT = { has_variable = tca_judicial_prison_title } }
                 scope:tca_test_rf_office = { NOT = { is_target_in_variable_list = { name = tca_judicial_prisoners target = scope:tca_test_rf_target } } }
             } debug_log = "TCA_TEST CHECK_PASS tca_test_imperial_refusal_war 4" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_imperial_refusal_war 4" }
+            else = { add_character_flag = tca_test_tca_judicial_refusal_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_imperial_refusal_war 4" }
             create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_test_rf_restore }
             scope:tca_test_rf_county = { change_title_holder_include_vassals = { holder = scope:tca_test_rf_county_owner change = scope:tca_test_rf_restore } }
             resolve_title_and_vassal_change = scope:tca_test_rf_restore
             scope:tca_test_rf_commissioner = { remove_variable = tca_test_direct_arrest_probe remove_variable = tca_test_direct_arrest_valid remove_variable = tca_test_direct_arrest_backer tca_test_restore_character_effect = yes }
             scope:tca_test_rf_target = { remove_character_flag = tca_test_arrest_force_target_decline }
             tca_test_cleanup_native_arrest_effect = yes
-            if = { limit = { has_character_flag = tca_test_case_failed }
+            if = { limit = { has_character_flag = tca_test_tca_judicial_refusal_test_case_failed }
                 debug_log = "TCA_TEST FAIL tca_test_imperial_refusal_war"
                 if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
             }
             else = { debug_log = "TCA_TEST PASS tca_test_imperial_refusal_war" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
-            remove_character_flag = tca_test_case_failed
-            remove_character_flag = tca_test_delayed_case_active
-            tca_test_continue_delayed_effect = yes
+            remove_character_flag = tca_test_tca_judicial_refusal_test_case_failed
+            tca_test_lane_end_effect = { GROUP = tca_judicial_refusal_test }
         }
     }
 }

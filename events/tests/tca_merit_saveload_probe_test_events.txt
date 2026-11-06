@@ -7,13 +7,10 @@ tca_merit_saveload_probe_test.1 = {
     type = character_event
     hidden = yes
     immediate = {
-        if = { limit = { has_character_flag = tca_test_delayed_case_active } debug_log = "TCA_TEST CASE_BUSY" }
-        else = {
             debug_log = "TCA_TEST BEGIN tca_merit_saveload_probe_test.1 tca_test_merit_saveload_contract"
-            remove_character_flag = tca_test_case_failed
+            remove_character_flag = tca_test_tca_merit_saveload_probe_test_case_failed
             if = {
                 limit = { debug_only = yes is_alive = yes title:h_china.holder = root title:h_china = { var:tca_cli_ready > 0 NOT = { has_variable = tca_merit_saveload_phase } } }
-                add_character_flag = tca_test_delayed_case_active
                 # 待提交普通事务只在核准自然年有效；年末先等到安全窗口，再建立夹具。
                 # 不是续局时改YEAR或重新prepare；原30日续接事件仍由同一存档恢复。
                 if = {
@@ -28,9 +25,8 @@ tca_merit_saveload_probe_test.1 = {
             else = {
                 debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_merit_saveload_contract"
                 if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
-                tca_test_continue_delayed_effect = yes
+                tca_test_lane_end_effect = { GROUP = tca_local_domain_realm }
             }
-        }
     }
 }
 
@@ -107,7 +103,7 @@ tca_merit_saveload_probe_test.1000 = {
                     set_variable = { name = tca_merit_saveload_phase value = 0 }
                 }
                 if = { limit = { scope:tca_msl_actor = { merit = 1000 var:tca_merit_probe_approved = 1 var:tca_merit_saveload_sentinel = 12345 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_saveload_contract 1" }
-                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 1" }
+                else = { add_character_flag = tca_test_tca_merit_saveload_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 1" }
                 debug_log = "TCA_TEST WAIT tca_test_merit_saveload_contract 2 days"
                 trigger_event = { id = tca_merit_saveload_probe_test.1001 days = 2 }
         }
@@ -123,7 +119,7 @@ tca_merit_saveload_probe_test.1001 = {
         if = {
             limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
             if = { limit = { scope:tca_msl_actor = { merit_level = 1 merit = 1000 has_character_modifier = tca_merit_probe_lock_modifier } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_saveload_contract 2" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 2" }
+            else = { add_character_flag = tca_test_tca_merit_saveload_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 2" }
             scope:tca_msl_transaction = { tca_test_begin_merit_transaction_probe_effect = { SOURCE = 1 TARGET = 2 BASE = 1000 } }
             scope:tca_msl_formal = {
                 tca_merit_initialize_character_effect = yes
@@ -166,19 +162,19 @@ tca_merit_saveload_probe_test.1002 = {
             # 保存后曾真实改回量才兼领；续局必须恢复文臣专领、冷却及从属限制。
             if = { limit = { has_realm_law = tca_local_domain_civil_law has_variable = tca_local_domain_reform_cooldown scope:tca_domain_civil = { domain_limit = 1 has_realm_law = tca_local_domain_restricted_law } scope:tca_domain_military = { domain_limit > 1 has_realm_law = tca_local_domain_unrestricted_law } }
                 debug_log = "TCA_TEST CHECK_PASS tca_test_merit_saveload_contract 24" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 24" }
+            else = { add_character_flag = tca_test_tca_merit_saveload_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 24" }
             if = { limit = { title:h_china = { var:tca_merit_saveload_saved = 1 OR = { var:tca_merit_saveload_phase = 2 var:tca_merit_saveload_phase = 4 } } NOT = { has_character_flag = tca_merit_saveload_corruption_logged } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_saveload_contract 3" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 3" }
+            else = { add_character_flag = tca_test_tca_merit_saveload_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 3" }
             if = { limit = { exists = scope:tca_msl_actor scope:tca_msl_actor = title:h_china.var:tca_merit_saveload_actor scope:tca_msl_actor = { var:tca_merit_saveload_sentinel = 12345 var:tca_merit_probe_approved = 1 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_saveload_contract 4" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 4" }
+            else = { add_character_flag = tca_test_tca_merit_saveload_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 4" }
             if = { limit = { scope:tca_msl_actor = { merit = 1000 merit_level = 1 var:tca_merit_saveload_frozen = 1000 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_saveload_contract 5" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 5" }
+            else = { add_character_flag = tca_test_tca_merit_saveload_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 5" }
             # 分别记录恢复后余额、等级与政体，避免把自然收入或人物移池误判成存档丢失。
             debug_log = tca_merit_saveload_diagnostic
             if = { limit = { scope:tca_msl_actor = { has_character_flag = passed_provincial_exam has_character_flag = passed_metropolitan_exam has_character_flag = passed_palace_exam has_character_modifier = tca_merit_probe_provincial_modifier has_character_modifier = tca_merit_probe_metropolitan_modifier has_character_modifier = tca_merit_probe_palace_modifier has_character_modifier = tca_merit_probe_lock_modifier } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_saveload_contract 6" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 6" }
+            else = { add_character_flag = tca_test_tca_merit_saveload_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 6" }
             if = { limit = { title:h_china = { has_variable_list = tca_merit_saveload_candidates any_in_list = { variable = tca_merit_saveload_candidates count = 1 this = scope:tca_msl_actor } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_saveload_contract 7" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 7" }
+            else = { add_character_flag = tca_test_tca_merit_saveload_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 7" }
             # 原事件scope仍须与持久引用相同，阶段／双账／回调也不得改变。
             # 精确30000余额在重载首帧只读核对；60日后允许正常奖励增长，不把它误当存档丢失。
             scope:tca_msl_transaction = {
@@ -199,7 +195,7 @@ tca_merit_saveload_probe_test.1002 = {
                     NOT = { has_character_flag = tca_merit_reset_probe_suppress }
                 }
             } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_saveload_contract 11" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 11" }
+            else = { add_character_flag = tca_test_tca_merit_saveload_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 11" }
             debug_log = "TCA_MSL11 TRACE_END"
             # 正式核准队列及原scope token必须由原排队事件从存档恢复，不允许重新prepare。
             if = { limit = {
@@ -217,10 +213,10 @@ tca_merit_saveload_probe_test.1002 = {
                     NOT = { has_variable = tca_merit_last_ordinary_year }
                 }
             } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_saveload_contract 15" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 15" }
+            else = { add_character_flag = tca_test_tca_merit_saveload_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 15" }
             scope:tca_msl_formal = { tca_merit_commit_grant_effect = { TOKEN = scope:tca_msl_formal_token } }
             if = { limit = { scope:tca_msl_formal = { var:tca_merit_grant_result = 1 var:tca_merit_grant_phase = 2 var:tca_merit_approved_level = 2 merit = 1000 var:tca_merit_last_ordinary_year = current_year } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_saveload_contract 17" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 17" }
+            else = { add_character_flag = tca_test_tca_merit_saveload_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 17" }
             scope:tca_msl_transaction = { tca_test_commit_merit_transaction_probe_effect = yes }
             # 保留已保存的零倍率考试修正，只移除锁品修正；高经验只能兑现到 Level 2。
             scope:tca_msl_actor = {
@@ -241,13 +237,13 @@ tca_merit_saveload_probe_test.1003 = {
         if = {
             limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
             if = { limit = { scope:tca_msl_actor = { merit_level = 2 merit = 1000 var:tca_merit_probe_approved = 2 var:tca_merit_saveload_sentinel = 12345 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_saveload_contract 8" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 8" }
+            else = { add_character_flag = tca_test_tca_merit_saveload_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 8" }
             if = { limit = { scope:tca_msl_transaction = {
                 var:tca_mtx_phase = 2 merit_level = 2 merit = 1000
                 var:tca_merit_reset_probe_gain_count = 1 var:tca_merit_reset_probe_loss_count = 0
                 NOT = { has_character_flag = tca_merit_reset_probe_suppress }
             } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_saveload_contract 12" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 12" }
+            else = { add_character_flag = tca_test_tca_merit_saveload_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 12" }
             scope:tca_msl_transaction = {
                 tca_test_commit_merit_transaction_probe_effect = yes
                 tca_test_commit_merit_transaction_probe_effect = yes
@@ -256,7 +252,7 @@ tca_merit_saveload_probe_test.1003 = {
                 var:tca_mtx_phase = 2 merit_level = 2 merit = 1000
                 var:tca_merit_reset_probe_gain_count = 1 var:tca_merit_reset_probe_loss_count = 0
             } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_saveload_contract 13" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 13" }
+            else = { add_character_flag = tca_test_tca_merit_saveload_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 13" }
             title:h_china.var:tca_merit_saveload_transaction = {
                 tca_test_cleanup_merit_transaction_probe_effect = yes
                 remove_variable = tca_merit_saveload_transaction_sentinel
@@ -267,7 +263,7 @@ tca_merit_saveload_probe_test.1003 = {
                 NOT = { has_variable = tca_mtx_source } NOT = { has_variable = tca_mtx_base } NOT = { has_variable = tca_mtx_liege }
                 NOT = { has_character_flag = tca_merit_reset_probe_suppress }
             } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_saveload_contract 14" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 14" }
+            else = { add_character_flag = tca_test_tca_merit_saveload_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 14" }
             remove_character_flag = tca_merit_saveload_corruption_logged
             # 若 saved scope 丢失，也从持久引用恢复清理对象；不据此补救先前断言。
             title:h_china.var:tca_merit_saveload_actor = {
@@ -309,22 +305,22 @@ tca_merit_saveload_probe_test.9001 = {
                 tca_sync_local_domain_realm_effect = yes
                 if = { limit = { has_realm_law = tca_local_domain_original_law NOT = { has_variable = tca_local_domain_reform_cooldown } title:h_china.var:tca_local_domain_saveload_actor = { has_realm_law = tca_local_domain_unrestricted_law } }
                     debug_log = "TCA_TEST CHECK_PASS tca_test_merit_saveload_contract 23" }
-                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 23" }
+                else = { add_character_flag = tca_test_tca_merit_saveload_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 23" }
                 if = {
                     limit = { debug_only = yes title:h_china.holder = root title:h_china = { var:tca_merit_saveload_phase = 3 NOT = { has_variable_list = tca_merit_saveload_candidates } var:tca_merit_saveload_actor = { merit = 7 var:tca_merit_saveload_sentinel = 54321 } } }
                     debug_log = "TCA_TEST CHECK_PASS tca_test_merit_saveload_contract 9"
                 }
-                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 9" }
+                else = { add_character_flag = tca_test_tca_merit_saveload_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 9" }
                 if = { limit = { title:h_china.var:tca_merit_saveload_transaction = {
                     var:tca_mtx_phase = 99 var:tca_mtx_target = 9 merit = 7
                     var:tca_merit_saveload_transaction_sentinel = 54321
                 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_saveload_contract 10" }
-                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 10" }
+                else = { add_character_flag = tca_test_tca_merit_saveload_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 10" }
                 if = { limit = { title:h_china.var:tca_merit_saveload_formal_actor = {
                     var:tca_merit_grant_phase = 99 var:tca_merit_grant_target = 9 var:tca_merit_grant_token = 99
                     var:tca_merit_saveload_formal_sentinel = 54321 merit = 7
                 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_saveload_contract 16" }
-                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 16" }
+                else = { add_character_flag = tca_test_tca_merit_saveload_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 16" }
                 trigger_event = tca_retirement_saveload_probe.9001
                 title:h_china = { set_variable = { name = tca_merit_saveload_reload_ready value = 1 } }
                 debug_log = "TCA_CLI RELOAD_SAVE tca_merit_saveload_probe"
@@ -348,7 +344,7 @@ tca_merit_saveload_probe_test.1004 = {
                 var:tca_merit_reset_probe_gain_count = 1 var:tca_merit_reset_probe_loss_count = 0
                 NOT = { has_variable = tca_merit_grant_phase } NOT = { has_variable = tca_merit_grant_notified_token }
             } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_saveload_contract 18" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 18" }
+            else = { add_character_flag = tca_test_tca_merit_saveload_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 18" }
             scope:tca_msl_formal = {
                 tca_merit_commit_grant_effect = { TOKEN = scope:tca_msl_formal_token }
                 tca_merit_audit_grant_effect = { TOKEN = scope:tca_msl_formal_token }
@@ -358,7 +354,7 @@ tca_merit_saveload_probe_test.1004 = {
                 var:tca_merit_reset_probe_gain_count = 1 var:tca_merit_reset_probe_loss_count = 0
                 NOT = { has_variable = tca_merit_grant_phase } NOT = { has_variable = tca_merit_grant_notified_token }
             } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_saveload_contract 19" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 19" }
+            else = { add_character_flag = tca_test_tca_merit_saveload_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 19" }
             title:h_china.var:tca_merit_saveload_formal_actor = {
                 tca_merit_leave_celestial_effect = yes
                 remove_variable = tca_merit_reset_probe_gain_count
@@ -370,7 +366,7 @@ tca_merit_saveload_probe_test.1004 = {
                 NOT = { has_character_flag = tca_merit_active } NOT = { has_variable = tca_merit_grant_phase }
                 var:tca_merit_grant_token = scope:tca_msl_formal_token merit = 1000
             } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_saveload_contract 20" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 20" }
+            else = { add_character_flag = tca_test_tca_merit_saveload_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 20" }
             # 反馈本人去重状态与最近一轮快照必须随原存档恢复；不重新排队、不重写变量。
             if = { limit = {
                 exists = scope:tca_msl_feedback
@@ -382,7 +378,7 @@ tca_merit_saveload_probe_test.1004 = {
                     var:tca_merit_feedback_last_source = 2
                 }
             } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_saveload_contract 21" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 21" }
+            else = { add_character_flag = tca_test_tca_merit_saveload_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 21" }
             if = { limit = { title:h_china = {
                 var:tca_merit_feedback_year = 4242
                 var:tca_merit_feedback_q_1_1 = 4
@@ -391,7 +387,7 @@ tca_merit_saveload_probe_test.1004 = {
                 var:tca_merit_feedback_band_pop_1_1 = 7
                 var:tca_merit_feedback_band_target_1_1 >= 3.299 var:tca_merit_feedback_band_target_1_1 <= 3.301
             } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_saveload_contract 22" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 22" }
+            else = { add_character_flag = tca_test_tca_merit_saveload_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 22" }
             tca_test_cleanup_local_domain_effect = yes
             remove_variable = tca_local_domain_reform_cooldown
             title:h_china = { remove_variable = tca_local_domain_saveload_actor }
@@ -418,17 +414,16 @@ tca_merit_saveload_probe_test.1004 = {
             # 正式预算人物真实重载后继续到账，并核对快照、公国、独立合同与普通rank排除；不是固定金币。
             title:h_china.var:tca_rsf_actor = { debug_log = "TCA_RETIREMENT_SAVELOAD late income=[THIS.Char.MakeScope.ScriptValue('tca_retirement_probe_monthly_gold_value')] weight=[THIS.Char.MakeScope.ScriptValue('tca_retirement_salary_weight_value')] gold=[THIS.Char.GetGold] before=[THIS.Char.MakeScope.Var('tca_rsf_gold_before').GetValue]" }
             if = { limit = { title:h_china.var:tca_rsf_actor = { merit_level = 5 has_trait = tca_fengci NOT = { has_perk = war_profiteer_perk } is_ruler = yes liege = title:h_china.holder has_variable = tca_retirement_title primary_title = var:tca_retirement_title var:tca_retirement_title = { holder = title:h_china.var:tca_rsf_actor tier = tier_duchy is_landless_type_title = yes has_variable = tca_retirement_title } vassal_contract_has_flag = tca_retirement_salary_active vassal_contract_obligation_level:celestial_salary_rank = 0 monthly_character_treasury_income = 0 monthly_character_treasury_variable_income = 0 NOT = { vassal_contract_has_flag = tca_retirement_merit_half } tca_retirement_salary_weight_value = 0.25 vassal_contract_has_flag = tca_fengci_salary_active monthly_character_income >= { value = scope:tca_rt_native_salary_rate multiply = 0.25 subtract = 0.0002 } monthly_character_income < { value = scope:tca_rt_native_salary_rate multiply = 0.25 add = 0.0002 } gold > var:tca_rsf_gold_before monthly_character_income > 0 NOT = { has_variable = tca_retirement_probe_country } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_saveload_contract 41" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 41" }
+            else = { add_character_flag = tca_test_tca_merit_saveload_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 41" }
             title:h_china.var:tca_rsg_actor = { debug_log = "TCA_RETIREMENT_SAVELOAD late income=[THIS.Char.MakeScope.ScriptValue('tca_retirement_probe_monthly_gold_value')] weight=[THIS.Char.MakeScope.ScriptValue('tca_retirement_salary_weight_value')] gold=[THIS.Char.GetGold] before=[THIS.Char.MakeScope.Var('tca_rsg_gold_before').GetValue]" }
             if = { limit = { title:h_china.var:tca_rsg_actor = { merit_level = 5 has_trait = tca_retired NOT = { has_perk = war_profiteer_perk } is_ruler = yes liege = title:h_china.holder has_variable = tca_retirement_title primary_title = var:tca_retirement_title var:tca_retirement_title = { holder = title:h_china.var:tca_rsg_actor tier = tier_duchy is_landless_type_title = yes has_variable = tca_retirement_title } vassal_contract_has_flag = tca_retirement_salary_active vassal_contract_obligation_level:celestial_salary_rank = 0 monthly_character_treasury_income = 0 monthly_character_treasury_variable_income = 0 vassal_contract_has_flag = tca_retirement_merit_half tca_retirement_salary_weight_value = 0.125 vassal_contract_has_flag = tca_zhishi_salary_active monthly_character_income >= { value = scope:tca_rt_native_salary_rate multiply = 0.125 subtract = 0.0002 } monthly_character_income < { value = scope:tca_rt_native_salary_rate multiply = 0.125 add = 0.0002 } gold > var:tca_rsg_gold_before monthly_character_income > 0 NOT = { has_variable = tca_retirement_probe_country } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_saveload_contract 43" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 43" }
+            else = { add_character_flag = tca_test_tca_merit_saveload_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 43" }
             title:h_china = { remove_variable = tca_msl_transaction_restore_checked remove_variable = tca_msl_transaction_restore_valid }
             tca_test_cleanup_retirement_saveload_effect = yes
-            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_merit_saveload_contract" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            if = { limit = { has_character_flag = tca_test_tca_merit_saveload_probe_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_merit_saveload_contract" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
             else = { debug_log = "TCA_TEST PASS tca_test_merit_saveload_contract" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
-            remove_character_flag = tca_test_case_failed
-            remove_character_flag = tca_test_delayed_case_active
-            tca_test_continue_delayed_effect = yes
+            remove_character_flag = tca_test_tca_merit_saveload_probe_test_case_failed
+            tca_test_lane_end_effect = { GROUP = tca_local_domain_realm }
         }
     }
 }

@@ -140,24 +140,33 @@ def source_files(repo):
     return files
 
 
-def configure_selection(run, rows, selected):
-    """只配置适配模组的选择标记；正式测试源保持原样。"""
+def configure_selection(run, rows, selected, parallel=1):
+    """配置适配模组的选择标记与并发上限；正式测试源保持原样。
+
+    无论全量还是选择都注入 tca_test_max_active，保证显式选择局也能复现 K>1；
+    注入点必须在观察者入口之前，且入口标记只能出现一次。
+    """
+    if type(parallel) is not int or not 1 <= parallel <= 32:
+        raise ValueError('parallel must be between 1 and 32')
     plan = {'format': 1, 'scope': 'selection' if selected else 'full', 'cases': rows}
     write_json(run / 'selection.json', plan)
     events = run / 'mod/tca_cli_adapter/events/tca_cli_events.txt'
+    text = events.read_text(encoding='utf-8-sig')
     if selected:
-        text = events.read_text(encoding='utf-8-sig')
         # 克隆已选择运行时先撤去旧标记，再安装本子运行的范围。
-        text = re.sub(r'\s*set_variable = \{ name = tca_test_(?:selected_run|\w+_selected) value = yes \}', '', text)
-        flags = 'set_variable = { name = tca_test_selected_run value = yes }\n' + ''.join(
-            f"   set_variable = {{ name = {row['name']}_selected value = yes }}\n" for row in rows)
-        marker = 'tca_run_observer_tests_effect = yes'
-        if text.count(marker) != 1:
-            raise ValueError('CLI observer entry must occur exactly once')
-        events.write_text(text.replace(marker, flags + '   ' + marker), encoding='utf-8-sig')
+        text = re.sub(r'\s*set_variable = \{ name = tca_test_(?:selected_run|max_active|\w+_selected) '
+                      r'value = (?:yes|\d+) \}', '', text)
+    marker = 'tca_run_observer_tests_effect = yes'
+    if text.count(marker) != 1:
+        raise ValueError('CLI observer entry must occur exactly once')
+    flags = [f'set_variable = {{ name = tca_test_max_active value = {parallel} }}']
+    if selected:
+        flags.append('set_variable = { name = tca_test_selected_run value = yes }')
+        flags += [f"   set_variable = {{ name = {row['name']}_selected value = yes }}" for row in rows]
+    events.write_text(text.replace(marker, '\n'.join(flags) + '\n   ' + marker), encoding='utf-8-sig')
 
 
-def prepare_run(repo, run_root, settings, selected_case=None, suites=(), cases=(), execution=None):
+def prepare_run(repo, run_root, settings, selected_case=None, suites=(), cases=(), execution=None, parallel=1):
     if run_root.resolve().is_relative_to(repo.resolve()):
         raise ValueError('Run root must be outside the source directory')
     run_root.mkdir(parents=True, exist_ok=True)
@@ -190,7 +199,7 @@ def prepare_run(repo, run_root, settings, selected_case=None, suites=(), cases=(
     if list((snapshot / 'common/scripted_effects').rglob('tca_test_catalog_effects.txt')):
         from testing.catalog import select_cases
         rows = select_cases(snapshot, suites, requested)
-        configure_selection(run, rows, bool(suites or requested))
+        configure_selection(run, rows, bool(suites or requested), parallel)
     elif suites or requested:
         raise ValueError('Native catalog missing')
     write_json(run / 'dlc_load.json', {'disabled_dlcs': [], 'enabled_mods': [
@@ -210,11 +219,18 @@ def prepare_run(repo, run_root, settings, selected_case=None, suites=(), cases=(
     return run
 
 
-def clone_run(base, run_root, rows):
-    """隔离子运行只从已封存任务复制，不能重新读取持续变化的工作目录。"""
+def clone_run(base, run_root, rows, parallel=None):
+    """隔离子运行只从已封存任务复制，不能重新读取持续变化的工作目录。
+
+    并发上限沿用父任务的 execution.json；缺失时回退 1，保证子运行与父任务同口径。
+    """
     issues = verify_snapshot(base)
     if issues:
         raise ValueError('; '.join(issues))
+    if parallel is None:
+        execution_path = base / 'execution.json'
+        execution = json.loads(execution_path.read_text(encoding='utf-8')) if execution_path.is_file() else {}
+        parallel = execution.get('parallel', 1)
     run = Path(tempfile.mkdtemp(prefix='run-', dir=run_root))
     for name in ('mod', 'tools', 'inputs'):
         shutil.copytree(base / name, run / name)
@@ -227,7 +243,7 @@ def clone_run(base, run_root, rows):
     shutil.copy2(run / 'inputs/pdx_settings.txt', run / 'pdx_settings.txt')
     for name, label in (('tca_main', 'TCA Main'), ('tca_cli_adapter', 'TCA CLI Adapter')):
         (run / 'mod' / (name + '.mod')).write_text(descriptor(label, run / 'mod' / name), encoding='utf-8')
-    configure_selection(run, rows, True)
+    configure_selection(run, rows, True, parallel)
     metadata = json.loads((run / 'metadata.json').read_text(encoding='utf-8'))
     metadata.update(run_id=run.name, parent_task=base.name)
     write_json(run / 'metadata.json', metadata)
@@ -672,7 +688,8 @@ def run_game(args, run):
             result.write('NOT VERIFIED\n' + '\n'.join(snapshot_issues) + '\n')
     write_json(run / 'terminal.json', {**state, 'condition': condition,
                'process_exit': None if condition == 'reload_launch_failed' else process.returncode,
-               'phases': phase, 'verification_exit': checker.returncode,
+               'phases': phase, 'parallel': getattr(args, 'parallel', 1),
+               'verification_exit': checker.returncode,
                'runner_exit': code, 'snapshot_issues': snapshot_issues,
                'source_sha256': json.loads((run / 'source_manifest.json').read_text(encoding='utf-8'))['sha256'],
                'scope': json.loads((run / 'selection.json').read_text(encoding='utf-8'))['scope']})
@@ -697,6 +714,8 @@ def main(argv=None):
     parser.add_argument('--timeout', type=float, default=240, help='每局启动及执行超时秒数，不包含排队')
     parser.add_argument('--prepare-only', action='store_true', help='封存任务但不启动游戏')
     parser.add_argument('--seed', type=int, help='原生新局随机种子')
+    parser.add_argument('--parallel', type=int, default=1,
+                        help='同一进程内并发延迟用例上限（1–32，默认 1 保持串行语义）')
     parser.add_argument('--strict-title-heir', action='store_true', help='首位继任不符也验收失败')
     parser.add_argument('--case', action='append', default=[], help='选择原生用例，可重复')
     parser.add_argument('--suite', action='append', default=[], help='选择模块或模块前缀，可重复')
@@ -707,6 +726,8 @@ def main(argv=None):
     args.run_root = args.run_root.expanduser().resolve()
     if args.seed is not None and not 0 <= args.seed <= 0xFFFFFFFF:
         parser.error('--seed 必须介于 0 和 4294967295')
+    if not 1 <= args.parallel <= 32:
+        parser.error('--parallel 必须介于 1 和 32')
     if args.timeout <= 0:
         parser.error('--timeout 必须为正数')
     base, runs, task = None, [], None
@@ -721,9 +742,10 @@ def main(argv=None):
         if not args.prepare_only and not (game_executable(args.game_dir)).is_file():
             raise ValueError('找不到 CK3，请设置 --game-dir')
         execution = {'environment': game_environment(args.game_dir), 'seed': args.seed,
-                     'strict_title_heir': args.strict_title_heir, 'timeout': args.timeout}
+                     'strict_title_heir': args.strict_title_heir, 'timeout': args.timeout,
+                     'parallel': args.parallel}
         base = prepare_run(ROOT, args.run_root, args.settings.expanduser(), suites=args.suite, cases=args.case,
-                           execution=execution)
+                           execution=execution, parallel=args.parallel)
         rows = json.loads((base / 'selection.json').read_text(encoding='utf-8'))['cases']
         if args.isolate == 'suite':
             for suite in dict.fromkeys(row['suite'] for row in rows):
@@ -732,6 +754,7 @@ def main(argv=None):
             runs = [base]
         task = {'task_id': base.name, 'execution': 'isolated' if args.isolate == 'suite' else 'same_world',
                 'scope': json.loads((base / 'selection.json').read_text(encoding='utf-8'))['scope'],
+                'parallel': args.parallel,
                 'runs': [str(run) for run in runs], 'state': 'prepared'}
         write_json(base / 'task.json', task)
         print(f'Task {base.name}: {base}', flush=True)

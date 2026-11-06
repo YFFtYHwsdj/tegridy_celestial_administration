@@ -5,7 +5,7 @@ tca_retirement_session.1 = {
     type = character_event hidden = yes
     immediate = {
         debug_log = "TCA_TEST BEGIN tca_retirement_session.1 tca_test_retirement_player_session"
-        remove_character_flag = tca_test_case_failed
+        remove_character_flag = tca_test_tca_retirement_session_case_failed
         # 本用例只接受独立人类会话适配器写入的标记；观察者/CLI局不运行真实玩家交接。
         # 先在最外层事件声明默认值，满足引擎“变量必须由可执行脚本设置”的契约；
         # 人类适配器先写1，这里的默认分支不会覆盖已存在的值。
@@ -23,10 +23,9 @@ tca_retirement_session.1 = {
             }
             scope:tca_rsess_child = { set_house = scope:tca_rsess_actor.house tca_test_protect_character_effect = yes add_character_flag = ai_will_not_convert add_character_flag = tca_merit_interface_probe set_appointment_timeout = { years = 150 desc = appointment_timeout_desc_refusing } }
             title:h_china = { set_variable = { name = tca_retirement_session_actor value = scope:tca_rsess_actor } set_variable = { name = tca_retirement_session_phase value = 0 } set_variable = { name = tca_retirement_session_family value = scope:tca_rsess_family } set_variable = { name = tca_retirement_session_estate value = scope:tca_rsess_estate } set_variable = { name = tca_retirement_session_child value = scope:tca_rsess_child } }
-            add_character_flag = tca_test_delayed_case_active
             trigger_event = { id = tca_retirement_session.1001 days = 2 }
         }
-        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_retirement_player_session" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_continue_delayed_effect = yes }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_retirement_player_session" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_lane_end_effect = { GROUP = tca_retirement_session } }
     }
 }
 tca_retirement_session.1001 = {
@@ -36,7 +35,7 @@ tca_retirement_session.1001 = {
         if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
             scope:tca_rsess_family.current_heir = { save_scope_as = tca_rsess_heir }
             if = { limit = { scope:tca_rsess_heir = scope:tca_rsess_child scope:tca_rsess_actor = { is_ai = yes is_incapable = yes can_execute_decision = tca_retirement_candidate_apply_probe_decision } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_player_session 1" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_player_session 1" }
+            else = { add_character_flag = tca_test_tca_retirement_session_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_player_session 1" }
             scope:tca_rsess_actor = { set_variable = { name = tca_rsess_rank_before value = merit_level } }
             title:h_china = { set_variable = { name = tca_retirement_session_phase value = 1 } set_variable = { name = tca_retirement_session_heir value = scope:tca_rsess_heir } }
         }
@@ -60,10 +59,10 @@ tca_retirement_session.1002 = {
             if = { limit = { scope:tca_rsess_actor = { can_execute_decision = tca_retirement_candidate_apply_probe_decision } } debug_log = "TCA_RETIREMENT_SESSION DECISION_CONFIRMED" }
 
             if = { limit = { scope:tca_rsess_actor = { is_ai = no is_incapable = yes can_execute_decision = tca_retirement_candidate_apply_probe_decision } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_player_session 2" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_player_session 2" }
+            else = { add_character_flag = tca_test_tca_retirement_session_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_player_session 2" }
             scope:tca_rsess_actor = { execute_decision = tca_retirement_candidate_apply_probe_decision }
             if = { limit = { scope:tca_rsess_actor = { has_trait = tca_retirement_probe_fengci tca_retirement_candidate_is_exited_trigger = yes NOT = { has_trait = devoted } } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_player_session 3" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_player_session 3" }
+            else = { add_character_flag = tca_test_tca_retirement_session_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_player_session 3" }
             create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_rsess_transfer }
             scope:tca_rsess_family = { change_title_holder = { holder = scope:tca_rsess_heir change = scope:tca_rsess_transfer } }
             resolve_title_and_vassal_change = scope:tca_rsess_transfer
@@ -82,7 +81,7 @@ tca_retirement_session.1003 = {
         tca_test_validate_environment_effect = yes
         if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
             if = { limit = { scope:tca_rsess_actor = { is_ai = yes is_ruler = no has_trait = tca_retirement_probe_fengci merit_level = var:tca_rsess_rank_before } scope:tca_rsess_heir = { is_ai = no primary_title = scope:tca_rsess_family domicile = scope:tca_rsess_estate NOT = { has_trait = tca_retirement_probe_fengci } NOT = { has_trait = devoted } } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_player_session 4" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_player_session 4" }
+            else = { add_character_flag = tca_test_tca_retirement_session_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_player_session 4" }
             title:h_china = { set_variable = { name = tca_retirement_session_phase value = 3 } }
             # 先排真实续接，再让GUI回观察者；无需在GUI控制台运行期间嵌套另一个effect。
             trigger_event = { id = tca_retirement_session.1004 days = 5 }
@@ -101,14 +100,14 @@ tca_retirement_session.1004 = {
         title:h_china.var:tca_retirement_session_child = { save_scope_as = tca_rsess_child }
         title:h_china.var:tca_retirement_session_heir = { save_scope_as = tca_rsess_heir }
             if = { limit = { scope:tca_rsess_actor = { is_ai = yes } scope:tca_rsess_heir = { is_ai = yes } title:h_china = { var:tca_retirement_session_phase = 3 } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_player_session 5" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_player_session 5" }
+            else = { add_character_flag = tca_test_tca_retirement_session_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_player_session 5" }
             remove_character_flag = tca_rsess_was_player
             scope:tca_rsess_actor = { remove_character_flag = tca_retirement_candidate_application_probe remove_trait = incapable tca_test_cleanup_retirement_exit_actor_effect = yes }
             scope:tca_rsess_child = { tca_test_cleanup_merit_probe_character_effect = yes }
             title:h_china = { remove_variable = tca_retirement_session_actor remove_variable = tca_retirement_session_family remove_variable = tca_retirement_session_estate remove_variable = tca_retirement_session_child remove_variable = tca_retirement_session_heir set_variable = { name = tca_retirement_session_phase value = 5 } }
-            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_retirement_player_session" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            if = { limit = { has_character_flag = tca_test_tca_retirement_session_case_failed } debug_log = "TCA_TEST FAIL tca_test_retirement_player_session" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
             else = { debug_log = "TCA_TEST PASS tca_test_retirement_player_session" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
-            remove_character_flag = tca_test_case_failed remove_character_flag = tca_test_delayed_case_active tca_test_continue_delayed_effect = yes
+            remove_character_flag = tca_test_tca_retirement_session_case_failed tca_test_lane_end_effect = { GROUP = tca_retirement_session }
         }
     }
 }

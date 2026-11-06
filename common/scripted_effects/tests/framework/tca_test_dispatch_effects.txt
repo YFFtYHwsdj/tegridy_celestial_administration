@@ -1,6 +1,8 @@
-﻿# 报告者作用域；模块以 EVENT、CASE、DELAYED 登记用例。
-# 阶段 0 计数并重置派发记录，1 执行即时，2 每轮仅认领一个延迟，3 清理。
-# CASE 对应唯一日志标识；选择标记由 CLI 适配设置，原生全组入口不需要选择标记。
+﻿# 报告者作用域；模块以 EVENT、CASE、DELAYED、GROUP、EXCLUSIVE 登记用例。
+# 阶段 0 计数并重置派发记录，1 执行即时，2 按并发上限连续认领延迟，3 清理。
+# CASE 对应唯一日志标识；GROUP 为一个 lane（同一测试文件命名空间），同组同时至多一项延迟用例在途。
+# EXCLUSIVE 独占用例要求认领时没有其它活跃延迟用例，在途期间也不再认领任何用例。
+# 选择标记由 CLI 适配设置，原生全组入口不需要选择标记。
 tca_test_visit_case_effect = {
     # 每个登记拥有显式默认值，既支持单项选择，也满足引擎全脚本引用检查。
     if = {
@@ -23,19 +25,44 @@ tca_test_visit_case_effect = {
             limit = { var:tca_test_dispatch_phase = 0 }
             remove_character_flag = $CASE$_dispatched
             change_variable = { name = tca_test_suite_expected add = 1 }
+            # 阶段 0 重置在途计数；延迟用例追加待派发数，即时用例在阶段 1 同步执行。
+            set_variable = { name = tca_test_active_count value = 0 }
+            if = {
+                limit = { always = $DELAYED$ }
+                change_variable = { name = tca_test_undispatched add = 1 }
+            }
         }
+        # 延迟认领：一次扫描可连续认领至并发上限；同 GROUP lane 与独占用例互斥。
         else_if = {
             limit = {
                 has_character_flag = tca_test_suite_running
                 NOT = { has_character_flag = tca_test_suite_aborted }
                 NOT = { has_character_flag = $CASE$_dispatched }
-                NOT = { has_character_flag = tca_test_delayed_case_active }
                 var:tca_test_dispatch_phase = 2
                 always = $DELAYED$
-                NOT = { has_character_flag = tca_test_dispatch_claimed }
+                var:tca_test_undispatched > 0
+                var:tca_test_active_count < var:tca_test_max_active
+                NOT = { has_character_flag = tca_test_lane_$GROUP$_active }
+                NOT = { has_character_flag = tca_test_exclusive_active }
+                # 独占用例只在当前没有其它活跃延迟用例时认领。
+                OR = {
+                    NOT = { always = $EXCLUSIVE$ }
+                    var:tca_test_active_count = 0
+                }
             }
+            # 认领顺序固定：先占位并登记在途，再触发用例，避免同步失败续接重复派发同一用例。
             add_character_flag = $CASE$_dispatched
-            add_character_flag = tca_test_dispatch_claimed
+            change_variable = { name = tca_test_undispatched subtract = 1 }
+            add_character_flag = tca_test_lane_$GROUP$_active
+            change_variable = { name = tca_test_active_count add = 1 }
+            if = {
+                limit = { var:tca_test_active_count = 1 }
+                add_character_flag = tca_test_delayed_case_active
+            }
+            if = {
+                limit = { always = $EXCLUSIVE$ }
+                add_character_flag = tca_test_exclusive_active
+            }
             trigger_event = $EVENT$
         }
         # 即时与延迟使用相反筛选；避免用例自身负责解释运行选择。
@@ -59,6 +86,9 @@ tca_test_cleanup_dispatch_effect = {
     set_variable = { name = tca_test_dispatch_phase value = 3 }
     tca_test_catalog_effect = yes
     remove_variable = tca_test_selected_run
-    remove_character_flag = tca_test_dispatch_claimed
+    # 在途与待派发计数归零；lane flag 无法枚举，异常残留依赖新局或中断语义清理。
+    set_variable = { name = tca_test_active_count value = 0 }
+    set_variable = { name = tca_test_undispatched value = 0 }
+    remove_character_flag = tca_test_exclusive_active
     # 保留闲置阶段，避免同步前置失败续接结束后，外层尚未返回的扫描读取空变量。
 }

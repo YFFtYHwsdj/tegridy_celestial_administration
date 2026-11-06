@@ -5,7 +5,7 @@ tca_retirement_ai_test.5 = {
     type = character_event hidden = yes
     immediate = {
         debug_log = "TCA_TEST BEGIN tca_retirement_ai_test.5 tca_test_retirement_ai_keep"
-        remove_character_flag = tca_test_case_failed
+        remove_character_flag = tca_test_tca_retirement_ai_test_case_failed
         if = { limit = { debug_only = yes is_alive = yes title:h_china.holder = root }
             tca_test_create_merit_interface_character_with_age_effect = { CHARACTER = tca_rak_actor GOVERNMENT = celestial_government AGE = 60 }
             scope:tca_rak_actor = {
@@ -19,10 +19,9 @@ tca_retirement_ai_test.5 = {
                 tca_test_add_native_merit_probe_exams_effect = yes add_trait = education_stewardship_1 set_merit_level = 4
                 add_trait = ambitious add_trait = diligent
             }
-            add_character_flag = tca_test_delayed_case_active
             trigger_event = { id = tca_retirement_ai_test.5000 days = 2 }
         }
-        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_retirement_ai_keep" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_continue_delayed_effect = yes }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_retirement_ai_keep" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_lane_end_effect = { GROUP = tca_retirement_ai_test } }
     }
 }
 tca_retirement_ai_test.5000 = {
@@ -38,7 +37,7 @@ tca_retirement_ai_test.5000 = {
             save_scope_value_as = { name = tca_rak_old_age value = retirement_age_current_value }
             if = { limit = { NOT = { has_realm_law = celestial_retirement_law_2 } } add_realm_law_skip_effects = celestial_retirement_law_2 }
             if = { limit = { scope:tca_rak_actor = { can_execute_decision = tca_retirement_ai_evaluate_decision tca_retirement_ai_fengci_weight_value = 0 tca_retirement_ai_retire_weight_value = 0 tca_retirement_ai_resume_weight_value = 0 tca_retirement_ai_keep_weight_value > 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_ai_keep 1" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_ai_keep 1" }
+            else = { add_character_flag = tca_test_tca_retirement_ai_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_ai_keep 1" }
             scope:tca_rak_control = { set_variable = { name = tca_rak_control_influence value = influence } debug_log = "TCA_RETIREMENT_AI_TEST CONTROL_START id=[THIS.Char.GetID] influence=[THIS.Char.GetInfluence]" }
             scope:tca_rak_actor = {
                 set_variable = { name = tca_rak_influence value = influence }
@@ -48,7 +47,7 @@ tca_retirement_ai_test.5000 = {
                 debug_log = "TCA_RETIREMENT_AI_TEST AFTER_DISPATCH influence=[THIS.Char.MakeScope.Var('tca_rak_observed_influence').GetValue]"
                 # 保持现状在决议链内不得扣费；等待期内庄园月度影响力自然增加，须与选项费用分开核对。
                 if = { limit = { influence = var:tca_rak_influence } debug_log = "TCA_RETIREMENT_AI_TEST KEEP_NO_COST" }
-                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_RETIREMENT_AI_TEST KEEP_COST_CHANGED" }
+                else = { add_character_flag = tca_test_tca_retirement_ai_test_case_failed debug_log = "TCA_RETIREMENT_AI_TEST KEEP_COST_CHANGED" }
             }
             # 真实逐日观察只补诊断，不改三日后的严格余额断言或人物资源。
             set_variable = { name = tca_rak_diagnostic_day value = 0 }
@@ -81,7 +80,7 @@ tca_retirement_ai_test.5001 = {
                 NOT = { has_variable = tca_retirement_request_kind } NOT = { has_variable = tca_retirement_entered_date }
             } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_ai_keep 2" }
             else = {
-                add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_ai_keep 2"
+                add_character_flag = tca_test_tca_retirement_ai_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_ai_keep 2"
                 if = { limit = { scope:tca_rak_family.holder = scope:tca_rak_actor } debug_log = "TCA_RETIREMENT_AI_TEST FAMILY_OK" } else = { debug_log = "TCA_RETIREMENT_AI_TEST FAMILY_CHANGED" }
                 scope:tca_rak_actor = {
                     if = { limit = { influence = var:tca_rak_influence } debug_log = "TCA_RETIREMENT_AI_TEST INFLUENCE_OK" } else = { debug_log = "TCA_RETIREMENT_AI_TEST INFLUENCE_CHANGED" }
@@ -98,9 +97,9 @@ tca_retirement_ai_test.5001 = {
             scope:tca_rak_actor = { tca_test_cleanup_retirement_formal_effect = yes }
             scope:tca_rak_control = { tca_test_cleanup_retirement_formal_effect = yes }
             remove_variable = tca_rak_month_day
-            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_retirement_ai_keep" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            if = { limit = { has_character_flag = tca_test_tca_retirement_ai_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_retirement_ai_keep" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
             else = { debug_log = "TCA_TEST PASS tca_test_retirement_ai_keep" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
-            remove_character_flag = tca_test_case_failed remove_character_flag = tca_test_delayed_case_active tca_test_continue_delayed_effect = yes
+            remove_character_flag = tca_test_tca_retirement_ai_test_case_failed tca_test_lane_end_effect = { GROUP = tca_retirement_ai_test }
         }
     }
 }
@@ -126,16 +125,15 @@ tca_retirement_ai_test.2 = {
     type = character_event hidden = yes
     immediate = {
         debug_log = "TCA_TEST BEGIN tca_retirement_ai_test.2 tca_test_retirement_ai_weights"
-        remove_character_flag = tca_test_case_failed
+        remove_character_flag = tca_test_tca_retirement_ai_test_case_failed
         if = { limit = { debug_only = yes is_alive = yes title:h_china.holder = root }
             save_scope_value_as = { name = tca_raw_old_age value = retirement_age_current_value }
             if = { limit = { NOT = { has_realm_law = celestial_retirement_law_5 } } add_realm_law_skip_effects = celestial_retirement_law_5 }
             tca_test_create_merit_interface_character_with_age_effect = { CHARACTER = tca_raw_actor GOVERNMENT = celestial_government AGE = 59 }
             scope:tca_raw_actor = { tca_test_add_native_merit_probe_exams_effect = yes add_trait = education_stewardship_1 set_merit_level = 4 change_influence = 1000 }
-            add_character_flag = tca_test_delayed_case_active
             trigger_event = { id = tca_retirement_ai_test.2000 days = 2 }
         }
-        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_retirement_ai_weights" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_continue_delayed_effect = yes }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_retirement_ai_weights" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_lane_end_effect = { GROUP = tca_retirement_ai_test } }
     }
 }
 tca_retirement_ai_test.2000 = {
@@ -144,19 +142,19 @@ tca_retirement_ai_test.2000 = {
         tca_test_validate_environment_effect = yes
         if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
             if = { limit = { scope:tca_raw_actor = { merit_level = 4 tca_retirement_ai_can_evaluate_trigger = no tca_retirement_ai_fengci_weight_value = 0 tca_retirement_ai_retire_weight_value = 0 tca_retirement_ai_keep_weight_value > 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_ai_weights 1" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_ai_weights 1" }
+            else = { add_character_flag = tca_test_tca_retirement_ai_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_ai_weights 1" }
             scope:tca_raw_actor = { set_age = 60 }
             if = { limit = { scope:tca_raw_actor = { tca_retirement_ai_can_evaluate_trigger = yes tca_retirement_ai_fengci_weight_value > 0 tca_retirement_ai_retire_weight_value = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_ai_weights 2" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_ai_weights 2" }
+            else = { add_character_flag = tca_test_tca_retirement_ai_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_ai_weights 2" }
             scope:tca_raw_actor = { set_age = 70 set_variable = { name = tca_raw_keep value = tca_retirement_ai_keep_weight_value } set_variable = { name = tca_raw_retire value = tca_retirement_ai_retire_weight_value } }
             if = { limit = { scope:tca_raw_actor = { tca_retirement_ai_fengci_weight_value > 0 tca_retirement_ai_retire_weight_value > 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_ai_weights 3" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_ai_weights 3" }
+            else = { add_character_flag = tca_test_tca_retirement_ai_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_ai_weights 3" }
             scope:tca_raw_actor = { set_age = 90 }
             if = { limit = { scope:tca_raw_actor = { tca_retirement_ai_keep_weight_value > 0 tca_retirement_ai_keep_weight_value < var:tca_raw_keep tca_retirement_ai_retire_weight_value > var:tca_raw_retire } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_ai_weights 4" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_ai_weights 4" }
+            else = { add_character_flag = tca_test_tca_retirement_ai_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_ai_weights 4" }
             scope:tca_raw_actor = { add_character_flag = tca_retirement_request_denied }
             if = { limit = { scope:tca_raw_actor = { tca_retirement_ai_can_evaluate_trigger = no tca_retirement_ai_fengci_weight_value = 0 tca_retirement_ai_retire_weight_value = 0 tca_retirement_ai_keep_weight_value > 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_ai_weights 5" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_ai_weights 5" }
+            else = { add_character_flag = tca_test_tca_retirement_ai_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_ai_weights 5" }
             scope:tca_raw_actor = {
                 remove_character_flag = tca_retirement_request_denied set_age = 40 add_trait = ambitious
                 tca_retirement_enter_effect = { KIND = 1 } tca_retirement_step_down_effect = yes
@@ -165,13 +163,13 @@ tca_retirement_ai_test.2000 = {
                 set_variable = { name = tca_retirement_entered_date value = { value = current_date subtract = 364 } }
             }
             if = { limit = { scope:tca_raw_actor = { tca_retirement_can_resume_trigger = yes tca_retirement_ai_resume_weight_value = var:tca_raw_recent tca_retirement_ai_resume_weight_value > 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_ai_weights 6" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_ai_weights 6" }
+            else = { add_character_flag = tca_test_tca_retirement_ai_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_ai_weights 6" }
             scope:tca_raw_actor = { set_variable = { name = tca_retirement_entered_date value = { value = current_date subtract = 365 } } }
             if = { limit = { scope:tca_raw_actor = { tca_retirement_ai_resume_weight_value = var:tca_raw_after_year } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_ai_weights 7" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_ai_weights 7" }
+            else = { add_character_flag = tca_test_tca_retirement_ai_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_ai_weights 7" }
             scope:tca_raw_actor = { tca_retirement_enter_effect = { KIND = 2 } tca_retirement_step_down_effect = yes }
             if = { limit = { scope:tca_raw_actor = { tca_retirement_ai_can_evaluate_trigger = no tca_retirement_ai_resume_weight_value = 0 tca_retirement_ai_keep_weight_value > 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_ai_weights 8" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_ai_weights 8" }
+            else = { add_character_flag = tca_test_tca_retirement_ai_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_ai_weights 8" }
             if = { limit = { scope:tca_raw_old_age = 50 } if = { limit = { NOT = { has_realm_law = celestial_retirement_law_0 } } add_realm_law_skip_effects = celestial_retirement_law_0 } }
             else_if = { limit = { scope:tca_raw_old_age = 60 } if = { limit = { NOT = { has_realm_law = celestial_retirement_law_1 } } add_realm_law_skip_effects = celestial_retirement_law_1 } }
             else_if = { limit = { scope:tca_raw_old_age = 70 } if = { limit = { NOT = { has_realm_law = celestial_retirement_law_2 } } add_realm_law_skip_effects = celestial_retirement_law_2 } }
@@ -179,9 +177,9 @@ tca_retirement_ai_test.2000 = {
             else_if = { limit = { scope:tca_raw_old_age = 90 } if = { limit = { NOT = { has_realm_law = celestial_retirement_law_4 } } add_realm_law_skip_effects = celestial_retirement_law_4 } }
             else = { if = { limit = { NOT = { has_realm_law = celestial_retirement_law_5 } } add_realm_law_skip_effects = celestial_retirement_law_5 } }
             scope:tca_raw_actor = { tca_test_cleanup_retirement_formal_effect = yes }
-            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_retirement_ai_weights" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            if = { limit = { has_character_flag = tca_test_tca_retirement_ai_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_retirement_ai_weights" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
             else = { debug_log = "TCA_TEST PASS tca_test_retirement_ai_weights" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
-            remove_character_flag = tca_test_case_failed remove_character_flag = tca_test_delayed_case_active tca_test_continue_delayed_effect = yes
+            remove_character_flag = tca_test_tca_retirement_ai_test_case_failed tca_test_lane_end_effect = { GROUP = tca_retirement_ai_test }
         }
     }
 }
@@ -191,16 +189,15 @@ tca_retirement_ai_test.3 = {
     type = character_event hidden = yes
     immediate = {
         debug_log = "TCA_TEST BEGIN tca_retirement_ai_test.3 tca_test_retirement_ai_approval"
-        remove_character_flag = tca_test_case_failed
+        remove_character_flag = tca_test_tca_retirement_ai_test_case_failed
         if = { limit = { debug_only = yes is_alive = yes is_ai = yes title:h_china.holder = root }
             tca_test_create_merit_interface_character_effect = { CHARACTER = tca_raa_valid GOVERNMENT = celestial_government }
             tca_test_create_merit_interface_character_effect = { CHARACTER = tca_raa_invalid GOVERNMENT = celestial_government }
             scope:tca_raa_valid = { tca_test_add_native_merit_probe_exams_effect = yes add_trait = education_stewardship_1 set_merit_level = 7 }
             scope:tca_raa_invalid = { tca_test_add_native_merit_probe_exams_effect = yes add_trait = education_stewardship_1 set_merit_level = 7 }
-            add_character_flag = tca_test_delayed_case_active
             trigger_event = { id = tca_retirement_ai_test.3000 days = 2 }
         }
-        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_retirement_ai_approval" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_continue_delayed_effect = yes }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_retirement_ai_approval" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_lane_end_effect = { GROUP = tca_retirement_ai_test } }
     }
 }
 tca_retirement_ai_test.3000 = {
@@ -229,24 +226,22 @@ tca_retirement_ai_test.3001 = {
         tca_test_validate_environment_effect = yes
         if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
             if = { limit = { scope:tca_raa_valid = { has_trait = tca_retired has_character_flag = tca_retirement_honor_processed var:tca_retirement_request_result = 1 NOT = { has_variable = tca_retirement_request_kind } NOT = { has_variable = tca_retirement_honor_target } OR = { merit_level = 7 merit_level = 8 } } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_ai_approval 1" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_ai_approval 1" }
+            else = { add_character_flag = tca_test_tca_retirement_ai_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_ai_approval 1" }
             if = { limit = { scope:tca_raa_invalid = { has_trait = tca_retired merit_level = 7 var:tca_retirement_request_result = -1 NOT = { has_variable = tca_retirement_request_kind } NOT = { has_variable = tca_retirement_honor_target } NOT = { has_character_flag = tca_retirement_honor_processed } } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_ai_approval 2" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_ai_approval 2" }
+            else = { add_character_flag = tca_test_tca_retirement_ai_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_ai_approval 2" }
             scope:tca_raa_valid = { tca_test_cleanup_retirement_formal_effect = yes }
             scope:tca_raa_invalid = { tca_test_cleanup_retirement_formal_effect = yes }
-            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_retirement_ai_approval" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            if = { limit = { has_character_flag = tca_test_tca_retirement_ai_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_retirement_ai_approval" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
             else = { debug_log = "TCA_TEST PASS tca_test_retirement_ai_approval" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
-            remove_character_flag = tca_test_case_failed remove_character_flag = tca_test_delayed_case_active tca_test_continue_delayed_effect = yes
+            remove_character_flag = tca_test_tca_retirement_ai_test_case_failed tca_test_lane_end_effect = { GROUP = tca_retirement_ai_test }
         }
     }
 }
 tca_retirement_ai_test.1 = {
     type = character_event hidden = yes
     immediate = {
-        if = { limit = { has_character_flag = tca_test_delayed_case_active } debug_log = "TCA_TEST CASE_BUSY" }
-        else = {
             debug_log = "TCA_TEST BEGIN tca_retirement_ai_test.1 tca_test_retirement_ai_transfer_entry"
-            remove_character_flag = tca_test_case_failed
+            remove_character_flag = tca_test_tca_retirement_ai_test_case_failed
             if = { limit = { debug_only = yes is_alive = yes title:h_china.holder = root }
                 tca_test_create_merit_interface_character_with_age_effect = { CHARACTER = tca_rat_parent GOVERNMENT = celestial_government AGE = 40 }
                 scope:tca_rat_parent = {
@@ -256,11 +251,9 @@ tca_retirement_ai_test.1 = {
                     create_character = { age = 18 gender_female_chance = 0 random_traits = no father = this dynasty = this.dynasty employer = this culture = this.culture faith = this.faith rite = this.rite save_scope_as = tca_rat_heir }
                 }
                 scope:tca_rat_heir = { set_house = scope:tca_rat_parent.house tca_test_protect_character_effect = yes set_appointment_timeout = { years = 150 desc = appointment_timeout_desc_refusing } }
-                add_character_flag = tca_test_delayed_case_active
                 trigger_event = { id = tca_retirement_ai_test.1000 days = 3 }
             }
-            else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_retirement_ai_transfer_entry" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_continue_delayed_effect = yes }
-        }
+            else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_retirement_ai_transfer_entry" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_lane_end_effect = { GROUP = tca_retirement_ai_test } }
     }
 }
 tca_retirement_ai_test.1000 = {
@@ -272,7 +265,7 @@ tca_retirement_ai_test.1000 = {
             if = { limit = { scope:tca_rat_parent = { is_ai = yes tca_retirement_can_transfer_trigger = yes } }
                 scope:tca_rat_parent = { tca_retirement_offer_transfer_effect = yes }
                 if = { limit = { scope:tca_rat_parent = { NOT = { has_character_flag = tca_retirement_transfer_offered } } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_ai_transfer_entry 1" }
-                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_ai_transfer_entry 1" }
+                else = { add_character_flag = tca_test_tca_retirement_ai_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_ai_transfer_entry 1" }
                 trigger_event = { id = tca_retirement_ai_test.1001 days = 3 }
             }
             else = {
@@ -280,7 +273,7 @@ tca_retirement_ai_test.1000 = {
                 if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
                 scope:tca_rat_parent = { tca_test_cleanup_retirement_formal_effect = yes }
                 scope:tca_rat_heir = { tca_test_cleanup_merit_probe_character_effect = yes }
-                remove_character_flag = tca_test_delayed_case_active tca_test_continue_delayed_effect = yes
+                tca_test_lane_end_effect = { GROUP = tca_retirement_ai_test }
             }
         }
     }
@@ -292,12 +285,12 @@ tca_retirement_ai_test.1001 = {
         if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
             # 年度AI决议可能合法传家；本项只验证未派发旧式一次性邀请。
             if = { limit = { scope:tca_rat_parent = { NOT = { has_character_flag = tca_retirement_transfer_offered } } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_ai_transfer_entry 2" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_ai_transfer_entry 2" }
+            else = { add_character_flag = tca_test_tca_retirement_ai_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_ai_transfer_entry 2" }
             scope:tca_rat_parent = { tca_test_cleanup_retirement_formal_effect = yes }
             scope:tca_rat_heir = { tca_test_cleanup_merit_probe_character_effect = yes }
-            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_retirement_ai_transfer_entry" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            if = { limit = { has_character_flag = tca_test_tca_retirement_ai_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_retirement_ai_transfer_entry" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
             else = { debug_log = "TCA_TEST PASS tca_test_retirement_ai_transfer_entry" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
-            remove_character_flag = tca_test_case_failed remove_character_flag = tca_test_delayed_case_active tca_test_continue_delayed_effect = yes
+            remove_character_flag = tca_test_tca_retirement_ai_test_case_failed tca_test_lane_end_effect = { GROUP = tca_retirement_ai_test }
         }
     }
 }
@@ -307,7 +300,7 @@ tca_retirement_ai_test.4 = {
     type = character_event hidden = yes
     immediate = {
         debug_log = "TCA_TEST BEGIN tca_retirement_ai_test.4 tca_test_retirement_ai_annual_transfer"
-        remove_character_flag = tca_test_case_failed
+        remove_character_flag = tca_test_tca_retirement_ai_test_case_failed
         if = { limit = { debug_only = yes is_alive = yes title:h_china.holder = root }
             tca_test_create_merit_interface_character_with_age_effect = { CHARACTER = tca_rta_parent GOVERNMENT = celestial_government AGE = 40 }
             scope:tca_rta_parent = {
@@ -319,10 +312,9 @@ tca_retirement_ai_test.4 = {
                 add_character_flag = tca_retirement_transfer_offered
             }
             scope:tca_rta_heir = { set_house = scope:tca_rta_parent.house tca_test_protect_character_effect = yes set_appointment_timeout = { years = 150 desc = appointment_timeout_desc_refusing } }
-            add_character_flag = tca_test_delayed_case_active
             trigger_event = { id = tca_retirement_ai_test.4000 days = 2 }
         }
-        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_retirement_ai_annual_transfer" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_continue_delayed_effect = yes }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_retirement_ai_annual_transfer" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_lane_end_effect = { GROUP = tca_retirement_ai_test } }
     }
 }
 tca_retirement_ai_test.4000 = {
@@ -331,16 +323,16 @@ tca_retirement_ai_test.4000 = {
         tca_test_validate_environment_effect = yes
         if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
             if = { limit = { scope:tca_rta_parent = { tca_retirement_ai_can_consider_transfer_trigger = no NOT = { can_execute_decision = tca_retirement_ai_transfer_decision } } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_ai_annual_transfer 1" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_ai_annual_transfer 1" }
+            else = { add_character_flag = tca_test_tca_retirement_ai_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_ai_annual_transfer 1" }
             scope:tca_rta_heir = { set_age = 18 }
             if = { limit = { scope:tca_rta_family.current_heir = scope:tca_rta_heir scope:tca_rta_parent = { can_execute_decision = tca_retirement_ai_transfer_decision } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_ai_annual_transfer 2" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_ai_annual_transfer 2" }
+            else = { add_character_flag = tca_test_tca_retirement_ai_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_ai_annual_transfer 2" }
             scope:tca_rta_parent = { set_variable = { name = tca_retirement_request_kind value = 4 } }
             if = { limit = { scope:tca_rta_parent = { NOT = { can_execute_decision = tca_retirement_ai_transfer_decision } } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_ai_annual_transfer 3" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_ai_annual_transfer 3" }
+            else = { add_character_flag = tca_test_tca_retirement_ai_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_ai_annual_transfer 3" }
             scope:tca_rta_parent = { remove_variable = tca_retirement_request_kind debug_log = "TCA_RETIREMENT_AI_TEST EXPECT_FAMILY_CHOICE id=[THIS.Char.GetID]" execute_decision = tca_retirement_ai_transfer_decision }
             if = { limit = { scope:tca_rta_parent = { NOT = { can_execute_decision = tca_retirement_ai_transfer_decision } } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_ai_annual_transfer 4" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_ai_annual_transfer 4" }
+            else = { add_character_flag = tca_test_tca_retirement_ai_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_ai_annual_transfer 4" }
             trigger_event = { id = tca_retirement_ai_test.4002 days = 3 }
         }
     }
@@ -356,12 +348,12 @@ tca_retirement_ai_test.4001 = {
                 AND = { scope:tca_rta_family.holder = scope:tca_rta_parent scope:tca_rta_parent = { can_execute_decision = tca_retirement_ai_transfer_decision } }
                 AND = { scope:tca_rta_family.holder = scope:tca_rta_heir scope:tca_rta_parent = { is_ruler = yes liege = root has_variable = tca_retirement_title primary_title = var:tca_retirement_title var:tca_retirement_title = { holder = scope:tca_rta_parent tier = tier_duchy is_landless_type_title = yes has_variable = tca_retirement_title } NOT = { has_title = scope:tca_rta_family } tca_retirement_ai_can_consider_transfer_trigger = no } }
             } scope:tca_rta_parent = { has_trait = tca_retired } scope:tca_rta_heir = { NOT = { tca_retirement_is_exited_trigger = yes } } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_ai_annual_transfer 5" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_ai_annual_transfer 5" }
+            else = { add_character_flag = tca_test_tca_retirement_ai_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_ai_annual_transfer 5" }
             scope:tca_rta_parent = { tca_test_cleanup_retirement_formal_effect = yes }
             scope:tca_rta_heir = { tca_test_cleanup_merit_probe_character_effect = yes }
-            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_retirement_ai_annual_transfer" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            if = { limit = { has_character_flag = tca_test_tca_retirement_ai_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_retirement_ai_annual_transfer" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
             else = { debug_log = "TCA_TEST PASS tca_test_retirement_ai_annual_transfer" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
-            remove_character_flag = tca_test_case_failed remove_character_flag = tca_test_delayed_case_active tca_test_continue_delayed_effect = yes
+            remove_character_flag = tca_test_tca_retirement_ai_test_case_failed tca_test_lane_end_effect = { GROUP = tca_retirement_ai_test }
         }
     }
 }

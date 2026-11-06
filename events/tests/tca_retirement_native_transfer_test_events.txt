@@ -6,13 +6,13 @@ tca_retirement_native_transfer_test.2 = {
     type = character_event hidden = yes
     immediate = {
         debug_log = "TCA_TEST BEGIN tca_retirement_native_transfer_test.2 tca_test_retirement_native_transfer_normal"
-        remove_character_flag = tca_test_case_failed
+        remove_character_flag = tca_test_tca_retirement_native_transfer_test_case_failed
         if = { limit = { debug_only = yes title:h_china.holder = root }
             tca_test_create_merit_interface_character_with_age_effect = { CHARACTER = tca_nn_actor GOVERNMENT = celestial_government AGE = 80 }
             # 普通家主使用原版允许的非佛教信仰；佛教对照由正式退休人物覆盖。
             scope:tca_nn_actor = { set_character_faith = faith:zhengyi }
             if = { limit = { scope:tca_nn_actor = { NOT = { can_execute_decision = renounce_noble_family_title_decision } } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_native_transfer_normal 1" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_native_transfer_normal 1" }
+            else = { add_character_flag = tca_test_tca_retirement_native_transfer_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_native_transfer_normal 1" }
             scope:tca_nn_actor = {
                 change_influence = 1000
                 primary_title = { save_scope_as = tca_nn_family }
@@ -20,13 +20,12 @@ tca_retirement_native_transfer_test.2 = {
                 create_character = { age = 18 gender_female_chance = 0 random_traits = no dynasty = this.dynasty father = this employer = this culture = this.culture faith = this.faith rite = this.rite save_scope_as = tca_nn_heir }
             }
             scope:tca_nn_heir = { set_house = scope:tca_nn_actor.house tca_test_protect_character_effect = yes add_character_flag = ai_will_not_convert set_appointment_timeout = { years = 150 desc = appointment_timeout_desc_refusing } }
-            add_character_flag = tca_test_delayed_case_active
             trigger_event = { id = tca_retirement_native_transfer_test.20 days = 3 }
         }
         else = {
             debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_retirement_native_transfer_normal"
             if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
-            tca_test_continue_delayed_effect = yes
+            tca_test_lane_end_effect = { GROUP = tca_retirement_native_transfer_test }
         }
     }
 }
@@ -44,8 +43,7 @@ tca_retirement_native_transfer_test.20 = {
                 if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
                 scope:tca_nn_actor = { tca_test_cleanup_merit_probe_character_effect = yes }
                 scope:tca_nn_heir = { tca_test_cleanup_merit_probe_character_effect = yes }
-                remove_character_flag = tca_test_delayed_case_active
-                tca_test_continue_delayed_effect = yes
+                tca_test_lane_end_effect = { GROUP = tca_retirement_native_transfer_test }
             }
         }
     }
@@ -60,13 +58,12 @@ tca_retirement_native_transfer_test.21 = {
                 scope:tca_nn_heir = { house.house_head = this domicile = scope:tca_nn_estate NOT = { tca_retirement_is_exited_trigger = yes } }
                 scope:tca_nn_actor = { has_trait = devoted has_character_modifier = ep3_renounced_estate is_ruler = no NOT = { tca_retirement_is_exited_trigger = yes } }
             } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_native_transfer_normal 2" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_native_transfer_normal 2" }
+            else = { add_character_flag = tca_test_tca_retirement_native_transfer_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_native_transfer_normal 2" }
             scope:tca_nn_actor = { tca_test_cleanup_merit_probe_character_effect = yes }
             scope:tca_nn_heir = { tca_test_cleanup_merit_probe_character_effect = yes }
-            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_retirement_native_transfer_normal" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            if = { limit = { has_character_flag = tca_test_tca_retirement_native_transfer_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_retirement_native_transfer_normal" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
             else = { debug_log = "TCA_TEST PASS tca_test_retirement_native_transfer_normal" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
-            remove_character_flag = tca_test_delayed_case_active
-            tca_test_continue_delayed_effect = yes
+            tca_test_lane_end_effect = { GROUP = tca_retirement_native_transfer_test }
         }
     }
 }
@@ -75,19 +72,18 @@ tca_retirement_native_transfer_test.1 = {
     type = character_event hidden = yes
     immediate = {
         debug_log = "TCA_TEST BEGIN tca_retirement_native_transfer_test.1 tca_test_retirement_native_transfer"
-        remove_character_flag = tca_test_case_failed
+        remove_character_flag = tca_test_tca_retirement_native_transfer_test_case_failed
         if = { limit = { debug_only = yes title:h_china.holder = root }
             tca_test_create_retirement_native_family_effect = { CHARACTER = tca_nb_f KIND = 1 }
             tca_test_create_retirement_native_family_effect = { CHARACTER = tca_nb_r KIND = 2 }
             # 奉祠者验证原版可见宗教下的交接；致仕者保留本朝佛教，验证原入口的宗教例外。
             scope:tca_nb_f = { set_character_faith = faith:zhengyi }
-            add_character_flag = tca_test_delayed_case_active
             trigger_event = { id = tca_retirement_native_transfer_test.10 days = 3 }
         }
         else = {
             debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_retirement_native_transfer"
             if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
-            tca_test_continue_delayed_effect = yes
+            tca_test_lane_end_effect = { GROUP = tca_retirement_native_transfer_test }
         }
     }
 }
@@ -118,7 +114,7 @@ tca_retirement_native_transfer_test.10 = {
                     var:tca_nb_heir = { set_age = 18 }
                 }
                 if = { limit = { NOT = { has_character_flag = tca_nb_bad } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_native_transfer 1" }
-                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_native_transfer 1" }
+                else = { add_character_flag = tca_test_tca_retirement_native_transfer_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_native_transfer 1" }
                 remove_character_flag = tca_nb_bad
                 every_in_list = { list = tca_nb_actors
                     set_variable = { name = tca_retirement_honor_target value = 1 }
@@ -132,7 +128,7 @@ tca_retirement_native_transfer_test.10 = {
                     remove_variable = tca_merit_grant_phase
                 }
                 if = { limit = { NOT = { has_character_flag = tca_nb_bad } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_native_transfer 2" }
-                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_native_transfer 2" }
+                else = { add_character_flag = tca_test_tca_retirement_native_transfer_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_native_transfer 2" }
                 every_in_list = { list = tca_nb_actors
                     set_variable = { name = tca_nb_rank value = merit_level }
                     set_variable = { name = tca_nb_title value = var:tca_retirement_title }
@@ -152,8 +148,7 @@ tca_retirement_native_transfer_test.10 = {
                 debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_retirement_native_transfer"
                 if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
                 every_in_list = { list = tca_nb_actors var:tca_nb_heir = { tca_test_cleanup_merit_probe_character_effect = yes } tca_test_cleanup_retirement_formal_effect = yes }
-                remove_character_flag = tca_test_delayed_case_active
-                tca_test_continue_delayed_effect = yes
+                tca_test_lane_end_effect = { GROUP = tca_retirement_native_transfer_test }
             }
         }
     }
@@ -200,12 +195,12 @@ tca_retirement_native_transfer_test.11 = {
                 } } } root = { add_character_flag = tca_nb_bad } }
             }
             if = { limit = { NOT = { has_character_flag = tca_nb_bad } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_native_transfer 3" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_native_transfer 3" }
+            else = { add_character_flag = tca_test_tca_retirement_native_transfer_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_native_transfer 3" }
             if = { limit = {
                 scope:tca_nb_f = { has_trait = tca_fengci NOT = { has_trait = tca_retired } vassal_contract_has_flag = tca_fengci_salary_active NOT = { vassal_contract_has_flag = tca_zhishi_salary_active } NOT = { vassal_contract_has_flag = tca_retirement_merit_half } }
                 scope:tca_nb_r = { has_trait = tca_retired NOT = { has_trait = tca_fengci } vassal_contract_has_flag = tca_zhishi_salary_active NOT = { vassal_contract_has_flag = tca_fengci_salary_active } vassal_contract_has_flag = tca_retirement_merit_half }
             } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_native_transfer 4" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_native_transfer 4" }
+            else = { add_character_flag = tca_test_tca_retirement_native_transfer_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_native_transfer 4" }
             # 交接已走完原版资格后才隔离主动消费；跨月检查真实金币，不把家门净收支当俸禄。
             every_in_list = { list = tca_nb_actors
                 tca_test_retirement_salary_baseline_effect = yes
@@ -273,12 +268,11 @@ tca_retirement_native_transfer_test.12 = {
                     } } } root = { add_character_flag = tca_nb_bad } }
                 }
                 if = { limit = { NOT = { has_character_flag = tca_nb_bad } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_native_transfer 5" }
-                else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_native_transfer 5" }
+                else = { add_character_flag = tca_test_tca_retirement_native_transfer_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_native_transfer 5" }
                 every_in_list = { list = tca_nb_actors var:tca_nb_heir = { tca_test_cleanup_merit_probe_character_effect = yes } tca_test_cleanup_retirement_formal_effect = yes }
-                if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_retirement_native_transfer" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+                if = { limit = { has_character_flag = tca_test_tca_retirement_native_transfer_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_retirement_native_transfer" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
                 else = { debug_log = "TCA_TEST PASS tca_test_retirement_native_transfer" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
-                remove_character_flag = tca_test_delayed_case_active
-                tca_test_continue_delayed_effect = yes
+                tca_test_lane_end_effect = { GROUP = tca_retirement_native_transfer_test }
             }
             else = { trigger_event = { id = tca_retirement_native_transfer_test.12 days = 1 } }
         }

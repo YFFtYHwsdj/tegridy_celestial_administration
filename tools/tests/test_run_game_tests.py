@@ -664,3 +664,57 @@ class IncrementalLogTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class ParallelOptionTests(unittest.TestCase):
+    """--parallel 注入与落盘字段：只验证准备阶段，不启动游戏。"""
+
+    def test_full_and_selected_runs_inject_limit_before_observer_entry(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            full = prepare_run(ROOT, root, root / 'absent', parallel=3)
+            text = (full / 'mod/tca_cli_adapter/events/tca_cli_events.txt').read_text(encoding='utf-8-sig')
+            self.assertEqual(text.count('set_variable = { name = tca_test_max_active value = 3 }'), 1)
+            self.assertLess(text.index('tca_test_max_active'),
+                            text.index('tca_run_observer_tests_effect = yes'))
+            self.assertNotIn('tca_test_selected_run', text)
+            selected = prepare_run(ROOT, root, root / 'absent', 'tca_exam_test.1', parallel=4)
+            text = (selected / 'mod/tca_cli_adapter/events/tca_cli_events.txt').read_text(encoding='utf-8-sig')
+            self.assertEqual(text.count('set_variable = { name = tca_test_max_active value = 4 }'), 1)
+            self.assertIn('set_variable = { name = tca_test_selected_run value = yes }', text)
+            self.assertLess(text.index('tca_test_max_active'),
+                            text.index('tca_run_observer_tests_effect = yes'))
+
+    def test_clone_replaces_parent_limit_instead_of_duplicating(self):
+        from run_game_tests import clone_run
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            base = prepare_run(ROOT, root, root / 'absent', suites=['exam'], parallel=2,
+                               execution={'environment': {}, 'parallel': 2})
+            rows = json.loads((base / 'selection.json').read_text())['cases']
+            child = clone_run(base, root, rows[:1])
+            text = (child / 'mod/tca_cli_adapter/events/tca_cli_events.txt').read_text(encoding='utf-8-sig')
+            self.assertEqual(text.count('name = tca_test_max_active'), 1)
+            self.assertIn('name = tca_test_max_active value = 2', text)
+            self.assertIn(rows[0]['name'] + '_selected', text)
+
+    def test_prepare_only_records_parallel_in_execution_and_task(self):
+        from run_game_tests import main
+        from platform_paths import game_executable
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            binary = game_executable(root / 'game')
+            binary.parent.mkdir(parents=True)
+            binary.write_text('not launched')
+            code = main(['--game-dir', str(root / 'game'), '--run-root', str(root / 'runs'),
+                         '--suite', 'exam', '--prepare-only', '--parallel', '3'])
+            self.assertEqual(code, 0)
+            run = next((root / 'runs').glob('run-*'))
+            self.assertEqual(json.loads((run / 'execution.json').read_text())['parallel'], 3)
+            self.assertEqual(json.loads((run / 'task.json').read_text())['parallel'], 3)
+
+    def test_parallel_bounds_are_checked_before_preparation(self):
+        from run_game_tests import main
+        for value in ('0', '33', '1.5'):
+            with self.assertRaises(SystemExit):
+                main(['--run-root', '/tmp/tca-parallel-check', '--prepare-only', '--parallel', value])

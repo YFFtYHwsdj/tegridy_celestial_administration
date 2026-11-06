@@ -15,7 +15,7 @@ python3 tools/run_game_tests.py --timeout 1800
 
 使用工具输出的本次任务目录，核对 `terminal.json`、`verification.json`、`result.txt` 和同次日志。通过必须同时满足所选范围完整执行、观察者确认、终局汇总、快照与日志核对通过；只看到PASS、只准备未执行或超时退出都不能算通过。详细文件及退出码见[运行隔离与结果](#运行隔离与结果)。
 
-全量回归在同一个世界内串行推进多个游戏年，包含两次进程启动与一次原生保存重载，近年用例和等待增加后明显变长；以 `terminal.json` 的 `seconds` 和实际日志为准，不要用固定数字承诺。超时预算不足时第二局不会执行，整次运行按超时失败，并且仍会进行收尾与验收核对。
+全量回归默认（`--parallel 1`）在同一个世界内串行推进多个游戏年，包含两次进程启动与一次原生保存重载，近年用例和等待增加后明显变长；以 `terminal.json` 的 `seconds` 和实际日志为准，不要用固定数字承诺。超时预算不足时第二局不会执行，整次运行按超时失败，并且仍会进行收尾与验收核对。
 
 Windows使用 `python`，先按[Windows步骤](#windows)设置UTF-8。需要保留产物时显式指定[持久输出目录](../development/README.md#测试证据如何保存)；不会自动上传共享。
 
@@ -38,7 +38,27 @@ python3 tools/run_game_tests.py --suite exam --suite confucian_statistics --isol
 
 当前目录：`events/tests/`保存原生事件，`common/scripted_effects/tests/framework/`保存框架效果，`modules/`保存登记，`fixtures/`保存场景准备。Python内部实现位于`tools/testing/`，回归位于`tools/tests/`；发现和封存都支持递归目录。
 
-主模组直接维护原生测试及模块登记，工具不生成测试或模拟业务。CLI只在适配副本中设置选择变量，普通游戏不加载适配。框架先从登记计算预期数量，统一派发；用例完成时调用`tca_test_continue_delayed_effect`，不再维护全局阶段编号。
+主模组直接维护原生测试及模块登记，工具不生成测试或模拟业务。CLI只在适配副本中设置选择变量，普通游戏不加载适配。框架先从登记计算预期数量，统一派发；延迟用例按模块lane调度，默认一次一个，用例结束时调用正式lane结束效果续接，不再维护全局阶段编号。
+
+## 并行运行
+
+同一进程、同一世界的延迟用例可按模块lane并发，缩短全量回归的墙钟。默认`--parallel 1`，调度顺序与既有全组串行逐项等价；`--parallel K`（1至32）最多同时运行K个不同GROUP的延迟用例，同一GROUP内仍逐个执行，保存重载、玩家会话、开局快照等独占用例在途时整体串行。lane、GROUP、EXCLUSIVE与结束效果的契约见[框架契约](framework.md#并发-lane-与用例隔离)。全量串行仍是权威口径，K>1只用于加速和对照。
+
+```sh
+# 同一选择范围分别按串行和并发运行；计划、断言和等待相同
+python3 tools/run_game_tests.py --suite judicial_law --suite custody_review --parallel 1 --timeout 900
+python3 tools/run_game_tests.py --suite judicial_law --suite custody_review --parallel 3 --timeout 900
+# 逐用例核对状态与断言计数；输出差异表与JSON，非0退出表示不一致
+python3 tools/compare_test_runs.py "<串行任务目录>" "<并行任务目录>"
+# 全量串行仍是权威口径；并发全量只作加速和对照
+python3 tools/run_game_tests.py --timeout 1800
+```
+
+并行运行不改变选择计划、用例集合、等待天数或断言，`selection.json`与`verification.json`的结构不变；`execution.json`、`task.json`额外记录`parallel`。并发只减少同局内等待的叠加，墙钟仍受最慢lane和独占用例限制，不能用固定倍率承诺耗时。并发时调试日志按实际发生顺序交错，验收仍按冻结计划和逐用例断言核对，不以日志相邻行判断用例归属。
+
+**验证边界**：并行运行的逐用例结果不能替代同范围串行同局结果作为验收依据，全量串行仍是权威口径。K>1必须用`tools/compare_test_runs.py`与同范围K=1逐项核对一致，并核对两次的冻结计划、终局结果、`TCA_TEST`日志和同次`error.log`；工具按`verification.json`比较逐用例状态和断言计数，缺失用例显示`<missing>`，可用`--ignore case1,case2`（可重复）排除已知项；`--ignore`只排除逐用例状态，聚合断言计数差异仍会列出并须单独解释，也可用`--json`另行输出结果。对比一致只说明本轮并发未改变已覆盖的断言，不覆盖保存重载、真实玩家路径和界面等另行验收项。K>1新出现的逐用例差异应先按并发冲突排查（写共享状态的延迟用例应独占），不能直接当作flaky忽略。已知WIP flaky项（如`tca_test_retirement_health_and_stress`、`tca_test_retirement_player_session`等）可在对比时用`--ignore`排除并单独记录原因，但不得用排除掩盖新增失败、缺失结果或引擎错误。
+
+新增或修改用例后先运行`python3 tools/check_test_parallel.py`：它检查注册的GROUP／EXCLUSIVE元数据、裸全局标识、lane flag与lane结束调用一致性、跨GROUP报告者状态冲突、写共享状态的延迟用例是否独占、失败flag的写入／读取配对及触发链内失败归属；检查不通过不得提交，检查通过也不证明引擎行为。
 
 ## Windows
 
@@ -60,7 +80,7 @@ python tools/run_game_tests.py --timeout 1800
 
 先启动Steam。安装目录和偏好文件由`tools/platform_paths.py`按平台定位，`CK3_GAME_DIR`可覆盖默认安装目录；macOS默认安装位置为`~/Library/Application Support/Steam/steamapps/common/Crusader Kings III`；`--game-dir`指定包含`binaries/`的安装根目录。使用原生`-debug_mode -develop -skip -bookmark=bm_1066_china -play=h_china`，工作目录为安装的`binaries/`，子进程`SteamAppId=1158310`。
 
-`--timeout`按每个子局计算，包含两阶段启动及执行，不包含排队、任务准备和运行结束后的日志验收及快照校验；默认240秒只适合单项或小范围。全量回归应显式使用`--timeout 1800`（机器繁忙或留更多余量时可用2400）：预算不足会让第二局不执行并整次按超时失败，事后核对仍需再花1至2分钟。`terminal.json`的`seconds`是计时器内的实际耗时，整次墙钟还需加上排队与开头所述的验收时间，报告耗时时应分开说明。`--seed`为0至4294967295的原生随机种子。固定种子不能保证异步时点及不同脚本版本的随机调用序列相同。`--strict-title-heir`将实际继任与死亡前预览首位不一致升级为失败，普通通过不代表此严格模式通过。
+`--timeout`按每个子局计算，包含两阶段启动及执行，不包含排队、任务准备和运行结束后的日志验收及快照校验；默认240秒只适合单项或小范围。全量回归应显式使用`--timeout 1800`（机器繁忙或留更多余量时可用2400）：预算不足会让第二局不执行并整次按超时失败，事后核对仍需再花1至2分钟。`terminal.json`的`seconds`是计时器内的实际耗时，整次墙钟还需加上排队与开头所述的验收时间，报告耗时时应分开说明。`--seed`为0至4294967295的原生随机种子。固定种子不能保证异步时点及不同脚本版本的随机调用序列相同。`--strict-title-heir`将实际继任与死亡前预览首位不一致升级为失败，普通通过不代表此严格模式通过。`--parallel N`取1至32，默认1，控制同局延迟lane并发上限，见[并行运行](#并行运行)。
 
 `--prepare-only`只封存任务，不启动游戏，不表示测试通过。`--run-root "<仓库外持久产物目录>"`指定输出根目录，必须位于源码目录之外，防止递归复制。默认使用系统临时目录，持久目录范例及保留规则见[证据保存](../development/README.md#测试证据如何保存)。`--settings`指定只读偏好来源，仅复制game／Graphics配置、关闭云存档并改为1280×800窗口，不复制账户段，不修改原文件。
 
@@ -76,16 +96,16 @@ python tools/run_game_tests.py --timeout 1800
 
 - `selection.json`：冻结的执行计划及full／selection范围。
 - `metadata.json`：运行ID、源码路径、提交、未提交状态，子运行记录父任务。
-- `execution.json`：游戏安装版本、可执行文件状态、种子、严格模式和超时；排队期间安装状态改变则拒绝启动。
+- `execution.json`：游戏安装版本、可执行文件状态、种子、严格模式、延迟lane并发上限和超时；排队期间安装状态改变则拒绝启动。
 - `process.json`：本工具拥有的PID、实际命令及环境版本。
 - `progress.json`：观察者确认、当前进度与PASS数。
-- `terminal.json`：终止原因、游戏退出码、日志验收退出码、最终退出码及源码摘要。
+- `terminal.json`：终止原因、游戏退出码、日志验收退出码、延迟lane并发上限、最终退出码及源码摘要。
 - `verification.json`：逐项PASS／FAIL／PRECONDITION_FAIL／NOT_RUN／NOT_VERIFIED，以及范围、计数和问题。
 - `result.txt`、`stdout.txt`、`logs/`：同次核对结果、进程输出和游戏日志。
 
 原生保存重载探针可在保存成功并完成现场断言后发出 `TCA_CLI RELOAD_SAVE <name>`。控制器仅接受一次受限本地名称，检查实际存档后退出自己拥有的进程，再以原生 `-loadsave=<name>.ck3` 加载同一存档，并指定同一测试君主进入续局后切回观察者；不重新生成世界或派发测试。全程共用原超时。`phases/`保留每个进程的原始日志、命令和退出状态，`reload_evidence.json`记录原始日志摘要，最终`logs/debug.log`和`logs/error.log`逐字节连接所有阶段供既有断言与错误验收。每个进程均须独立确认观察者，`terminal.json` 的 `phase_observer_confirmed` 逐阶段记录，不沿用首进程确认。原进程异常退出、重复请求、缺失保存和续局启动失败均不能通过。续局识别必须依赖写入存档的脚本状态：原生 UI 会话变量不随存档恢复，不能单独用来判断当前进程是首局还是续局；识别失败时，加载后的 GUI 会再次保存／破坏并发第二个请求，控制器按重复请求中止。用于识别的脚本标记须在保存前写入，且由实际事件或效果设置；只在 GUI 控制台字符串中赋值会被静态检查判为未设置。阶段切换也不应与保存同帧提交，须让异步存档快照包含该状态。原生观察者存档是否需要额外界面操作以实际用例结果为准，不把该控制器能力推广为任意存档兼容保证。
 
-任务目录另保存`task.json`和`task_result.json`，列出同局／隔离模式及全部子结果。只有所有预期子运行均有成功终局，任务才通过；缺失、损坏、中断或失败均不能被其他通过覆盖。准备而未执行的任务没有通过结果。
+任务目录另保存`task.json`和`task_result.json`，列出同局／隔离模式、延迟lane并发上限及全部子结果。只有所有预期子运行均有成功终局，任务才通过；缺失、损坏、中断或失败均不能被其他通过覆盖。准备而未执行的任务没有通过结果。
 
 业务断言失败且环境有效时继续收集后续结果；承载者死亡或皇位变化等环境损坏中止当前局，剩余用例记为未执行。隔离局互相独立，当前局失败后仍可继续其他子局；用户中断则停止整个任务。
 
@@ -101,7 +121,7 @@ python tools/run_game_tests.py --timeout 1800
 
 `tools/cli_adapter/gui/scripted_widgets/tca_cli_widgets.txt`登记两个透明原生 widget。其`_show`回调使用`ExecuteConsoleCommand('observe')`、最高速`SetGameSpeed('(int32)4')`（内部参数4对应界面第5档）及`OnPause`。依据为原版 scripted widget 登记规范、`gui/hud.gui`中的速度／暂停接口及原生 debug GUI 的`on_start`用法。次日`events/tca_cli_events.txt`核对承载皇帝为AI、准备变量存在，再直接调用`tca_run_observer_tests_effect`；所有业务断言继续来自正式`events/tests/tca_*_test_events.txt`，没有 Python 生成器或另一套业务规则。
 
-目前不是通用远程控制台：适配 GUI 可执行预置开局命令，尚未验证外部脚本向运行中游戏发送任意指令。原版`game/_commandline_options.info`提供`-skip`、`-bookmark`、`-play`等启动参数；已尝试的启动时 console-action 路径在正常运行循环前执行并退出，不能承载串行延迟测试。无图形实验还出现资源／关闭错误，因此当前工具不使用`-nographics`、启动时 console-action 或本机已知卡住的`scripted_tests`命令。
+目前不是通用远程控制台：适配 GUI 可执行预置开局命令，尚未验证外部脚本向运行中游戏发送任意指令。原版`game/_commandline_options.info`提供`-skip`、`-bookmark`、`-play`等启动参数；已尝试的启动时 console-action 路径在正常运行循环前执行并退出，不能承载延迟用例测试。无图形实验还出现资源／关闭错误，因此当前工具不使用`-nographics`、启动时 console-action 或本机已知卡住的`scripted_tests`命令。
 
 ## 可选：三关系窗口控制器探针
 
@@ -117,6 +137,8 @@ python tools/run_game_tests.py --timeout 1800
 
 以 `--list` 和该次冻结 `selection.json` 获取实际范围，不手填全组总数。超时、中断、未确认观察者、缺少结果或日志核对失败均为 `NOT VERIFIED`。没有执行不能算通过；单项、选择运行和分局隔离分别报告，不能替代同局完整回归。
 
-[通判生命周期](../tongpan/implementation.md#未解决的生命周期一致性)及[经费请求](../office_funding/interactions.md#待复核的请求状态)存在尚未归因的跨执行范围差异。实际失败场景、源码入口和复核方法由所属模块维护；测试运行文档不保留另一份历史成绩表。真实 Windows 引擎、测试窗口显示、保存重载与长期 AI 仍需专门验收。
+并行运行是加速与对照模式，不单独构成验收：`--parallel K`（K>1）须与同范围K=1逐项一致，逐项核对使用`tools/compare_test_runs.py`，全量串行仍是权威口径。并发安全依靠lane分组与静态检查，没有运行时共享状态守卫，跨模块共享状态仍须按[框架契约](framework.md#并发-lane-与用例隔离)人工判断。
+
+[通判生命周期](../tongpan/implementation.md#未解决的生命周期一致性)及[经费请求](../office_funding/interactions.md#待复核的请求状态)存在尚未归因的跨执行范围差异。实际失败场景、源码入口和复核方法由所属模块维护；测试运行文档不保留另一份历史成绩表。已知WIP flaky项的对比处理见[并行运行](#并行运行)。真实 Windows 引擎、测试窗口显示、保存重载与长期 AI 仍需专门验收。
 
 用例编写、生命周期及观察者手工入口见[框架契约](framework.md)；重要证据的筛选和保存由[开发规范](../development/README.md)维护。

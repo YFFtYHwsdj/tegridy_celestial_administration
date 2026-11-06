@@ -4,14 +4,13 @@ tca_local_domain_test.1 = {
  type = character_event hidden = yes
  immediate = {
   debug_log = "TCA_TEST BEGIN tca_local_domain_test.1 tca_test_local_domain_immediate"
-  remove_character_flag = tca_test_case_failed
+  remove_character_flag = tca_test_tca_local_domain_test_case_failed
   tca_test_prepare_local_domain_effect = yes
   if = { limit = { debug_only = yes exists = scope:tca_domain_civil exists = scope:tca_domain_military }
-   add_character_flag = tca_test_delayed_case_active
    debug_log = "TCA_TEST WAIT tca_test_local_domain_immediate 1 day"
    trigger_event = { id = tca_local_domain_test.101 days = 1 }
   }
-  else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_local_domain_immediate" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_continue_delayed_effect = yes }
+  else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_local_domain_immediate" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_lane_end_effect = { GROUP = tca_local_domain_realm } }
  }
 }
 tca_local_domain_test.101 = {
@@ -23,18 +22,18 @@ tca_local_domain_test.101 = {
    scope:tca_domain_civil = { save_scope_value_as = { name = tca_domain_test_civil_capacity value = domain_limit } }
    scope:tca_domain_military = { save_scope_value_as = { name = tca_domain_test_military_capacity value = domain_limit } }
    if = { limit = { scope:tca_domain_civil = { domain_limit > 1 vassal_contract_has_flag = celestial_civil_appointment } scope:tca_domain_military = { domain_limit > 1 vassal_contract_has_flag = celestial_military_appointment } } debug_log = "TCA_TEST CHECK_PASS tca_test_local_domain_immediate 1" }
-   else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_local_domain_immediate 1" }
+   else = { add_character_flag = tca_test_tca_local_domain_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_local_domain_immediate 1" }
    # 真实颁布后立即检查后台法；不直接调用同步，不用skip_effects绕过回调。
    remove_variable = tca_local_domain_reform_cooldown
    add_realm_law = tca_local_domain_civil_law
    if = { limit = { has_realm_law = tca_local_domain_civil_law scope:tca_domain_civil = { has_realm_law = tca_local_domain_restricted_law } scope:tca_domain_military = { has_realm_law = tca_local_domain_unrestricted_law } } debug_log = "TCA_TEST CHECK_PASS tca_test_local_domain_immediate 2" }
-   else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_local_domain_immediate 2" }
+   else = { add_character_flag = tca_test_tca_local_domain_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_local_domain_immediate 2" }
    if = { limit = { has_variable = tca_local_domain_reform_cooldown tca_local_domain_reform_can_pass_trigger = no } debug_log = "TCA_TEST CHECK_PASS tca_test_local_domain_immediate 3" }
-   else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_local_domain_immediate 3" }
+   else = { add_character_flag = tca_test_tca_local_domain_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_local_domain_immediate 3" }
    clear_saved_scope = tca_domain_test_indirect
    random_vassal_or_below = { limit = { government_has_flag = government_is_celestial is_landed = yes vassal_contract_has_flag = celestial_civil_appointment NOT = { liege = root } } save_scope_as = tca_domain_test_indirect }
    if = { limit = { exists = scope:tca_domain_test_indirect scope:tca_domain_test_indirect = { has_realm_law = tca_local_domain_restricted_law } } debug_log = "TCA_TEST CHECK_PASS tca_test_local_domain_immediate 12" }
-   else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_local_domain_immediate 12" }
+   else = { add_character_flag = tca_test_tca_local_domain_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_local_domain_immediate 12" }
    debug_log = "TCA_TEST WAIT tca_test_local_domain_immediate 1 day"
    trigger_event = { id = tca_local_domain_test.102 days = 1 }
   }
@@ -47,15 +46,15 @@ tca_local_domain_test.102 = {
   if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
    # 保留原先数值断言，跨原生tick核对，不能把已换法等同于容量已经刷新。
    if = { limit = { scope:tca_domain_civil = { domain_limit = 1 } scope:tca_domain_military = { domain_limit = scope:tca_domain_test_military_capacity } } debug_log = "TCA_TEST CHECK_PASS tca_test_local_domain_immediate 9" }
-   else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_local_domain_immediate 9" }
+   else = { add_character_flag = tca_test_tca_local_domain_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_local_domain_immediate 9" }
    tca_sync_local_domain_realm_effect = yes
    tca_sync_local_domain_realm_effect = yes
    if = { limit = { scope:tca_domain_civil = { domain_limit = 1 } scope:tca_domain_military = { domain_limit = scope:tca_domain_test_military_capacity } domain_limit = scope:tca_domain_test_sovereign_capacity } debug_log = "TCA_TEST CHECK_PASS tca_test_local_domain_immediate 4" }
-   else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_local_domain_immediate 4" }
+   else = { add_character_flag = tca_test_tca_local_domain_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_local_domain_immediate 4" }
    remove_variable = tca_local_domain_reform_cooldown
    add_realm_law = tca_local_domain_all_law
    if = { limit = { scope:tca_domain_civil = { has_realm_law = tca_local_domain_restricted_law } scope:tca_domain_military = { has_realm_law = tca_local_domain_restricted_law } } debug_log = "TCA_TEST CHECK_PASS tca_test_local_domain_immediate 5" }
-   else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_local_domain_immediate 5" }
+   else = { add_character_flag = tca_test_tca_local_domain_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_local_domain_immediate 5" }
    debug_log = "TCA_TEST WAIT tca_test_local_domain_immediate 1 day"
    trigger_event = { id = tca_local_domain_test.103 days = 1 }
   }
@@ -67,13 +66,13 @@ tca_local_domain_test.103 = {
   tca_test_validate_environment_effect = yes
   if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
    if = { limit = { scope:tca_domain_civil = { domain_limit = 1 } scope:tca_domain_military = { domain_limit = 1 } domain_limit = scope:tca_domain_test_sovereign_capacity } debug_log = "TCA_TEST CHECK_PASS tca_test_local_domain_immediate 10" }
-   else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_local_domain_immediate 10" }
+   else = { add_character_flag = tca_test_tca_local_domain_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_local_domain_immediate 10" }
    remove_variable = tca_local_domain_reform_cooldown
    add_realm_law = tca_local_domain_original_law
    if = { limit = { scope:tca_domain_civil = { has_realm_law = tca_local_domain_unrestricted_law } scope:tca_domain_military = { has_realm_law = tca_local_domain_unrestricted_law } } debug_log = "TCA_TEST CHECK_PASS tca_test_local_domain_immediate 6" }
-   else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_local_domain_immediate 6" }
+   else = { add_character_flag = tca_test_tca_local_domain_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_local_domain_immediate 6" }
    if = { limit = { scope:tca_domain_civil = { primary_title = var:tca_domain_test_circuit capital_county = var:tca_domain_test_county } scope:tca_domain_military = { primary_title = var:tca_domain_test_circuit capital_county = var:tca_domain_test_county } } debug_log = "TCA_TEST CHECK_PASS tca_test_local_domain_immediate 7" }
-   else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_local_domain_immediate 7" }
+   else = { add_character_flag = tca_test_tca_local_domain_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_local_domain_immediate 7" }
    debug_log = "TCA_TEST WAIT tca_test_local_domain_immediate 1 day"
    trigger_event = { id = tca_local_domain_test.104 days = 1 }
   }
@@ -85,19 +84,18 @@ tca_local_domain_test.104 = {
   tca_test_validate_environment_effect = yes
   if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
    if = { limit = { scope:tca_domain_civil = { domain_limit = scope:tca_domain_test_civil_capacity } scope:tca_domain_military = { domain_limit = scope:tca_domain_test_military_capacity } } debug_log = "TCA_TEST CHECK_PASS tca_test_local_domain_immediate 11" }
-   else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_local_domain_immediate 11" }
+   else = { add_character_flag = tca_test_tca_local_domain_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_local_domain_immediate 11" }
    remove_variable = tca_local_domain_reform_cooldown
    if = { limit = { tca_local_domain_reform_can_pass_trigger = yes } debug_log = "TCA_TEST CHECK_PASS tca_test_local_domain_immediate 8" }
-   else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_local_domain_immediate 8" }
+   else = { add_character_flag = tca_test_tca_local_domain_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_local_domain_immediate 8" }
    tca_test_cleanup_local_domain_effect = yes
    # 两条原路均从州制文官取得；还回头衔后必须恢复原类型，避免污染后续用例。
    if = { limit = { scope:tca_domain_civil.var:tca_domain_test_old_circuit_holder = { vassal_contract_has_flag = celestial_province_standard } scope:tca_domain_military.var:tca_domain_test_old_circuit_holder = { vassal_contract_has_flag = celestial_province_standard } } debug_log = "TCA_TEST CHECK_PASS tca_test_local_domain_immediate 13" }
-   else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_local_domain_immediate 13" }
-   if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_local_domain_immediate" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+   else = { add_character_flag = tca_test_tca_local_domain_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_local_domain_immediate 13" }
+   if = { limit = { has_character_flag = tca_test_tca_local_domain_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_local_domain_immediate" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
    else = { debug_log = "TCA_TEST PASS tca_test_local_domain_immediate" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
-   remove_character_flag = tca_test_case_failed
-   remove_character_flag = tca_test_delayed_case_active
-   tca_test_continue_delayed_effect = yes
+   remove_character_flag = tca_test_tca_local_domain_test_case_failed
+   tca_test_lane_end_effect = { GROUP = tca_local_domain_realm }
   }
  }
 }
@@ -107,22 +105,22 @@ tca_local_domain_test.3 = {
     type = character_event hidden = yes
     immediate = {
         debug_log = "TCA_TEST BEGIN tca_local_domain_test.3 tca_test_local_domain_startup"
-        remove_character_flag = tca_test_case_failed
+        remove_character_flag = tca_test_tca_local_domain_test_case_failed
         if = { limit = { debug_only = yes game_start_date = 1066.9.15 title:h_china.holder = root }
             if = { limit = { has_realm_law = tca_local_domain_all_law has_variable = tca_local_domain_initialized NOT = { has_realm_law = tca_local_domain_restricted_law } }
                 debug_log = "TCA_TEST CHECK_PASS tca_test_local_domain_startup 1" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_local_domain_startup 1" }
+            else = { add_character_flag = tca_test_tca_local_domain_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_local_domain_startup 1" }
             add_realm_law_skip_effects = tca_local_domain_civil_law
             tca_initialize_local_domain_new_game_effect = yes
             if = { limit = { has_realm_law = tca_local_domain_civil_law }
                 debug_log = "TCA_TEST CHECK_PASS tca_test_local_domain_startup 2" }
-            else = { add_character_flag = tca_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_local_domain_startup 2" }
+            else = { add_character_flag = tca_test_tca_local_domain_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_local_domain_startup 2" }
             add_realm_law_skip_effects = tca_local_domain_all_law
             tca_sync_local_domain_realm_effect = yes
-            if = { limit = { has_character_flag = tca_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_local_domain_startup" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            if = { limit = { has_character_flag = tca_test_tca_local_domain_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_local_domain_startup" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
             else = { debug_log = "TCA_TEST PASS tca_test_local_domain_startup" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
         }
         else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_local_domain_startup" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } }
-        remove_character_flag = tca_test_case_failed
+        remove_character_flag = tca_test_tca_local_domain_test_case_failed
     }
 }
