@@ -37,7 +37,7 @@
 
 ```sh
 python3 tools/run_game_tests.py --suite merit_state --suite merit_lifecycle --suite merit_annual --suite merit_feedback --suite merit_multicountry --suite merit_central --timeout 600
-python3 tools/run_game_tests.py --timeout 600
+python3 tools/run_game_tests.py --timeout 1800
 ```
 
 囚犯的政治归属筛选、真实人类交互与同链快速连续迁国仍需针对自然路径补验；访问囚犯列表本身不等于这些组合都已验证。
@@ -118,7 +118,7 @@ python3 tools/run_game_tests.py --timeout 600
 - **客居与入廷**：已覆盖原生 `add_courtier` 入朝／离朝的 `on_join_court`／`on_leave_court` 同步；邀请接受、距离、花费、AI 玩家路径和 UI 未覆盖。
 - **J 多头衔**：已覆盖同名头衔重复登记不翻倍、两个不同头衔分别计数；是否应捆绑为一次竞争仍是设计解释边界。
 - **保存重载**：已覆盖正式事务、排队事件、原 TOKEN、持久名单与审计续接；旧档迁移不做。
-- **性能与长跑**：370 日自然年度探针在最近同局的日志时间戳跨度约 38 秒，仅为 1 秒分辨率下的测试局粗粒度参考；正式全链单帧预算、长期人口增长后的同步卡顿及长年 soak 仍未验收。
+- **性能与长跑**：366 日自然年度探针在最近同局的日志时间戳跨度约 38 秒，仅为 1 秒分辨率下的测试局粗粒度参考；正式全链单帧预算、长期人口增长后的同步卡顿及长年 soak 仍未验收。
 - **显示与长期运行**：实际玩家显示、自然 AI、长期人口增长后的耗时及 Windows 未验收。
 
 ### 整体回归的独立未解决项
@@ -311,7 +311,7 @@ python3 tools/run_game_tests.py --suite merit_probe --timeout 360
 
 ## 自然年度与保存重载
 
-`events/tests/tca_merit_annual_probe_test_events.txt` 等待370个真实游戏日，由追加的 `yearly_global_pulse` 记录自然回调，比较经过年份与回调次数；不直接调用年度回调。该探针完整观察期已通过，回调次数与跨过的年份相符。本机追加回调日志实际落在1月2日，不能把原版说明的1月1日直接当成追加工作器同帧保证。该探针不处理候选、员额或升品。
+`events/tests/tca_merit_annual_probe_test_events.txt` 等待366个真实游戏日，由追加的 `yearly_global_pulse` 记录自然回调，比较经过年份与回调次数；不直接调用年度回调。该探针完整观察期已通过，回调次数与跨过的年份相符。本机追加回调日志实际落在1月2日，不能把原版说明的1月1日直接当成追加工作器同帧保证。该探针不处理候选、员额或升品。
 
 `events/tests/tca_merit_saveload_probe_test_events.txt` 在独立 CLI debug 局执行原生保存、现场破坏、退出进程，再以原生 `-loadsave=<name>` 启动同一存档。保存前排队续接事件，随后破坏哨兵、余额和持久候选名单；第9项现场断言留在首进程日志，加载后必须由原排队事件验证 saved scope、及第标记、修正、核定品级及名单，最后开放一档检查隐藏经验仍受上限约束。不得重派发事件或补写这些状态。
 

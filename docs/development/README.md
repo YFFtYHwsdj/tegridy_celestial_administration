@@ -43,7 +43,7 @@
 当前运行器默认使用系统临时目录，没有自动上传、归档或清理。需要保留产物时显式指定仓库外持久目录：
 
 ```sh
-python3 tools/run_game_tests.py --timeout 600 \
+python3 tools/run_game_tests.py --timeout 1800 \
   --run-root "<仓库外持久产物目录>"
 ```
 

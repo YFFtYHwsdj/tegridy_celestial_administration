@@ -155,7 +155,7 @@
 
 ```sh
 python3 tools/run_game_tests.py --case tca_official_appointment_test.1 --case tca_official_appointment_test.2 --timeout 600
-python3 tools/run_game_tests.py --timeout 600
+python3 tools/run_game_tests.py --timeout 1800
 ```
 
 运行时核对同次冻结计划、终局、断言和引擎错误；同局全组需覆盖原有制度启停、补位、自然死亡和连续交接；通判生命周期另核对临时上级超时不变、最终官员取得原版期限及官署法，不以评分单项通过替代生命周期回归。新用例的普通地方参考头衔仍走原版类型；中央任命类型没有覆盖，中央真实候选、AI支持和界面仍需另验。

@@ -9,11 +9,13 @@
 ```sh
 # 查看可选择的正式用例，不启动游戏
 python3 tools/run_game_tests.py --list
-# 执行完整同局回归；600秒是本例显式上限，默认值见启动参数
-python3 tools/run_game_tests.py --timeout 600
+# 执行完整同局回归；全量通常需要20至30分钟，必须给足超时
+python3 tools/run_game_tests.py --timeout 1800
 ```
 
 使用工具输出的本次任务目录，核对 `terminal.json`、`verification.json`、`result.txt` 和同次日志。通过必须同时满足所选范围完整执行、观察者确认、终局汇总、快照与日志核对通过；只看到PASS、只准备未执行或超时退出都不能算通过。详细文件及退出码见[运行隔离与结果](#运行隔离与结果)。
+
+全量回归在同一个世界内串行推进多个游戏年，包含两次进程启动与一次原生保存重载，近年用例和等待增加后明显变长；以 `terminal.json` 的 `seconds` 和实际日志为准，不要用固定数字承诺。超时预算不足时第二局不会执行，整次运行按超时失败，并且仍会进行收尾与验收核对。
 
 Windows使用 `python`，先按[Windows步骤](#windows)设置UTF-8。需要保留产物时显式指定[持久输出目录](../development/README.md#测试证据如何保存)；不会自动上传共享。
 
@@ -46,7 +48,8 @@ python3 tools/run_game_tests.py --suite exam --suite confucian_statistics --isol
 
 ```powershell
 $env:PYTHONUTF8 = "1"
-python tools/run_game_tests.py --timeout 600
+# 全量回归预留20至30分钟；单项或小范围可用较短超时
+python tools/run_game_tests.py --timeout 1800
 ```
 
 队列锁按平台选择原生后端：Windows使用`msvcrt.locking`的首字节非阻塞锁，macOS使用`fcntl.flock`；只在竞争时等待，其他系统错误直接报告。元数据更新保留锁定字节，运行结束或异常退出后释放锁。`platform_paths.py`与内部运行模块都包含在冻结工具副本中。
@@ -57,7 +60,7 @@ python tools/run_game_tests.py --timeout 600
 
 先启动Steam。安装目录和偏好文件由`tools/platform_paths.py`按平台定位，`CK3_GAME_DIR`可覆盖默认安装目录；macOS默认安装位置为`~/Library/Application Support/Steam/steamapps/common/Crusader Kings III`；`--game-dir`指定包含`binaries/`的安装根目录。使用原生`-debug_mode -develop -skip -bookmark=bm_1066_china -play=h_china`，工作目录为安装的`binaries/`，子进程`SteamAppId=1158310`。
 
-`--timeout`默认240秒，按每个子局计算，包含启动及执行，不包含排队；可用`--timeout 360`延长。`--seed`为0至4294967295的原生随机种子。固定种子不能保证异步时点及不同脚本版本的随机调用序列相同。`--strict-title-heir`将实际继任与死亡前预览首位不一致升级为失败，普通通过不代表此严格模式通过。
+`--timeout`按每个子局计算，包含两阶段启动及执行，不包含排队、任务准备和运行结束后的日志验收及快照校验；默认240秒只适合单项或小范围。全量回归应显式使用`--timeout 1800`（机器繁忙或留更多余量时可用2400）：预算不足会让第二局不执行并整次按超时失败，事后核对仍需再花1至2分钟。`terminal.json`的`seconds`是计时器内的实际耗时，整次墙钟还需加上排队与开头所述的验收时间，报告耗时时应分开说明。`--seed`为0至4294967295的原生随机种子。固定种子不能保证异步时点及不同脚本版本的随机调用序列相同。`--strict-title-heir`将实际继任与死亡前预览首位不一致升级为失败，普通通过不代表此严格模式通过。
 
 `--prepare-only`只封存任务，不启动游戏，不表示测试通过。`--run-root "<仓库外持久产物目录>"`指定输出根目录，必须位于源码目录之外，防止递归复制。默认使用系统临时目录，持久目录范例及保留规则见[证据保存](../development/README.md#测试证据如何保存)。`--settings`指定只读偏好来源，仅复制game／Graphics配置、关闭云存档并改为1280×800窗口，不复制账户段，不修改原文件。
 
@@ -96,7 +99,7 @@ python tools/run_game_tests.py --timeout 600
 
 `tools/cli_adapter/common/on_action/tca_cli_on_actions.txt`追加`on_game_start_after_lobby`，在`h_china`上设置准备变量，并让皇帝接收次日启动事件。原版`common/on_action/game_start.txt`明确此回调发生在退出大厅之后，适合需要玩家／规则已确定的逻辑。该同名追加内容作为`auxiliary_extensions`登记于`tools/upstream_overrides.json`，对应原版完整回调的已审阅基线为`tools/baselines/cli_on_game_start_after_lobby.txt`，由覆盖检查核对；普通模组查漏扫描不把独立适配模组当作正式加载对象。
 
-`tools/cli_adapter/gui/scripted_widgets/tca_cli_widgets.txt`登记两个透明原生 widget。其`_show`回调使用`ExecuteConsoleCommand('observe')`、`SetGameSpeed('(int32)4')`及`OnPause`。依据为原版 scripted widget 登记规范、`gui/hud.gui`中的速度／暂停接口及原生 debug GUI 的`on_start`用法。次日`events/tca_cli_events.txt`核对承载皇帝为AI、准备变量存在，再直接调用`tca_run_observer_tests_effect`；所有业务断言继续来自正式`events/tests/tca_*_test_events.txt`，没有 Python 生成器或另一套业务规则。
+`tools/cli_adapter/gui/scripted_widgets/tca_cli_widgets.txt`登记两个透明原生 widget。其`_show`回调使用`ExecuteConsoleCommand('observe')`、最高速`SetGameSpeed('(int32)4')`（内部参数4对应界面第5档）及`OnPause`。依据为原版 scripted widget 登记规范、`gui/hud.gui`中的速度／暂停接口及原生 debug GUI 的`on_start`用法。次日`events/tca_cli_events.txt`核对承载皇帝为AI、准备变量存在，再直接调用`tca_run_observer_tests_effect`；所有业务断言继续来自正式`events/tests/tca_*_test_events.txt`，没有 Python 生成器或另一套业务规则。
 
 目前不是通用远程控制台：适配 GUI 可执行预置开局命令，尚未验证外部脚本向运行中游戏发送任意指令。原版`game/_commandline_options.info`提供`-skip`、`-bookmark`、`-play`等启动参数；已尝试的启动时 console-action 路径在正常运行循环前执行并退出，不能承载串行延迟测试。无图形实验还出现资源／关闭错误，因此当前工具不使用`-nographics`、启动时 console-action 或本机已知卡住的`scripted_tests`命令。
 
