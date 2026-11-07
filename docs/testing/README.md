@@ -60,6 +60,8 @@ python3 tools/run_game_tests.py --timeout 1800
 
 新增或修改用例后先运行`python3 tools/check_test_parallel.py`：它检查注册的GROUP／EXCLUSIVE元数据、裸全局标识、lane flag与lane结束调用一致性、跨GROUP报告者状态冲突、写共享状态的延迟用例是否独占、失败flag的写入／读取配对及触发链内失败归属；检查不通过不得提交，检查通过也不证明引擎行为。
 
+**当前放行状态**：登记以`python3 tools/check_test_parallel.py`输出为准（当前62个GROUP、38例EXCLUSIVE、3个跨命名空间合并组）。全量`--parallel 4`已在本机固定种子下连续两轮验收，可作为加速与回归对比模式：245/245用例执行、无重复BEGIN、独占用例窗口无并发违规、无确定性新增失败；每轮另有约2至5例属于既有WIP flaky或夹具世界状态漂移（清单随WIP修复变化，不写入本文），须用对比工具逐项核对并记录。`tca_test_retirement_eligibility`的原生等级缓存时序对调度敏感，仅在EXCLUSIVE下稳定通过，其独占登记不得移除。保存重载探针偶发引擎级中断（console save→reload转换，同配置多数轮次未复现），遇到`process_exit`或`NOT VERIFIED`按整轮重跑处理，不记为用例失败；若复现，可在`gui/tca_merit_saveload_probe.gui`保存后加`OnPause`并延长等待，或由运行器在检测到保存成功后门控注入破坏步骤。全量K=1串行仍是权威验收口径。
+
 ## Windows
 
 平台路径适配：从注册表读取Steam位置，在`libraryfolders.vdf`登记的库中查找CK3；通过系统已知文件夹接口定位「文档」，兼容OneDrive重定向。Windows可执行文件为`binaries/ck3.exe`，macOS为`binaries/ck3.app/Contents/MacOS/ck3`。`--game-dir`和`--settings`仍可显式指定。
