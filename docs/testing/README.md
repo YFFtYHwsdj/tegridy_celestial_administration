@@ -1,4 +1,4 @@
-# 测试运行
+﻿# 测试运行
 
 本页提供运行步骤、参数和产物解释；新增原生用例及调度契约见[测试框架](framework.md)。
 
@@ -60,7 +60,7 @@ python3 tools/run_game_tests.py --timeout 1800
 
 新增或修改用例后先运行`python3 tools/check_test_parallel.py`：它检查注册的GROUP／EXCLUSIVE元数据、裸全局标识、lane flag与lane结束调用一致性、跨GROUP报告者状态冲突、共享状态跨GROUP写冲突（延迟非独占用例）、失败flag的写入／读取配对及触发链内失败归属；检查不通过不得提交，检查通过也不证明引擎行为。
 
-**当前放行状态**：登记以`python3 tools/check_test_parallel.py`输出为准（当前62个GROUP、38例EXCLUSIVE、3个跨命名空间合并组）。全量`--parallel 4`已在本机固定种子下连续两轮验收，可作为加速与回归对比模式：245/245用例执行、无重复BEGIN、独占用例窗口无并发违规、无确定性新增失败；每轮另有约2至5例属于既有WIP flaky或夹具世界状态漂移（清单随WIP修复变化，不写入本文），须用对比工具逐项核对并记录。`tca_test_retirement_eligibility`的原生等级缓存时序对调度敏感，仅在EXCLUSIVE下稳定通过，其独占登记不得移除。保存重载探针偶发引擎级中断（console save→reload转换，同配置多数轮次未复现），遇到`process_exit`或`NOT VERIFIED`按整轮重跑处理，不记为用例失败；若复现，可在`gui/tca_merit_saveload_probe.gui`保存后加`OnPause`并延长等待，或由运行器在检测到保存成功后门控注入破坏步骤。全量K=1串行仍是权威验收口径。
+**当前放行状态**：登记以`python3 tools/check_test_parallel.py`输出为准（当前54个GROUP、26例EXCLUSIVE、5个跨命名空间合并组）。全量`--parallel 4`（固定种子424242）已在本机同一时段做过基线/放宽A/B：基线配置（62 GROUP／38 EXCLUSIVE）约496s、235 PASS，放宽后配置（54 GROUP／26 EXCLUSIVE）连续两轮约445s与458s、239与242 PASS；相对同机基线约1.08至1.12倍，相对全量K=1（715.7s）约1.56至1.61倍，可作为加速与回归对比模式。两轮均245/245用例执行、无重复BEGIN、无新增mod引擎错误。固定种子下失败集仍逐轮漂移（基线单轮也出现约10例非通过），已知WIP flaky、K>1夹具世界状态漂移与调度敏感项（retirement系列、tongpan_lifecycle、arrest家族、`tca_test_merit_startup_central_boundaries`等）不写入本文清单；同一用例跨轮PASS／FAIL／PRECONDITION_FAIL交替应视为漂移而非确定性回归，新差异须用`tools/compare_test_runs.py`逐项核对并记录。放宽轨迹：拘捕组10例曾试解除独占，两轮共同出现确定性失败且墙钟无收益，已回退；司法六个模块合并为`tca_judicial_realm`（timing三例与`tca_test_review_send_resolution`保留独占，否则续接断言在并发下缺失）；功绩年度组四模块合并为`tca_merit_annual_worker`（`tca_test_merit_maintenance_idempotence`与`tca_test_merit_multicountry`保留独占，避免任意日期世界级年度结算互污；pulse／draw／natural／legacy解除独占）。`tca_test_retirement_eligibility`的原生等级缓存时序对调度敏感，仅在EXCLUSIVE下稳定通过，其独占登记不得移除。保存重载探针偶发引擎级中断（console save→reload转换，同配置多数轮次未复现），遇到`process_exit`或`NOT VERIFIED`按整轮重跑处理，不记为用例失败；若复现，可在`gui/tca_merit_saveload_probe.gui`保存后加`OnPause`并延长等待，或由运行器在检测到保存成功后门控注入破坏步骤。全量K=1串行仍是权威验收口径。
 
 ## Windows
 
