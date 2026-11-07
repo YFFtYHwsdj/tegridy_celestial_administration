@@ -86,6 +86,52 @@ def _engine_entries(text):
         yield text[start:]
 
 
+def _frame_function(line):
+    """取脚本栈帧括号内的函数名；无函数名时返回空串。"""
+    match = re.search(r'\(([^)]+)\)\s*$', line)
+    return match.group(1).strip() if match else ''
+
+
+def _script_stack_related(entry, owned_paths):
+    """判断脚本错误栈是否落在本模组脚本。
+
+    Script system error 的正文会内嵌角色名、头衔名等运行时文本；模组头衔键
+    （如 c_tca_tongpan_junzhou）随原生脚本错误被打印时，不能仅凭正文里的
+    `tca_` 认定为模组错误。这里只看 `Script location:` 之后的 file: 栈帧。
+
+    原版 on_action 允许各文件追加同名定义，引擎栈会把同一 on_action 的
+    其他定义也列出来（例如本模组只追加 `on_death = { on_actions = {...} }`
+    时，原版 death.txt:1561 的 on_death 自身错误也会带上本模组文件名）。
+    这类“同名 on_action 组合帧”不是调用来源，不据此归属模组；真正的
+    模组 effect／trigger 帧函数名不同，仍会命中。首个脚本位置本身就是
+    模组文件时，无论函数名如何都视为模组相关。
+    """
+    frames = []
+    for line in entry.splitlines():
+        stripped = line.strip()
+        if not (stripped.startswith('file:') or stripped.startswith('Script location:')):
+            continue
+        frames.append(stripped)
+    if not frames:
+        return False
+    first_function = _frame_function(frames[0])
+    first_is_mod = 'tca_' in frames[0] or '提点刑狱司' in frames[0] or any(
+        path in frames[0] for path in owned_paths)
+    if first_is_mod:
+        return True
+    for frame in frames[1:]:
+        is_mod = 'tca_' in frame or '提点刑狱司' in frame or any(
+            path in frame for path in owned_paths)
+        if not is_mod:
+            continue
+        # 仅追加同类 on_action 定义时，组合帧与首个位置同名，不构成调用来源。
+        if (frame.startswith('file: common/on_action/')
+                and _frame_function(frame) == first_function):
+            continue
+        return True
+    return False
+
+
 def _inspect_engine_entries(entries):
     """逐条分类启动期引擎错误，返回顺序与原文逐条扫描一致。"""
     registry = json.loads((ROOT / 'tools/upstream_overrides.json').read_text(encoding='utf-8'))
@@ -100,9 +146,13 @@ def _inspect_engine_entries(entries):
             findings['Invalid numeric event ID'] += 1
             continue
         loc_error = re.search(r"Data error in loc string '([^']+)'", entry)
-        related = ('tca_' in entry or '提点刑狱司' in entry or
-                   any(path in entry for path in owned_paths) or
-                   bool(loc_error and loc_error[1] in owned_loc_keys))
+        if 'Script system error' in entry:
+            # 脚本错误只看调用栈；正文中的头衔／角色名可能是原生运行时文本。
+            related = _script_stack_related(entry, owned_paths)
+        else:
+            related = ('tca_' in entry or '提点刑狱司' in entry or
+                       any(path in entry for path in owned_paths) or
+                       bool(loc_error and loc_error[1] in owned_loc_keys))
         if not related:
             continue
         if 'Script system error' in entry:

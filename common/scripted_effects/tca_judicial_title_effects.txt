@@ -80,6 +80,8 @@ tca_configure_judicial_title_location_effect = {
 # 使持久官职脱离实际路。引擎会保留已退休父头衔的引用，
 # 因此移除的是实际路的祖先关系，不保证清空
 # 父指针本身。绝不删除持久提刑官职对象。
+# 仅在实际脱离时执行：已指向退休父头衔就跳过，避免每季度
+# 重复创建／销毁临时头衔并再次触发原生 situation 参与者重算。
 tca_detach_judicial_title_de_jure_effect = {
     if = {
         limit = { exists = de_jure_liege NOT = { de_jure_liege = { has_variable = tca_judicial_retirement_parent } } }
@@ -132,7 +134,16 @@ tca_sync_judicial_title_de_jure_effect = {
                 NOT = { has_variable = tca_judicial_disabled }
             }
         }
-        set_de_jure_liege_title = var:song_judicial_circuit
+        # 幂等写入：原生 set_de_jure_liege_title 每次执行都会经由
+        # CLandedTitle::SetDeJureLiege → NSituation::UpdateSituationsAfterDrift
+        # 重算全部 situation 的参与者。1.20.1.2 原生 dynastic_cycle 的
+        # undecided_movement 校验在 trigger_else 直接读取未设置的
+        # var:movement_member，重算即报脚本错误。父级已指向本路时无需再写，
+        # 只在绑定实际变化（首次绑定、换路或恢复）时调用。
+        if = {
+            limit = { OR = { NOT = { exists = de_jure_liege } NOT = { de_jure_liege = var:song_judicial_circuit } } }
+            set_de_jure_liege_title = var:song_judicial_circuit
+        }
     }
     else = { tca_detach_judicial_title_de_jure_effect = yes }
 }

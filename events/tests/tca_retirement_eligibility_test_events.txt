@@ -81,6 +81,11 @@ tca_retirement_eligibility.1001 = {
 # 未确认接口：stress_gain_mult/stress_loss_mult直接脚本getter。改用同一无随机人格人物的
 # 真实add_stress增减及移除后恢复作因果对照；不声称覆盖自然活动、压力崩溃或长期健康。
 # 十个人物、当前法律和原生状态均由本例自备；三品、教育、资历与原生回调隔离保持相同。
+# 精确健康边界必须扣除运行时外部宫廷修正：原版宫廷医师的scaling_employer_court_modifiers
+# 会给其宫廷内除宫主外的所有角色加health（common/court_positions/types/00_court_positions.txt，
+# 档位0.01/0.03/0.05/0.07/0.1）。成熟世界里新建家门可能已聘到医师，使本例人物整体高出
+# 期望值；故.2另建同宫廷对照人物，.2001按其实测偏移给十个人物加测试专用负health修正，
+# 再等2天让派生health刷新后由.2011执行原有检查。偏移≈0时（全新局）不补偿，与旧例等价。
 tca_retirement_eligibility.2 = {
     type = character_event hidden = yes
     immediate = {
@@ -89,11 +94,26 @@ tca_retirement_eligibility.2 = {
         if = { limit = { debug_only = yes is_alive = yes title:h_china.holder = root }
             save_scope_value_as = { name = tca_rh_old_age value = retirement_age_current_value }
             add_realm_law_skip_effects = celestial_retirement_law_4
-            # 无王廷的独立家门作雇主，隔离皇帝宫廷待遇的健康抵消和压力修正。
+            # 独立家门作雇主；但人物仍会继承该宫廷的宫廷职位修正（含原版宫廷医师的健康加成），
+            # 所以不能假定创建值就是实际health，需用同宫廷对照人物测偏移（见.2001）。
             # 健康／压力人物统一用20岁，避开25岁后的年度健康损失在测试窗口内改变基线；
             # 法律年龄资格由eligibility.1单独验证，不在这里用年龄替代健康判定。
             tca_test_create_merit_interface_character_effect = { CHARACTER = tca_rh_host GOVERNMENT = celestial_government }
             scope:tca_rh_host = { add_character_flag = tca_history_defined_character }
+            # 同宫廷对照人物：health基线5，其余配置与十个人物一致，只用于测量外部健康偏移。
+            # 不参与任何业务断言；测量前撤掉本例添加的不朽保护，测完恢复保护供清理。
+            create_character = { age = 20 health = 5 gender_female_chance = 0 random_traits = no dynasty = none employer = scope:tca_rh_host culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_rh_control }
+            scope:tca_rh_control = {
+                add_character_flag = tca_history_defined_character
+                add_character_flag = tca_merit_interface_probe
+                add_character_flag = ai_will_not_convert
+                tca_test_protect_character_effect = yes
+                add_trait = education_stewardship_3
+                tca_test_add_native_merit_probe_exams_effect = yes
+                set_merit_level = 7
+                change_influence = 500
+                clear_appointment_timeout = yes
+            }
             create_character = { age = 20 health = 0.99 gender_female_chance = 0 random_traits = no dynasty = none employer = scope:tca_rh_host culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_rh_below }
             scope:tca_rh_below = {
                 add_character_flag = tca_history_defined_character
@@ -224,9 +244,106 @@ tca_retirement_eligibility.2001 = {
     immediate = {
         tca_test_validate_environment_effect = yes
         if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
-            # 仅在等待原生官品时保留不朽保护；测量健康与压力前撤回本例拥有的保护。
+            # 用同宫廷对照人物实测外部健康偏移（对照基线health=5）：成熟世界中新建家门
+            # 可能已聘到原版宫廷医师，其scaling_employer_court_modifiers会给宫廷内除宫主外
+            # 的所有角色加health，档位随AI实际聘任情况变化。这里按运行时实测值补偿，
+            # 不写死常量；全新局未聘医师时偏移为0，不添加任何补偿，与旧例等价。
+            scope:tca_rh_control = { tca_test_restore_character_effect = yes }
+            if = { limit = { scope:tca_rh_control = { is_alive = yes } }
+                set_variable = { name = tca_rh_health_offset value = { value = scope:tca_rh_control.health subtract = 5 } }
+            }
+            else = { set_variable = { name = tca_rh_health_offset value = 0 } debug_log = "TCA_RH_HEALTH_OFFSET_FALLBACK" }
+            # 输出实测偏移供复核；saved value只用于debug_log_scopes显示，随后清除。
+            save_scope_value_as = { name = tca_rh_health_offset_log value = var:tca_rh_health_offset }
+            debug_log = "TCA_RH_HEALTH_OFFSET" debug_log_scopes = yes
+            clear_saved_scope = tca_rh_health_offset_log
+            # 测量后恢复对照人物的死亡保护，保证后续清理可安全操作；不影响十个人物。
+            scope:tca_rh_control = { tca_test_protect_character_effect = yes }
+            # 按原版宫廷医师的离散档位施加等额负health修正，抵消宫廷对全体成员的健康加成；
+            # 修正定义见common/modifiers/tests/tca_retirement_test_modifiers.txt。
+            # 偏移≈0时不添加；超出最高档（>0.1）时补偿到最高档，残余偏差会由精确断言暴露。
+            # 补偿修正的派生health须真实跨日刷新，故保持十个人物的不朽保护并再等2天，
+            # 到.2011执行原有检查体（撤保护、读取health与压力）。
+            if = { limit = { var:tca_rh_health_offset < 0.005 }
+                debug_log = "TCA_RH_HEALTH_COMPENSATION NONE"
+            }
+            else_if = { limit = { var:tca_rh_health_offset < 0.02 }
+                scope:tca_rh_below = { add_character_modifier = { modifier = tca_retirement_test_health_minus_001 } }
+                scope:tca_rh_at = { add_character_modifier = { modifier = tca_retirement_test_health_minus_001 } }
+                scope:tca_rh_above = { add_character_modifier = { modifier = tca_retirement_test_health_minus_001 } }
+                scope:tca_rh_resume_below = { add_character_modifier = { modifier = tca_retirement_test_health_minus_001 } }
+                scope:tca_rh_resume_at = { add_character_modifier = { modifier = tca_retirement_test_health_minus_001 } }
+                scope:tca_rh_incapable = { add_character_modifier = { modifier = tca_retirement_test_health_minus_001 } }
+                scope:tca_rh_blind = { add_character_modifier = { modifier = tca_retirement_test_health_minus_001 } }
+                scope:tca_rh_wound = { add_character_modifier = { modifier = tca_retirement_test_health_minus_001 } }
+                scope:tca_rh_eye = { add_character_modifier = { modifier = tca_retirement_test_health_minus_001 } }
+                scope:tca_rh_stress = { add_character_modifier = { modifier = tca_retirement_test_health_minus_001 } }
+                debug_log = "TCA_RH_HEALTH_COMPENSATION MINUS_001"
+            }
+            else_if = { limit = { var:tca_rh_health_offset < 0.04 }
+                scope:tca_rh_below = { add_character_modifier = { modifier = tca_retirement_test_health_minus_003 } }
+                scope:tca_rh_at = { add_character_modifier = { modifier = tca_retirement_test_health_minus_003 } }
+                scope:tca_rh_above = { add_character_modifier = { modifier = tca_retirement_test_health_minus_003 } }
+                scope:tca_rh_resume_below = { add_character_modifier = { modifier = tca_retirement_test_health_minus_003 } }
+                scope:tca_rh_resume_at = { add_character_modifier = { modifier = tca_retirement_test_health_minus_003 } }
+                scope:tca_rh_incapable = { add_character_modifier = { modifier = tca_retirement_test_health_minus_003 } }
+                scope:tca_rh_blind = { add_character_modifier = { modifier = tca_retirement_test_health_minus_003 } }
+                scope:tca_rh_wound = { add_character_modifier = { modifier = tca_retirement_test_health_minus_003 } }
+                scope:tca_rh_eye = { add_character_modifier = { modifier = tca_retirement_test_health_minus_003 } }
+                scope:tca_rh_stress = { add_character_modifier = { modifier = tca_retirement_test_health_minus_003 } }
+                debug_log = "TCA_RH_HEALTH_COMPENSATION MINUS_003"
+            }
+            else_if = { limit = { var:tca_rh_health_offset < 0.06 }
+                scope:tca_rh_below = { add_character_modifier = { modifier = tca_retirement_test_health_minus_005 } }
+                scope:tca_rh_at = { add_character_modifier = { modifier = tca_retirement_test_health_minus_005 } }
+                scope:tca_rh_above = { add_character_modifier = { modifier = tca_retirement_test_health_minus_005 } }
+                scope:tca_rh_resume_below = { add_character_modifier = { modifier = tca_retirement_test_health_minus_005 } }
+                scope:tca_rh_resume_at = { add_character_modifier = { modifier = tca_retirement_test_health_minus_005 } }
+                scope:tca_rh_incapable = { add_character_modifier = { modifier = tca_retirement_test_health_minus_005 } }
+                scope:tca_rh_blind = { add_character_modifier = { modifier = tca_retirement_test_health_minus_005 } }
+                scope:tca_rh_wound = { add_character_modifier = { modifier = tca_retirement_test_health_minus_005 } }
+                scope:tca_rh_eye = { add_character_modifier = { modifier = tca_retirement_test_health_minus_005 } }
+                scope:tca_rh_stress = { add_character_modifier = { modifier = tca_retirement_test_health_minus_005 } }
+                debug_log = "TCA_RH_HEALTH_COMPENSATION MINUS_005"
+            }
+            else_if = { limit = { var:tca_rh_health_offset < 0.08 }
+                scope:tca_rh_below = { add_character_modifier = { modifier = tca_retirement_test_health_minus_007 } }
+                scope:tca_rh_at = { add_character_modifier = { modifier = tca_retirement_test_health_minus_007 } }
+                scope:tca_rh_above = { add_character_modifier = { modifier = tca_retirement_test_health_minus_007 } }
+                scope:tca_rh_resume_below = { add_character_modifier = { modifier = tca_retirement_test_health_minus_007 } }
+                scope:tca_rh_resume_at = { add_character_modifier = { modifier = tca_retirement_test_health_minus_007 } }
+                scope:tca_rh_incapable = { add_character_modifier = { modifier = tca_retirement_test_health_minus_007 } }
+                scope:tca_rh_blind = { add_character_modifier = { modifier = tca_retirement_test_health_minus_007 } }
+                scope:tca_rh_wound = { add_character_modifier = { modifier = tca_retirement_test_health_minus_007 } }
+                scope:tca_rh_eye = { add_character_modifier = { modifier = tca_retirement_test_health_minus_007 } }
+                scope:tca_rh_stress = { add_character_modifier = { modifier = tca_retirement_test_health_minus_007 } }
+                debug_log = "TCA_RH_HEALTH_COMPENSATION MINUS_007"
+            }
+            else = {
+                scope:tca_rh_below = { add_character_modifier = { modifier = tca_retirement_test_health_minus_010 } }
+                scope:tca_rh_at = { add_character_modifier = { modifier = tca_retirement_test_health_minus_010 } }
+                scope:tca_rh_above = { add_character_modifier = { modifier = tca_retirement_test_health_minus_010 } }
+                scope:tca_rh_resume_below = { add_character_modifier = { modifier = tca_retirement_test_health_minus_010 } }
+                scope:tca_rh_resume_at = { add_character_modifier = { modifier = tca_retirement_test_health_minus_010 } }
+                scope:tca_rh_incapable = { add_character_modifier = { modifier = tca_retirement_test_health_minus_010 } }
+                scope:tca_rh_blind = { add_character_modifier = { modifier = tca_retirement_test_health_minus_010 } }
+                scope:tca_rh_wound = { add_character_modifier = { modifier = tca_retirement_test_health_minus_010 } }
+                scope:tca_rh_eye = { add_character_modifier = { modifier = tca_retirement_test_health_minus_010 } }
+                scope:tca_rh_stress = { add_character_modifier = { modifier = tca_retirement_test_health_minus_010 } }
+                debug_log = "TCA_RH_HEALTH_COMPENSATION MINUS_010"
+            }
+            trigger_event = { id = tca_retirement_eligibility.2011 days = 2 }
+        }
+    }
+}
+tca_retirement_eligibility.2011 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            # 补偿修正已跨日刷新；读取health与压力前撤回本例拥有的不朽保护。
             # immortal=yes会改变原生健康读数；不以抵消修正伪造边界。
-            # 被测人物属于无王廷的临时家主，排除皇帝宫廷待遇和本人庄园修正。
+            # 被测人物与对照人物同宫廷，外部宫廷健康修正已由.2001按实测偏移补偿。
             scope:tca_rh_below = { tca_test_restore_character_effect = yes }
             scope:tca_rh_at = { tca_test_restore_character_effect = yes }
             scope:tca_rh_above = { tca_test_restore_character_effect = yes }
@@ -481,6 +598,19 @@ tca_retirement_eligibility.2007 = {
             scope:tca_rh_wound = { remove_variable = tca_rh_influence_before remove_variable = tca_rh_stress_before remove_variable = tca_rh_gain remove_variable = tca_rh_loss tca_test_cleanup_retirement_exit_actor_effect = yes }
             scope:tca_rh_eye = { remove_variable = tca_rh_influence_before remove_variable = tca_rh_stress_before remove_variable = tca_rh_gain remove_variable = tca_rh_loss tca_test_cleanup_retirement_exit_actor_effect = yes }
             scope:tca_rh_stress = { remove_variable = tca_rh_influence_before remove_variable = tca_rh_stress_before remove_variable = tca_rh_gain remove_variable = tca_rh_loss remove_variable = tca_rh_health_wait_round tca_test_cleanup_retirement_exit_actor_effect = yes }
+            # 移除本例按实测偏移添加的外部健康补偿修正，并清理对照人物与偏移变量。
+            scope:tca_rh_below = { tca_test_retirement_clear_health_compensation_effect = yes }
+            scope:tca_rh_at = { tca_test_retirement_clear_health_compensation_effect = yes }
+            scope:tca_rh_above = { tca_test_retirement_clear_health_compensation_effect = yes }
+            scope:tca_rh_resume_below = { tca_test_retirement_clear_health_compensation_effect = yes }
+            scope:tca_rh_resume_at = { tca_test_retirement_clear_health_compensation_effect = yes }
+            scope:tca_rh_incapable = { tca_test_retirement_clear_health_compensation_effect = yes }
+            scope:tca_rh_blind = { tca_test_retirement_clear_health_compensation_effect = yes }
+            scope:tca_rh_wound = { tca_test_retirement_clear_health_compensation_effect = yes }
+            scope:tca_rh_eye = { tca_test_retirement_clear_health_compensation_effect = yes }
+            scope:tca_rh_stress = { tca_test_retirement_clear_health_compensation_effect = yes }
+            scope:tca_rh_control = { remove_variable = tca_rh_influence_before remove_variable = tca_rh_stress_before remove_variable = tca_rh_gain remove_variable = tca_rh_loss tca_test_retirement_clear_health_compensation_effect = yes tca_test_cleanup_retirement_exit_actor_effect = yes }
+            remove_variable = tca_rh_health_offset
             if = { limit = { has_character_flag = tca_test_tca_retirement_eligibility_case_failed } debug_log = "TCA_TEST FAIL tca_test_retirement_health_and_stress" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
             else = { debug_log = "TCA_TEST PASS tca_test_retirement_health_and_stress" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
         }

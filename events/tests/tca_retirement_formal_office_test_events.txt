@@ -32,7 +32,36 @@ tca_retirement_formal_office.4001 = {
             if = { limit = { scope:tca_ro_actor = { appointment_timeout_days > 36500 } scope:tca_ro_office = { NOT = { holder = scope:tca_ro_actor } } scope:tca_ro_family.holder = scope:tca_ro_actor }
                 debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_formal_tongpan 2" }
             else = { add_character_flag = tca_test_tca_retirement_formal_office_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_formal_tongpan 2" }
-            trigger_event = { id = tca_retirement_formal_office.4002 days = 70 }
+            # 70 日固定窗口在该轮随机世界仍可能不足：先进入有界等待门 .4004 复查，
+            # 最多再等 60 日后才执行原检查 3／4／5，不改变断言本身。
+            set_variable = { name = tca_rt_formal_tongpan_wait_attempts value = 0 }
+            trigger_event = { id = tca_retirement_formal_office.4004 days = 70 }
+        }
+    }
+}
+
+# .4001 与 .4002 之间的有界等待门：step down 后固定等待 70 日时，辖区新负责人
+# 仍可能尚未成为 active 通判，或分权关系仍停留在旧 actor。逐 2 日复查检查 4 的
+# 辖区前置（active 通判且 diarch 已不是旧 actor），最多再等 60 日（30 次）；
+# 满足或到上限都记录 WAIT 诊断后转入 .4002 执行原有检查，断言与失败路径不变。
+tca_retirement_formal_office.4004 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { OR = { scope:tca_ro_jurisdiction.holder = { tca_has_active_tongpan_trigger = yes NOT = { diarch = scope:tca_ro_actor } } var:tca_rt_formal_tongpan_wait_attempts >= 30 } }
+                if = { limit = { scope:tca_ro_jurisdiction.holder = { tca_has_active_tongpan_trigger = yes NOT = { diarch = scope:tca_ro_actor } } }
+                    debug_log = "TCA_RETIREMENT_TP_WAIT C4_ACTIVE" }
+                else = { debug_log = "TCA_RETIREMENT_TP_WAIT C4_TIMEOUT" }
+                remove_variable = tca_rt_formal_tongpan_wait_attempts
+                trigger_event = { id = tca_retirement_formal_office.4002 days = 0 }
+            }
+            else = {
+                # 只在进入等待时记录一次，避免逐次复查刷日志；超时另行记录 C4_TIMEOUT。
+                if = { limit = { var:tca_rt_formal_tongpan_wait_attempts = 0 } debug_log = "TCA_RETIREMENT_TP_WAIT C4_PENDING" }
+                change_variable = { name = tca_rt_formal_tongpan_wait_attempts add = 1 }
+                trigger_event = { id = tca_retirement_formal_office.4004 days = 2 }
+            }
         }
     }
 }

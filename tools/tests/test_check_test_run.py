@@ -1,4 +1,4 @@
-import unittest
+﻿import unittest
 import tempfile
 from pathlib import Path
 from check_test_run import (inspect_run, inspect_engine_errors, case_outcomes,
@@ -248,6 +248,57 @@ class RunEvidenceTests(unittest.TestCase):
     def test_native_error_in_mod_call_chain_invalidates_pass(self):
         issues, _ = inspect_run(self.run_log(), '[10:00:00][E]: Script system error!\nError: wrong scope\nfile: common/scripted_effects/tca_example.txt', {'tca_test_example'})
         self.assertTrue(any('wrong scope' in x for x in issues))
+
+    def test_vanilla_script_error_mentioning_mod_title_is_not_attributed(self):
+        # 原生方案事件把模组头衔键打印进角色名时，栈仍全部是原版文件，
+        # 不能仅凭正文中的 tca_ 判定为模组脚本错误。
+        error = (
+            '[14:02:21][E][jomini_script_system.cpp:304]: Script system error!\n'
+            '  Error: add_opinion effect [ Datong Pengshui Miáo of c_tca_tongpan_junzhou '
+            '(Internal ID: 66157) is trying to add an opinion of themself ]\n'
+            '  Script location: file: common/scripted_effects/00_relation_effects.txt line: 197 '
+            '(progress_towards_friend_effect)\n'
+            '    file: events/scheme_events/agent_events.txt line: 610 (agent_events.0011:option)\n'
+        )
+        issues, _ = inspect_run(self.run_log(), error, {'tca_test_example': 1})
+        self.assertEqual(issues, [])
+
+    def test_native_on_action_error_with_mod_composition_frame_is_not_attributed(self):
+        # 模组只向 on_death 追加 on_actions 时，原版 death.txt 自身的 on_death
+        # 错误也会带上模组文件帧；同名 on_action 组合帧不是调用来源。
+        error = (
+            "[14:24:54][E][jomini_script_system.cpp:304]: Script system error!\n"
+            "  Error: Undefined event target 'killer'\n"
+            '  Script location: file: common/on_action/death.txt line: 1561 (on_death)\n'
+            '    file: common/on_action/tca_retirement_title_on_actions.txt line: 2 (on_death)\n'
+        )
+        issues, _ = inspect_run(self.run_log(), error, {'tca_test_example': 1})
+        self.assertEqual(issues, [])
+
+    def test_mod_on_action_effect_error_is_still_attributed(self):
+        # 模组 on_action 内实际 effect 报错（函数名与 on_action 不同）仍应归属。
+        error = (
+            '[14:24:54][E][jomini_script_system.cpp:304]: Script system error!\n'
+            '  Error: add_character_flag effect [ bad scope ]\n'
+            '  Script location: file: common/on_action/death.txt line: 1561 (on_death)\n'
+            '    file: common/on_action/tca_retirement_title_on_actions.txt line: 8 '
+            '(tca_retirement_title_death)\n'
+        )
+        issues, _ = inspect_run(self.run_log(), error, {'tca_test_example': 1})
+        self.assertTrue(any('bad scope' in issue for issue in issues))
+
+    def test_mod_stack_is_still_attributed_when_native_callee_errors(self):
+        # 原生 situation 在模组 effect 调用链内报错时仍是模组相关错误。
+        error = (
+            '[20:59:00][E][jomini_script_system.cpp:304]: Script system error!\n'
+            "  Error: Event target link 'var' returned an unset scope\n"
+            '  Script location: file: common/situation/situations/tgp_dynastic_cycle.txt line: 406 '
+            '(dynastic_cycle:is_character_valid)\n'
+            '    file: common/scripted_effects/tca_judicial_title_effects.txt line: 264 '
+            '(tca_restore_judicial_title_identity_effect)\n'
+        )
+        issues, _ = inspect_run(self.run_log(), error, {'tca_test_example': 1})
+        self.assertTrue(any("Event target link 'var'" in issue for issue in issues))
 
     def test_interleaved_cohort_results_are_order_independent(self):
         # 单实例并行下不同 lane 的 BEGIN/CHECK/PASS 会交错出现；验收按名字统计，不依赖先后。
