@@ -56,9 +56,9 @@ python3 tools/run_game_tests.py --timeout 1800
 
 并行运行不改变选择计划、用例集合、等待天数或断言，`selection.json`与`verification.json`的结构不变；`execution.json`、`task.json`额外记录`parallel`。并发只减少同局内等待的叠加，墙钟仍受最慢lane和独占用例限制，不能用固定倍率承诺耗时。并发时调试日志按实际发生顺序交错，验收仍按冻结计划和逐用例断言核对，不以日志相邻行判断用例归属。
 
-**验证边界**：并行运行的逐用例结果不能替代同范围串行同局结果作为验收依据，全量串行仍是权威口径。K>1必须用`tools/compare_test_runs.py`与同范围K=1逐项核对一致，并核对两次的冻结计划、终局结果、`TCA_TEST`日志和同次`error.log`；工具按`verification.json`比较逐用例状态和断言计数，缺失用例显示`<missing>`，可用`--ignore case1,case2`（可重复）排除已知项；`--ignore`只排除逐用例状态，聚合断言计数差异仍会列出并须单独解释，也可用`--json`另行输出结果。对比一致只说明本轮并发未改变已覆盖的断言，不覆盖保存重载、真实玩家路径和界面等另行验收项。K>1新出现的逐用例差异应先按并发冲突排查（写共享状态的延迟用例应独占），不能直接当作flaky忽略。已知WIP flaky项（如`tca_test_retirement_health_and_stress`、`tca_test_retirement_player_session`等）可在对比时用`--ignore`排除并单独记录原因，但不得用排除掩盖新增失败、缺失结果或引擎错误。
+**验证边界**：并行运行的逐用例结果不能替代同范围串行同局结果作为验收依据，全量串行仍是权威口径。K>1必须用`tools/compare_test_runs.py`与同范围K=1逐项核对一致，并核对两次的冻结计划、终局结果、`TCA_TEST`日志和同次`error.log`；工具按`verification.json`比较逐用例状态和断言计数，缺失用例显示`<missing>`，可用`--ignore case1,case2`（可重复）排除已知项；`--ignore`只排除逐用例状态，聚合断言计数差异仍会列出并须单独解释，也可用`--json`另行输出结果。对比一致只说明本轮并发未改变已覆盖的断言，不覆盖保存重载、真实玩家路径和界面等另行验收项。K>1新出现的逐用例差异应先按并发冲突排查（同一共享状态应只由同一GROUP的延迟非独占用例写入，否则合并GROUP或保持独占），不能直接当作flaky忽略。已知WIP flaky项（如`tca_test_retirement_health_and_stress`、`tca_test_retirement_player_session`等）可在对比时用`--ignore`排除并单独记录原因，但不得用排除掩盖新增失败、缺失结果或引擎错误。
 
-新增或修改用例后先运行`python3 tools/check_test_parallel.py`：它检查注册的GROUP／EXCLUSIVE元数据、裸全局标识、lane flag与lane结束调用一致性、跨GROUP报告者状态冲突、写共享状态的延迟用例是否独占、失败flag的写入／读取配对及触发链内失败归属；检查不通过不得提交，检查通过也不证明引擎行为。
+新增或修改用例后先运行`python3 tools/check_test_parallel.py`：它检查注册的GROUP／EXCLUSIVE元数据、裸全局标识、lane flag与lane结束调用一致性、跨GROUP报告者状态冲突、共享状态跨GROUP写冲突（延迟非独占用例）、失败flag的写入／读取配对及触发链内失败归属；检查不通过不得提交，检查通过也不证明引擎行为。
 
 **当前放行状态**：登记以`python3 tools/check_test_parallel.py`输出为准（当前62个GROUP、38例EXCLUSIVE、3个跨命名空间合并组）。全量`--parallel 4`已在本机固定种子下连续两轮验收，可作为加速与回归对比模式：245/245用例执行、无重复BEGIN、独占用例窗口无并发违规、无确定性新增失败；每轮另有约2至5例属于既有WIP flaky或夹具世界状态漂移（清单随WIP修复变化，不写入本文），须用对比工具逐项核对并记录。`tca_test_retirement_eligibility`的原生等级缓存时序对调度敏感，仅在EXCLUSIVE下稳定通过，其独占登记不得移除。保存重载探针偶发引擎级中断（console save→reload转换，同配置多数轮次未复现），遇到`process_exit`或`NOT VERIFIED`按整轮重跑处理，不记为用例失败；若复现，可在`gui/tca_merit_saveload_probe.gui`保存后加`OnPause`并延长等待，或由运行器在检测到保存成功后门控注入破坏步骤。全量K=1串行仍是权威验收口径。
 

@@ -54,7 +54,7 @@ tca_test_visit_case_effect = { EVENT = tca_x_test.1 CASE = tca_test_x_demo DELAY
 
 延迟用例在正常完成、前置失败或环境清理时调用`tca_test_lane_end_effect = { GROUP = <GROUP> }`（报告者作用域），不再直接调用`tca_test_continue_delayed_effect`。该效果移除本用例的lane flag与独占标记，活跃数减1（已有负值保护，重复结束不继续递减），归零时移除`tca_test_delayed_case_active`，再调用`tca_test_continue_delayed_effect`触发下一轮扫描。效果只释放本GROUP的lane占用，不触碰其它lane；用例不得自行清洗计数或提前结束其它lane。
 
-`EXCLUSIVE = yes`的用例在派发时要求当前活跃数为0，且在其结束前不再认领任何其它延迟用例，因此独占期间整轮延迟链串行。静态检查把在夹具中写`title:h_china`、`title:h_china.holder`或全局变量的延迟用例也列为必须独占。当前独占清单如下，新增同类场景必须设置独占并更新本节：
+`EXCLUSIVE = yes`的用例在派发时要求当前活跃数为0，且在其结束前不再认领任何其它延迟用例，因此独占期间整轮延迟链串行。静态检查对共享作用域（`title:h_china`、`title:h_china.holder`、全局变量；含夹具间接写入）上的变量与角色flag做写-写冲突检测：只有两个及以上不同GROUP的“延迟且非独占”用例写同一个状态键时才报违规；同GROUP的延迟用例串行、独占用例与其它延迟用例互斥、即时用例在同步阶段先于延迟阶段执行，因此都不参与冲突集合。检查器不跟踪读取与原生法则状态，读-写耦合仍须人工判断并以K>1引擎对照验证。当前独占清单如下，新增同类场景必须设置独占并更新本节：
 
 - 保存重载探针`tca_test_merit_saveload_contract`：保存、重载及续局阶段不能被其它用例的世界写入干扰；与州郡兼领法同属`tca_local_domain_realm`。
 - 玩家会话`tca_test_retirement_player_session`：等待人工接管玩家，结束时间不受框架控制。
@@ -73,9 +73,9 @@ tca_test_visit_case_effect = { EVENT = tca_x_test.1 CASE = tca_test_x_demo DELAY
 - 在所属模块登记`EVENT`、唯一`CASE`、`DELAYED`、`GROUP`与`EXCLUSIVE`；新用例的状态变量和角色flag带所属模块命名空间（如`tca_test_<命名空间>_*`），失败flag为`tca_test_<命名空间>_case_failed`，不再使用共享的`tca_test_case_failed`。
 - 等待仍用原生`trigger_event`的`days`参数续接，不用直接调用正式worker或循环检查代替自然触发。
 - 延迟用例结束时调用`tca_test_lane_end_effect = { GROUP = <GROUP> }`；不增减`tca_test_delayed_case_active`，不直接调用`tca_test_continue_delayed_effect`。由`trigger_event`链式调用的纯续接事件不是独立登记用例，其失败flag和lane结束调用沿用宿主用例的模块命名空间与GROUP。
-- 写共享状态的延迟用例——`title:h_china`、报告者上的共享状态、全局变量，或任何其它模块可能同时读取的状态——必须`EXCLUSIVE = yes`并登记到上节；即时用例在同步阶段执行，不占lane。
+- 写共享状态的延迟用例——`title:h_china`、报告者上的共享状态、全局变量，或任何其它模块可能同时读取的状态——默认`EXCLUSIVE = yes`并登记到上节；只有在确认其它非独占延迟lane既不写也不依赖该状态、且有K>1引擎对照证据后，才可去掉独占，或把竞争的GROUP合并为同一GROUP（合并后同lane串行）而不作全局阻塞。即时用例在同步阶段执行，不占lane。
 - 涉及保存重载、真实玩家会话、开局快照顺序的用例默认独占，不得利用lane并发。
-- 新增或修改登记后运行`python3 tools/check_test_parallel.py`，核对注册元数据、裸全局标识、lane flag与结束调用一致、跨GROUP状态名冲突、共享写入独占、失败flag配对及触发链归属；检查器白名单只用于已确认的框架共享状态，新增条目必须写明理由，不得用白名单代替合并GROUP或独占。检查通过不代表引擎验证通过。
+- 新增或修改登记后运行`python3 tools/check_test_parallel.py`，核对注册元数据、裸全局标识、lane flag与结束调用一致、跨GROUP状态名冲突、共享状态跨GROUP写冲突、失败flag配对及触发链归属；检查器白名单只用于已确认的框架共享状态，新增条目必须写明理由，不得用白名单代替合并GROUP或独占。检查通过不代表引擎验证通过。
 
 ### 等价与当前边界
 

@@ -182,16 +182,16 @@ class ParallelCheckerTests(unittest.TestCase):
                 temp, {'events/tests/tca_beta_test_events.txt': conflict}, whitelist=whitelist)
             self.assertEqual(inspect(root, whitelist_path)['violations'], [])
 
-    def test_delayed_shared_write_requires_exclusive_but_immediate_does_not(self):
+    def test_single_group_delayed_shared_write_is_allowed_and_immediate_is_ignored(self):
+        # a) 单个 GROUP 的延迟非独占用例写共享变量：同 GROUP 串行，不构成冲突。
         module = BASE_FILES['common/scripted_effects/tests/modules/tca_test_modules_alpha_effects.txt']
         alpha = BASE_FILES['events/tests/tca_alpha_test_events.txt']
         with tempfile.TemporaryDirectory() as temp:
             root, whitelist = self.write_root(
                 temp, {'common/scripted_effects/tests/modules/tca_test_modules_alpha_effects.txt':
                        module.replace('EXCLUSIVE = yes', 'EXCLUSIVE = no')})
-            report = inspect(root, whitelist)
-            self.assertEqual(self.checks(report['violations']), {5})
-            self.assertIn('tca_test_alpha', report['violations'][0]['message'])
+            self.assertEqual(inspect(root, whitelist)['violations'], [])
+        # d) 即时用例写共享作用域先于延迟阶段同步执行，不要求独占。
         with tempfile.TemporaryDirectory() as temp:
             root, whitelist = self.write_root(
                 temp, {'events/tests/tca_alpha_test_events.txt':
@@ -199,6 +199,121 @@ class ParallelCheckerTests(unittest.TestCase):
                                      '    set_variable = { name = tca_alpha_immediate_value value = 1 }\n'
                                      '    title:h_china.holder = { add_character_flag = tca_alpha_immediate_flag }\n')})
             self.assertEqual(inspect(root, whitelist)['violations'], [])
+
+    def beta_delayed_events(self, shared_write):
+        """把 beta 用例改为延迟调用，并在用例体追加指定的共享写入与 lane 结束。"""
+        beta = BASE_FILES['events/tests/tca_beta_test_events.txt']
+        return beta.replace(
+            '    if = { limit = { has_character_flag = tca_test_tca_beta_test_case_failed } '
+            'debug_log = "TCA_TEST FAIL tca_test_beta" }\n',
+            '    if = { limit = { has_character_flag = tca_test_tca_beta_test_case_failed } '
+            'debug_log = "TCA_TEST FAIL tca_test_beta" }\n'
+            + shared_write +
+            '    tca_test_lane_end_effect = { GROUP = tca_beta_test }\n')
+
+    def beta_delayed_module(self):
+        """把 beta 登记改为延迟、非独占。"""
+        return BASE_FILES['common/scripted_effects/tests/modules/tca_test_modules_beta_effects.txt'].replace(
+            'DELAYED = no', 'DELAYED = yes')
+
+    def test_shared_write_conflicts_when_two_groups_write_same_key(self):
+        # b) 两个 GROUP 的延迟非独占用例写同一共享变量 → 检查5 报冲突并列出两个 GROUP。
+        alpha_module = BASE_FILES['common/scripted_effects/tests/modules/tca_test_modules_alpha_effects.txt']
+        shared_write = ('    title:h_china = { set_variable = '
+                        '{ name = tca_alpha_shared_value value = 2 } }\n')
+        with tempfile.TemporaryDirectory() as temp:
+            root, whitelist = self.write_root(temp, {
+                'common/scripted_effects/tests/modules/tca_test_modules_alpha_effects.txt':
+                    alpha_module.replace('EXCLUSIVE = yes', 'EXCLUSIVE = no'),
+                'events/tests/tca_beta_test_events.txt': self.beta_delayed_events(shared_write),
+                'common/scripted_effects/tests/modules/tca_test_modules_beta_effects.txt':
+                    self.beta_delayed_module()})
+            report = inspect(root, whitelist)
+            self.assertEqual(self.checks(report['violations']), {5})
+            message = report['violations'][0]['message']
+            self.assertIn('tca_alpha_shared_value', message)
+            self.assertIn('tca_alpha_test', message)
+            self.assertIn('tca_beta_test', message)
+            # 冲突说明必须给出可操作建议：合并 GROUP 或保持独占。
+            self.assertIn('合并', message)
+            self.assertIn('EXCLUSIVE = yes', message)
+
+    def test_exclusive_group_does_not_join_shared_write_conflict(self):
+        # c) 一个非独占 GROUP 加一个独占 GROUP 写同一共享键：独占用例与其它延迟
+        # 用例互斥，不参与冲突集合，因此通过。
+        shared_write = ('    title:h_china = { set_variable = '
+                        '{ name = tca_alpha_shared_value value = 2 } }\n')
+        with tempfile.TemporaryDirectory() as temp:
+            root, whitelist = self.write_root(temp, {
+                'events/tests/tca_beta_test_events.txt': self.beta_delayed_events(shared_write),
+                'common/scripted_effects/tests/modules/tca_test_modules_beta_effects.txt':
+                    self.beta_delayed_module()})
+            self.assertEqual(inspect(root, whitelist)['violations'], [])
+
+    def test_immediate_shared_write_does_not_join_conflict_set(self):
+        # d 边界：即时用例与延迟非独占 GROUP 写同一共享键时，即时写入发生在
+        # 同步阶段，不属于并发写集合；只有延迟侧 GROUP 参与判断。
+        alpha = BASE_FILES['events/tests/tca_alpha_test_events.txt']
+        alpha_immediate = alpha.replace(
+            '    set_variable = { name = tca_alpha_immediate_value value = 1 }\n',
+            '    set_variable = { name = tca_alpha_immediate_value value = 1 }\n'
+            '    title:h_china = { set_variable = { name = tca_alpha_shared_value value = 3 } }\n')
+        with tempfile.TemporaryDirectory() as temp:
+            root, whitelist = self.write_root(
+                temp, {'events/tests/tca_alpha_test_events.txt': alpha_immediate})
+            self.assertEqual(inspect(root, whitelist)['violations'], [])
+
+    def test_fixture_shared_write_conflict_follows_calling_group(self):
+        # e) 夹具间接写共享：冲突集合按调用用例的 GROUP 归属，而非夹具名。
+        fixture = (
+            'tca_alpha_cleanup_effect = {\n'
+            '    remove_character_flag = tca_test_tca_alpha_test_case_failed\n'
+            '}\n'
+            'tca_shared_fixture_effect = {\n'
+            '    title:h_china = { set_variable = { name = tca_fixture_shared_value value = 1 } }\n'
+            '}\n')
+        alpha = BASE_FILES['events/tests/tca_alpha_test_events.txt']
+        alpha_fixture = alpha.replace(
+            '    tca_alpha_cleanup_effect = yes\n',
+            '    tca_alpha_cleanup_effect = yes\n'
+            '    tca_shared_fixture_effect = yes\n')
+        alpha_module = BASE_FILES['common/scripted_effects/tests/modules/tca_test_modules_alpha_effects.txt']
+        alpha_second = (
+            'tca_alpha_test.3 = { immediate = {\n'
+            '    remove_character_flag = tca_test_tca_alpha_test_case_failed\n'
+            '    tca_shared_fixture_effect = yes\n'
+            '    tca_test_lane_end_effect = { GROUP = tca_alpha_test }\n'
+            '} }\n')
+        module_second = alpha_module.replace(
+            '    tca_test_visit_case_effect = { EVENT = tca_alpha_test.2',
+            '    tca_test_visit_case_effect = { EVENT = tca_alpha_test.3 '
+            'CASE = tca_test_alpha_second DELAYED = yes GROUP = tca_alpha_test EXCLUSIVE = no }\n'
+            '    tca_test_visit_case_effect = { EVENT = tca_alpha_test.2')
+        # 同一 GROUP 的两个延迟用例调用同一夹具 → 通过。
+        with tempfile.TemporaryDirectory() as temp:
+            root, whitelist = self.write_root(temp, {
+                'common/scripted_effects/tests/fixtures/tca_alpha_test_effects.txt': fixture,
+                'events/tests/tca_alpha_test_events.txt': alpha_fixture + alpha_second,
+                'common/scripted_effects/tests/modules/tca_test_modules_alpha_effects.txt':
+                    module_second.replace('EXCLUSIVE = yes', 'EXCLUSIVE = no')})
+            self.assertEqual(inspect(root, whitelist)['violations'], [])
+        # 两个 GROUP 的延迟用例调用同一夹具 → 报冲突并列出两个 GROUP。
+        with tempfile.TemporaryDirectory() as temp:
+            root, whitelist = self.write_root(temp, {
+                'common/scripted_effects/tests/fixtures/tca_alpha_test_effects.txt': fixture,
+                'events/tests/tca_alpha_test_events.txt': alpha_fixture,
+                'common/scripted_effects/tests/modules/tca_test_modules_alpha_effects.txt':
+                    alpha_module.replace('EXCLUSIVE = yes', 'EXCLUSIVE = no'),
+                'events/tests/tca_beta_test_events.txt':
+                    self.beta_delayed_events('    tca_shared_fixture_effect = yes\n'),
+                'common/scripted_effects/tests/modules/tca_test_modules_beta_effects.txt':
+                    self.beta_delayed_module()})
+            report = inspect(root, whitelist)
+            self.assertEqual(self.checks(report['violations']), {5})
+            message = report['violations'][0]['message']
+            self.assertIn('tca_fixture_shared_value', message)
+            self.assertIn('tca_alpha_test', message)
+            self.assertIn('tca_beta_test', message)
 
     def test_failure_flag_requires_both_write_and_read(self):
         alpha = BASE_FILES['events/tests/tca_alpha_test_events.txt']

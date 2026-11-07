@@ -8,8 +8,11 @@
 2. 用例体不得使用裸全局失败 flag、裸延迟续接与裸延迟活跃 flag。
 3. lane flag／lane 结束调用的 GROUP 必须与用例注册 GROUP 一致。
 4. 报告者作用域状态名不得跨 GROUP 冲突；白名单条目必须写明理由。
-5. 延迟用例写共享作用域（title:h_china、title:h_china.holder、全局变量）时
-   必须 EXCLUSIVE = yes。
+5. 共享作用域（title:h_china、title:h_china.holder、全局变量）上的状态只在
+   被两个及以上不同 GROUP 的“延迟且非独占”用例写入时才构成并发冲突；
+   独占用例与其它延迟用例互斥、同 GROUP 的延迟用例串行、即时用例在同步
+   阶段先于延迟阶段执行，因此这三类都不参与冲突集合（夹具间接写入按调用
+   点作用域归属到调用用例）。
 6. 失败 flag 必须在全仓同时存在写入与读取，避免改名后失败不再被主用例读取。
 7. 从每个用例的 BEGIN 事件沿 trigger_event 链核对失败 flag 与 lane 结束 GROUP，
    并拒绝被多个 GROUP 共用且引用这些标识的链事件。
@@ -339,7 +342,7 @@ def _namespace_groups(registrations):
 def inspect(root=ROOT, whitelist_path=None):
     """运行全部静态检查，返回违规清单与统计信息。
 
-    违规条目格式：{'check': 1-5, 'message': 中文说明, 'subject': 定位标识}。
+    违规条目格式：{'check': 1-7, 'message': 中文说明, 'subject': 定位标识}。
     注册解析本身失败（结构性损坏、GROUP 非法或同名命名空间冲突）时，
     作为检查 1 违规返回，继续完成不依赖注册的源码扫描。
     """
@@ -480,10 +483,18 @@ def inspect(root=ROOT, whitelist_path=None):
                      f'或把状态名改为按 GROUP 命名空间化（来源：'
                      f'{_brief(state_sources[state_kind, name])}）')
 
-    # 检查 5：延迟用例写共享作用域必须独占。
-    shared_cases = defaultdict(set)
+    # 检查 5：共享状态写-写冲突。
+    # 共享状态指 title:h_china、title:h_china.holder 或全局变量上的变量与角色
+    # flag，按（状态类型, 名字）聚合写入者。只有被两个及以上不同 GROUP 的
+    # “延迟且非独占”用例写入时才构成并发冲突：独占用例在途时不会派发其它延迟
+    # 用例，同 GROUP 的延迟用例串行执行，即时用例在同步阶段先于延迟阶段完成，
+    # 因此这三类都不参与冲突集合。夹具间接写入按调用点作用域组合归属到调用
+    # 用例（夹具内部写共享作用域时恒记；夹具顶层写报告者时仅在共享作用域调用
+    # 点才转成共享写入）。
     variables = whitelist['variables']
     flags = whitelist['character_flags']
+    shared_groups = defaultdict(set)   # (状态类型, 名字) -> {写入它的 GROUP}
+    shared_cases = defaultdict(set)    # (状态类型, 名字) -> {用例名（事件）}
 
     def filter_shared(entries):
         return [(kind, name) for kind, name in entries
@@ -494,10 +505,11 @@ def inspect(root=ROOT, whitelist_path=None):
                 if root in by_event and by_event[root]['delayed'] and not by_event[root]['exclusive']]
 
     def collect_shared(roots, shared):
-        names = {name for _kind, name in shared}
         for root in roots:
             row = by_event[root]
-            shared_cases[(row['name'], row['event'])].update(names)
+            for kind, name in shared:
+                shared_groups[(kind, name)].add(row['group'])
+                shared_cases[(kind, name)].add(f'{row["name"]}（{row["event"]}）')
 
     for event, info in events.items():
         shared = filter_shared((kind, name) for kind, name, scope in _writes(info['body'])
@@ -513,10 +525,14 @@ def inspect(root=ROOT, whitelist_path=None):
             shared = internal + (top if scope == 'shared' else [])
             if shared:
                 collect_shared(delayed_roots(event), shared)
-    for (case, event), names in sorted(shared_cases.items()):
-        if names:
-            add(5, case, f'延迟用例 {case}（{event}）写共享作用域状态 '
-                         f'{", ".join(sorted(names))}；必须 EXCLUSIVE = yes')
+    for (kind, name), groups in sorted(shared_groups.items()):
+        if len(groups) < 2:
+            continue
+        label = '变量' if kind == 'variable' else '角色 flag'
+        add(5, name, f'共享{label} {name} 被多个 GROUP 的延迟非独占用例写入：'
+                     f'{_brief(groups, 12)}；并发运行会互相覆盖，'
+                     f'请把这些 GROUP 合并为同一 lane，或让写该状态的用例保持 '
+                     f'EXCLUSIVE = yes（涉及用例：{_brief(shared_cases[kind, name])}）')
 
     # 检查 6：失败 flag 必须在全仓同时有写入与读取，避免改 namespace 后失败被掩盖。
     flag_writes = defaultdict(int)
@@ -610,7 +626,7 @@ def main(argv=None):
         2: '用例体裸全局标识',
         3: 'lane flag／结束调用 GROUP 一致性',
         4: '报告者状态跨 GROUP 冲突',
-        5: '延迟用例共享写入的独占要求',
+        5: '共享状态跨 GROUP 写冲突（延迟非独占用例）',
         6: '失败 flag 的写入与读取配对',
         7: '触发链失败归属与 lane 结束一致性',
     }
