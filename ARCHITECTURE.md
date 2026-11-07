@@ -9,6 +9,7 @@
 - [地方司法](docs/judicial/README.md)：提刑机构、路法理辖区、位望、分层拘捕、公职囚犯与详覆。拥有统一司法辖区和身份分档接口。
 - [通判](docs/tongpan/README.md)：州级独立无地官职、绑定与原生任命、常设分权、治理加成和行动附费。复用官署生命周期思路，保持自己的资格、绑定与法律。
 - [官署经费](docs/office_funding/README.md)：复用司法路和通判州的登记表，按辖区绑定付款、按官署保存待遇；[契约](docs/office_funding/contracts.md)拥有身份／功绩／俸禄边界，[调整互动](docs/office_funding/interactions.md)拥有授权与冷却。
+- [地方驻军与军费](docs/military/README.md)：伯爵级军制头衔兵士的基准规模与中央军事预算份额；法律、科技、文化加成在其上叠加，不新增事件。
 - [科举](docs/examination/README.md)：知贡举宫廷职位与玩家皇帝代办事件链，复用原版考生来源、评分和及第状态；AI保留原版活动。
 - [宗教与儒家统计](docs/religion/README.md)：区分宗教设计与已实现的Rite分布缓存；统计当前提供读取接口，尚未接入人物生成概率。
 
