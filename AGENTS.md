@@ -38,14 +38,18 @@
 
 ## 测试与验证
 
-- 游戏行为直接维护 `events/tests/tca_*_test_events.txt`，调用正式trigger／effect；无生成器、中间测试源或Python业务规则副本。统一入口 `events/tests/tca_tests_events.txt`，模块登记位于 `common/scripted_effects/tests/modules/`。详细契约见[原生框架](docs/testing/framework.md)。
+- 游戏行为直接维护 `events/tests/tca_*_test_events.txt`，调用正式trigger／effect；无生成器、中间测试源或Python业务规则副本。统一入口 `events/tests/tca_tests_events.txt`，模块登记位于 `common/scripted_effects/tests/modules/`。延迟用例按模块 lane 调度：登记行须带 `GROUP`（默认取事件命名空间）与 `EXCLUSIVE`；用例结束、前置失败或清理时调用 `tca_test_lane_end_effect = { GROUP = ... }`；用例私有状态与失败flag使用所属模块命名空间。详细契约见[原生框架](docs/testing/framework.md#并发-lane-与用例隔离)。
 - 新增行为／修复对可自动验证部分维护有意义的正反与边界回归。尽量先构造暴露原问题的正确断言，确认修复前失败、修复后通过；未运行明确写“待引擎复现／复测”。纯文档、格式等低影响改动不机械新增业务测试。
 - 每项自备必要状态，不依赖其他用例顺序或遗留状态；前置不满足是未执行。保留唯一日志名、连续断言及真实等待，不改写框架统计／运行标记、不删失败断言或无理由放宽预期换取通过。
-- 新用例登记到所属模块；仅新增模块时调整 `common/scripted_effects/tests/framework/tca_test_catalog_effects.txt` 顺序。不手填总数和全局阶段编号，延迟用例原生串行调度。
-- 引擎回归优先 `python3 tools/run_game_tests.py`，默认独立1066中国观察者同局全组，仅加载主模组及CLI适配。`--case`／`--suite`可重复，`--isolate suite`才分局；固定任务ID用于协作，不引用 `latest.json`。需要macOS／Windows图形会话与Steam，详见[运行说明](docs/testing/README.md)。
+- 新增／修改用例在所属模块登记 `EVENT`、唯一 `CASE`、`DELAYED`、`GROUP`、`EXCLUSIVE`；仅新增模块时调整 `common/scripted_effects/tests/framework/tca_test_catalog_effects.txt` 顺序。不手填总数和全局阶段编号。默认 `--parallel 1` 在每个扫描轮次只认领一个延迟用例，与既有串行逐项等价；K>1 只改变同局在途延迟用例数，不改变用例集合、等待天数和断言。
+- 引擎回归优先 `python3 tools/run_game_tests.py`，默认独立1066中国观察者同局全组，仅加载主模组及CLI适配。`--case`／`--suite`可重复，`--isolate suite`才分局；`--parallel N`（1至32，默认1）设置同局延迟 lane 并发上限，缺省值保持串行语义。固定任务ID用于协作，不引用 `latest.json`。需要macOS／Windows图形会话与Steam，详见[运行说明](docs/testing/README.md)。
 - 核对同次 `terminal.json`、`result.txt`、`debug.log` 的 `TCA_TEST`、`error.log`及冻结计划。超时、中断、缺结果、未确认观察者、未执行或日志核对失败均不能算通过；全部断言通过也不等于没有相关引擎错误。
 - CLI不可用或需要人工验收时，在专用debug局使用测试决议／`event tca_tests.1`；观察者用 `effect tca_run_observer_tests_effect = yes`。说明未用CLI的原因及实际范围。不使用本机原因未明、会卡住的 `scripted_tests` 命令。
 - 修复后运行相关单项和同模块；共享接口、权限、生命周期变更扩展受影响组。单项通过不覆盖全组失败，分局通过不等于同局通过；静态／工具检查不证明引擎、真实玩家路径、显示或保存重载。
+- 测试框架或 lane 登记改动后先运行 `python3 tools/check_test_parallel.py`：校验注册元数据、裸全局标识、lane 结束调用与 `GROUP` 一致性、跨 GROUP 报告者状态冲突、写共享状态的延迟用例是否独占、失败flag读写配对及触发链归属。检查不通过不得提交，检查通过也不证明引擎行为。已登记的 `EXCLUSIVE` 是经过并发验证的必需配置，未经 `tools/compare_test_runs.py` 对照不得移除或放宽；对原生派生值、世界状态或时序敏感的用例只能在独占下稳定，新增同类用例同样登记独占。
+- K>1 运行只作加速与对照：必须用 `tools/compare_test_runs.py` 与同范围 K=1 逐用例核对，把已知 WIP flaky 项与新增差异分开记录；不得用 `--ignore` 掩盖新增失败、缺失结果或引擎错误。全量串行结果始终是权威验收口径，K>1 不得替代 K=1。
+- **控制全量回归次数**：全量回归需要独占图形会话与机器，串行耗时可达十余分钟，K>1 也要数分钟且可能产生需逐项解释的波动。只在准备收口、跨模块／共享接口变更或需要权威结论时运行全量；日常修复先跑 Python 检查与 `--list`，再用 `--suite`／`--case` 定向验证受影响模块；多项改动合并后一次运行，不要每个小改都重跑全量。
+- 保存重载探针偶发引擎级中断（`process_exit`、整轮 `NOT VERIFIED`），属引擎／原生状态波动而非测试逻辑失败：整轮重跑即可，不记为用例失败，也不因此改动并发或独占配置。
 - 界面、自然AI、延迟原始触发路径、完整交互和保存重载按模块补充验收；不能用直接维护／worker调用替代。报告实际执行范围、结果、未解决问题和限制。
 
 ## 常用检查
@@ -54,10 +58,16 @@
 # 包含对当前仓库的文档检查
 python3 -m unittest discover -s tools -p 'test_*.py'
 python3 tools/check_upstream_overrides.py
+python3 tools/check_test_parallel.py
 python3 tools/run_game_tests.py --list
+
+# 全量串行仍是权威验收口径；全量 K=4 为加速反馈，须用 compare 工具逐项核对
+python3 tools/run_game_tests.py --timeout 1800
+python3 tools/run_game_tests.py --timeout 1800 --parallel 4
+python3 tools/compare_test_runs.py "<串行run目录>" "<K=4 run目录>"
 ```
 
-纯文档整理检查链接、锚点、旧路径和差异；涉及源码注释时确认可执行内容不变，不为文档迁移机械重跑游戏。
+纯文档整理检查链接、锚点、旧路径和差异；涉及源码注释时确认可执行内容不变，不为文档迁移机械重跑游戏。全量回归不是默认动作，按上节“控制全量回归次数”执行。
 
 ## macOS 默认参考目录
 
