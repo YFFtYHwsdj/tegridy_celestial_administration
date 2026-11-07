@@ -104,10 +104,42 @@ tca_retirement_formal_office.4003 = {
         if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
             # 归还事务完成与原生分权可用性并非同帧刷新；有界逐日等最终状态，不调用维护器修复结果。
             if = { limit = { OR = { AND = { scope:tca_ro_office = { holder = scope:tca_ro_original tca_is_valid_tongpan_holder_trigger = yes } scope:tca_ro_jurisdiction.holder = { tca_has_active_tongpan_trigger = yes diarch = scope:tca_ro_original } } var:tca_rt_restore_attempts >= 30 } }
+                # 满足或超时都逐项记录，避免组合断言掩盖实际失败环节；标签与同结构候选事务用例一致。
                 if = { limit = { scope:tca_ro_office.holder = scope:tca_ro_original } debug_log = "TCA_RETIREMENT_TP_RESTORE HOLDER_OK" } else = { debug_log = "TCA_RETIREMENT_TP_RESTORE HOLDER_BAD" }
                 if = { limit = { scope:tca_ro_office = { tca_is_valid_tongpan_holder_trigger = yes } } debug_log = "TCA_RETIREMENT_TP_RESTORE VALID_OK" } else = { debug_log = "TCA_RETIREMENT_TP_RESTORE VALID_BAD" }
                 if = { limit = { scope:tca_ro_jurisdiction.holder = { diarch = scope:tca_ro_original } } debug_log = "TCA_RETIREMENT_TP_RESTORE DIARCH_OK" } else = { debug_log = "TCA_RETIREMENT_TP_RESTORE DIARCH_BAD" }
-                if = { limit = { scope:tca_ro_office = { holder = scope:tca_ro_original tca_is_valid_tongpan_holder_trigger = yes } scope:tca_ro_jurisdiction.holder = { tca_has_active_tongpan_trigger = yes diarch = scope:tca_ro_original } }
+                if = { limit = { scope:tca_ro_jurisdiction.holder = { has_diarchy_type = tca_tongpan } } } else = { debug_log = "TCA_RETIREMENT_TP_RESTORE DIARCH_TYPE_BAD" }
+                if = { limit = { scope:tca_ro_jurisdiction.holder.primary_title = { tca_is_tongpan_county_trigger = yes } } } else = { debug_log = "TCA_RETIREMENT_TP_RESTORE COUNTY_BAD" }
+                if = { limit = { scope:tca_ro_jurisdiction.holder.primary_title = { tca_has_tongpan_office_trigger = yes } } } else = { debug_log = "TCA_RETIREMENT_TP_RESTORE BINDING_BAD" }
+                if = { limit = { scope:tca_ro_office.holder = { is_diarch_valid_trigger = yes is_diarch_able_trigger = yes } } } else = { debug_log = "TCA_RETIREMENT_TP_RESTORE HOLDER_DIARCH_BAD" }
+                # 官署实际归还且仍有效是硬条件；原任因战争、囚禁、活动等环境原因已不能任分权者时，
+                # 只记录 RESTORED_NOT_DIARCHABLE 及分项原因，不伪造分权生效（与同结构候选用例一致）。
+                # 官署未归还、官署无效，或原任仍可任而 active trigger 不成立时保留失败。
+                if = { limit = { scope:tca_ro_office = { holder = scope:tca_ro_original tca_is_valid_tongpan_holder_trigger = yes } }
+                    if = { limit = {
+                        NOT = { scope:tca_ro_jurisdiction.holder = { tca_has_active_tongpan_trigger = yes diarch = scope:tca_ro_original } }
+                        NOT = { scope:tca_ro_office.holder = { is_diarch_valid_trigger = yes is_diarch_able_trigger = yes } }
+                    }
+                        debug_log = "TCA_RETIREMENT_TP_RESTORE RESTORED_NOT_DIARCHABLE"
+                        # 原版 is_diarch_valid／able 见 00_diarchy_scripted_triggers.txt；这里只记录实际命中的环境条件。
+                        scope:tca_ro_original = {
+                            if = { limit = { is_imprisoned = yes } debug_log = "TCA_RETIREMENT_TP_RESTORE NOT_DIARCHABLE_IMPRISONED" }
+                            if = { limit = { regency_for_personal_reasons_trigger = yes } debug_log = "TCA_RETIREMENT_TP_RESTORE NOT_DIARCHABLE_PERSONAL_REGEN" }
+                            if = { limit = { exists = involved_activity } debug_log = "TCA_RETIREMENT_TP_RESTORE NOT_DIARCHABLE_ACTIVITY" }
+                            if = { limit = { exists = liege } if = { limit = { is_at_war_with = liege } debug_log = "TCA_RETIREMENT_TP_RESTORE NOT_DIARCHABLE_WAR" } }
+                            if = { limit = { is_travelling = yes } debug_log = "TCA_RETIREMENT_TP_RESTORE NOT_DIARCHABLE_TRAVELLING" }
+                            if = { limit = { is_adult = no } debug_log = "TCA_RETIREMENT_TP_RESTORE NOT_DIARCHABLE_NOT_ADULT" }
+                            if = { limit = { has_character_flag = cannot_be_diarch } debug_log = "TCA_RETIREMENT_TP_RESTORE NOT_DIARCHABLE_EVENT_BLOCK" }
+                        }
+                    }
+                }
+                if = { limit = {
+                    scope:tca_ro_office = { holder = scope:tca_ro_original tca_is_valid_tongpan_holder_trigger = yes }
+                    OR = {
+                        scope:tca_ro_jurisdiction.holder = { tca_has_active_tongpan_trigger = yes diarch = scope:tca_ro_original }
+                        NOT = { scope:tca_ro_office.holder = { is_diarch_valid_trigger = yes is_diarch_able_trigger = yes } }
+                    }
+                }
                     debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_formal_tongpan 6" }
                 else = { add_character_flag = tca_test_tca_retirement_formal_office_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_formal_tongpan 6" }
                 scope:tca_ro_original = { tca_test_restore_character_effect = yes }

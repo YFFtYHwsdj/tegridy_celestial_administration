@@ -210,20 +210,16 @@ tca_retirement_exit.4000 = {
             limit = { tca_has_judicial_title_trigger = yes var:song_judicial_title = { tca_is_valid_judicial_holder_trigger = yes has_title_law = tca_judicial_office_succession_law holder = { top_liege = root } } }
             var:song_judicial_title = { save_scope_as = tca_re_judicial_title }
         }
-        # 固定使用已转换为天朝军事行省的k_xichuan：其原生任官继任名单稳定，
-        # 避免随机抽到只有领地法律、没有任官头衔法的王国造成假阴性。
-        if = { limit = { exists = title:k_xichuan.holder title:k_xichuan.holder = { is_landed = yes government_has_flag = government_is_celestial highest_held_title_tier = tier_kingdom top_liege = root } }
-            title:k_xichuan = { save_scope_as = tca_re_local_title }
-        }
+        # 优先k_xichuan（已转为天朝军事行省、原生任官名单稳定）；若其名单当前无合格候选，
+        # 改选另一名真实天朝王级任官头衔，仍从原生名单冻结控制，不指定继承人。
+        tca_test_pick_retirement_local_title_effect = yes
         # current_heir可能仍是缓存里的冷却人物；先原生刷新四个真实目标，再冻结真实current。
         # fallback不是任官候选，绝不对皇帝／现任／上级加身份；控制还必须无原生任命超时。
-        if = { limit = { exists = scope:tca_re_local_title.holder } scope:tca_re_local_title.holder = { scriptedtests_recalculate_succession = yes } }
         if = { limit = { exists = title:e_minister_of_justice.holder } title:e_minister_of_justice.holder = { scriptedtests_recalculate_succession = yes } }
         if = { limit = { exists = scope:tca_re_tongpan_title.holder } scope:tca_re_tongpan_title.holder = { scriptedtests_recalculate_succession = yes } }
         if = { limit = { exists = scope:tca_re_judicial_title.holder } scope:tca_re_judicial_title.holder = { scriptedtests_recalculate_succession = yes } }
 
         if = { limit = { exists = scope:tca_re_local_title }
-            tca_test_pick_retirement_native_heir_effect = { TITLE = scope:tca_re_local_title OUT = tca_re_local_heir }
             tca_test_dump_retirement_native_heirs_effect = { TITLE = scope:tca_re_local_title LABEL = LOCAL }
         }
         tca_test_pick_retirement_native_heir_effect = { TITLE = title:e_minister_of_justice OUT = tca_re_ministry_heir }
@@ -236,6 +232,11 @@ tca_retirement_exit.4000 = {
             tca_test_pick_retirement_native_heir_effect = { TITLE = scope:tca_re_judicial_title OUT = tca_re_judicial_heir }
             tca_test_dump_retirement_native_heirs_effect = { TITLE = scope:tca_re_judicial_title LABEL = JUDICIAL }
         }
+        # 组合前置失败前先逐项记录冻结控制与选人缺失原因；诊断只读，不改变断言。
+        tca_test_diag_retirement_native_heir_effect = { CHARACTER = scope:tca_re_local_heir TITLE = scope:tca_re_local_title LABEL = LOCAL }
+        tca_test_diag_retirement_native_heir_effect = { CHARACTER = scope:tca_re_ministry_heir TITLE = title:e_minister_of_justice LABEL = MINISTRY }
+        tca_test_diag_retirement_native_heir_effect = { CHARACTER = scope:tca_re_tongpan_heir TITLE = scope:tca_re_tongpan_title LABEL = TONGPAN }
+        tca_test_diag_retirement_native_heir_effect = { CHARACTER = scope:tca_re_judicial_heir TITLE = scope:tca_re_judicial_title LABEL = JUDICIAL }
         if = { limit = { debug_only = yes is_alive = yes title:h_china.holder = root exists = scope:tca_re_local_title exists = scope:tca_re_tongpan_title exists = scope:tca_re_judicial_title exists = scope:tca_re_local_heir exists = scope:tca_re_ministry_heir exists = scope:tca_re_tongpan_heir exists = scope:tca_re_judicial_heir scope:tca_re_local_heir = { is_alive = yes is_adult = yes is_incapable = no health >= 1.2 appointment_timeout_days = 0 NOT = { tca_is_landless_official_trigger = yes } NOT = { has_trait = tca_retirement_probe_fengci } NOT = { has_trait = tca_retirement_probe_retired } NOT = { has_character_flag = tca_retirement_candidate_enabled } NOT = { has_character_flag = tca_re_native_borrowed } NOT = { has_variable = tca_retirement_candidate_prior_timeout } NOT = { has_variable = tca_retirement_candidate_entered_date } this != root NOT = { this = scope:tca_re_local_title.holder } NOT = { this = scope:tca_re_local_title.holder.liege } } scope:tca_re_ministry_heir = { is_alive = yes is_adult = yes is_incapable = no health >= 1.2 appointment_timeout_days = 0 NOT = { tca_is_landless_official_trigger = yes } NOT = { has_trait = tca_retirement_probe_fengci } NOT = { has_trait = tca_retirement_probe_retired } NOT = { has_character_flag = tca_retirement_candidate_enabled } NOT = { has_character_flag = tca_re_native_borrowed } NOT = { has_variable = tca_retirement_candidate_prior_timeout } NOT = { has_variable = tca_retirement_candidate_entered_date } this != root NOT = { this = title:e_minister_of_justice.holder } NOT = { this = title:e_minister_of_justice.holder.liege } } scope:tca_re_tongpan_heir = { is_alive = yes is_adult = yes is_incapable = no health >= 1.2 appointment_timeout_days = 0 NOT = { tca_is_landless_official_trigger = yes } NOT = { has_trait = tca_retirement_probe_fengci } NOT = { has_trait = tca_retirement_probe_retired } NOT = { has_character_flag = tca_retirement_candidate_enabled } NOT = { has_character_flag = tca_re_native_borrowed } NOT = { has_variable = tca_retirement_candidate_prior_timeout } NOT = { has_variable = tca_retirement_candidate_entered_date } this != root NOT = { this = scope:tca_re_tongpan_title.holder } NOT = { this = scope:tca_re_tongpan_title.holder.liege } } scope:tca_re_judicial_heir = { is_alive = yes is_adult = yes is_incapable = no health >= 1.2 appointment_timeout_days = 0 NOT = { tca_is_landless_official_trigger = yes } NOT = { has_trait = tca_retirement_probe_fengci } NOT = { has_trait = tca_retirement_probe_retired } NOT = { has_character_flag = tca_retirement_candidate_enabled } NOT = { has_character_flag = tca_re_native_borrowed } NOT = { has_variable = tca_retirement_candidate_prior_timeout } NOT = { has_variable = tca_retirement_candidate_entered_date } this != root NOT = { this = scope:tca_re_judicial_title.holder } NOT = { this = scope:tca_re_judicial_title.holder.liege } } }
             save_scope_as = tca_re_reporter
             tca_test_retirement_native_controls_effect = { ACTION = tca_test_borrow_retirement_native_heir_effect }

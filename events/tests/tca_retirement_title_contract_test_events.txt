@@ -358,19 +358,39 @@ tca_retirement_title_contract_test.4001 = {
         }
     }
 }
+# 天子预算重立会即时改写活动预算基准率，人物毛收入却按原生月结缓存刷新；
+# 单日取样可能落在“重立后、月结前”的窗口，使期望与实得不同源。以下三处断言
+# 按日重取活动基准率并与缓存收入比较，相等才判定；最多等待40日（覆盖一个完整
+# 月结周期）让原生月结刷新缓存，超界仍按原断言记CHECK_FAIL，等值、容差±0.0001
+# 与全部结构条件均不删除、不放宽。
 tca_retirement_title_contract_test.4002 = {
     type = character_event hidden = yes
     immediate = {
         tca_test_validate_environment_effect = yes
         if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { NOT = { has_variable = tca_rms_wait } } set_variable = { name = tca_rms_wait value = 0 } }
             set_variable = { name = tca_rms_rate value = treasury_budget_base_rate_salaries }
+            debug_log = "TCA_RETIREMENT_MERIT_SALARY fengci_wait wait=[THIS.Char.MakeScope.Var('tca_rms_wait').GetValue]"
             scope:tca_rms_actor = { set_variable = { name = tca_rms_expected value = { value = root.var:tca_rms_rate multiply = 0.2 } } debug_log = "TCA_RETIREMENT_MERIT_SALARY fengci actual=[THIS.Char.MakeScope.ScriptValue('tca_retirement_probe_monthly_gold_value')] expected=[THIS.Char.MakeScope.Var('tca_rms_expected').GetValue] rank=[THIS.Char.GetMeritLevel] weight=[THIS.Char.MakeScope.ScriptValue('tca_retirement_salary_weight_value')] M=[THIS.Char.MakeScope.ScriptValue('tca_retirement_merit_salary_base_value')]" }
-            if = { limit = { var:tca_rms_rate > 0 scope:tca_rms_actor = { merit_level = 4 tca_retirement_salary_weight_value = 0.2 vassal_contract_obligation_level:celestial_salary_rank = 0 NOT = { exists = domicile } monthly_character_income >= { value = var:tca_rms_expected subtract = 0.0001 } monthly_character_income <= { value = var:tca_rms_expected add = 0.0001 } } }
-                debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_merit_salary 2"
+            if = { limit = { var:tca_rms_rate > 0 scope:tca_rms_actor = { merit_level = 4 tca_retirement_salary_weight_value = 0.2 vassal_contract_obligation_level:celestial_salary_rank = 0 NOT = { exists = domicile } } }
+                if = { limit = { scope:tca_rms_actor = { monthly_character_income >= { value = var:tca_rms_expected subtract = 0.0001 } monthly_character_income <= { value = var:tca_rms_expected add = 0.0001 } } }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_merit_salary 2"
+                }
+                else_if = { limit = { var:tca_rms_wait < 40 }
+                    change_variable = { name = tca_rms_wait add = 1 }
+                    trigger_event = { id = tca_retirement_title_contract_test.4002 days = 1 }
+                    set_variable = { name = tca_rms_syncing value = yes }
+                }
+                else = { add_character_flag = tca_test_tca_retirement_title_contract_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_merit_salary 2" }
             }
             else = { add_character_flag = tca_test_tca_retirement_title_contract_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_merit_salary 2" }
-            scope:tca_rms_actor = { tca_retirement_finish_effect = { KIND = 2 APPROVE = no } }
-            trigger_event = { id = tca_retirement_title_contract_test.4003 days = 35 }
+            # 未同步时只重试并等待月结，不推进后续断言与清理。
+            if = { limit = { NOT = { has_variable = tca_rms_syncing } }
+                scope:tca_rms_actor = { tca_retirement_finish_effect = { KIND = 2 APPROVE = no } }
+                remove_variable = tca_rms_wait
+                trigger_event = { id = tca_retirement_title_contract_test.4003 days = 35 }
+            }
+            else = { remove_variable = tca_rms_syncing }
         }
     }
 }
@@ -379,14 +399,29 @@ tca_retirement_title_contract_test.4003 = {
     immediate = {
         tca_test_validate_environment_effect = yes
         if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { NOT = { has_variable = tca_rms_wait } } set_variable = { name = tca_rms_wait value = 0 } }
             set_variable = { name = tca_rms_rate value = treasury_budget_base_rate_salaries }
+            debug_log = "TCA_RETIREMENT_MERIT_SALARY retired_wait wait=[THIS.Char.MakeScope.Var('tca_rms_wait').GetValue]"
             scope:tca_rms_actor = { set_variable = { name = tca_rms_expected value = { value = root.var:tca_rms_rate multiply = 0.125 } } debug_log = "TCA_RETIREMENT_MERIT_SALARY retired actual=[THIS.Char.MakeScope.ScriptValue('tca_retirement_probe_monthly_gold_value')] expected=[THIS.Char.MakeScope.Var('tca_rms_expected').GetValue] rank=[THIS.Char.GetMeritLevel] weight=[THIS.Char.MakeScope.ScriptValue('tca_retirement_salary_weight_value')] M=[THIS.Char.MakeScope.ScriptValue('tca_retirement_merit_salary_base_value')]" }
-            if = { limit = { var:tca_rms_rate > 0 scope:tca_rms_actor = { merit_level = 5 tca_retirement_salary_weight_value = 0.125 has_trait = tca_retired has_character_flag = tca_retirement_honor_processed NOT = { has_variable = tca_retirement_honor_target } monthly_character_income >= { value = var:tca_rms_expected subtract = 0.0001 } monthly_character_income <= { value = var:tca_rms_expected add = 0.0001 } } }
-                debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_merit_salary 3"
+            if = { limit = { var:tca_rms_rate > 0 scope:tca_rms_actor = { merit_level = 5 tca_retirement_salary_weight_value = 0.125 has_trait = tca_retired has_character_flag = tca_retirement_honor_processed NOT = { has_variable = tca_retirement_honor_target } } }
+                if = { limit = { scope:tca_rms_actor = { monthly_character_income >= { value = var:tca_rms_expected subtract = 0.0001 } monthly_character_income <= { value = var:tca_rms_expected add = 0.0001 } } }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_merit_salary 3"
+                }
+                else_if = { limit = { var:tca_rms_wait < 40 }
+                    change_variable = { name = tca_rms_wait add = 1 }
+                    trigger_event = { id = tca_retirement_title_contract_test.4003 days = 1 }
+                    set_variable = { name = tca_rms_syncing value = yes }
+                }
+                else = { add_character_flag = tca_test_tca_retirement_title_contract_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_merit_salary 3" }
             }
             else = { add_character_flag = tca_test_tca_retirement_title_contract_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_merit_salary 3" }
-            scope:tca_rms_actor = { add_character_modifier = tca_retirement_test_salary_positive remove_short_term_gold = gold set_variable = { name = tca_rms_before value = gold } set_variable = { name = tca_rms_treasury_before value = treasury } }
-            trigger_event = { id = tca_retirement_title_contract_test.4004 days = 35 }
+            # 未同步时只重试并等待月结，不添加外部薪俸倍率、不推进后续断言。
+            if = { limit = { NOT = { has_variable = tca_rms_syncing } }
+                scope:tca_rms_actor = { add_character_modifier = tca_retirement_test_salary_positive remove_short_term_gold = gold set_variable = { name = tca_rms_before value = gold } set_variable = { name = tca_rms_treasury_before value = treasury } }
+                remove_variable = tca_rms_wait
+                trigger_event = { id = tca_retirement_title_contract_test.4004 days = 35 }
+            }
+            else = { remove_variable = tca_rms_syncing }
         }
     }
 }
@@ -395,16 +430,28 @@ tca_retirement_title_contract_test.4004 = {
     immediate = {
         tca_test_validate_environment_effect = yes
         if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { NOT = { has_variable = tca_rms_wait } } set_variable = { name = tca_rms_wait value = 0 } }
+            debug_log = "TCA_RETIREMENT_MERIT_SALARY honor_wait wait=[THIS.Char.MakeScope.Var('tca_rms_wait').GetValue]"
             if = { limit = { scope:tca_rms_actor = { gold > var:tca_rms_before vassal_contract_has_flag = tca_retirement_merit_half monthly_character_income >= { value = root.treasury_budget_base_rate_salaries multiply = 0.1875 subtract = 0.0002 } monthly_character_income <= { value = root.treasury_budget_base_rate_salaries multiply = 0.1875 add = 0.0002 } monthly_character_treasury_income = 0 monthly_character_treasury_variable_income = 0 treasury <= var:tca_rms_treasury_before monthly_character_income > 0 } }
                 debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_merit_salary 4"
             }
+            else_if = { limit = { var:tca_rms_wait < 40 }
+                change_variable = { name = tca_rms_wait add = 1 }
+                trigger_event = { id = tca_retirement_title_contract_test.4004 days = 1 }
+                set_variable = { name = tca_rms_syncing value = yes }
+            }
             else = { add_character_flag = tca_test_tca_retirement_title_contract_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_merit_salary 4" }
-            scope:tca_rms_actor = { remove_character_modifier = tca_retirement_test_salary_positive remove_character_modifier = tca_merit_probe_approved_base_modifier remove_character_flag = tca_merit_grant_suppress tca_test_cleanup_retirement_formal_effect = yes }
-            scope:tca_rms_heir = { remove_character_flag = tca_merit_grant_suppress tca_test_cleanup_merit_probe_character_effect = yes }
-            remove_variable = tca_rms_rate
-            if = { limit = { has_character_flag = tca_test_tca_retirement_title_contract_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_retirement_merit_salary" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
-            else = { debug_log = "TCA_TEST PASS tca_test_retirement_merit_salary" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
-            remove_character_flag = tca_test_tca_retirement_title_contract_test_case_failed tca_test_lane_end_effect = { GROUP = tca_retirement_title_contract_test }
+            # 未同步时只重试并等待月结，不提前清理夹具或汇总结果。
+            if = { limit = { NOT = { has_variable = tca_rms_syncing } }
+                scope:tca_rms_actor = { remove_character_modifier = tca_retirement_test_salary_positive remove_character_modifier = tca_merit_probe_approved_base_modifier remove_character_flag = tca_merit_grant_suppress tca_test_cleanup_retirement_formal_effect = yes }
+                scope:tca_rms_heir = { remove_character_flag = tca_merit_grant_suppress tca_test_cleanup_merit_probe_character_effect = yes }
+                remove_variable = tca_rms_rate
+                remove_variable = tca_rms_wait
+                if = { limit = { has_character_flag = tca_test_tca_retirement_title_contract_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_retirement_merit_salary" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+                else = { debug_log = "TCA_TEST PASS tca_test_retirement_merit_salary" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+                remove_character_flag = tca_test_tca_retirement_title_contract_test_case_failed tca_test_lane_end_effect = { GROUP = tca_retirement_title_contract_test }
+            }
+            else = { remove_variable = tca_rms_syncing }
         }
     }
 }

@@ -178,8 +178,47 @@ tca_test_dump_retirement_native_heirs_effect = {
     }
 }
 
+# 报告者作用域；为本地原生名单挑选真实天朝王级任官头衔，并冻结其原生继任者。
+# 优先k_xichuan；若该头衔当前原生任官名单为空（例如刚经原生任命、候选整体冷却），
+# 改选另一名满足相同条件的真实天朝王级任官头衔，仍只从原生名单冻结控制，不指定继承人。
+# 候选头衔必须是无地类型之外、且持有人在原生任官继任法下的王级头衔，避免抽到无任官法的假阴性。
+tca_test_pick_retirement_local_title_effect = {
+    clear_saved_scope = tca_re_local_title
+    clear_saved_scope = tca_re_local_heir
+    if = { limit = { exists = title:k_xichuan.holder title:k_xichuan.holder = { is_landed = yes government_has_flag = government_is_celestial highest_held_title_tier = tier_kingdom top_liege = root } }
+        title:k_xichuan.holder = { scriptedtests_recalculate_succession = yes }
+        title:k_xichuan = { if = { limit = { holder ?= { has_realm_law_flag = appointment_type_succession } } save_scope_as = tca_re_local_title } }
+    }
+    if = { limit = { exists = scope:tca_re_local_title }
+        tca_test_pick_retirement_native_heir_effect = { TITLE = scope:tca_re_local_title OUT = tca_re_local_heir }
+        if = { limit = { NOT = { exists = scope:tca_re_local_heir } }
+            debug_log = "TCA_RETIREMENT_EXIT LOCAL_LIST_FALLBACK title=k_xichuan"
+            clear_saved_scope = tca_re_local_title
+        }
+    }
+    if = { limit = { NOT = { exists = scope:tca_re_local_title } }
+        root = { every_vassal = {
+            limit = {
+                is_landed = yes government_has_flag = government_is_celestial highest_held_title_tier = tier_kingdom top_liege = root
+                primary_title = { is_landless_type_title = no }
+                primary_title = { holder ?= { has_realm_law_flag = appointment_type_succession } }
+            }
+            if = { limit = { NOT = { exists = scope:tca_re_local_title } }
+                primary_title.holder = { scriptedtests_recalculate_succession = yes }
+                primary_title = { save_scope_as = tca_re_local_title }
+                tca_test_pick_retirement_native_heir_effect = { TITLE = scope:tca_re_local_title OUT = tca_re_local_heir }
+                if = { limit = { NOT = { exists = scope:tca_re_local_heir } } clear_saved_scope = tca_re_local_title }
+                else = { scope:tca_re_local_title = { debug_log = "TCA_RETIREMENT_EXIT LOCAL_TITLE_FALLBACK title=[THIS.Title.GetKey]" } }
+            }
+        } }
+    }
+}
+
 # TITLE / OUT；从原生任官名单冻结一名真实合格继任者，不指定具体人物。
 # 优先使用名单成员而非可能陈旧的current_heir缓存；仍由调用者做完整资格前置检查。
+# 选取条件与 tca_retirement_exit_test_events.txt `.4000` 的组合前置保持一致，
+# 额外排除已带退休候选残留状态的人物：否则每次遍历覆盖 saved scope 后，最终
+# 选中的人物可能满足不了断言，前置失败却看不出是哪一项。
 tca_test_pick_retirement_native_heir_effect = {
     clear_saved_scope = $OUT$
     $TITLE$ = {
@@ -188,6 +227,12 @@ tca_test_pick_retirement_native_heir_effect = {
                 limit = {
                     is_alive = yes is_adult = yes is_incapable = no health >= 1.2 appointment_timeout_days = 0
                     NOT = { tca_is_landless_official_trigger = yes }
+                    NOT = { has_trait = tca_retirement_probe_fengci }
+                    NOT = { has_trait = tca_retirement_probe_retired }
+                    NOT = { has_character_flag = tca_retirement_candidate_enabled }
+                    NOT = { has_character_flag = tca_re_native_borrowed }
+                    NOT = { has_variable = tca_retirement_candidate_prior_timeout }
+                    NOT = { has_variable = tca_retirement_candidate_entered_date }
                     this != root
                     NOT = { this = $TITLE$.holder }
                     NOT = { this = $TITLE$.holder.liege }
@@ -196,4 +241,45 @@ tca_test_pick_retirement_native_heir_effect = {
             }
         }
     }
+}
+
+# 报告者作用域；只读诊断 `.4000` 组合前置的失败分量，不改变断言与统计。
+# CHARACTER 为已冻结的原生继任者（可能未设置），TITLE 为来源头衔，LABEL 为日志标签。
+# 正常时只输出一行 PICKED 摘要；失败时输出对应分量，便于从同次 debug.log 归因。
+tca_test_diag_retirement_native_heir_effect = {
+    if = { limit = { NOT = { exists = $CHARACTER$ } }
+        if = { limit = { exists = $TITLE$ }
+            $TITLE$ = {
+                debug_log = "TCA_RETIREMENT_EXIT_DIAG $LABEL$ PICK_ABSENT title=[THIS.Title.GetKey]"
+                current_heir ?= { debug_log = "TCA_RETIREMENT_EXIT_DIAG $LABEL$ CURRENT_HEIR id=[THIS.Char.GetID]" }
+                if = { limit = { holder ?= { has_realm_law_flag = appointment_type_succession } }
+                    holder ?= { debug_log = "TCA_RETIREMENT_EXIT_DIAG $LABEL$ APPOINTMENT_LAW_OK holder=[THIS.Char.GetID]" }
+                }
+                else = { debug_log = "TCA_RETIREMENT_EXIT_DIAG $LABEL$ NO_APPOINTMENT_LAW" }
+            }
+        }
+        else = { debug_log = "TCA_RETIREMENT_EXIT_DIAG $LABEL$ TITLE_ABSENT" }
+    }
+    else = { $CHARACTER$ = {
+        debug_log = "TCA_RETIREMENT_EXIT_DIAG $LABEL$ PICKED id=[THIS.Char.GetID] rank=[THIS.Char.GetMeritLevel]"
+        if = { limit = { is_alive = yes } } else = { debug_log = "TCA_RETIREMENT_EXIT_DIAG $LABEL$ FAIL IS_DEAD" }
+        if = { limit = { is_adult = yes } } else = { debug_log = "TCA_RETIREMENT_EXIT_DIAG $LABEL$ FAIL NOT_ADULT" }
+        if = { limit = { is_incapable = no } } else = { debug_log = "TCA_RETIREMENT_EXIT_DIAG $LABEL$ FAIL INCAPABLE" }
+        if = { limit = { health >= 1.2 } } else = { debug_log = "TCA_RETIREMENT_EXIT_DIAG $LABEL$ FAIL LOW_HEALTH" }
+        if = { limit = { appointment_timeout_days = 0 } } else = { debug_log = "TCA_RETIREMENT_EXIT_DIAG $LABEL$ FAIL APPOINTMENT_TIMEOUT" }
+        if = { limit = { NOT = { tca_is_landless_official_trigger = yes } } } else = { debug_log = "TCA_RETIREMENT_EXIT_DIAG $LABEL$ FAIL LANDLESS_OFFICIAL" }
+        if = { limit = { NOT = { has_trait = tca_retirement_probe_fengci } } } else = { debug_log = "TCA_RETIREMENT_EXIT_DIAG $LABEL$ FAIL FENGCI_TRAIT" }
+        if = { limit = { NOT = { has_trait = tca_retirement_probe_retired } } } else = { debug_log = "TCA_RETIREMENT_EXIT_DIAG $LABEL$ FAIL RETIRED_TRAIT" }
+        if = { limit = { NOT = { has_character_flag = tca_retirement_candidate_enabled } } } else = { debug_log = "TCA_RETIREMENT_EXIT_DIAG $LABEL$ FAIL CANDIDATE_ENABLED" }
+        if = { limit = { NOT = { has_character_flag = tca_re_native_borrowed } } } else = { debug_log = "TCA_RETIREMENT_EXIT_DIAG $LABEL$ FAIL NATIVE_BORROWED" }
+        if = { limit = { NOT = { has_variable = tca_retirement_candidate_prior_timeout } } } else = { debug_log = "TCA_RETIREMENT_EXIT_DIAG $LABEL$ FAIL PRIOR_TIMEOUT_VAR" }
+        if = { limit = { NOT = { has_variable = tca_retirement_candidate_entered_date } } } else = { debug_log = "TCA_RETIREMENT_EXIT_DIAG $LABEL$ FAIL ENTERED_DATE_VAR" }
+        if = { limit = { this != root } } else = { debug_log = "TCA_RETIREMENT_EXIT_DIAG $LABEL$ FAIL IS_ROOT" }
+        if = { limit = { exists = $TITLE$ }
+            # 前置要求 picked 不等于目标头衔的现任或其领主；命中才记录失败分量。
+            if = { limit = { this = $TITLE$.holder } debug_log = "TCA_RETIREMENT_EXIT_DIAG $LABEL$ FAIL IS_TARGET_HOLDER" }
+            if = { limit = { this = $TITLE$.holder.liege } debug_log = "TCA_RETIREMENT_EXIT_DIAG $LABEL$ FAIL IS_TARGET_HOLDER_LIEGE" }
+        }
+        else = { debug_log = "TCA_RETIREMENT_EXIT_DIAG $LABEL$ FAIL TITLE_GONE" }
+    } }
 }
