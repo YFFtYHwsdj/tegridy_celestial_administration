@@ -59,10 +59,16 @@ tca_retirement_probe.1002 = {
             # 现行待遇由退休头衔与独立契约承担；仅加特质不得自行建立契约或发薪。
             if = { limit = { scope:tca_rp_actor = {
                 has_trait = tca_retirement_probe_fengci
-                # 与同配置无特质对照人物比较收入变化量（容差±0.0002）；
-                # 仅加探针特质不得产生比对照更多的收入。
-                monthly_character_income >= { value = var:tca_rp_baseline add = scope:tca_rp_control.monthly_character_income subtract = scope:tca_rp_control.var:tca_rp_control_baseline subtract = 0.0002 }
-                monthly_character_income <= { value = var:tca_rp_baseline add = scope:tca_rp_control.monthly_character_income subtract = scope:tca_rp_control.var:tca_rp_control_baseline add = 0.0002 }
+                # 只加特质不得产生额外收入：收入应与加特质前基线一致，或与同配置
+                # 无特质对照人物同一时点读数一致（±0.0002）；原生收入会随世界预算
+                # 整体漂移，两种参照任一成立即排除特质单独发薪。
+                OR = {
+                    monthly_character_income = var:tca_rp_baseline
+                    AND = {
+                        monthly_character_income >= { value = scope:tca_rp_control.monthly_character_income subtract = 0.0002 }
+                        monthly_character_income <= { value = scope:tca_rp_control.monthly_character_income add = 0.0002 }
+                    }
+                }
                 NOT = { has_variable = tca_retirement_title }
                 NOT = { vassal_contract_has_flag = tca_fengci_salary_active }
                 NOT = { vassal_contract_has_flag = tca_zhishi_salary_active }
@@ -92,9 +98,16 @@ tca_retirement_probe.1003 = {
             scope:tca_rp_actor = { trigger_event = tca_retirement_probe.90 }
             if = { limit = { scope:tca_rp_actor = {
                 has_trait = tca_retirement_probe_retired
-                # 同断言2口径：特质的相对收入变化与同配置对照人物一致。
-                monthly_character_income >= { value = var:tca_rp_baseline add = scope:tca_rp_control.monthly_character_income subtract = scope:tca_rp_control.var:tca_rp_control_baseline subtract = 0.0002 }
-                monthly_character_income <= { value = var:tca_rp_baseline add = scope:tca_rp_control.monthly_character_income subtract = scope:tca_rp_control.var:tca_rp_control_baseline add = 0.0002 }
+                # 只加特质不得产生额外收入：收入应与加特质前基线一致，或与同配置
+                # 无特质对照人物同一时点读数一致（±0.0002）；原生收入会随世界预算
+                # 整体漂移，两种参照任一成立即排除特质单独发薪。
+                OR = {
+                    monthly_character_income = var:tca_rp_baseline
+                    AND = {
+                        monthly_character_income >= { value = scope:tca_rp_control.monthly_character_income subtract = 0.0002 }
+                        monthly_character_income <= { value = scope:tca_rp_control.monthly_character_income add = 0.0002 }
+                    }
+                }
                 NOT = { has_variable = tca_retirement_title }
                 NOT = { vassal_contract_has_flag = tca_fengci_salary_active }
                 NOT = { vassal_contract_has_flag = tca_zhishi_salary_active }
