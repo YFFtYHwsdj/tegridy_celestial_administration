@@ -40,7 +40,7 @@ effect tca_run_observer_tests_effect = yes
 tca_test_visit_case_effect = { EVENT = tca_x_test.1 CASE = tca_test_x_demo DELAYED = yes GROUP = tca_x_test EXCLUSIVE = no }
 ```
 
-`GROUP`只使用`[a-z0-9_]`，默认取事件ID的命名空间；同一命名空间只能对应一个GROUP。需要共用报告者状态的模块可以跨文件合并为同一GROUP（如州郡兼领法两个测试文件与保存重载探针共用`tca_local_domain_realm`，退休与致仕资格两组共用`tca_retirement_eligibility`），合并后这些模块的延迟用例同处一条lane。即时用例同样登记GROUP，以便统一检查命名空间。`EXCLUSIVE = yes`表示独占用例，语义见下文。
+`GROUP`只使用`[a-z0-9_]`，默认取事件ID的命名空间；同一命名空间只能对应一个GROUP。需要共用报告者状态的模块可以跨文件合并为同一GROUP（如州郡兼领法两个测试文件与保存重载探针共用`tca_local_domain_realm`，退休资格与退休AI两组共用`tca_retirement_law`（同翻`celestial_retirement_law_*`法），merit议席探针两组共用`tca_merit_probe_seat`：后者争用同一原生议席），合并后这些模块的延迟用例同处一条lane。即时用例同样登记GROUP，以便统一检查命名空间。`EXCLUSIVE = yes`表示独占用例，语义见下文。
 
 ### 调度状态与认领
 
@@ -65,6 +65,8 @@ tca_test_visit_case_effect = { EVENT = tca_x_test.1 CASE = tca_test_x_demo DELAY
 - 司法时限组：`tca_test_judicial_delayed_law_disabled`、`tca_test_judicial_delayed_law_enabled`、`tca_test_judicial_delayed_commissioner_death`。
 - 科举`tca_test_exam_pending`（写`tca_exam_cooldown`）。
 - 功绩组：`tca_test_merit_annual_pulse`、`tca_test_merit_annual_draw`、`tca_test_merit_annual_natural`、`tca_test_merit_legacy_ruler_cap`、`tca_test_merit_maintenance_idempotence`、`tca_test_merit_multicountry`（写`tca_merit_annual_processed_year`、`tca_merit_annual_run_count`等）。
+- 通判法翻转组：`tca_test_tongpan_static_peer_diarchy`、`tca_test_tongpan_lifecycle`、`tca_test_office_native_income`、`tca_test_office_funding`、`tca_test_office_funding_multimonth`：翻转通判法并刷新官职（`tca_tongpan_enabled_law`／`tca_tongpan_disabled_law`，调用`tca_refresh_tongpan_realm_effect`），独占以隔离原生官职重建。
+- 退休资格边界`tca_test_retirement_eligibility`：在`tca_retirement_law` lane内翻`celestial_retirement_law_*`法条（窗口≈2游戏日），独占以隔离法条状态与时序。
 
 ### 新增用例
 
