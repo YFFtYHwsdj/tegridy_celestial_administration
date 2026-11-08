@@ -71,6 +71,9 @@ tca_merit_state_test.3 = {
             scope:tca_ms_career_recipient = {
                 set_house = scope:tca_ms_career_actor.house
                 add_trait = education_stewardship_1
+                # 新档位下无考试九品 L=1 不再是普通候选；补真实乡试档（L=2）以保留
+                # “转轨后可候选”的原用例语义，而不是把资格封顶误当转轨失败。
+                add_character_modifier = { modifier = tgp_passed_provincial_exam_modifier }
                 set_merit_level = 1
                 change_merit_no_experience = { value = 12345 subtract = merit }
                 tca_merit_initialize_character_effect = yes
@@ -111,13 +114,17 @@ tca_merit_state_test.1 = {
                 tca_merit_initialize_character_effect = yes
                 tca_merit_initialize_character_effect = yes
             }
-            if = { limit = { scope:tca_ms_actor = { has_character_flag = tca_merit_active var:tca_merit_approved_level = 1 merit = 12345 tca_merit_level_value = 1 tca_merit_theoretical_cap_value = 2 tca_merit_next_threshold_value = merit_level_2_value tca_merit_population_trigger = yes tca_merit_ordinary_candidate_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_state 1" }
+            # 资格按考试最高档取值：无考试九品 L=1（九品），因此不是普通候选但仍计入人口；
+            # 探针副本修正不参与 tca_merit_theoretical_cap_value，只有真实 tgp_passed_* 才改变档位。
+            if = { limit = { scope:tca_ms_actor = { has_character_flag = tca_merit_active var:tca_merit_approved_level = 1 merit = 12345 tca_merit_level_value = 1 tca_merit_theoretical_cap_value = 1 tca_merit_next_threshold_value = merit_level_2_value tca_merit_population_trigger = yes tca_merit_ordinary_candidate_trigger = no } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_state 1" }
             else = { add_character_flag = tca_test_tca_merit_state_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_state 1" }
+            # 乡试、跳过乡试、荫补同属乡试档；同时持有不叠加，仍只有 L=2（八品）。
             scope:tca_ms_actor = { add_character_modifier = { modifier = tgp_passed_provincial_exam_modifier } add_character_modifier = { modifier = tgp_bypassed_provincial_exam_modifier } add_character_modifier = { modifier = tgp_nepotism_bypass_exams_modifier } }
-            if = { limit = { scope:tca_ms_actor = { tca_merit_theoretical_cap_value = 8 tca_merit_exam_scale_value = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_state 2" }
+            if = { limit = { scope:tca_ms_actor = { tca_merit_theoretical_cap_value = 2 tca_merit_exam_scale_value = 0 tca_merit_ordinary_candidate_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_state 2" }
             else = { add_character_flag = tca_test_tca_merit_state_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_state 2" }
+            # 会试、殿试同为 L=7（三品），不再抬到一品；普通铨叙最高三品。
             scope:tca_ms_actor = { add_character_modifier = { modifier = tgp_passed_metropolitan_exam_modifier } add_character_modifier = { modifier = tgp_passed_palace_exam_modifier } }
-            if = { limit = { scope:tca_ms_actor = { tca_merit_theoretical_cap_value = 9 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_state 3" }
+            if = { limit = { scope:tca_ms_actor = { tca_merit_theoretical_cap_value = 7 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_state 3" }
             else = { add_character_flag = tca_test_tca_merit_state_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_state 3" }
             scope:tca_ms_actor = { tca_merit_mark_retired_effect = yes set_appointment_timeout = { months = 6 desc = appointment_timeout_desc_examinations } clear_appointment_timeout = yes }
             if = { limit = { scope:tca_ms_actor = { tca_merit_population_trigger = no tca_merit_ordinary_candidate_trigger = no has_character_flag = tca_merit_retired } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_state 4" }
@@ -210,7 +217,7 @@ tca_merit_state_test.2001 = {
             limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
             scope:tca_ms_entry = { tca_merit_initialize_character_effect = yes }
             debug_log = tca_merit_state_entry_diagnostic
-            if = { limit = { scope:tca_ms_entry = { merit_level = 1 merit = 30000 var:tca_merit_approved_level = 1 tca_merit_population_trigger = yes tca_merit_theoretical_cap_value = 9 } scope:tca_ms_meritocratic = { merit_level = 5 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_state_entry 3" }
+            if = { limit = { scope:tca_ms_entry = { merit_level = 1 merit = 30000 var:tca_merit_approved_level = 1 tca_merit_population_trigger = yes tca_merit_theoretical_cap_value = 7 } scope:tca_ms_meritocratic = { merit_level = 5 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_state_entry 3" }
             else = { add_character_flag = tca_test_tca_merit_state_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_state_entry 3" }
             scope:tca_ms_entry = { change_government = meritocratic_government tca_merit_leave_celestial_effect = yes }
             debug_log = "TCA_TEST WAIT tca_test_merit_state_entry 2 days"
@@ -354,5 +361,88 @@ tca_merit_state_test.6 = {
         else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_merit_cross_system_resume" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } }
         remove_character_flag = tca_test_tca_merit_state_test_case_failed
         tca_test_lane_end_effect = { GROUP = tca_merit_annual_worker }
+    }
+}
+
+# 文官任命考试出身加分：只对天朝文官候选生效，按最高通过层次取一档，不叠加；
+# 贤能制（非天朝领主）与军事候选返回0。直接读取正式script value，不复制条件或取档分支。
+tca_merit_state_test.8 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_merit_state_test.8 tca_test_merit_exam_appointment_score"
+        remove_character_flag = tca_test_tca_merit_state_test_case_failed
+        if = {
+            limit = { debug_only = yes is_alive = yes title:h_china.holder = root exists = title:e_goryeo.holder }
+            tca_test_create_merit_probe_character_effect = { CHARACTER = tca_mea_none GOVERNMENT = celestial_government }
+            tca_test_create_merit_probe_character_effect = { CHARACTER = tca_mea_provincial GOVERNMENT = celestial_government }
+            tca_test_create_merit_probe_character_effect = { CHARACTER = tca_mea_metropolitan GOVERNMENT = celestial_government }
+            tca_test_create_merit_probe_character_effect = { CHARACTER = tca_mea_palace GOVERNMENT = celestial_government }
+            tca_test_create_merit_probe_character_effect = { CHARACTER = tca_mea_both GOVERNMENT = celestial_government }
+            tca_test_create_merit_probe_character_effect = { CHARACTER = tca_mea_military GOVERNMENT = celestial_government }
+            scope:tca_mea_none = { add_trait = education_stewardship_3 }
+            scope:tca_mea_provincial = { add_trait = education_stewardship_3 add_character_modifier = { modifier = tgp_passed_provincial_exam_modifier } }
+            scope:tca_mea_metropolitan = { add_trait = education_stewardship_3 add_character_modifier = { modifier = tgp_passed_metropolitan_exam_modifier } }
+            scope:tca_mea_palace = { add_trait = education_stewardship_3 add_character_modifier = { modifier = tgp_passed_palace_exam_modifier } }
+            scope:tca_mea_both = { add_trait = education_stewardship_3 add_character_modifier = { modifier = tgp_passed_metropolitan_exam_modifier } add_character_modifier = { modifier = tgp_passed_palace_exam_modifier } }
+            scope:tca_mea_military = { add_trait = education_martial_3 add_character_modifier = { modifier = tgp_passed_palace_exam_modifier } }
+            # 天朝文官：无考试与仅乡试均为0；会试15；殿试30。
+            if = { limit = { scope:tca_mea_none = { is_civilian_candidate_trigger = yes is_military_candidate_trigger = no tca_exam_civil_appointment_score_value = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_exam_appointment_score 1" }
+            else = { add_character_flag = tca_test_tca_merit_state_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_exam_appointment_score 1" }
+            if = { limit = { scope:tca_mea_provincial = { tca_exam_civil_appointment_score_value = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_exam_appointment_score 2" }
+            else = { add_character_flag = tca_test_tca_merit_state_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_exam_appointment_score 2" }
+            if = { limit = { scope:tca_mea_metropolitan = { tca_exam_civil_appointment_score_value = 15 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_exam_appointment_score 3" }
+            else = { add_character_flag = tca_test_tca_merit_state_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_exam_appointment_score 3" }
+            if = { limit = { scope:tca_mea_palace = { tca_exam_civil_appointment_score_value = 30 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_exam_appointment_score 4" }
+            else = { add_character_flag = tca_test_tca_merit_state_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_exam_appointment_score 4" }
+            # 会试+殿试按最高档只算30，不叠加成45。
+            if = { limit = { scope:tca_mea_both = { tca_exam_civil_appointment_score_value = 30 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_exam_appointment_score 5" }
+            else = { add_character_flag = tca_test_tca_merit_state_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_exam_appointment_score 5" }
+            # 军事候选即使持有殿试也加0；加分只加文官。
+            if = { limit = { scope:tca_mea_military = { is_military_candidate_trigger = yes is_civilian_candidate_trigger = no tca_exam_civil_appointment_score_value = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_exam_appointment_score 6" }
+            else = { add_character_flag = tca_test_tca_merit_state_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_exam_appointment_score 6" }
+            # 贤能制（高丽）领主不是天朝：文官候选即使有殿试也为0。
+            title:e_goryeo.holder = { save_scope_as = tca_mea_foreign }
+            if = { limit = { scope:tca_mea_foreign = { government_has_flag = government_is_meritocratic } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_exam_appointment_score 7" }
+            else = { add_character_flag = tca_test_tca_merit_state_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_exam_appointment_score 7" }
+            create_character = {
+                age = 40 gender_female_chance = 0 random_traits = no dynasty = none
+                employer = scope:tca_mea_foreign culture = root.culture faith = root.faith rite = root.rite
+                save_scope_as = tca_mea_meritocratic
+            }
+            scope:tca_mea_meritocratic = {
+                tca_test_protect_character_effect = yes
+                add_character_flag = ai_will_not_convert
+                add_trait = education_stewardship_3
+                add_character_modifier = { modifier = tgp_passed_palace_exam_modifier }
+            }
+            if = { limit = { scope:tca_mea_meritocratic = { top_liege = scope:tca_mea_foreign is_civilian_candidate_trigger = yes is_military_candidate_trigger = no tca_exam_civil_appointment_score_value = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_exam_appointment_score 8" }
+            else = { add_character_flag = tca_test_tca_merit_state_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_exam_appointment_score 8" }
+            # 资格上限按考试最高档取值：无考试1、仅乡试2、会试7、殿试7；会试+殿试仍7，不叠加。
+            if = { limit = { scope:tca_mea_none = { tca_merit_theoretical_cap_value = 1 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_exam_appointment_score 9" }
+            else = { add_character_flag = tca_test_tca_merit_state_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_exam_appointment_score 9" }
+            if = { limit = { scope:tca_mea_provincial = { tca_merit_theoretical_cap_value = 2 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_exam_appointment_score 10" }
+            else = { add_character_flag = tca_test_tca_merit_state_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_exam_appointment_score 10" }
+            if = { limit = { scope:tca_mea_metropolitan = { tca_merit_theoretical_cap_value = 7 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_exam_appointment_score 11" }
+            else = { add_character_flag = tca_test_tca_merit_state_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_exam_appointment_score 11" }
+            if = { limit = { scope:tca_mea_palace = { tca_merit_theoretical_cap_value = 7 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_exam_appointment_score 12" }
+            else = { add_character_flag = tca_test_tca_merit_state_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_exam_appointment_score 12" }
+            if = { limit = { scope:tca_mea_both = { tca_merit_theoretical_cap_value = 7 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_exam_appointment_score 13" }
+            else = { add_character_flag = tca_test_tca_merit_state_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_exam_appointment_score 13" }
+            scope:tca_mea_none = { tca_test_cleanup_merit_probe_character_effect = yes }
+            scope:tca_mea_provincial = { tca_test_cleanup_merit_probe_character_effect = yes }
+            scope:tca_mea_metropolitan = { tca_test_cleanup_merit_probe_character_effect = yes }
+            scope:tca_mea_palace = { tca_test_cleanup_merit_probe_character_effect = yes }
+            scope:tca_mea_both = { tca_test_cleanup_merit_probe_character_effect = yes }
+            scope:tca_mea_military = { tca_test_cleanup_merit_probe_character_effect = yes }
+            scope:tca_mea_meritocratic = {
+                remove_character_modifier = tgp_passed_palace_exam_modifier
+                remove_character_flag = ai_will_not_convert
+                tca_test_restore_character_effect = yes
+            }
+            if = { limit = { has_character_flag = tca_test_tca_merit_state_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_merit_exam_appointment_score" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_merit_exam_appointment_score" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_merit_exam_appointment_score" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } }
+        remove_character_flag = tca_test_tca_merit_state_test_case_failed
     }
 }

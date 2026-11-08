@@ -1,9 +1,10 @@
-﻿# 全国年度升品：先全世界一次冻结，再算所有国家十二关配额，最后逐国高到低结算。
+﻿# 全国年度升品：先全世界一次冻结，再算各国配额（第一关不设员额），最后逐国高到低结算。
 # 人物冻结名单是同链临时list；国家由实际top_liege.primary_title锚定，绝不按法理归属。
 # 所有tca_ma_*人物/title字段均为本轮工作数据，末尾清理；幂等年份与诊断计数保留。
 
 # 任意可存变量作用域。输入tca_ma_B/S/E，输出实数q和相邻整数Q。
-# 每次调用仅消耗一次取整随机；提交取消只补抽名单，不再次计算或重抽Q。
+# 仅第二至第六关调用；每次调用消耗一次取整随机，提交取消只补抽名单，不再次计算或重抽Q。
+# 第一关（九→八品）不设员额，不调用本effect，也不消耗任何随机数。
 tca_merit_annual_compute_quota_effect = {
     set_variable = { name = tca_ma_q value = tca_merit_annual_raw_quota_value }
     set_variable = { name = tca_ma_Q value = { value = var:tca_ma_q floor = yes } }
@@ -171,13 +172,22 @@ tca_merit_annual_scan_demand_effect = {
 }
 
 # title作用域，指定ROUTE/SOURCE。六关S/B/E与Q全部在任何国家授品前计算并保存。
+# 第一关（九→八品）取消员额：冻结候选数E直接作为可提交上限，不计算加权配额、不消耗取整随机。
+# 其余五关仍按目标／人口／候选计算配额。Q仍写入 tca_ma_quota_$ROUTE$_$SOURCE$ 供反馈快照，
+# 但第一关的Q只表示可提交候选数，不是计划核准员额。
+# 失败／取消仍可能让实际核准少于E；快照只记候选数与真实成功数，简报文案不在本段修改。
 tca_merit_annual_freeze_quota_effect = {
     set_variable = { name = tca_ma_route value = $ROUTE$ }
     set_variable = { name = tca_ma_source value = $SOURCE$ }
     set_variable = { name = tca_ma_B value = tca_merit_annual_target_tail_value }
     set_variable = { name = tca_ma_S value = tca_merit_annual_tail_value }
     set_variable = { name = tca_ma_E value = tca_merit_annual_candidates_value }
-    tca_merit_annual_compute_quota_effect = yes
+    if = {
+        limit = { var:tca_ma_source = 1 }
+        set_variable = { name = tca_ma_q value = var:tca_ma_E }
+        set_variable = { name = tca_ma_Q value = var:tca_ma_E }
+    }
+    else = { tca_merit_annual_compute_quota_effect = yes }
     set_variable = { name = tca_ma_quota_$ROUTE$_$SOURCE$ value = var:tca_ma_Q }
     # 工作账只在提交成功时变化；冻结尾人数与原始配额仍保留本轮原值。
     set_variable = { name = tca_ma_success_$ROUTE$_$SOURCE$ value = 0 }
@@ -192,56 +202,96 @@ tca_merit_annual_freeze_route_effect = {
 }
 
 # 国家title作用域；共享冻结名单中按国家/路线/来源筛选，故两国同名list不串池。
-# 一次尝试即移除，最多E次；失效候选不消费成功额度，只从剩余冻结池补抽。
+# 第二至第六关按员额加权抽选：一次尝试即移除，最多E次；失效候选不消费成功额度，只从剩余冻结池补抽。
+# 第一关（九→八品）不设员额，交给下方确定性遍历；两路都仍以每人每年一次、来源冻结为前提。
 tca_merit_annual_draw_pool_effect = {
     save_scope_as = tca_ma_anchor
     set_variable = { name = tca_ma_route value = $ROUTE$ }
     set_variable = { name = tca_ma_source value = $SOURCE$ }
     set_variable = { name = tca_ma_target value = { value = $SOURCE$ add = 1 } }
-    set_variable = { name = tca_ma_half_gap value = tca_merit_annual_half_gap_value }
-    every_in_list = {
-        list = tca_ma_candidates
-        limit = { var:tca_ma_frozen_anchor = scope:tca_ma_anchor var:tca_ma_frozen_route = $ROUTE$ var:tca_ma_frozen_level = $SOURCE$ }
-        add_to_list = tca_ma_remaining
+    if = {
+        limit = { var:tca_ma_source = 1 }
+        tca_merit_annual_draw_nine_to_eight_effect = { ROUTE = $ROUTE$ SOURCE = $SOURCE$ TARGET = $TARGET$ }
     }
-    set_variable = { name = tca_ma_attempt_limit value = tca_merit_annual_remaining_count_value }
-    set_variable = { name = tca_ma_attempts value = 0 }
-    while = {
-        limit = {
-            var:tca_ma_attempts < var:tca_ma_attempt_limit
-            var:tca_ma_success_$ROUTE$_$SOURCE$ < var:tca_ma_quota_$ROUTE$_$SOURCE$
-            tca_merit_annual_remaining_count_value > 0
+    else = {
+        set_variable = { name = tca_ma_half_gap value = tca_merit_annual_half_gap_value }
+        every_in_list = {
+            list = tca_ma_candidates
+            limit = { var:tca_ma_frozen_anchor = scope:tca_ma_anchor var:tca_ma_frozen_route = $ROUTE$ var:tca_ma_frozen_level = $SOURCE$ }
+            add_to_list = tca_ma_remaining
         }
-        set_variable = { name = tca_ma_max value = tca_merit_annual_max_value }
-        random_in_list = {
-            list = tca_ma_remaining
-            weight = { base = 0 modifier = { add = tca_merit_annual_weight_value } }
-            remove_from_list = tca_ma_remaining
-            scope:tca_ma_anchor = { change_variable = { name = tca_ma_attempts add = 1 } }
-            # 本次被抽中即留下“已尝试”标记；结算后只有未被抽中者才是正常落选。
-            # 仅为真实人类保存，AI不建立展示账；尝试成功/失效都在年度反馈末尾清理。
-            if = { limit = { is_ai = no } set_variable = { name = tca_merit_feedback_attempted_year value = current_year } }
-            if = {
-                limit = {
-                    tca_merit_ordinary_hard_candidate_trigger = yes
-                    var:tca_merit_approved_level = $SOURCE$
-                    var:tca_merit_route = $ROUTE$
-                    exists = top_liege.primary_title top_liege.primary_title ?= scope:tca_ma_anchor
-                }
-                tca_merit_begin_grant_effect = { SOURCE = $SOURCE$ TARGET = scope:tca_ma_anchor.var:tca_ma_target MODE = 1 YEAR = current_year }
+        set_variable = { name = tca_ma_attempt_limit value = tca_merit_annual_remaining_count_value }
+        set_variable = { name = tca_ma_attempts value = 0 }
+        while = {
+            limit = {
+                var:tca_ma_attempts < var:tca_ma_attempt_limit
+                var:tca_ma_success_$ROUTE$_$SOURCE$ < var:tca_ma_quota_$ROUTE$_$SOURCE$
+                tca_merit_annual_remaining_count_value > 0
+            }
+            set_variable = { name = tca_ma_max value = tca_merit_annual_max_value }
+            random_in_list = {
+                list = tca_ma_remaining
+                weight = { base = 0 modifier = { add = tca_merit_annual_weight_value } }
+                remove_from_list = tca_ma_remaining
+                scope:tca_ma_anchor = { change_variable = { name = tca_ma_attempts add = 1 } }
+                # 本次被抽中即留下“已尝试”标记；结算后只有未被抽中者才是正常落选。
+                # 仅为真实人类保存，AI不建立展示账；尝试成功/失效都在年度反馈末尾清理。
+                if = { limit = { is_ai = no } set_variable = { name = tca_merit_feedback_attempted_year value = current_year } }
                 if = {
-                    limit = { var:tca_merit_grant_result = 1 }
-                    scope:tca_ma_anchor = {
-                        change_variable = { name = tca_ma_success_$ROUTE$_$SOURCE$ add = 1 }
-                        change_variable = { name = tca_ma_work_n_$ROUTE$_$SOURCE$ subtract = 1 }
-                        change_variable = { name = tca_ma_work_n_$ROUTE$_$TARGET$ add = 1 }
+                    limit = {
+                        tca_merit_ordinary_hard_candidate_trigger = yes
+                        var:tca_merit_approved_level = $SOURCE$
+                        var:tca_merit_route = $ROUTE$
+                        exists = top_liege.primary_title top_liege.primary_title ?= scope:tca_ma_anchor
+                    }
+                    tca_merit_begin_grant_effect = { SOURCE = $SOURCE$ TARGET = scope:tca_ma_anchor.var:tca_ma_target MODE = 1 YEAR = current_year }
+                    if = {
+                        limit = { var:tca_merit_grant_result = 1 }
+                        scope:tca_ma_anchor = {
+                            change_variable = { name = tca_ma_success_$ROUTE$_$SOURCE$ add = 1 }
+                            change_variable = { name = tca_ma_work_n_$ROUTE$_$SOURCE$ subtract = 1 }
+                            change_variable = { name = tca_ma_work_n_$ROUTE$_$TARGET$ add = 1 }
+                        }
                     }
                 }
             }
         }
+        every_in_list = { list = tca_ma_remaining remove_from_list = tca_ma_remaining }
     }
-    every_in_list = { list = tca_ma_remaining remove_from_list = tca_ma_remaining }
 }
+# 国家title作用域；第一关（九→八品）专用：冻结名单内该国家/路线/来源的全部候选逐个确定性尝试一次。
+# 不抽随机数、不读员额与尝试上限；硬条件、人类attempted标记、事务提交、成功与工作账均与抽选路径相同。
+# 失败或取消不补抽（名单已遍历完），每人每年仍最多普通升品一次；本级晚于八升七结算，新八品同年不再进八升七。
+# 真实人类即使被尝试但未成功，也保留 tca_merit_feedback_attempted_year，避免反馈误报正常落选。
+tca_merit_annual_draw_nine_to_eight_effect = {
+    set_variable = { name = tca_ma_target value = { value = $SOURCE$ add = 1 } }
+    every_in_list = {
+        list = tca_ma_candidates
+        limit = { var:tca_ma_frozen_anchor = scope:tca_ma_anchor var:tca_ma_frozen_route = $ROUTE$ var:tca_ma_frozen_level = $SOURCE$ }
+        # 冻结候选全部会被尝试；先于硬条件复验写入标记，语义与抽中即尝试一致。
+        if = { limit = { is_ai = no } set_variable = { name = tca_merit_feedback_attempted_year value = current_year } }
+        if = {
+            limit = {
+                tca_merit_ordinary_hard_candidate_trigger = yes
+                var:tca_merit_approved_level = $SOURCE$
+                var:tca_merit_route = $ROUTE$
+                exists = top_liege.primary_title top_liege.primary_title ?= scope:tca_ma_anchor
+            }
+            tca_merit_begin_grant_effect = { SOURCE = $SOURCE$ TARGET = scope:tca_ma_anchor.var:tca_ma_target MODE = 1 YEAR = current_year }
+            if = {
+                limit = { var:tca_merit_grant_result = 1 }
+                scope:tca_ma_anchor = {
+                    change_variable = { name = tca_ma_success_$ROUTE$_$SOURCE$ add = 1 }
+                    change_variable = { name = tca_ma_work_n_$ROUTE$_$SOURCE$ subtract = 1 }
+                    change_variable = { name = tca_ma_work_n_$ROUTE$_$TARGET$ add = 1 }
+                }
+            }
+        }
+    }
+}
+# 逐国按来源高到低结算：先跑第二至第六关的员额抽选，最后跑第一关的确定性遍历。
+# 顺序保证本年新晋八品不再进入同年八升七；本段不改事务／TOKEN／授品规则，
+# 也不改八升七及以上关口的员额、加权抽选与来源冻结语义。
 tca_merit_annual_draw_route_effect = {
     tca_merit_annual_draw_pool_effect = { ROUTE = $ROUTE$ SOURCE = 6 TARGET = 7 }
     tca_merit_annual_draw_pool_effect = { ROUTE = $ROUTE$ SOURCE = 5 TARGET = 6 }
@@ -374,7 +424,7 @@ tca_merit_run_annual_effect = {
         }
         # 全人物校验完成后再确认已有分支快照；只访问本轮收集的旧快照持有人，不二次扫描世界。
         every_in_list = { list = tca_ma_membership_anchors tca_merit_record_branch_anchor_effect = yes remove_from_list = tca_ma_membership_anchors }
-        # 全国候选及人口已冻结；先完成全部国家需求与配额，再允许任何授品回调。
+        # 全国候选及人口已冻结；先完成全部国家需求与各关额度（第一关额度即合格候选数），再允许任何授品回调。
         every_in_list = { list = tca_ma_countries tca_merit_annual_scan_demand_effect = yes }
         every_in_list = {
             list = tca_ma_countries
@@ -386,7 +436,8 @@ tca_merit_run_annual_effect = {
         }
         every_in_list = { list = tca_ma_countries tca_merit_annual_country_effect = yes }
         # 所有国家授品完成后，先从同一批冻结名单/工作账复制反馈快照，再清理。
-        # 不重算额度、不重跑抽选；消息接收者按本国锚点与实际持有人确定。
+        # 不重算额度、不重跑抽选；第一关快照的Q是合格候选数（E）而非计划员额。
+        # 消息接收者按本国锚点与实际持有人确定。
         every_in_list = { list = tca_ma_countries tca_merit_feedback_capture_country_effect = { YEAR = current_year } }
         every_in_list = {
             list = tca_ma_population

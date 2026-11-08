@@ -25,6 +25,9 @@ tca_merit_feedback_test.1 = {
             tca_test_create_merit_probe_character_effect = { CHARACTER = tca_mfb_actor GOVERNMENT = celestial_government }
             scope:tca_mfb_actor = {
                 add_trait = education_stewardship_3
+                # 新资格档位下无考试九品 L=1 会直接进入资格封顶；本段功绩门槛与可参选场景
+                # 需要非封顶状态，因此挂真实乡试档（L=2）而不是放宽期望值。
+                add_character_modifier = { modifier = tgp_passed_provincial_exam_modifier }
                 set_merit_level = 1
                 tca_merit_initialize_character_effect = yes
                 change_merit_no_experience = { value = merit_level_2_value subtract = 1 subtract = merit }
@@ -81,7 +84,7 @@ tca_merit_feedback_test.1 = {
             scope:tca_mfb_actor = { set_variable = { name = tca_merit_approved_level value = 9 } }
             if = { limit = { scope:tca_mfb_actor = { tca_merit_panel_state_value = 17 tca_merit_feedback_next_threshold_value = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_feedback_panel 15" }
             else = { add_character_flag = tca_test_tca_merit_feedback_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_feedback_panel 15" }
-            # 资格封顶：二品但理论上限仍是二品；普通竞争不可越过。
+            # 资格封顶：八品但资格档位仍是八品；普通竞争不可越过。
             scope:tca_mfb_actor = { set_variable = { name = tca_merit_approved_level value = 2 } }
             if = { limit = { scope:tca_mfb_actor = { tca_merit_theoretical_cap_value = 2 tca_merit_panel_state_value = 13 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_feedback_panel 16" }
             else = { add_character_flag = tca_test_tca_merit_feedback_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_feedback_panel 16" }
@@ -119,6 +122,14 @@ tca_merit_feedback_test.1 = {
             scope:tca_mfb_minor = { add_trait = education_stewardship_1 set_merit_level = 1 tca_merit_initialize_character_effect = yes }
             if = { limit = { scope:tca_mfb_minor = { is_adult = no tca_merit_panel_state_value = 8 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_feedback_panel 20" }
             else = { add_character_flag = tca_test_tca_merit_feedback_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_feedback_panel 20" }
+            # 无考试回到 L=1：九品立即进入资格封顶状态，不能再用功绩继续升品。
+            scope:tca_mfb_actor = { remove_character_modifier = tgp_passed_provincial_exam_modifier }
+            if = { limit = { scope:tca_mfb_actor = { tca_merit_theoretical_cap_value = 1 var:tca_merit_approved_level = 1 tca_merit_panel_state_value = 13 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_feedback_panel 21" }
+            else = { add_character_flag = tca_test_tca_merit_feedback_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_feedback_panel 21" }
+            # 旧角色现官品高于资格档位：保留已得官品且仍显示封顶；资格只限制此后的普通升品。
+            scope:tca_mfb_actor = { set_variable = { name = tca_merit_approved_level value = 2 } }
+            if = { limit = { scope:tca_mfb_actor = { tca_merit_theoretical_cap_value = 1 var:tca_merit_approved_level = 2 tca_merit_level_value = 2 tca_merit_panel_state_value = 13 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_feedback_panel 22" }
+            else = { add_character_flag = tca_test_tca_merit_feedback_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_feedback_panel 22" }
             scope:tca_mfb_actor = { tca_merit_leave_celestial_effect = yes tca_test_cleanup_merit_probe_character_effect = yes }
             scope:tca_mfb_minor = { tca_merit_leave_celestial_effect = yes tca_test_cleanup_merit_probe_character_effect = yes }
             scope:tca_mfb_raw = { tca_test_cleanup_merit_probe_character_effect = yes }
@@ -164,7 +175,9 @@ tca_merit_feedback_test.2 = {
                 scope:tca_mfb_pop_b1 = { tca_merit_annual_count_population_effect = { CANDIDATE = no } }
                 # 本人结果判定夹具必须直接隶属测试皇帝；两个动态锚点只用于国家快照隔离。
                 tca_test_create_merit_probe_character_effect = { CHARACTER = tca_mfb_person GOVERNMENT = celestial_government }
-                scope:tca_mfb_person = { add_trait = education_stewardship_3 set_merit_level = 1 tca_merit_initialize_character_effect = yes set_variable = { name = tca_ma_frozen_anchor value = root.primary_title } set_variable = { name = tca_ma_frozen_route value = 1 } set_variable = { name = tca_ma_frozen_level value = 1 } }
+                # 无考试九品在新档位下 L=1 会命中“资格已失效”，本段要验“正常落选=0”；
+                # 因此补真实乡试档（L=2）保持既有候选完整性语义。
+                scope:tca_mfb_person = { add_trait = education_stewardship_3 add_character_modifier = { modifier = tgp_passed_provincial_exam_modifier } set_merit_level = 1 tca_merit_initialize_character_effect = yes set_variable = { name = tca_ma_frozen_anchor value = root.primary_title } set_variable = { name = tca_ma_frozen_route value = 1 } set_variable = { name = tca_ma_frozen_level value = 1 } }
                 # 冻结需求J：A文九八1、七六2、三二一1；A武七六1；B武七六1。
                 create_dynamic_title = { tier = duchy name = tca_test_arrest_office_name }
                 scope:new_title = { save_scope_as = tca_mfb_demand_a1 set_capital_county = root.capital_county set_landless_title = yes add_to_list = tca_ma_demand set_variable = { name = tca_ma_demand_anchor value = scope:tca_mfb_anchor_a } set_variable = { name = tca_ma_demand_route value = 1 } set_variable = { name = tca_ma_demand_band value = 1 } }
@@ -434,9 +447,11 @@ tca_merit_feedback_test.1003 = {
         tca_test_validate_environment_effect = yes
         if = {
             limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
-            scope:tca_mfb_draw_a = { add_trait = education_stewardship_3 set_merit_level = 1 tca_merit_initialize_character_effect = yes change_merit = 100 }
-            scope:tca_mfb_draw_b = { add_trait = education_stewardship_3 set_merit_level = 1 tca_merit_initialize_character_effect = yes change_merit = 100 }
-            scope:tca_mfb_draw_c = { add_trait = education_stewardship_3 set_merit_level = 2 tca_merit_initialize_character_effect = yes change_merit = 100 }
+            # 九升八不设员额，但硬条件仍要求资格档位高于现官品：补真实考试修正，
+            # 使本段只验证“冻结后退休失效”与晋升提交，而不是被新 L=1 档位挡住。
+            scope:tca_mfb_draw_a = { add_trait = education_stewardship_3 tca_test_add_native_merit_probe_exams_effect = yes set_merit_level = 1 tca_merit_initialize_character_effect = yes change_merit = 100 }
+            scope:tca_mfb_draw_b = { add_trait = education_stewardship_3 tca_test_add_native_merit_probe_exams_effect = yes set_merit_level = 1 tca_merit_initialize_character_effect = yes change_merit = 100 }
+            scope:tca_mfb_draw_c = { add_trait = education_stewardship_3 tca_test_add_native_merit_probe_exams_effect = yes set_merit_level = 2 tca_merit_initialize_character_effect = yes change_merit = 100 }
             debug_log = "TCA_TEST WAIT tca_test_merit_feedback_draw 2 days"
             trigger_event = { id = tca_merit_feedback_test.1004 days = 2 }
         }
@@ -459,27 +474,21 @@ tca_merit_feedback_test.1004 = {
             # 冻结后退休：工作器应尝试但不提交，成功数/快照均为0。
             scope:tca_mfb_draw_c = { add_character_flag = tca_merit_retired set_variable = { name = tca_ma_frozen_anchor value = scope:tca_mfb_draw_anchor } set_variable = { name = tca_ma_frozen_route value = 1 } set_variable = { name = tca_ma_frozen_level value = 2 } set_variable = { name = tca_ma_frozen_merit value = merit } add_to_list = tca_ma_candidates }
             scope:tca_mfb_draw_anchor = {
-                set_variable = { name = tca_ma_quota_1_1 value = 1 } set_variable = { name = tca_ma_success_1_1 value = 0 }
+                # 第一关的 Q 在新语义下等于冻结候选数（E），不是计划员额；两名合格候选都应晋升。
+                set_variable = { name = tca_ma_quota_1_1 value = 2 } set_variable = { name = tca_ma_success_1_1 value = 0 }
                 set_variable = { name = tca_ma_quota_1_2 value = 1 } set_variable = { name = tca_ma_success_1_2 value = 0 }
                 set_variable = { name = tca_ma_work_n_1_1 value = 2 } set_variable = { name = tca_ma_work_n_1_2 value = 1 }
                 tca_merit_annual_draw_pool_effect = { ROUTE = 1 SOURCE = 1 TARGET = 2 }
                 tca_merit_annual_draw_pool_effect = { ROUTE = 1 SOURCE = 2 TARGET = 3 }
             }
-            if = { limit = { scope:tca_mfb_draw_anchor = { var:tca_ma_success_1_1 = 1 var:tca_ma_success_1_2 = 0 var:tca_ma_work_n_1_1 = 1 var:tca_ma_work_n_1_2 = 2 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_feedback_draw 1" }
+            # 九升八按合格即升：冻结名单内两名合格者全部提交，零员额不参与；八升七仍受员额与失效约束。
+            if = { limit = { scope:tca_mfb_draw_anchor = { var:tca_ma_success_1_1 = 2 var:tca_ma_success_1_2 = 0 var:tca_ma_work_n_1_1 = 0 var:tca_ma_work_n_1_2 = 3 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_feedback_draw 1" }
             else = { add_character_flag = tca_test_tca_merit_feedback_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_feedback_draw 1" }
-            # 恰好一人普通获准并进入phase2；另一人无获准标记。
+            # 两名合格者都普通获准并进入phase2，不存在抽签落选。
             if = {
                 limit = {
-                    OR = {
-                        AND = {
-                            scope:tca_mfb_draw_a = { has_variable = tca_merit_last_ordinary_success_year var:tca_merit_last_ordinary_success_year ?= current_year var:tca_merit_grant_phase ?= 2 var:tca_merit_grant_mode ?= 1 var:tca_merit_grant_source ?= 1 var:tca_merit_grant_target ?= 2 }
-                            scope:tca_mfb_draw_b = { NOT = { has_variable = tca_merit_last_ordinary_success_year } NOT = { has_variable = tca_merit_grant_phase } }
-                        }
-                        AND = {
-                            scope:tca_mfb_draw_b = { has_variable = tca_merit_last_ordinary_success_year var:tca_merit_last_ordinary_success_year ?= current_year var:tca_merit_grant_phase ?= 2 var:tca_merit_grant_mode ?= 1 var:tca_merit_grant_source ?= 1 var:tca_merit_grant_target ?= 2 }
-                            scope:tca_mfb_draw_a = { NOT = { has_variable = tca_merit_last_ordinary_success_year } NOT = { has_variable = tca_merit_grant_phase } }
-                        }
-                    }
+                    scope:tca_mfb_draw_a = { has_variable = tca_merit_last_ordinary_success_year var:tca_merit_last_ordinary_success_year ?= current_year var:tca_merit_grant_phase ?= 2 var:tca_merit_grant_mode ?= 1 var:tca_merit_grant_source ?= 1 var:tca_merit_grant_target ?= 2 }
+                    scope:tca_mfb_draw_b = { has_variable = tca_merit_last_ordinary_success_year var:tca_merit_last_ordinary_success_year ?= current_year var:tca_merit_grant_phase ?= 2 var:tca_merit_grant_mode ?= 1 var:tca_merit_grant_source ?= 1 var:tca_merit_grant_target ?= 2 }
                 }
                 debug_log = "TCA_TEST CHECK_PASS tca_test_merit_feedback_draw 2"
             }
@@ -495,9 +504,9 @@ tca_merit_feedback_test.1004 = {
                 limit = {
                     scope:tca_mfb_draw_anchor = {
                         var:tca_merit_feedback_year = current_year
-                        var:tca_merit_feedback_q_1_1 = 1 var:tca_merit_feedback_ok_1_1 = 1
+                        var:tca_merit_feedback_q_1_1 = 2 var:tca_merit_feedback_ok_1_1 = 2
                         var:tca_merit_feedback_q_1_2 = 1 var:tca_merit_feedback_ok_1_2 = 0
-                        var:tca_merit_feedback_success_1 = 1 var:tca_merit_feedback_success_2 = 0
+                        var:tca_merit_feedback_success_1 = 2 var:tca_merit_feedback_success_2 = 0
                         var:tca_merit_feedback_band_pop_1_1 = 0
                     }
                 }
@@ -518,19 +527,11 @@ tca_merit_feedback_test.1005 = {
         tca_test_validate_environment_effect = yes
         if = {
             limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
-            # 原生等级确认后成功者已到目标品级；落选者冻结余额与品级不变。
+            # 原生等级确认后两名合格者都到八品；冻结后退休者保持原品级与余额。
             if = {
                 limit = {
-                    OR = {
-                        AND = {
-                            scope:tca_mfb_draw_a = { merit_level = 2 merit = 1000 var:tca_merit_approved_level = 2 NOT = { has_variable = tca_merit_grant_phase } }
-                            scope:tca_mfb_draw_b = { merit_level = 1 merit = 100 var:tca_merit_approved_level = 1 NOT = { has_variable = tca_merit_last_ordinary_success_year } }
-                        }
-                        AND = {
-                            scope:tca_mfb_draw_b = { merit_level = 2 merit = 1000 var:tca_merit_approved_level = 2 NOT = { has_variable = tca_merit_grant_phase } }
-                            scope:tca_mfb_draw_a = { merit_level = 1 merit = 100 var:tca_merit_approved_level = 1 NOT = { has_variable = tca_merit_last_ordinary_success_year } }
-                        }
-                    }
+                    scope:tca_mfb_draw_a = { merit_level = 2 merit = 1000 var:tca_merit_approved_level = 2 NOT = { has_variable = tca_merit_grant_phase } }
+                    scope:tca_mfb_draw_b = { merit_level = 2 merit = 1000 var:tca_merit_approved_level = 2 NOT = { has_variable = tca_merit_grant_phase } }
                 }
                 debug_log = "TCA_TEST CHECK_PASS tca_test_merit_feedback_draw 6"
             }
@@ -548,7 +549,7 @@ tca_merit_feedback_test.1005 = {
                 remove_variable = tca_ma_route remove_variable = tca_ma_source remove_variable = tca_ma_target
                 remove_variable = tca_ma_half_gap remove_variable = tca_ma_max remove_variable = tca_ma_attempt_limit remove_variable = tca_ma_attempts
             }
-            if = { limit = { scope:tca_mfb_draw_anchor = { var:tca_merit_feedback_ok_1_1 = 1 var:tca_merit_feedback_ok_1_2 = 0 var:tca_merit_feedback_success_1 = 1 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_feedback_draw 8" }
+            if = { limit = { scope:tca_mfb_draw_anchor = { var:tca_merit_feedback_ok_1_1 = 2 var:tca_merit_feedback_ok_1_2 = 0 var:tca_merit_feedback_success_1 = 2 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_feedback_draw 8" }
             else = { add_character_flag = tca_test_tca_merit_feedback_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_feedback_draw 8" }
             scope:tca_mfb_draw_c = { remove_character_flag = tca_merit_retired }
             scope:tca_mfb_draw_a = { remove_variable = tca_merit_last_ordinary_success_year tca_merit_leave_celestial_effect = yes tca_test_cleanup_merit_probe_character_effect = yes }

@@ -250,6 +250,9 @@ tca_merit_central_test.2001 = {
             else = { add_character_flag = tca_test_tca_merit_central_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_central_matrix 8" }
             if = { limit = { scope:tca_mcm_works = { tca_merit_central_target_value = 8 var:tca_merit_approved_level = 8 merit_level = 8 merit >= 17000 var:tca_merit_reset_probe_gain_merit = 17000 var:tca_merit_last_ordinary_year = current_year NOT = { has_variable = tca_merit_grant_phase } NOT = { has_character_flag = tca_merit_central_pending } var:tca_merit_reset_probe_gain_count = 1 var:tca_merit_reset_probe_loss_count = 0 } cp:minister_works = scope:tca_mcm_works title:e_minister_of_works.holder = scope:tca_mcm_works } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_central_matrix 9" }
             else = { add_character_flag = tca_test_tca_merit_central_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_central_matrix 9" }
+            # 新资格档位下无考试者 L=1；中央授品仍到一品/二品，证明二品一品不读取普通铨叙资格档位。
+            if = { limit = { scope:tca_mcm_chancellor = { tca_merit_theoretical_cap_value = 1 var:tca_merit_approved_level = 9 } scope:tca_mcm_personnel = { tca_merit_theoretical_cap_value = 1 var:tca_merit_approved_level = 8 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_central_matrix 10" }
+            else = { add_character_flag = tca_test_tca_merit_central_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_central_matrix 10" }
             # 先还原头衔（此时cp仍是测试候选，on_title_gain目标为0，不会排正式授品），再还原原议会成员，避免产生新的pending。
             title:e_minister_chancellor = { create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_mcm_restore_chancellor } change_title_holder = { holder = scope:tca_mcm_orig_title_chancellor change = scope:tca_mcm_restore_chancellor } resolve_title_and_vassal_change = scope:tca_mcm_restore_chancellor }
             title:e_minister_censor = { create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_mcm_restore_censor } change_title_holder = { holder = scope:tca_mcm_orig_title_censor change = scope:tca_mcm_restore_censor } resolve_title_and_vassal_change = scope:tca_mcm_restore_censor }
@@ -283,9 +286,9 @@ tca_merit_central_test.2001 = {
                     cp:councillor_chancellor = scope:tca_mcm_orig_chancellor cp:councillor_spymaster = scope:tca_mcm_orig_censor cp:minister_grand_marshal = scope:tca_mcm_orig_grand_marshal cp:minister_personnel = scope:tca_mcm_orig_personnel cp:councillor_steward = scope:tca_mcm_orig_revenue cp:councillor_court_chaplain = scope:tca_mcm_orig_rites cp:councillor_marshal = scope:tca_mcm_orig_war cp:minister_justice = scope:tca_mcm_orig_justice cp:minister_works = scope:tca_mcm_orig_works
                     title:e_minister_chancellor.holder = scope:tca_mcm_orig_title_chancellor title:e_minister_censor.holder = scope:tca_mcm_orig_title_censor title:e_minister_grand_marshal.holder = scope:tca_mcm_orig_title_grand_marshal title:e_minister_of_personnel.holder = scope:tca_mcm_orig_title_personnel title:e_minister_of_revenue.holder = scope:tca_mcm_orig_title_revenue title:e_minister_of_rites.holder = scope:tca_mcm_orig_title_rites title:e_minister_of_war.holder = scope:tca_mcm_orig_title_war title:e_minister_of_justice.holder = scope:tca_mcm_orig_title_justice title:e_minister_of_works.holder = scope:tca_mcm_orig_title_works
                 }
-                debug_log = "TCA_TEST CHECK_PASS tca_test_merit_central_matrix 10"
+                debug_log = "TCA_TEST CHECK_PASS tca_test_merit_central_matrix 11"
             }
-            else = { add_character_flag = tca_test_tca_merit_central_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_central_matrix 10" }
+            else = { add_character_flag = tca_test_tca_merit_central_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_central_matrix 11" }
             if = { limit = { has_character_flag = tca_test_tca_merit_central_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_merit_central_matrix" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
             else = { debug_log = "TCA_TEST PASS tca_test_merit_central_matrix" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
             remove_character_flag = tca_test_tca_merit_central_test_case_failed
@@ -312,6 +315,9 @@ tca_merit_central_test.3 = {
                 tca_test_create_merit_probe_character_effect = { CHARACTER = tca_mcs_actor GOVERNMENT = celestial_government }
                 scope:tca_mcs_actor = {
                     add_trait = education_stewardship_1
+                    # 新档位下无考试九品 L=1 无法普通 1→2；补真实乡试档（L=2）保持
+                    # “普通1→2后中央续接”的原用例语义，不改期望值。
+                    add_character_modifier = { modifier = tgp_passed_provincial_exam_modifier }
                     set_merit_level = 1
                     change_merit_no_experience = { value = 100 subtract = merit }
                     remove_variable = tca_merit_reset_probe_gain_merit set_variable = { name = tca_merit_reset_probe_capture_merit value = yes } set_variable = { name = tca_merit_reset_probe_gain_count value = 0 }
@@ -385,6 +391,8 @@ tca_merit_central_test.4001 = {
                 tca_test_create_merit_probe_character_effect = { CHARACTER = tca_ybs_actor GOVERNMENT = celestial_government }
                 scope:tca_ybs_actor = {
                     add_trait = education_stewardship_1
+                    # 同上：仅乡试档 L=2 才能普通 1→2；本用例验证跨年串行而非资格封顶。
+                    add_character_modifier = { modifier = tgp_passed_provincial_exam_modifier }
                     set_merit_level = 1
                     change_merit_no_experience = { value = 100 subtract = merit }
                     remove_variable = tca_merit_reset_probe_gain_merit set_variable = { name = tca_merit_reset_probe_capture_merit value = yes } set_variable = { name = tca_merit_reset_probe_gain_count value = 0 }

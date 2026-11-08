@@ -24,7 +24,37 @@
 此前其他同局轮次出现过 `tca_test_tongpan_lifecycle` 的分权有效性失败，以及 `tca_test_merit_central_matrix` 断言5的户部原生 gain 功绩快照不等于17000；最终同局未复现。两项尚无稳定复现和根因，保留为顺序／随机局面敏感的验收边界，不能用此次全绿或修改前对照中的通过宣称永久关闭，也不放宽原断言。实际提速尚未用相同冻结场景做独立 A/B 计时；界面、自然 AI、长期多国和 Windows 边界仍按下文分别验收。
 
 
-规则及未实现范围见[升品设计](merit_design.md)。本页只维护可复现探针、接口限制及证据边界，不记录普通运行流水。
+## 资格档位与九升八调整验证
+
+本轮实现范围：`tca_merit_theoretical_cap_value` 按考试最高档取 L（无考试 1、乡试／跳级／荫补 2、会试与殿试 7，取最高档不叠加）；年度第一关冻结后 `Q_1=E_1`，遍历全部合格候选，不抽随机数、不补抽；`appointment_score_governor` 覆盖只追加 `tca_exam_civil_appointment_score_value`（会试 +15、殿试 +30，取最高档）。新增用例 `tca_test_merit_exam_appointment_score`（13 断言）与 `tca_test_merit_annual_nine_to_eight`（6 断言），并更新 `tca_merit_state_test`、`tca_merit_feedback_test`、`tca_merit_central_test`、`tca_merit_annual_test` 与退休探针中按旧加法上限或第一关员额编写的断言。
+
+### 自动回归结果
+
+执行 `python3 tools/run_game_tests.py --timeout 1800`：全量同局（same_world）、K=1 串行、独立观察者局，两阶段观察者确认均为 true，含一次原生保存重载检查点（`merit_saveload_probe`）并在重载后继续执行。最近一次全量为 248 用例／1717 断言，终端统计 BEGIN 248、PASS 246、FAIL 1、PRECONDITION_FAIL 1、CHECK_PASS 1711、CHECK_FAIL 1；`verification_exit` 与 `runner_exit` 为 1，原因是下列失败，不是 `NOT VERIFIED` 的中断。
+
+本次调整相关的新增／更新用例全部通过：`tca_test_merit_exam_appointment_score`（13 断言）、`tca_test_merit_annual_nine_to_eight`（6 断言）以及 state／feedback／central matrix 的更新断言。首轮全量曾在 `tca_test_merit_annual_nine_to_eight` 断言 6 失败，原因是测试的 8 天窗口内真实年度 worker 推进了测试角色；用例已加入“2–11 月窗口才建角色”的年份门隔离，最终串行全量通过，不是引擎行为缺陷。
+
+同轮静态检查：`python3 tools/check_upstream_overrides.py` 通过（62 overrides／63 loc／2 aux／6 file，无未登记同名定义）；`python3 tools/check_test_parallel.py` 通过；`python3 tools/run_game_tests.py --list` 为 248 用例／1717 断言；`tools` 下 unittest 305 项通过。`error.log` 未检出 TCA／功绩相关错误，仅有既有的材质缺失与 holder trigger context 错误；终端汇总中的 `start_war` “already at war”、`use_hook` 无 hook、`change_title_holder` 死亡角色等均为既有世界／AI 干扰，与本调整无关。
+
+### 失败归类与边界
+
+最近一次全量 246/248 通过，唯一 FAIL 与 1 项 PRECONDITION_FAIL 均不属于本次资格档位或九升八调整：
+
+- `tca_test_merit_central_appointment` 断言 9：既有间歇性中央任命恢复时序失败。改动前的旧全量也失败过同一用例；该用例不涉及资格档位、九升八或考试任官加分，未归因于本次调整，也未修复。
+- `tca_test_retirement_player_session`：观察者局按既有文档必然前置未执行，需人工人类会话适配器，记未执行，不算失败。
+
+全量串行共执行三次，失败集合每次不同（曾出现 `retirement_tongpan_office`／`judicial_office`、`retirement_formal_tongpan`／`tongpan_candidate`、`merit_central_zero_recheck`、`merit_central_appointment`），改动前旧全量也非全绿。这些均属既有间歇／世界状态时序问题，未归因于本次调整，也未修复；因此本次调整范围无确定性失败，但不能据此宣称整个套件已全绿。
+
+未由自动回归覆盖、仍需人工或长局验收：
+
+- 真实游戏内考试概念页与三个考试浮窗、资格上限概念、迁秩段在简中／英文下的实际显示、换行与链接；静态双制度文本不证明游戏内渲染。
+- 文官任命候选分中考试出身是否显示为独立条目（或嵌套悬停）及数值；覆盖评分不证明界面展开。
+- 资格上限与当前官品并存的显示、旧角色“现官品高于资格档位”的面板措辞与兼容档位；旧存档加载后的资格实时重算与官品保持。
+- 皇帝简报“晋至八品：核准 X 人（不设员额）”与九八带“八品不设员额”的实际布局、截断、展开与悬停；迁秩段九品及无考试者文案。
+- 八品蓄水层规模、九品人口、任命与收入连带影响、自然 AI 升迁分布的长局观察；八品开放不等于数值平衡已验收。
+- Windows、人类会话退休用例与玩家真实路径。
+
+规则及剩余实现边界见[升品设计](merit_design.md)。本页只维护可复现探针、接口限制及证据边界，不记录普通运行流水。
 
 ## 性能维护回归
 
@@ -284,7 +314,7 @@ python3 tools/run_game_tests.py --suite merit_probe --timeout 360
 
 ### 资格与上限来源
 
-静态调查共找到五个相关共享对象，均在原版 `common/modifiers/10_tgp_modifiers.txt`：`tgp_passed_provincial_exam_modifier`、`tgp_bypassed_provincial_exam_modifier`、`tgp_nepotism_bypass_exams_modifier`、`tgp_passed_metropolitan_exam_modifier`、`tgp_passed_palace_exam_modifier`。前三项各加两档，会试加两档，殿试加三档。本轮处理三项及第及现有绕过乡试路径，荫补对象仅作背景记录，不列为当前适配任务；不能把“拥有乡试及第标记”视作一定拥有同名乡试修正。
+静态调查共找到五个相关共享对象，均在原版 `common/modifiers/10_tgp_modifiers.txt`：`tgp_passed_provincial_exam_modifier`、`tgp_bypassed_provincial_exam_modifier`、`tgp_nepotism_bypass_exams_modifier`、`tgp_passed_metropolitan_exam_modifier`、`tgp_passed_palace_exam_modifier`。前三项各加两档，会试加两档，殿试加三档。以上是原版修正的加法事实；天朝资格已改为按考试最高档读取，不再累加这些修正，见[设计](merit_design.md#目标与范围)。荫补对象仅作背景记录，不列为当前适配任务；不能把“拥有乡试及第标记”视作一定拥有同名乡试修正。
 
 - 实际考试：`tgp_imperial_examination_scripted_effects.txt` 的 `imperial_examination_disburse_activity_entrant_rewards` 与 `local_examination_disburse_activity_entrant_rewards`。前者使用真实活动的考生分组、分数和主持人上下文，直接在无活动人物上调用不能冒充活动验收。
 - 本模组代办考试：`common/scripted_effects/tca_exam_effects.txt` 的 `tca_exam_award_candidate_effect`，既写绕过乡试，也写会试／殿试修正。原版活动与本模组代办需使用一致的资格接口。

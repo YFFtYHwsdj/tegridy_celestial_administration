@@ -4,16 +4,33 @@ tca_merit_level_value = {
     if = { limit = { has_character_flag = tca_merit_active has_variable = tca_merit_approved_level } value = var:tca_merit_approved_level }
 }
 
-# 原版天朝基础2；五项资格按实际持有的修正贡献相加。不得读取已锁定的实际cap。
-# 本机10_tgp_modifiers的乡试／绕试／荫补／会试各+2，殿试+3；原版最大等级9。
+# 资格上限L按考试最高档取值，同档只取一档、不叠加；不得读取已锁定的实际cap。
+# 默认1（九品）；乡试／跳级／荫补同属乡试档2（八品）；会试或殿试7（三品，普通铨叙最高）。
+# 不再把各项修正相加，也不设max=9。中央授品的二品／一品不读取L，仍由授品mode分支处理。
+# 只读修正存在性，不读原生上限；考试修正以 tca_merit_exam_scale_value=0 隔离。
 tca_merit_theoretical_cap_value = {
-    value = 2
-    if = { limit = { has_character_modifier = tgp_passed_provincial_exam_modifier } add = 2 }
-    if = { limit = { has_character_modifier = tgp_bypassed_provincial_exam_modifier } add = 2 }
-    if = { limit = { has_character_modifier = tgp_nepotism_bypass_exams_modifier } add = 2 }
-    if = { limit = { has_character_modifier = tgp_passed_metropolitan_exam_modifier } add = 2 }
-    if = { limit = { has_character_modifier = tgp_passed_palace_exam_modifier } add = 3 }
-    max = 9
+    value = 1
+    # 会试与殿试同档；两者同时持有仍只计7。
+    if = {
+        limit = {
+            OR = {
+                has_character_modifier = tgp_passed_metropolitan_exam_modifier
+                has_character_modifier = tgp_passed_palace_exam_modifier
+            }
+        }
+        value = 7
+    }
+    # 乡试、跳级、荫补同档；同时持有多项修正仍只计2，不能累加。
+    else_if = {
+        limit = {
+            OR = {
+                has_character_modifier = tgp_passed_provincial_exam_modifier
+                has_character_modifier = tgp_bypassed_provincial_exam_modifier
+                has_character_modifier = tgp_nepotism_bypass_exams_modifier
+            }
+        }
+        value = 2
+    }
 }
 
 tca_merit_next_threshold_value = {

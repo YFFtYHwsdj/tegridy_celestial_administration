@@ -1,0 +1,123 @@
+﻿# 基于本机原版 CK3 1.20.1.2 的 07_appointment_values.txt 覆盖对象。
+# 作用域：人物（任命候选）；由文官任命类型的 candidate_score 调用，scope:title 为有持有人的目标官署。
+# 覆盖来源：原版 appointment_score_governor（本机 07_appointment_values.txt 第 1406–1496 行）整段逐项保留，
+#           仅在原值末尾追加天朝文官考试出身加分。
+# 取档规则：按最高通过层次取一档，殿试 +30、会试 +15，不叠加；贤能制、军事候选及非天朝为 0。
+# 考试修正仍由原版 scale = 0 隔离；本文件只读取修正存在性，不以 government_has_merit 判断制度。
+
+appointment_score_governor = {
+	if = {
+		limit = { is_at_war_with = liege }
+		add = {
+			value = -9999
+			desc = game_concept_revolt
+		}
+	}
+	if = {
+		limit = { has_trait = governor }
+		add = {
+			value = 5
+			if = {
+				limit = {
+					has_trait_xp = { trait = governor value >= 25 }
+				}
+				add = 5
+			}
+			if = {
+				limit = {
+					has_trait_xp = { trait = governor value >= 50 }
+				}
+				add = 5
+			}
+			if = {
+				limit = {
+					has_trait_xp = { trait = governor value >= 75 }
+				}
+				add = 5
+			}
+			desc = governor_trait_desc_short
+		}
+	}
+	# RITE BASED
+	if = {
+		limit = {
+			exists = top_liege.primary_title.state_rite
+		}
+		top_liege.primary_title.state_rite = {
+			save_temporary_scope_as = target_rite
+		}
+	}
+	else = {
+		top_liege.rite = {
+			save_temporary_scope_as = target_rite
+		}
+	}
+	# RITE HOSTILITY
+	if = {
+		limit = {
+			scope:target_rite ?= {
+				rite_hostility_level = {
+					target = root.rite
+					value = faith_astray_level
+				}
+			}
+		} #Change to faith acceptance
+		subtract = {
+			value = 10
+			desc = astray_faith_succession_desc
+		}
+	}
+	if = {
+		limit = {
+			scope:target_rite ?= {
+				rite_hostility_level = {
+					target = root.rite
+					value = faith_hostile_level
+				}
+			}
+		} #Change to faith acceptance
+		subtract = {
+			value = 25
+			desc = hostile_faith_succession_desc
+		}
+	}
+	if = {
+		limit = {
+			scope:target_rite ?= {
+				rite_hostility_level = {
+					target = root.rite
+					value >= faith_evil_level
+				}
+			}
+		} #Change to faith acceptance
+		subtract = {
+			value = 50
+			desc = evil_faith_sucession_desc
+		}
+	}
+
+	# 天朝文官考试出身加分；条件、取档与排除统一在 tca_exam_civil_appointment_score_value 内维护。
+	add = tca_exam_civil_appointment_score_value
+}
+
+# 人物作用域（任命候选）；仅天朝文官候选。
+# 先殿试后会试，按最高通过层次取一档，不叠加；贤能制、军事候选及非天朝返回 0。
+# desc 供任命候选分明细显示；本值不影响资格、年度名额或抽选权重。
+tca_exam_civil_appointment_score_value = {
+    if = {
+        limit = {
+            exists = top_liege
+            top_liege ?= { government_has_flag = government_is_celestial }
+            is_civilian_candidate_trigger = yes
+            is_military_candidate_trigger = no
+        }
+        if = {
+            limit = { has_character_modifier = tgp_passed_palace_exam_modifier }
+            add = { value = 30 desc = tca_exam_palace_appointment_score }
+        }
+        else_if = {
+            limit = { has_character_modifier = tgp_passed_metropolitan_exam_modifier }
+            add = { value = 15 desc = tca_exam_metropolitan_appointment_score }
+        }
+    }
+}
