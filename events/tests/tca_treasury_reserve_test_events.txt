@@ -1,0 +1,271 @@
+﻿# 官库留储法接口回归；直接调用正式数值、触发条件与结算效果，不重写业务规则。
+# 夹具为真实无地伯爵官署，保存并恢复法律、treasury、历史变量与特质，避免污染同局。
+namespace = tca_treasury_reserve_test
+
+tca_treasury_reserve_test.1 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_treasury_reserve_test.1 tca_test_treasury_reserve"
+        remove_character_flag = tca_test_tca_treasury_reserve_test_case_failed
+        if = {
+            limit = { debug_only = yes is_alive = yes title:h_china.holder = root }
+            tca_test_validate_environment_effect = yes
+            if = {
+                limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+                # 1 皇帝本人不进入结算范围。
+                if = {
+                    limit = { NOT = { tca_treasury_reserve_scope_trigger = yes } }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_treasury_reserve 1"
+                }
+                else = {
+                    add_character_flag = tca_test_tca_treasury_reserve_test_case_failed
+                    debug_log = "TCA_TEST CHECK_FAIL tca_test_treasury_reserve 1"
+                }
+                # 2 霸权级基础保底为 2000。
+                if = {
+                    limit = { tca_treasury_reserve_base_floor_value = 2000 }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_treasury_reserve 2"
+                }
+                else = {
+                    add_character_flag = tca_test_tca_treasury_reserve_test_case_failed
+                    debug_log = "TCA_TEST CHECK_FAIL tca_test_treasury_reserve 2"
+                }
+                # 选择一名真实无地伯爵官署作为夹具。
+                random_living_character = {
+                    limit = {
+                        top_liege = root
+                        has_treasury = yes
+                        is_landed = no
+                        highest_held_title_tier = tier_county
+                        tca_treasury_reserve_scope_trigger = yes
+                    }
+                    save_scope_as = tca_tr_actor
+                }
+                if = {
+                    limit = { exists = scope:tca_tr_actor }
+                    # 3 普通官员进入结算范围。
+                    if = {
+                        limit = { scope:tca_tr_actor = { tca_treasury_reserve_scope_trigger = yes } }
+                        debug_log = "TCA_TEST CHECK_PASS tca_test_treasury_reserve 3"
+                    }
+                    else = {
+                        add_character_flag = tca_test_tca_treasury_reserve_test_case_failed
+                        debug_log = "TCA_TEST CHECK_FAIL tca_test_treasury_reserve 3"
+                    }
+                    # 保存夹具原状。
+                    scope:tca_tr_actor = {
+                        save_scope_value_as = { name = tca_tr_original_treasury value = treasury }
+                        primary_title = {
+                            if = {
+                                limit = { has_variable = tca_treasury_reserve_income_last_year }
+                                save_scope_value_as = { name = tca_tr_original_last_year value = var:tca_treasury_reserve_income_last_year }
+                            }
+                            if = {
+                                limit = { has_variable = tca_treasury_reserve_income_two_years_ago }
+                                save_scope_value_as = { name = tca_tr_original_two value = var:tca_treasury_reserve_income_two_years_ago }
+                            }
+                        }
+                    }
+                    # 4 伯爵基础保底为 250。
+                    if = {
+                        limit = { scope:tca_tr_actor = { tca_treasury_reserve_base_floor_value = 250 } }
+                        debug_log = "TCA_TEST CHECK_PASS tca_test_treasury_reserve 4"
+                    }
+                    else = {
+                        add_character_flag = tca_test_tca_treasury_reserve_test_case_failed
+                        debug_log = "TCA_TEST CHECK_FAIL tca_test_treasury_reserve 4"
+                    }
+                    # 5 从严档倍率 0.75。
+                    if = { limit = { NOT = { has_realm_law = tca_treasury_reserve_strict_law } } add_realm_law_skip_effects = tca_treasury_reserve_strict_law }
+                    if = {
+                        limit = { scope:tca_tr_actor = { tca_treasury_reserve_law_multiplier_value = 0.75 } }
+                        debug_log = "TCA_TEST CHECK_PASS tca_test_treasury_reserve 5"
+                    }
+                    else = {
+                        add_character_flag = tca_test_tca_treasury_reserve_test_case_failed
+                        debug_log = "TCA_TEST CHECK_FAIL tca_test_treasury_reserve 5"
+                    }
+                    # 6 从宽档倍率 1.5。
+                    add_realm_law_skip_effects = tca_treasury_reserve_lenient_law
+                    if = {
+                        limit = { scope:tca_tr_actor = { tca_treasury_reserve_law_multiplier_value = 1.5 } }
+                        debug_log = "TCA_TEST CHECK_PASS tca_test_treasury_reserve 6"
+                    }
+                    else = {
+                        add_character_flag = tca_test_tca_treasury_reserve_test_case_failed
+                        debug_log = "TCA_TEST CHECK_FAIL tca_test_treasury_reserve 6"
+                    }
+                    # 7 常额档倍率 1.0。
+                    add_realm_law_skip_effects = tca_treasury_reserve_normal_law
+                    if = {
+                        limit = { scope:tca_tr_actor = { tca_treasury_reserve_law_multiplier_value = 1 } }
+                        debug_log = "TCA_TEST CHECK_PASS tca_test_treasury_reserve 7"
+                    }
+                    else = {
+                        add_character_flag = tca_test_tca_treasury_reserve_test_case_failed
+                        debug_log = "TCA_TEST CHECK_FAIL tca_test_treasury_reserve 7"
+                    }
+                    # 8 三年取最大：去年 1000 → 上限 24000。
+                    scope:tca_tr_actor = {
+                        primary_title = {
+                            set_variable = { name = tca_treasury_reserve_income_last_year value = 1000 }
+                            set_variable = { name = tca_treasury_reserve_income_two_years_ago value = 5 }
+                        }
+                    }
+                    if = {
+                        limit = { scope:tca_tr_actor = { tca_treasury_reserve_cap_value = 24000 } }
+                        debug_log = "TCA_TEST CHECK_PASS tca_test_treasury_reserve 8"
+                    }
+                    else = {
+                        add_character_flag = tca_test_tca_treasury_reserve_test_case_failed
+                        debug_log = "TCA_TEST CHECK_FAIL tca_test_treasury_reserve 8"
+                    }
+                    # 9 常额：去年 10、前年 5、国库 1000 → 上限 250、应缴 750。
+                    scope:tca_tr_actor = {
+                        primary_title = {
+                            set_variable = { name = tca_treasury_reserve_income_last_year value = 10 }
+                            set_variable = { name = tca_treasury_reserve_income_two_years_ago value = 5 }
+                        }
+                        tca_treasury_reserve_test_set_treasury_effect = { VALUE = 1000 }
+                    }
+                    if = {
+                        limit = {
+                            scope:tca_tr_actor = {
+                                tca_treasury_reserve_cap_value = 250
+                                tca_treasury_reserve_sweep_value = 750
+                            }
+                        }
+                        debug_log = "TCA_TEST CHECK_PASS tca_test_treasury_reserve 9"
+                    }
+                    else = {
+                        add_character_flag = tca_test_tca_treasury_reserve_test_case_failed
+                        debug_log = "TCA_TEST CHECK_FAIL tca_test_treasury_reserve 9"
+                    }
+                    # 10 结算后夹具国库 250，皇帝国库增加 750。
+                    save_scope_value_as = { name = tca_tr_emperor_before value = treasury }
+                    scope:tca_tr_actor = {
+                        save_scope_value_as = { name = tca_tr_income_before value = monthly_character_treasury_variable_income }
+                        tca_treasury_reserve_settle_character_effect = yes
+                    }
+                    if = {
+                        limit = {
+                            scope:tca_tr_actor = { treasury = 250 }
+                            treasury >= { value = scope:tca_tr_emperor_before add = 750 }
+                            treasury <= { value = scope:tca_tr_emperor_before add = 751 }
+                        }
+                        debug_log = "TCA_TEST CHECK_PASS tca_test_treasury_reserve 10"
+                    }
+                    else = {
+                        add_character_flag = tca_test_tca_treasury_reserve_test_case_failed
+                        debug_log = "TCA_TEST CHECK_FAIL tca_test_treasury_reserve 10"
+                    }
+                    # 11 历史滚动：前年 ← 去年 10；去年 ← 结算时月收入。
+                    if = {
+                        limit = {
+                            scope:tca_tr_actor = {
+                                primary_title = { var:tca_treasury_reserve_income_two_years_ago = 10 }
+                                primary_title = { var:tca_treasury_reserve_income_last_year = scope:tca_tr_income_before }
+                            }
+                        }
+                        debug_log = "TCA_TEST CHECK_PASS tca_test_treasury_reserve 11"
+                    }
+                    else = {
+                        add_character_flag = tca_test_tca_treasury_reserve_test_case_failed
+                        debug_log = "TCA_TEST CHECK_FAIL tca_test_treasury_reserve 11"
+                    }
+                    # 12 门槛：国库 260、上限 250、应缴 10 < 25，不转移但历史更新。
+                    scope:tca_tr_actor = {
+                        primary_title = {
+                            set_variable = { name = tca_treasury_reserve_income_last_year value = 10 }
+                            set_variable = { name = tca_treasury_reserve_income_two_years_ago value = 5 }
+                        }
+                        tca_treasury_reserve_test_set_treasury_effect = { VALUE = 260 }
+                        tca_treasury_reserve_settle_character_effect = yes
+                    }
+                    if = {
+                        limit = {
+                            scope:tca_tr_actor = {
+                                treasury = 260
+                                primary_title = { var:tca_treasury_reserve_income_two_years_ago = 10 }
+                            }
+                        }
+                        debug_log = "TCA_TEST CHECK_PASS tca_test_treasury_reserve 12"
+                    }
+                    else = {
+                        add_character_flag = tca_test_tca_treasury_reserve_test_case_failed
+                        debug_log = "TCA_TEST CHECK_FAIL tca_test_treasury_reserve 12"
+                    }
+                    # 13 负国库不产生应缴。
+                    scope:tca_tr_actor = { tca_treasury_reserve_test_set_treasury_effect = { VALUE = -50 } }
+                    if = {
+                        limit = { scope:tca_tr_actor = { tca_treasury_reserve_sweep_value = 0 } }
+                        debug_log = "TCA_TEST CHECK_PASS tca_test_treasury_reserve 13"
+                    }
+                    else = {
+                        add_character_flag = tca_test_tca_treasury_reserve_test_case_failed
+                        debug_log = "TCA_TEST CHECK_FAIL tca_test_treasury_reserve 13"
+                    }
+                    # 14 奉祠身份不进入结算范围。
+                    scope:tca_tr_actor = { add_trait = tca_fengci }
+                    if = {
+                        limit = { scope:tca_tr_actor = { NOT = { tca_treasury_reserve_scope_trigger = yes } } }
+                        debug_log = "TCA_TEST CHECK_PASS tca_test_treasury_reserve 14"
+                    }
+                    else = {
+                        add_character_flag = tca_test_tca_treasury_reserve_test_case_failed
+                        debug_log = "TCA_TEST CHECK_FAIL tca_test_treasury_reserve 14"
+                    }
+                    scope:tca_tr_actor = { remove_trait = tca_fengci }
+                    # 15 年锁：本年已结算时再调用年度入口不改变夹具国库。
+                    scope:tca_tr_actor = { save_scope_value_as = { name = tca_tr_lock_before value = treasury } }
+                    set_global_variable = { name = tca_treasury_reserve_processed_year value = current_year }
+                    tca_treasury_reserve_annual_effect = yes
+                    if = {
+                        limit = { scope:tca_tr_actor = { treasury = scope:tca_tr_lock_before } }
+                        debug_log = "TCA_TEST CHECK_PASS tca_test_treasury_reserve 15"
+                    }
+                    else = {
+                        add_character_flag = tca_test_tca_treasury_reserve_test_case_failed
+                        debug_log = "TCA_TEST CHECK_FAIL tca_test_treasury_reserve 15"
+                    }
+                    # 16 免缴档：停收羡余，本领域官库不进入结算范围。
+                    if = { limit = { NOT = { has_realm_law = tca_treasury_reserve_exempt_law } } add_realm_law_skip_effects = tca_treasury_reserve_exempt_law }
+                    if = {
+                        limit = { scope:tca_tr_actor = { NOT = { tca_treasury_reserve_scope_trigger = yes } } }
+                        debug_log = "TCA_TEST CHECK_PASS tca_test_treasury_reserve 16"
+                    }
+                    else = {
+                        add_character_flag = tca_test_tca_treasury_reserve_test_case_failed
+                        debug_log = "TCA_TEST CHECK_FAIL tca_test_treasury_reserve 16"
+                    }
+                    if = {
+                        limit = { NOT = { has_character_flag = tca_test_tca_treasury_reserve_test_case_failed } }
+                        debug_log = "TCA_TEST PASS tca_test_treasury_reserve"
+                        if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } }
+                    }
+                    else = { debug_log = "TCA_TEST CASE_FAILED tca_test_treasury_reserve" }
+                    remove_character_flag = tca_test_tca_treasury_reserve_test_case_failed
+                    # 恢复夹具与法律。
+                    scope:tca_tr_actor = {
+                        if = { limit = { treasury < scope:tca_tr_original_treasury } add_treasury = { value = scope:tca_tr_original_treasury subtract = treasury } }
+                        else_if = { limit = { treasury > scope:tca_tr_original_treasury } remove_treasury = { value = treasury subtract = scope:tca_tr_original_treasury } }
+                        primary_title = {
+                            remove_variable = tca_treasury_reserve_income_last_year
+                            remove_variable = tca_treasury_reserve_income_two_years_ago
+                            if = { limit = { exists = scope:tca_tr_original_last_year } set_variable = { name = tca_treasury_reserve_income_last_year value = scope:tca_tr_original_last_year } }
+                            if = { limit = { exists = scope:tca_tr_original_two } set_variable = { name = tca_treasury_reserve_income_two_years_ago value = scope:tca_tr_original_two } }
+                        }
+                    }
+                    if = { limit = { NOT = { has_realm_law = tca_treasury_reserve_normal_law } } add_realm_law_skip_effects = tca_treasury_reserve_normal_law }
+                    tca_test_lane_end_effect = { GROUP = tca_treasury_reserve_test }
+                }
+                else = {
+                    debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_treasury_reserve"
+                    if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+                    if = { limit = { NOT = { has_realm_law = tca_treasury_reserve_normal_law } } add_realm_law_skip_effects = tca_treasury_reserve_normal_law }
+                    tca_test_lane_end_effect = { GROUP = tca_treasury_reserve_test }
+                }
+            }
+        }
+    }
+}

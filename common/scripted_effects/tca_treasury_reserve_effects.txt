@@ -1,0 +1,135 @@
+﻿# 官库留储法运行时：年度入口、逐人结算、历史更新、上缴与通知。
+# 只读写人物 treasury 与 primary_title 变量，不新增持续 modifier，不写 monthly_income。
+# 公式与参数见 common/script_values/tca_treasury_reserve_values.txt 与 docs/office_funding/treasury_reserve.md。
+
+# 无根入口；yearly_global_pulse 每年 1 月 1 日调用一次。
+# 全局年锁防止同一自然年重复入口；顺序为清账、逐人结算、逐国汇总。
+tca_treasury_reserve_annual_effect = {
+    if = {
+        limit = { NOT = { global_var:tca_treasury_reserve_processed_year ?= current_year } }
+        set_global_variable = { name = tca_treasury_reserve_processed_year value = current_year }
+        # 先清零各国年度累计，避免上一轮或保存重载残留。
+        every_independent_ruler = {
+            limit = { tca_treasury_reserve_sovereign_trigger = yes }
+            primary_title = {
+                set_variable = { name = tca_treasury_reserve_year_total value = 0 }
+                set_variable = { name = tca_treasury_reserve_year_count value = 0 }
+            }
+        }
+        # 逐角色结算；每人每期最多一次。
+        every_living_character = {
+            limit = { tca_treasury_reserve_scope_trigger = yes }
+            tca_treasury_reserve_settle_character_effect = yes
+        }
+        # 逐国发送皇帝汇总并清理年度账。
+        every_independent_ruler = {
+            limit = { tca_treasury_reserve_sovereign_trigger = yes }
+            tca_treasury_reserve_send_realm_summary_effect = yes
+        }
+    }
+}
+
+# 角色作用域；先算后写：上限与应缴额读取当年及前两年历史，随后才滚动历史。
+# 无论是否上缴都更新历史；达到门槛才实际转移。
+tca_treasury_reserve_settle_character_effect = {
+    save_scope_value_as = { name = tca_tr_cap value = tca_treasury_reserve_cap_value }
+    save_scope_value_as = { name = tca_tr_sweep value = tca_treasury_reserve_sweep_value }
+    save_scope_value_as = { name = tca_tr_income value = monthly_character_treasury_variable_income }
+    # 历史只存原始采样：前年 ← 去年；去年 ← 本年。
+    if = {
+        limit = { exists = primary_title }
+        primary_title = {
+            if = {
+                limit = { has_variable = tca_treasury_reserve_income_last_year }
+                set_variable = { name = tca_treasury_reserve_income_two_years_ago value = var:tca_treasury_reserve_income_last_year }
+            }
+            else = { set_variable = { name = tca_treasury_reserve_income_two_years_ago value = 0 } }
+            set_variable = { name = tca_treasury_reserve_income_last_year value = scope:tca_tr_income }
+        }
+    }
+    # 负国库在 sweep_value 中已归零；这里只对正额调用资金效果。
+    if = {
+        limit = { scope:tca_tr_sweep >= tca_treasury_reserve_threshold_value }
+        remove_treasury = scope:tca_tr_sweep
+        top_liege = {
+            add_treasury = scope:tca_tr_sweep
+            if = {
+                limit = { exists = primary_title }
+                primary_title = {
+                    # 直接调用接口或换主头衔时可能尚未初始化；先补零，再累计。
+                    if = { limit = { NOT = { has_variable = tca_treasury_reserve_year_total } } set_variable = { name = tca_treasury_reserve_year_total value = 0 } }
+                    if = { limit = { NOT = { has_variable = tca_treasury_reserve_year_count } } set_variable = { name = tca_treasury_reserve_year_count value = 0 } }
+                    change_variable = { name = tca_treasury_reserve_year_total add = scope:tca_tr_sweep }
+                    change_variable = { name = tca_treasury_reserve_year_count add = 1 }
+                }
+            }
+        }
+        # 只有真实人类缴款人需要个人反馈；AI 不生成消息。
+        if = { limit = { is_ai = no } tca_treasury_reserve_send_payer_notice_effect = yes }
+    }
+}
+
+# 角色作用域；缴款人右侧 feed 个人通知。金额在本效果内冻结，避免消息模板再求值。
+tca_treasury_reserve_send_payer_notice_effect = {
+    save_scope_value_as = { name = tca_tr_notice_amount value = scope:tca_tr_sweep }
+    save_scope_value_as = { name = tca_tr_notice_cap value = scope:tca_tr_cap }
+    send_interface_message = {
+        type = tca_treasury_reserve_payer_notice
+        left_icon = root
+        tooltip = tca_treasury_reserve_payer_notice_tooltip
+        desc = { desc = tca_treasury_reserve_payer_notice_desc }
+    }
+}
+
+# 天朝独立君主作用域；读取本国年度账、清零并发送一条皇帝汇总。
+# 汇总只对真实人类皇帝发送；AI 皇帝只清账。
+tca_treasury_reserve_send_realm_summary_effect = {
+    save_scope_value_as = { name = tca_tr_total value = 0 }
+    save_scope_value_as = { name = tca_tr_count value = 0 }
+    if = {
+        limit = { exists = primary_title }
+        if = {
+            limit = { primary_title = { has_variable = tca_treasury_reserve_year_total } }
+            save_scope_value_as = { name = tca_tr_total value = primary_title.var:tca_treasury_reserve_year_total }
+        }
+        if = {
+            limit = { primary_title = { has_variable = tca_treasury_reserve_year_count } }
+            save_scope_value_as = { name = tca_tr_count value = primary_title.var:tca_treasury_reserve_year_count }
+        }
+        primary_title = {
+            set_variable = { name = tca_treasury_reserve_year_total value = 0 }
+            set_variable = { name = tca_treasury_reserve_year_count value = 0 }
+        }
+    }
+    if = {
+        limit = { scope:tca_tr_total > 0 }
+        if = {
+            limit = { is_ai = no }
+            send_interface_message = {
+                type = tca_treasury_reserve_emperor_briefing
+                left_icon = root
+                tooltip = tca_treasury_reserve_emperor_briefing_tooltip
+                desc = { desc = tca_treasury_reserve_emperor_briefing_desc }
+            }
+        }
+    }
+}
+
+# 无根入口；after_lobby 为独立天朝补常额，不覆盖玩家已选档位。
+tca_treasury_reserve_initialize_global_effect = {
+    every_independent_ruler = {
+        limit = {
+            is_alive = yes
+            government_has_flag = government_is_celestial
+        }
+        if = {
+            limit = {
+                NOT = { has_realm_law = tca_treasury_reserve_strict_law }
+                NOT = { has_realm_law = tca_treasury_reserve_normal_law }
+                NOT = { has_realm_law = tca_treasury_reserve_lenient_law }
+                NOT = { has_realm_law = tca_treasury_reserve_exempt_law }
+            }
+            add_realm_law_skip_effects = tca_treasury_reserve_normal_law
+        }
+    }
+}

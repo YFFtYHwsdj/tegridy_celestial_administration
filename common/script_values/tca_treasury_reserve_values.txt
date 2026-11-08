@@ -1,0 +1,103 @@
+﻿# 《官库留储法》数值层。定稿公式：
+#   R = max(24 × max(I_t, I_t-1, I_t-2), B_tier × L)
+#   T = max(0, 本人 treasury − R)，T < 25 不转移、不通知。
+# I = monthly_character_treasury_variable_income；B_tier 按本人最高持有头衔等级；
+# L 按缴款人 top_liege（天朝皇帝）的领域法律档位。本文件所有 script value 根作用域为缴款人角色。
+# 本文件只读国库与变量，不写任何状态；收入历史由运行时年度结算写入。
+
+# 角色作用域；四档保底金额。霸权与帝国同额，无地、男爵领或未列明等级按伯爵下限 250。
+tca_treasury_reserve_base_floor_value = {
+    value = 250
+    if = {
+        limit = { highest_held_title_tier = tier_duchy }
+        value = 500
+    }
+    if = {
+        limit = { highest_held_title_tier = tier_kingdom }
+        value = 1000
+    }
+    if = {
+        limit = {
+            OR = {
+                highest_held_title_tier = tier_empire
+                highest_held_title_tier = tier_hegemony
+            }
+        }
+        value = 2000
+    }
+}
+
+# 角色作用域；保底倍率。读最高领主的领域法而非本人法律：
+# 从属领主不自持该法律组，只有天朝独立君主能改档。
+# 从严 0.75、常额 1.00、从宽 1.50；缺少最高领主或未匹配任何档位时按常额 1.00。
+tca_treasury_reserve_law_multiplier_value = {
+    value = 1
+    if = {
+        limit = {
+            exists = top_liege
+            top_liege = { has_realm_law = tca_treasury_reserve_strict_law }
+        }
+        value = 0.75
+    }
+    if = {
+        limit = {
+            exists = top_liege
+            top_liege = { has_realm_law = tca_treasury_reserve_lenient_law }
+        }
+        value = 1.5
+    }
+}
+
+# 角色作用域；保底金额 = 头衔基础保底 × 法律倍率。
+tca_treasury_reserve_floor_value = {
+    value = tca_treasury_reserve_base_floor_value
+    multiply = tca_treasury_reserve_law_multiplier_value
+}
+
+# 角色作用域；近三年月收入的最高值，缺失年份按 0，最终取非负。
+# 历史变量挂在缴款人 primary_title（运行时年度结算的写入点）；同时兼容角色自身同名变量，
+# 以便测试夹具直接设置人物变量；二者都缺失时只计当前月收入。
+tca_treasury_reserve_income_max_value = {
+    value = monthly_character_treasury_variable_income
+    if = {
+        limit = { exists = primary_title }
+        if = {
+            limit = { primary_title = { has_variable = tca_treasury_reserve_income_last_year } }
+            min = { value = primary_title.var:tca_treasury_reserve_income_last_year }
+        }
+        if = {
+            limit = { primary_title = { has_variable = tca_treasury_reserve_income_two_years_ago } }
+            min = { value = primary_title.var:tca_treasury_reserve_income_two_years_ago }
+        }
+    }
+    if = {
+        limit = { has_variable = tca_treasury_reserve_income_last_year }
+        min = var:tca_treasury_reserve_income_last_year
+    }
+    if = {
+        limit = { has_variable = tca_treasury_reserve_income_two_years_ago }
+        min = var:tca_treasury_reserve_income_two_years_ago
+    }
+    min = 0
+}
+
+# 角色作用域；留储月数，固定 24，不随档位变化。
+tca_treasury_reserve_months_value = 24
+
+# 角色作用域；留储量 R = max(24 × 近三年最高月收入, 保底金额)。
+tca_treasury_reserve_cap_value = {
+    value = tca_treasury_reserve_income_max_value
+    multiply = tca_treasury_reserve_months_value
+    min = tca_treasury_reserve_floor_value
+}
+
+# 角色作用域；应上缴额 T = max(0, 本人 treasury − 留储量)。
+# 负国库或未超留储量时为零；是否实际转移另看门槛。
+tca_treasury_reserve_sweep_value = {
+    value = treasury
+    subtract = tca_treasury_reserve_cap_value
+    min = 0
+}
+
+# 角色作用域；转移门槛，低于此额不转移、不通知。
+tca_treasury_reserve_threshold_value = 25
