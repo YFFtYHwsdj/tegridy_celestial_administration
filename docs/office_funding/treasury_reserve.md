@@ -35,7 +35,7 @@ T = max( 0, G − R )，T < 25 不转移、不通知
 - 顺序：清零各国年度累计 → 逐角色计算上限与应缴额 → 达到门槛才转账 → 更新历史（前年 ← 去年；去年 ← 当前月收入）→ 逐国发送皇帝汇总并清理。
 - 历史变量挂 `primary_title`：`tca_treasury_reserve_income_last_year`、`tca_treasury_reserve_income_two_years_ago`。原生国库随头衔更换持有人而保留，换任继承历史。
 - 上缴直接 `remove_treasury` 并从皇帝 `add_treasury` 同额，不经过转运使；不写任何 `monthly_income`，避免反馈进下一期收入。
-- 通知：皇帝一条汇总（总额、笔数），实际缴款人各一条；仅 `is_ai = no`；使用原生右侧 feed 消息。
+- 通知：皇帝一条汇总（总额、笔数；零额也发；免缴档不发），实际缴款人各一条；仅 `is_ai = no`；使用原生右侧 feed 消息。零额汇总说明本年岁计已行且无羡余可缴，避免玩家误以为制度未执行。
 
 ## 实现入口
 

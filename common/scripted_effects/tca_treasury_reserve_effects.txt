@@ -77,30 +77,41 @@ tca_treasury_reserve_send_payer_notice_effect = {
 }
 
 # 天朝独立君主作用域；读取本国年度账、清零并发送一条皇帝汇总。
+# 免缴档不结算也不发汇总；其余档位即使总额为零也发一条，便于皇帝确认岁计已行。
 # 汇总只对真实人类皇帝发送；AI 皇帝只清账。
 tca_treasury_reserve_send_realm_summary_effect = {
-    save_scope_value_as = { name = tca_tr_total value = 0 }
-    save_scope_value_as = { name = tca_tr_count value = 0 }
     if = {
-        limit = { exists = primary_title }
+        limit = { has_realm_law = tca_treasury_reserve_exempt_law }
         if = {
-            limit = { primary_title = { has_variable = tca_treasury_reserve_year_total } }
-            save_scope_value_as = { name = tca_tr_total value = primary_title.var:tca_treasury_reserve_year_total }
-        }
-        if = {
-            limit = { primary_title = { has_variable = tca_treasury_reserve_year_count } }
-            save_scope_value_as = { name = tca_tr_count value = primary_title.var:tca_treasury_reserve_year_count }
-        }
-        primary_title = {
-            set_variable = { name = tca_treasury_reserve_year_total value = 0 }
-            set_variable = { name = tca_treasury_reserve_year_count value = 0 }
+            limit = { exists = primary_title }
+            primary_title = {
+                set_variable = { name = tca_treasury_reserve_year_total value = 0 }
+                set_variable = { name = tca_treasury_reserve_year_count value = 0 }
+            }
         }
     }
-    if = {
-        limit = { scope:tca_tr_total > 0 }
+    else = {
+        save_scope_value_as = { name = tca_tr_total value = 0 }
+        save_scope_value_as = { name = tca_tr_count value = 0 }
+        if = {
+            limit = { exists = primary_title }
+            if = {
+                limit = { primary_title = { has_variable = tca_treasury_reserve_year_total } }
+                save_scope_value_as = { name = tca_tr_total value = primary_title.var:tca_treasury_reserve_year_total }
+            }
+            if = {
+                limit = { primary_title = { has_variable = tca_treasury_reserve_year_count } }
+                save_scope_value_as = { name = tca_tr_count value = primary_title.var:tca_treasury_reserve_year_count }
+            }
+            primary_title = {
+                set_variable = { name = tca_treasury_reserve_year_total value = 0 }
+                set_variable = { name = tca_treasury_reserve_year_count value = 0 }
+            }
+        }
         if = {
             limit = { is_ai = no }
             # 无根全局链不能可靠渲染角色消息；排独立事件，在角色作用域发送。
+            # 零额也发汇总，向皇帝说明本年岁计已行且无羡余可缴。
             trigger_event = { id = tca_treasury_reserve.2 days = 1 }
         }
     }
