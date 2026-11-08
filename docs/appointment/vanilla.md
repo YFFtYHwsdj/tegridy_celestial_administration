@@ -85,6 +85,14 @@
 
 法律说明写“境内所有成年人可竞争”，游戏内概念 `game_concept_merit_pool` 写池包含“所有潜在角色”。实际池由引擎按“可被该领主授予头衔者”生成，本次只核对到脚本与界面文本，具体成员构成待引擎复现。
 
+界面侧另核对到：政府行政窗口的贤能池列表由引擎 `AdminMeritPool` 提供（`GovernmentAdministrationWindow.SetMeritPoolCharacterList( AdminMeritPool.Self )` 交给 `CharacterSelectionList.GetList`，`game/gui/window_government_administration.gui:3278`、`:3747`），脚本没有生成或过滤该列表的入口。已观察到的展示行为：
+
+- 列表只按官品门槛列潜在候选人；`appointment_timeout`（辞谢、致仕等任命超时）与任命冷却**不参与列表过滤**，带超时的人物照常显示，行尾按 `Character.HasNewAppointmentCooldown` 显示沙漏与剩余时间，悬浮说明 `ADMIN_WINDOW_APPOINTMENT_COOLDOWN_TT` 为“无法被任命”（同文件 `:3487-3518`）。
+- 行首编号是当前排序下的列表索引（GUI 取 `CharacterListItem.GetIndex + 1`，`:3740`），不是独立的顺位字段。
+- “排序规则”下拉可切名称／总督效率／影响力／贤能／分数，只改变显示顺序；默认仍是官品→候选分数。
+
+这些是 GUI 与本机界面观察证据，不代表引擎已逐项复现池成员生成；实际能否被任命仍以 `is_appointment_valid_trigger` 与引擎内部过滤为准。
+
 ### 资格限制
 
 `common/scripted_triggers/07_ep3_triggers.txt:915` 的 `is_appointment_valid_trigger` 与人际交互的 `can_appoint_for_title` 共同限制：
@@ -114,14 +122,16 @@
 
 游戏内概念 `game_concept_merit_pool` 写明：使用功绩的任命继承法，候选人**先按功绩等级、再按候选分数**排序；持有者死亡时头衔传给列表最前者。若最前者已持头衔，新头衔的 `appointment_prominence` 必须高于其现有头衔，否则顺延。
 
-这与法律副标题“拥有最高分数的候选人继承”并不完全一致：副标题只概括分数，实际首选键是功绩等级。排序由引擎完成，本次未在游戏中复现，标待验证。
+这与法律副标题“拥有最高分数的候选人继承”并不完全一致：副标题只概括分数，实际首选键是功绩等级。排序由引擎完成；界面文本与列表显示已观察到官品→分数顺序（见上文“池的生成”），引擎内部排序在各头衔等级上的一致性仍待复现。
 
 “重要性”（`appointment_prominence`）由 `appointment_title_value` 计算（原版 `common/script_values/tgp_values.txt:272`）：民政头衔按 24 个月收入加“距首都距离”加成；军政头衔按兵员规模和行省规模。模组覆盖了该脚本值，见文末。
 
 ### 冷却与退出
 
 - 受任后 5 年内不再被考虑为其他任命候选人（`RECENT_APPOINTMENT_COOLDOWN = 1825`，`common/defines/00_defines.txt:1867`）。`level` 模式下原版说明为“有时执行”，触发条件待验证。
-- 角色可用辞谢任命决议（`tgp_refuse_appointments_decision`）把自己从候选池移除（设定 150 年任命超时），再用恢复任命决议（`tgp_resume_appointments_decision`）重新加入。
+- 辞谢任命决议 `tgp_refuse_appointments_decision` 设定 150 年任命超时（`set_appointment_timeout = { years = 150 }`，`common/decisions/dlc_decisions/tgp/tgp_china_decisions.txt:361`），恢复任命决议 `tgp_resume_appointments_decision` 用 `clear_appointment_timeout = yes`（同文件 `:404`）重新加入。超时期间人物退出实际继任名单，但仍留在贤能池列表展示中并标注“无法被任命”（见“池的生成”），所以“从候选池移除”只指任命资格，不是界面列表消失。
+- 原版“致仕”对应辞官决议 `renounce_governorship_decision`：交出实职并给 15 年 `ep3_renounced_governorship_merit`，同时设 `set_appointment_timeout = { years = 3 desc = appointment_timeout_desc_retired_governor }`（`common/decisions/dlc_decisions/ep_3/06_ep3_admin_decisions.txt:1661`，事件侧 `events/dlc/ep3/ep3_decisions_events.txt:6150`）。3 年到期后自动恢复可任命，不是永久退出；期间同样只标注“无法被任命”。
+- 拒绝继承 `reject_inheritance_decision` 的实际效果是加 `gallivanter` 特质（`common/decisions/dlc_decisions/ep_3/06_ep3_laamp_decisions.txt:1700`）：`inheritance_blocker = all`、`claim_inheritance_blocker = all`、`flag = cannot_inherit_titles`（`common/traits/00_traits.txt:12748`），由 `embrace_responsibilities_decision`（同 decisions 文件 `:1994`）移除；剥夺继承权则加 `disinherited` 特质。两者在 `appointment_score_base` 各扣 200 分（`common/script_values/07_appointment_values.txt:521-533`），不改变贤能池列表是否显示。这些拒绝类特质都不是任命资格里的硬性排除；`is_appointment_valid_trigger` 中的硬性身份条件是 `is_clergy = no`（见“资格限制”），与拒绝继承无关。
 
 ## 评分构成（地方文官）
 
@@ -197,9 +207,10 @@
 
 ## 待验证
 
-1. 候选池的实际成员构成与“所有成年人”文案的差距；`level` 门槛在引擎侧的精确判定。
+1. 候选池的实际成员构成与“所有成年人”文案的差距；`level` 门槛在引擎侧的精确判定。界面已核对列表会列出带任命超时的人物并标注“无法被任命”（见“池的生成”），成员生成本身仍待引擎复现。
 2. “先功绩等级、再候选分数”的排序是否与所有头衔等级一致；法律副标题只写“最高分数”。
 3. `level` 模式下 5 年任命冷却的“有时执行”具体条件。
 4. 契约在民政/军政间切换后，法律是即时由脚本补挂，还是等约一个月的 `can_keep` 失效替换；两者结果相同，时点不同。
 5. 省部头衔按帝国级应要求功绩 7，但界面文案写 2；以引擎实测为准。
 6. AI 的候选支持、职业分互动频率与年龄限制在实战中的表现；本次只读脚本，未开测试局。
+7. 贤能池列表对任命超时与任命冷却不设过滤的引擎实现；当前只有 GUI／本地化静态核对与本机界面观察，未做引擎成员复现。
