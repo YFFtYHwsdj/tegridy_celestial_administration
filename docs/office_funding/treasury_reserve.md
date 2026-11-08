@@ -45,6 +45,7 @@ T = max( 0, G − R )，T < 25 不转移、不通知
 - 触发条件：`common/scripted_triggers/tca_treasury_reserve_triggers.txt`
 - 结算与通知：`common/scripted_effects/tca_treasury_reserve_effects.txt`
 - 年度与开局钩子：`common/on_action/tca_treasury_reserve_on_actions.txt`
+- 通知事件：`events/tca_treasury_reserve_events.txt`（无根年度链只冻结数值，消息在独立角色事件中发送）
 - 消息类型：`common/messages/tca_treasury_reserve_messages.txt`
 - 本地化：`localization/simp_chinese/tca_treasury_reserve_l_simp_chinese.yml`、`localization/english/tca_treasury_reserve_l_english.yml`
 

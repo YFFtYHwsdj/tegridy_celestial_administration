@@ -69,16 +69,11 @@ tca_treasury_reserve_settle_character_effect = {
     }
 }
 
-# 角色作用域；缴款人右侧 feed 个人通知。金额在本效果内冻结，避免消息模板再求值。
+# 角色作用域；缴款人右侧 feed 个人通知。金额在本效果内冻结，由独立事件渲染。
 tca_treasury_reserve_send_payer_notice_effect = {
     save_scope_value_as = { name = tca_tr_notice_amount value = scope:tca_tr_sweep }
     save_scope_value_as = { name = tca_tr_notice_cap value = scope:tca_tr_cap }
-    send_interface_message = {
-        type = tca_treasury_reserve_payer_notice
-        left_icon = root
-        tooltip = tca_treasury_reserve_payer_notice_tooltip
-        desc = { desc = tca_treasury_reserve_payer_notice_desc }
-    }
+    trigger_event = { id = tca_treasury_reserve.1 days = 1 }
 }
 
 # 天朝独立君主作用域；读取本国年度账、清零并发送一条皇帝汇总。
@@ -105,12 +100,8 @@ tca_treasury_reserve_send_realm_summary_effect = {
         limit = { scope:tca_tr_total > 0 }
         if = {
             limit = { is_ai = no }
-            send_interface_message = {
-                type = tca_treasury_reserve_emperor_briefing
-                left_icon = root
-                tooltip = tca_treasury_reserve_emperor_briefing_tooltip
-                desc = { desc = tca_treasury_reserve_emperor_briefing_desc }
-            }
+            # 无根全局链不能可靠渲染角色消息；排独立事件，在角色作用域发送。
+            trigger_event = { id = tca_treasury_reserve.2 days = 1 }
         }
     }
 }
