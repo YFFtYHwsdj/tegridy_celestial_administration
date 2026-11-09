@@ -53,7 +53,7 @@
 
 ### 模组官署
 
-[官员身份契约](../../../common/subject_contracts/contracts/tca_official_contracts.txt)的提刑基础4/月、通判2/月，属于原生月功绩乘区。[官署经费系数](../../../common/script_values/tca_office_funding_values.txt)为实拨金额×0.2；[正式结算](../../../common/scripted_effects/tca_office_funding_effects.txt)以冻结实付、实际收款人即时`change_merit`发放，并有官署30日防重。该动态奖励不再套个人月倍率，个人俸禄也不是此奖励基数。离职不保留旧任期的终身拨款收益。
+[官员身份契约](../../../common/subject_contracts/contracts/tca_official_contracts.txt)的提刑基础3/月、通判1/月，属于原生月功绩乘区。[官署经费系数](../../../common/script_values/tca_office_funding_values.txt)提刑为实拨金额×20.0、通判为实拨金额×6.0；[正式结算](../../../common/scripted_effects/tca_office_funding_effects.txt)以冻结实付、实际收款人即时`change_merit`发放，并有官署30日防重。该动态奖励不再套个人月倍率，个人俸禄也不是此奖励基数。离职不保留旧任期的终身拨款收益。
 
 ## 离散奖励、资格与初始化
 

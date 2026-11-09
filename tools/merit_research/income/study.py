@@ -72,8 +72,8 @@ def source_catalog(game,repo):
       ('game',contract,'celestial_minister_military','monthly_merit',20),
       ('game','common/modifiers/00_basic_modifiers.txt','king_modifier','monthly_merit_mult',.5),
       ('game','common/modifiers/00_basic_modifiers.txt','emperor_modifier','monthly_merit_mult',1),
-      ('mod','common/subject_contracts/contracts/tca_official_contracts.txt','tca_official_judicial','monthly_merit',4),
-      ('mod','common/subject_contracts/contracts/tca_official_contracts.txt','tca_official_tongpan','monthly_merit',2)]
+      ('mod','common/subject_contracts/contracts/tca_official_contracts.txt','tca_official_judicial','monthly_merit',3),
+      ('mod','common/subject_contracts/contracts/tca_official_contracts.txt','tca_official_tongpan','monthly_merit',1)]
     records=[]
     for origin,path,block,key,expected in specs:
         file=(game if origin=='game' else repo)/path

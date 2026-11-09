@@ -1,4 +1,4 @@
-﻿# 官署经费比例集中配置；各档独立维护，结算和契约说明共用。
+# 官署经费比例集中配置；各档独立维护，结算和契约说明共用。
 tca_circuit_funding_low_rate_value = 0.02
 tca_circuit_funding_frugal_rate_value = 0.04
 tca_circuit_funding_medium_rate_value = 0.06
@@ -11,12 +11,33 @@ tca_tongpan_funding_increased_rate_value = 0.20
 tca_tongpan_funding_high_rate_value = 0.25
 
 # 官署实付经费的功绩兑换系数；不包含个人俸禄，不应用月功绩倍率。
-tca_office_funding_merit_rate_value = 0.2
+tca_circuit_funding_merit_rate_value = 20.0
+tca_tongpan_funding_merit_rate_value = 6.0
+
+# 综合换算系数；官署头衔或人物作用域均适用。
+tca_office_funding_merit_rate_value = {
+    value = tca_circuit_funding_merit_rate_value
+    if = {
+        limit = {
+            OR = {
+                has_variable = tca_tongpan_title
+                primary_title ?= { has_variable = tca_tongpan_title }
+            }
+        }
+        value = tca_tongpan_funding_merit_rate_value
+    }
+}
 
 # 人物作用域；下期预测沿用正式拨款资格、基数与费率，不读取上次实付。
 tca_office_funding_expected_merit_value = {
-    value = tca_office_funding_income_value
-    multiply = tca_office_funding_merit_rate_value
+    value = 0
+    every_held_title = {
+        limit = { OR = { has_variable = tca_judicial_title has_variable = tca_tongpan_title } }
+        add = {
+            value = tca_office_funding_amount_value
+            multiply = tca_office_funding_merit_rate_value
+        }
+    }
 }
 
 # 人物作用域；汇总当前所持官署中属于本人物、本任期的上次实际功绩奖励。
