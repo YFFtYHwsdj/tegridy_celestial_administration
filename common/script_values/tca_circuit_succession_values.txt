@@ -1,0 +1,45 @@
+# 路主任命继承补授（王国级有地头衔）共享数值。
+# 抽选权重为第一版兜底简化值，不冒充原生候选分；文官、军区、都护使用同一公式。
+# 生成兜底的功绩按目标头衔等级取原版起始值，确保满足该头衔的功绩等级门槛。
+
+# 角色作用域（候选）；加权抽选权重 = 1 + 原生功绩等级。
+# 只读 merit_level，不读本模组核定官品，也不改写官品。
+tca_circuit_candidate_weight_value = {
+    value = merit_level
+    add = 1
+}
+
+# 头衔作用域（生成兜底时）；按目标头衔等级取原版起始功绩，保证新角色满足该头衔的功绩等级门槛。
+# 调用方 tca_circuit_generate_holder_effect 在当前作用域即目标头衔时先求值保存，再传给新角色。
+tca_circuit_generated_merit_value = {
+    if = {
+        limit = { tier = tier_kingdom }
+        value = kingdom_starting_merit_value
+    }
+    else_if = {
+        limit = { tier = tier_duchy }
+        value = duchy_starting_merit_value
+    }
+    else = { value = county_starting_merit_value }
+}
+
+# 一人多路的“信息记录阈值”，默认 1。全局变量不存在时按 1 处理。
+# 兼任本身不视为不合格：该阈值只供可选诊断日志（默认关闭）使用，不进入收回/补授链路，
+# 也不改变原生任命与继承规则。调试时可用全局变量 tca_circuit_max_kingdom_roads 覆盖。
+tca_circuit_max_kingdom_roads_value = {
+    value = 1
+    if = {
+        limit = { has_global_variable = tca_circuit_max_kingdom_roads }
+        value = global_var:tca_circuit_max_kingdom_roads
+    }
+}
+
+# 角色作用域；名下已登记路的数量（只统计带 tca_circuit_kind 的王国级路）。
+# 仅用于“一人多路”可选诊断；与原生头衔数量、中央兼领、家门头衔无关，不参与不合格判定。
+tca_circuit_holder_road_count_value = {
+    value = 0
+    every_held_title = {
+        limit = { tca_circuit_is_tracked_road_trigger = yes }
+        add = 1
+    }
+}

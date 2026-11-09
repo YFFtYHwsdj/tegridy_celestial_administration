@@ -1,0 +1,394 @@
+# 路主任命继承补授：判定入口。
+# 路 = h_china 法理之下、王国级、非无地、非家门的头衔；类型标记 tca_circuit_kind 由持有人契约推导：
+#   1 = 文官（民政契约）
+#   2 = 军区（celestial_province_military）
+#   3 = 都护（celestial_province_protectorate）
+# 只有“曾由天朝封臣持有并写入类型标记”的路进入本机制；皇帝通过战争、剥夺或正常授予取得且从未由
+# 天朝封臣持有的路没有标记，不会被处理。标记、待补授状态与全局登记的解释见效果文件头。
+# 设计依据：docs/appointment/circuit_succession_design.md。
+# 探针结论（1066 观察者局）：正常任命继承 = flag:appointment_succession；无人继承回落皇帝 = flag:inheritance；
+# 两种情况前任均已死。回落约 1 tick 后 AI 会以 flag:appointment 把路授予低品角色（前任=皇帝且存活）。
+
+# 头衔作用域；是否为天朝路（h_china 法理下的王国级有地世俗头衔）。
+tca_circuit_is_road_trigger = {
+    tier = tier_kingdom
+    is_landless_type_title = no
+    is_noble_family_title = no
+    target_is_de_jure_liege_or_above = title:h_china
+}
+
+# 头衔作用域；已带持久类型标记、被本机制追踪的路。
+tca_circuit_is_tracked_road_trigger = {
+    tca_circuit_is_road_trigger = yes
+    has_variable = tca_circuit_kind
+}
+
+# 头衔作用域；当前由天朝封臣（非 h_china 持有人）持有。
+tca_circuit_has_celestial_vassal_holder_trigger = {
+    exists = holder
+    NOT = { holder = { has_title = title:h_china } }
+    holder = {
+        is_alive = yes
+        government_has_flag = government_is_celestial
+    }
+}
+
+# 角色作用域；参数 $TITLE$ 目标头衔。
+# 只校验功绩等级是否达到目标头衔等级要求：王国 5、公爵 3、伯爵 1（与 APPOINTMENT_MERIT_TIER 一致）。
+# 这是本机制对“合格顺位/合格在任者”的制度口径，不代表原生自动继任一定执行该门槛：
+# 存档核对显示低品亲属可进入王国级继承顺位。原生 has_appointment_level_for_title 只在互动中调用，
+# 且依赖目标头衔 holder/任命法语境，故此处不复用它，只按 defines 等级下限做稳定判定。
+tca_circuit_has_title_level_requirement_trigger = {
+    trigger_if = {
+        limit = { $TITLE$.tier >= tier_kingdom }
+        merit_level >= merit_level_expected_kingdom_value
+    }
+    trigger_else_if = {
+        limit = { $TITLE$.tier = tier_duchy }
+        merit_level >= merit_level_expected_duchy_value
+    }
+    trigger_else = { merit_level >= merit_level_expected_county_value }
+}
+
+# 头衔作用域；当前第一继承顺位是否满足该头衔的功绩等级要求。
+# 原生自动继任会实际选 current_heir；只存在“任意非领主顺位人”不等于继任有效。
+tca_circuit_heir_meets_level_trigger = {
+    exists = current_heir
+    current_heir = {
+        is_alive = yes
+        NOT = { this = title:h_china.holder }
+        tca_circuit_has_title_level_requirement_trigger = { TITLE = prev }
+    }
+}
+
+# 头衔作用域；原生继承顺位存在且可用。
+# 探针确认：候选耗尽时原生继承列表只剩领主（皇帝），这不是可继承的顺位；必须排除。
+# 另要求第一顺位人满足头衔功绩等级：原版只把等级当作互动门槛，自动继任可能排行到低品亲属，
+# 仅“存在顺位人”不能视为有效继任；不满足时交给季度预清/审计处理。
+# tca_circuit_heir_meets_level_trigger 已覆盖 current_heir 存在、存活、非皇帝与等级门槛，不再重复遍历 any_title_heir。
+tca_circuit_has_valid_heir_trigger = {
+    tca_circuit_heir_meets_level_trigger = yes
+}
+
+# 头衔作用域；在任持有人是否满足该头衔的功绩等级要求。
+tca_circuit_incumbent_meets_level_trigger = {
+    exists = holder
+    holder = { tca_circuit_has_title_level_requirement_trigger = { TITLE = prev } }
+}
+
+# 角色作用域；是否持有超过“信息记录阈值”的已登记路。
+# 兼任/多路本身不视为不合格：原生允许同级多路，强制拆分可能破坏正常继承与既有机制；
+# 该判定只供可选的诊断日志（默认关闭）使用，不进入不合格处置链路。
+tca_circuit_holder_exceeds_road_limit_trigger = {
+    tca_circuit_holder_road_count_value > tca_circuit_max_kingdom_roads_value
+}
+
+# 头衔作用域；在任资格不合格：官品低于头衔等级。
+# 只对仍由天朝封臣持有的已登记路生效；只写审计标记与日志，不改头衔归属。
+# 一人多路不在此列：兼任可能是原生允许的正常状态，模组不默认判定为异常。
+tca_circuit_incumbent_invalid_trigger = {
+    tca_circuit_is_tracked_road_trigger = yes
+    tca_circuit_has_celestial_vassal_holder_trigger = yes
+    NOT = { tca_circuit_incumbent_meets_level_trigger = yes }
+}
+
+# 头衔作用域；带在任不合格待处理标记（默认关闭强制收回时只用于记录，避免与回落 pending 混淆）。
+tca_circuit_has_incumbent_pending_trigger = {
+    tca_circuit_is_tracked_road_trigger = yes
+    has_variable = tca_circuit_incumbent_pending
+}
+
+# 头衔作用域；带待补授标记（无论当前持有人是谁）。
+tca_circuit_has_pending_appointment_trigger = {
+    tca_circuit_is_tracked_road_trigger = yes
+    has_variable = tca_circuit_pending_appointment
+}
+
+# 头衔作用域；带待补授标记且当前仍回落在皇帝名下。
+tca_circuit_is_lapsed_trigger = {
+    tca_circuit_has_pending_appointment_trigger = yes
+    exists = holder
+    holder = { has_title = title:h_china }
+}
+
+# 头衔作用域；第一层：仍由天朝封臣持有、继承顺位为空且没有未决补授，需要预清近期受任冷却。
+# 待补授未结算的路交给第二层判断，避免在收回/接受前又清冷却。
+tca_circuit_should_preclear_trigger = {
+    tca_circuit_is_tracked_road_trigger = yes
+    NOT = { has_variable = tca_circuit_pending_appointment }
+    tca_circuit_has_celestial_vassal_holder_trigger = yes
+    NOT = { tca_circuit_has_valid_heir_trigger = yes }
+}
+
+# 头衔作用域；季度巡检/次日维护是否需要处理该路（用于 any_in_global_list 预判，避免无待办时进入维护）。
+# 含跨日两段式的“已准备、待次日授予”状态。
+tca_circuit_needs_maintenance_trigger = {
+    OR = {
+        tca_circuit_has_pending_appointment_trigger = yes
+        tca_circuit_has_incumbent_pending_trigger = yes
+        has_variable = tca_circuit_prepared_candidate
+        tca_circuit_should_preclear_trigger = yes
+    }
+}
+
+# 头衔作用域；本次维护是否需要构建候选池。
+# 默认关闭自动补授（tca_circuit_self_grant_enabled 不存在）时，pending 路只做“接受合格现持有人”或保留标记，
+# 根本不读取候选池；仅当存在需要季度预清的路，或已开启自动补授且有待补授/待强制收回时，才收集候选池。
+tca_circuit_needs_candidate_pool_trigger = {
+    OR = {
+        tca_circuit_should_preclear_trigger = yes
+        AND = {
+            has_global_variable = tca_circuit_self_grant_enabled
+            OR = {
+                tca_circuit_has_pending_appointment_trigger = yes
+                tca_circuit_has_incumbent_pending_trigger = yes
+            }
+        }
+    }
+}
+
+# 角色作用域；本机制候选的国家与身份基线。
+# 探针提示：无地朝臣可能没有 top_liege，不能只用 exists = top_liege 判定同一天朝；
+# 先用直属领主/宫廷主判断，再以其 top_liege 兜底（无地朝臣、封臣的封臣都覆盖）。
+# 客卿（pool guest）不纳入候选：其领主链不保证指向 h_china 持有人，与“同一天朝”口径一致；
+# 候选池只从皇帝侧封臣与其宫廷收集（见 tca_circuit_collect_candidate_pool_effect）。
+# 排除清单是唯一维护位置；不读取近期受任冷却与 appointment_prominence 顺延（这两类正是本机制要处理的）。
+# 性能短路：先判功绩等级下限（默认只处理王国级路，要求 >= 5 品；开启自动补授时因旧头衔递归最低可至伯爵级 >= 1 品），
+# 直接过滤掉全帝国绝大部分无品级廷臣与低品角色，避免对他们求值领主链与排除清单。
+tca_circuit_candidate_realm_trigger = {
+    is_alive = yes
+    is_adult = yes
+    trigger_if = {
+        limit = { NOT = { has_global_variable = tca_circuit_self_grant_enabled } }
+        merit_level >= merit_level_expected_kingdom_value
+    }
+    trigger_else = {
+        merit_level >= merit_level_expected_county_value
+    }
+    this != title:h_china.holder
+    OR = {
+        liege ?= title:h_china.holder
+        liege_or_court_owner ?= { top_liege ?= title:h_china.holder }
+    }
+    NOT = { tca_circuit_candidate_excluded_trigger = yes }
+}
+
+# 角色作用域；候选基线池成员：国家身份合格且本轮尚未被本机制授职。
+# used_serial 未设置时不做比较，避免未定义变量比较。
+tca_circuit_candidate_base_trigger = {
+    tca_circuit_candidate_realm_trigger = yes
+    NOT = {
+        AND = {
+            has_global_variable = tca_circuit_run_serial
+            has_variable = tca_circuit_used_serial
+            var:tca_circuit_used_serial ?= global_var:tca_circuit_run_serial
+        }
+    }
+}
+
+# 角色作用域；本机制的排除清单唯一维护位置（其他文档只链接，不复制）。
+# 原版 is_appointment_valid_trigger 已覆盖“持有更高等级有地头衔、非现任、神职”等硬条件，
+# 此处只补它不覆盖或需要显式保留的制度性排除。
+tca_circuit_candidate_excluded_trigger = {
+    OR = {
+        # 中央大臣
+        tgp_is_any_minister = yes
+        # 奉祠／致仕（含本模组退出状态与候选退出）
+        tca_retirement_excludes_appointment_trigger = yes
+        # 辞谢／拒任
+        has_character_flag = tca_merit_refused
+        # 原版辞官／致仕总督：15 年修饰符配套 3 年（1095 天）任命超时。
+        # 修饰符本身不永久排除；只有超时仍大于 0 时才算退出候选，超时归零后允许重新进入候选池。
+        AND = {
+            has_character_modifier = ep3_renounced_governorship_merit
+            appointment_timeout_days > 0
+        }
+        # 考试赶考或正在参与乡试／会试活动（旅行阶段 6 个月、被动阶段 1 年超时）；
+        # 与原生考试结束时清冷却的口径一致，不允许在考试期间被预清拉回候选池
+        has_activity_intent = local_exam_taker_intent
+        has_activity_intent = imperial_exam_taker_intent
+        involved_activity ?= {
+            OR = {
+                has_activity_type = activity_local_examination
+                has_activity_type = activity_imperial_examination
+            }
+        }
+        # 无近期受任标记的大额超时（原版辞谢 150 年等）：不属于“只差冷却”，连抽选都不进入
+        AND = {
+            appointment_timeout_days > tca_official_appointment_cooldown_days
+            NOT = { has_variable = tca_recent_appointment }
+        }
+    }
+}
+
+# 角色作用域；是否处于“只差近期受任冷却”的状态（第一层预清的唯一目标）。
+# 原版与本模组所有设置 appointment_timeout 的来源仅有四类：
+#   1) 150 年辞谢／模组奉祠致仕（> 1825 天且带对应特质/flag）；
+#   2) 原版辞官致仕 3 年超时（必带 15 年修饰符 ep3_renounced_governorship_merit）；
+#   3) 乡试／会试期间的 6 个月／1 年超时（带应试 intent 或处于考试 involved_activity）；
+#   4) 5 年（1825 天）近期受任冷却（原生受任或模组 tca_set_official_appointment_cooldown_effect）。
+# 前三类已由 tca_circuit_candidate_excluded_trigger 完整排除，因此候选基线池内凡满足
+# 0 < appointment_timeout_days <= 1825 的角色均为近期受任冷却（含已衰减至 3 年以内的原版受任官员）。
+tca_circuit_has_recent_appointment_cooldown_trigger = {
+    appointment_timeout_days > 0
+    appointment_timeout_days <= tca_official_appointment_cooldown_days
+}
+
+# 角色作用域；复刻原版 is_appointment_valid_trigger（game/common/scripted_triggers/07_ep3_triggers.txt:915-1024）
+# 的资格条件，另补原版其他入口的任命等级门槛（has_appointment_level_for_title，见 06_ep3_interactions.txt:176-180）。
+# 不含国家/排除清单/现任判定，供“空缺头衔选人”和“判断现有持有人是否合格落点”共用。
+# 参数：$TITLE$ 目标头衔（路/旧头衔），$TOP_LIEGE$ 皇帝（h_china 持有人）。
+# 原版 follows_other_title_appointment_tt 用“当前持有人 primary_title 的等级”判定；头衔由皇帝持有时
+# （primary_title = h_china，霸权级）恒为假，无法整段调用。逐项对应（行号为 is_appointment_valid_trigger 内）：
+#   成年（原版 :963-968；仅当领主等级不等于目标等级时检查，路场景恒需成年）
+#   非神职（原版 :1022）
+#   可被最高领主授予（含神权与共治分支，原版 :1004-1014）
+#   有地候选必须为行政政体（原版 :1015-1021）
+#   天朝候选不得竞争更高等级的有地世俗头衔；非天朝不得持有同级有地世俗头衔（原版 :969-1003）
+#   非现任（原版 :998-1002）由调用方 qualified 触发器另行要求，acceptable 判现任时不要求
+# 额外补：
+#   has_appointment_level_for_title 是独立 engine trigger（不在 is_appointment_valid_trigger 内）；
+#   它在“目标头衔由皇帝持有”的空位语境下实测恒为 false，因此只在非皇帝持有时调用，
+#   皇帝持有场景改由与 APPOINTMENT_MERIT_TIER 一致的头衔等级下限（王国5/公爵3/伯爵1）等价覆盖。
+# 省略项与理由：
+#   首都伯爵领判定（原版 :919-925）：目标为王国级头衔，不会等于伯爵领，恒真。
+#   礼仪性领主限制（原版 :926-947）：中国无礼仪性领主机制，且其 trigger 依赖互动 scope。
+#   appointment_type_succession 法条判定（原版 :948-958）：空位路由皇帝持有时该判定必假；
+#     新持有人的领地法由原版默认法/契约决定，不在候选资格里重复。
+# 引擎实测（test-circuit）：皇帝持有时 has_appointment_level_for_title 不可用，其余复刻条件与空位选人一致；
+# tier 等级下限替代等级门槛。若后续引擎行为变化再按实测复核本 trigger。
+tca_circuit_is_native_appointment_eligible_trigger = {
+    is_clergy = no
+    OR = {
+        can_be_granted_titles_by = { RULER = $TOP_LIEGE$ }
+        can_be_granted_theocratic_titles_by = { RULER = $TOP_LIEGE$ }
+        AND = {
+            is_diarch_of_target = $TOP_LIEGE$
+            $TOP_LIEGE$ = { has_diarchy_active_parameter = diarchy_is_co_rulership }
+        }
+    }
+    trigger_if = {
+        limit = { is_landed = yes }
+        government_has_mechanic = administrative
+    }
+    trigger_if = {
+        limit = {
+            government_has_flag = government_is_celestial
+            any_held_title = { count >= 1 }
+        }
+        NOT = {
+            any_held_title = {
+                tier > $TITLE$.tier
+                is_landless_type_title = no
+                is_noble_family_title = no
+            }
+        }
+    }
+    trigger_if = {
+        limit = {
+            NOT = { government_has_flag = government_is_celestial }
+            any_held_title = { count >= 1 }
+        }
+        NOT = {
+            any_held_title = {
+                tier = $TITLE$.tier
+                is_landless_type_title = no
+                is_noble_family_title = no
+            }
+        }
+    }
+    # 引擎的 has_appointment_level_for_title 依赖目标头衔当前任命法/holder 语境：
+    # 路由皇帝持有（空位语境）时实测恒为 false，会把全部候选否掉；该场景改用按 tier 的 merit 下限等价替代。
+    # 目标头衔仍由非皇帝的天朝封臣持有时（含 acceptable-holder 判定）仍走原生检查。
+    trigger_if = {
+        limit = { $TITLE$.holder ?= { NOT = { has_title = title:h_china } } }
+        has_appointment_level_for_title = $TITLE$
+    }
+    trigger_if = {
+        limit = { $TITLE$.tier >= tier_kingdom }
+        merit_level >= merit_level_expected_kingdom_value
+    }
+    trigger_else_if = {
+        limit = { $TITLE$.tier = tier_duchy }
+        merit_level >= merit_level_expected_duchy_value
+    }
+    trigger_else = { merit_level >= merit_level_expected_county_value }
+}
+
+# 角色作用域；空缺/待重新授予头衔的合格候选。
+# 参数：$TITLE$ 目标头衔，$TOP_LIEGE$ 皇帝。
+# 角色作用域；参数 $TITLE$ 目标头衔、$TOP_LIEGE$ 皇帝。
+# 安全收窄：候选必须“已有地或已有家门头衔”才进入加权抽选/旧头衔递归；
+# 无家门且无地的真实候选会被跳过（引擎对真实角色新建家门的同链/跨日授予都可能销毁有地头衔）。
+tca_circuit_is_qualified_candidate_trigger = {
+    tca_circuit_candidate_base_trigger = yes
+    tca_circuit_is_native_appointment_eligible_trigger = {
+        TITLE = $TITLE$
+        TOP_LIEGE = $TOP_LIEGE$
+    }
+    this != $TITLE$.holder
+    OR = {
+        is_landed = yes
+        any_held_title = { is_noble_family_title = yes }
+    }
+}
+
+# 角色作用域；判断待补授路当前持有人是否算合格落点（回落同 tick 已被原生/AI 授予时）。
+# 与合格候选同一套条件，但不排除“现任持有人”和本轮已用序号：当前持有人正是在任者。
+# 参数：$TITLE$ 目标头衔，$TOP_LIEGE$ 皇帝。
+tca_circuit_is_acceptable_road_holder_trigger = {
+    tca_circuit_candidate_realm_trigger = yes
+    tca_circuit_is_native_appointment_eligible_trigger = {
+        TITLE = $TITLE$
+        TOP_LIEGE = $TOP_LIEGE$
+    }
+}
+
+# 角色作用域；参数 $TITLE$ 目标头衔。仅“无任何家门头衔”的接收者需要跨日准备（生成角色用）。
+# 引擎实测（收窄后的安全边界）：
+#   - pre-existing 家门头衔的无地统治者 same-tick include_vassals 授予有稳定绿证（test.32）；
+#   - 真实角色（无论同链新建家门还是已有家门但跨日）由本机制补授仍有销毁风险；
+#   - generated 角色 day1 建王朝/家门、day2 授予有绿证（test.19/17）。
+# 因此真实候选要求“已有地或已有家门”才进入抽选（见 tca_circuit_is_qualified_candidate_trigger），
+# 无家门的真实候选会被跳过；两段式只用于生成兜底。
+tca_circuit_needs_recipient_preparation_trigger = {
+    is_alive = yes
+    is_landed = no
+    NOT = { any_held_title = { is_noble_family_title = yes } }
+    $TITLE$ = { is_landless_type_title = no }
+}
+
+# 头衔作用域；跨日两段式：本头衔的 prepared 候选是否“本轮刚准备”（必须等到新的 run_serial 才能消费/授予）。
+# 同一 tick 内由 prepare 产生的事务可能触发二次维护；事务未结束时 run_serial 不变，故用 serial 判断同轮。
+tca_circuit_prepared_same_run_trigger = {
+    has_variable = tca_circuit_prepared_serial
+    has_global_variable = tca_circuit_run_serial
+    var:tca_circuit_prepared_serial ?= global_var:tca_circuit_run_serial
+}
+
+# 头衔作用域；跨日两段式闸门：day1 准备后，到次日维护入口解除前，禁止任何路径消费/授予该头衔的 prepared 候选。
+# 同时覆盖两种同轮情形：同一事务内 run_serial 不变；以及 prepare 产生的事务可能触发二次维护/新事务。
+# 闸门只由 tca_circuit_maintenance_work / tca_circuit_quarterly（真正的次日/季度维护入口）解除。
+tca_circuit_prepared_wait_next_day_trigger = {
+    OR = {
+        has_variable = tca_circuit_prepared_wait
+        tca_circuit_prepared_same_run_trigger = yes
+    }
+}
+
+# 角色作用域；第一层预清候选：除近期受任冷却外其余条件全部合格。
+# 参数：$TITLE$ 目标路，$CANDIDATE$ 候选角色，$TOP_LIEGE$ 皇帝。
+# 第一层时路仍由天朝封臣持有（其 primary_title 即该路），因此可整段调用原版 is_appointment_valid_trigger。
+# 性能短路：先判轻量冷却区间与等级门槛，已清过冷却或不在冷却中的候选在首行 O(1) 短路，不重复进入 is_appointment_valid_trigger。
+tca_circuit_is_preclear_candidate_trigger = {
+    $CANDIDATE$ = {
+        tca_circuit_has_recent_appointment_cooldown_trigger = yes
+        tca_circuit_candidate_base_trigger = yes
+        has_appointment_level_for_title = $TITLE$
+        is_appointment_valid_trigger = {
+            TITLE = $TITLE$
+            CANDIDATE = $CANDIDATE$
+            TOP_LIEGE = $TOP_LIEGE$
+        }
+    }
+}

@@ -1,0 +1,1334 @@
+# 路主任命继承补授原生回归；直接调用正式 trigger/effect，不复制排位、权重或授予规则。
+# 覆盖：回落自授（无地候选／同 tick 未合格持有／同 tick 合格接受）、旧头衔按 current_heir 交接、
+# 旧头衔无继承人递归到生成、排除清单、军区路契约、生成补授属性、幂等、季度预清冷却、
+# “继承顺位只剩领主”时预清触发，以及次日维护真实 on_action 排队路径。
+# 用例13-18另覆盖第一顺位等级门槛、在任等级审计、一人多路审计、默认保留处置、审计幂等与文官路补法。
+# 世界依赖：从全局登记 tca_circuit_titles 动态挑选真实路（不写死头衔 ID）；候选一律取生产
+# 候选池中的真实合格人物（引擎侧 merit_level 已就绪），避免用脚本即时改 merit 的不可靠构造；
+# 每个用例结束把被移动的真实路还原给原持有人，并清掉本例写入的冷却/标记/处理序号。
+# 本文件全部用例写全局事务状态、真实头衔与共享登记，必须独占（EXCLUSIVE=yes）。
+namespace = tca_circuit_succession_test
+
+
+
+# 用例4：旧头衔按 current_heir 交接（第三层规则1）。
+# 直接对一条真实路调用正式重分配效果，验证头衔交给它自己的非领主继承顺位、原持有人仍存活。
+tca_circuit_succession_test.4 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_circuit_succession_test.4 tca_test_circuit_old_title_heir"
+        remove_character_flag = tca_test_tca_circuit_succession_test_case_failed
+        if = {
+            limit = { debug_only = yes is_alive = yes root = { has_title = title:h_china } }
+            if = { limit = { NOT = { has_global_variable_list = tca_circuit_titles } } tca_circuit_rebuild_registry_effect = yes }
+            clear_saved_scope = tca_cs_road
+            random_in_global_list = {
+                variable = tca_circuit_titles
+                limit = {
+                    has_variable = tca_circuit_kind
+                    var:tca_circuit_kind = 1
+                    tca_circuit_has_celestial_vassal_holder_trigger = yes
+                    holder = { liege = { has_title = title:h_china } }
+                    exists = current_heir
+                    current_heir = { is_alive = yes is_landed = yes NOT = { this = title:h_china.holder } }
+                }
+                save_scope_as = tca_cs_road
+            }
+            if = {
+                limit = { exists = scope:tca_cs_road }
+                scope:tca_cs_road.holder = { save_scope_as = tca_cs_original_holder }
+                scope:tca_cs_road = { current_heir = { save_scope_as = tca_cs_heir } }
+                root = { tca_circuit_begin_transaction_effect = yes }
+                scope:tca_cs_road = { tca_circuit_reassign_old_title_effect = yes }
+                if = {
+                    limit = { scope:tca_cs_road = { holder = scope:tca_cs_heir } }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_old_title_heir 1"
+                }
+                else = {
+                    add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                    debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_old_title_heir 1"
+                }
+                if = {
+                    limit = { scope:tca_cs_heir = { is_alive = yes } }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_old_title_heir 2"
+                }
+                else = {
+                    add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                    debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_old_title_heir 2"
+                }
+                if = {
+                    limit = { scope:tca_cs_original_holder = { is_alive = yes } }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_old_title_heir 3"
+                }
+                else = {
+                    add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                    debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_old_title_heir 3"
+                }
+                if = {
+                    limit = { scope:tca_cs_heir = { has_title = scope:tca_cs_road } }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_old_title_heir 4"
+                }
+                else = {
+                    add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                    debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_old_title_heir 4"
+                }
+                if = {
+                    limit = { NOT = { scope:tca_cs_road = { holder = { has_title = title:h_china } } } }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_old_title_heir 5"
+                }
+                else = {
+                    add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                    debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_old_title_heir 5"
+                }
+                if = {
+                    limit = {
+                        scope:tca_cs_heir = {
+                            NOT = { this = scope:tca_cs_original_holder }
+                            OR = {
+                                top_liege = title:h_china.holder
+                                liege_or_court_owner = { top_liege = title:h_china.holder }
+                            }
+                        }
+                    }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_old_title_heir 6"
+                }
+                else = {
+                    add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                    debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_old_title_heir 6"
+                }
+                if = {
+                    limit = { exists = scope:tca_cs_original_holder scope:tca_cs_original_holder = { is_alive = yes } }
+                    scope:tca_cs_road.holder = { save_scope_as = tca_cs_from }
+                    scope:tca_cs_from = {
+                        create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_cs_back }
+                        scope:tca_cs_road = { change_title_holder = { holder = scope:tca_cs_original_holder change = scope:tca_cs_back } }
+                        resolve_title_and_vassal_change = scope:tca_cs_back
+                    }
+                }
+                scope:tca_cs_road = { remove_variable = tca_circuit_processed_serial }
+                scope:tca_cs_heir = { remove_variable = tca_circuit_used_serial }
+                root = { tca_circuit_end_transaction_effect = yes remove_variable = tca_circuit_maintenance_pending remove_variable = tca_circuit_maintenance_running }
+            }
+            else = {
+                add_character_flag = tca_cs_precondition_failed
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+                debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_circuit_old_title_heir"
+            }
+        }
+        else = {
+            add_character_flag = tca_cs_precondition_failed
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_circuit_old_title_heir"
+        }
+        if = { limit = { has_character_flag = tca_cs_precondition_failed } remove_character_flag = tca_cs_precondition_failed }
+        else_if = {
+            limit = { has_character_flag = tca_test_tca_circuit_succession_test_case_failed }
+            debug_log = "TCA_TEST FAIL tca_test_circuit_old_title_heir"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+        }
+        else = {
+            debug_log = "TCA_TEST PASS tca_test_circuit_old_title_heir"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } }
+        }
+        remove_character_flag = tca_test_tca_circuit_succession_test_case_failed
+        tca_test_lane_end_effect = { GROUP = tca_circuit_succession_test }
+    }
+}
+
+
+
+# 用例6：排除清单不被抽中（排除清单唯一维护位置在正式 trigger）。
+# 以真实合格候选为基线，加奉祠／辞谢后断言正式排除 trigger 命中；中央大臣用真实在任者验证。
+tca_circuit_succession_test.6 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_circuit_succession_test.6 tca_test_circuit_exclusions"
+        remove_character_flag = tca_test_tca_circuit_succession_test_case_failed
+        if = {
+            limit = { debug_only = yes is_alive = yes root = { has_title = title:h_china } }
+            if = { limit = { NOT = { has_global_variable_list = tca_circuit_titles } } tca_circuit_rebuild_registry_effect = yes }
+            clear_saved_scope = tca_cs_road
+            clear_saved_scope = tca_cs_candidate
+            random_in_global_list = {
+                variable = tca_circuit_titles
+                limit = {
+                    has_variable = tca_circuit_kind
+                    var:tca_circuit_kind = 1
+                    tca_circuit_has_celestial_vassal_holder_trigger = yes
+                }
+                save_scope_as = tca_cs_road
+            }
+            if = {
+                limit = {
+                    exists = scope:tca_cs_road
+                    exists = title:e_minister_chancellor.holder
+                }
+                root = { tca_circuit_begin_transaction_effect = yes tca_circuit_collect_candidate_pool_effect = yes }
+                scope:tca_cs_road = { tca_circuit_build_qualified_candidates_effect = yes }
+                random_in_list = { list = tca_circuit_qualified_candidates save_scope_as = tca_cs_candidate }
+                if = {
+                    limit = { exists = scope:tca_cs_candidate scope:tca_cs_candidate = { NOT = { tca_circuit_candidate_excluded_trigger = yes } } }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_exclusions 1"
+                }
+                else = {
+                    add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                    debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_exclusions 1"
+                }
+                scope:tca_cs_candidate = { add_trait = tca_fengci }
+                if = {
+                    limit = { scope:tca_cs_candidate = { tca_circuit_candidate_excluded_trigger = yes } }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_exclusions 2"
+                }
+                else = {
+                    add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                    debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_exclusions 2"
+                }
+                if = {
+                    limit = {
+                        scope:tca_cs_candidate = {
+                            NOT = { tca_circuit_is_qualified_candidate_trigger = { TITLE = scope:tca_cs_road TOP_LIEGE = root } }
+                        }
+                    }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_exclusions 3"
+                }
+                else = {
+                    add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                    debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_exclusions 3"
+                }
+                scope:tca_cs_candidate = { remove_trait = tca_fengci add_character_flag = tca_merit_refused }
+                if = {
+                    limit = { scope:tca_cs_candidate = { tca_circuit_candidate_excluded_trigger = yes } }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_exclusions 4"
+                }
+                else = {
+                    add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                    debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_exclusions 4"
+                }
+                scope:tca_cs_candidate = { remove_character_flag = tca_merit_refused }
+                if = {
+                    limit = {
+                        scope:tca_cs_candidate = {
+                            tca_circuit_is_qualified_candidate_trigger = { TITLE = scope:tca_cs_road TOP_LIEGE = root }
+                        }
+                    }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_exclusions 5"
+                }
+                else = {
+                    add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                    debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_exclusions 5"
+                }
+                if = {
+                    limit = { title:e_minister_chancellor.holder = { tca_circuit_candidate_excluded_trigger = yes } }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_exclusions 6"
+                }
+                else = {
+                    add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                    debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_exclusions 6"
+                }
+                scope:tca_cs_candidate = { remove_trait = tca_fengci remove_character_flag = tca_merit_refused }
+                every_in_list = { list = tca_circuit_candidate_pool remove_from_list = tca_circuit_candidate_pool }
+                every_in_list = { list = tca_circuit_qualified_candidates remove_from_list = tca_circuit_qualified_candidates }
+                root = { tca_circuit_end_transaction_effect = yes remove_variable = tca_circuit_maintenance_pending remove_variable = tca_circuit_maintenance_running }
+            }
+            else = {
+                add_character_flag = tca_cs_precondition_failed
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+                debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_circuit_exclusions"
+            }
+        }
+        else = {
+            add_character_flag = tca_cs_precondition_failed
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_circuit_exclusions"
+        }
+        if = { limit = { has_character_flag = tca_cs_precondition_failed } remove_character_flag = tca_cs_precondition_failed }
+        else_if = {
+            limit = { has_character_flag = tca_test_tca_circuit_succession_test_case_failed }
+            debug_log = "TCA_TEST FAIL tca_test_circuit_exclusions"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+        }
+        else = {
+            debug_log = "TCA_TEST PASS tca_test_circuit_exclusions"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } }
+        }
+        remove_character_flag = tca_test_tca_circuit_succession_test_case_failed
+        tca_test_lane_end_effect = { GROUP = tca_circuit_succession_test }
+    }
+}
+
+
+
+
+
+
+
+
+
+
+# 用例8：季度预清只清“其余合格、只被近期受任冷却挡住”的候选人。
+# 从生产候选池选一个通过原版任命资格的真实候选人，写入近期冷却/标记后断言：
+# 排除项不清；解除排除后清理；清理后重新进入原生继任列表。
+tca_circuit_succession_test.8 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_circuit_succession_test.8 tca_test_circuit_preclear_cooldown"
+        remove_character_flag = tca_test_tca_circuit_succession_test_case_failed
+        if = {
+            limit = { debug_only = yes is_alive = yes root = { has_title = title:h_china } }
+            if = { limit = { NOT = { has_global_variable_list = tca_circuit_titles } } tca_circuit_rebuild_registry_effect = yes }
+            clear_saved_scope = tca_cs_road
+            clear_saved_scope = tca_cs_candidate
+            random_in_global_list = {
+                variable = tca_circuit_titles
+                limit = {
+                    has_variable = tca_circuit_kind
+                    var:tca_circuit_kind = 1
+                    tca_circuit_has_celestial_vassal_holder_trigger = yes
+                }
+                save_scope_as = tca_cs_road
+            }
+            if = {
+                limit = { exists = scope:tca_cs_road }
+                root = { tca_circuit_begin_transaction_effect = yes tca_circuit_collect_candidate_pool_effect = yes }
+                random_in_list = {
+                    list = tca_circuit_candidate_pool
+                    limit = {
+                        tca_circuit_candidate_base_trigger = yes
+                        is_appointment_valid_trigger = { TITLE = scope:tca_cs_road CANDIDATE = this TOP_LIEGE = root }
+                        has_appointment_level_for_title = scope:tca_cs_road
+                    }
+                    save_scope_as = tca_cs_candidate
+                }
+                if = {
+                    limit = { exists = scope:tca_cs_candidate }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_preclear_cooldown 1"
+                }
+                else = {
+                    add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                    debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_preclear_cooldown 1"
+                }
+                scope:tca_cs_candidate = {
+                    set_appointment_timeout = { years = 2 desc = appointment_timeout_desc_refusing }
+                    set_variable = { name = tca_recent_appointment value = yes }
+                }
+                if = {
+                    limit = {
+                        scope:tca_cs_road = {
+                            tca_circuit_is_preclear_candidate_trigger = { TITLE = scope:tca_cs_road CANDIDATE = scope:tca_cs_candidate TOP_LIEGE = root }
+                        }
+                    }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_preclear_cooldown 2"
+                }
+                else = {
+                    add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                    debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_preclear_cooldown 2"
+                }
+                scope:tca_cs_candidate = { add_trait = tca_fengci }
+                if = {
+                    limit = {
+                        scope:tca_cs_road = {
+                            NOT = { tca_circuit_is_preclear_candidate_trigger = { TITLE = scope:tca_cs_road CANDIDATE = scope:tca_cs_candidate TOP_LIEGE = root } }
+                        }
+                    }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_preclear_cooldown 3"
+                }
+                else = {
+                    add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                    debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_preclear_cooldown 3"
+                }
+                # 池只留该候选后执行预清：排除项不应被清。
+                every_in_list = { list = tca_circuit_candidate_pool remove_from_list = tca_circuit_candidate_pool }
+                every_in_list = { list = tca_circuit_qualified_candidates remove_from_list = tca_circuit_qualified_candidates }
+                scope:tca_cs_candidate = { add_to_list = tca_circuit_candidate_pool }
+                scope:tca_cs_road = { tca_circuit_preclear_cooldowns_effect = yes }
+                if = {
+                    limit = { scope:tca_cs_candidate = { appointment_timeout_days > 0 } }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_preclear_cooldown 4"
+                }
+                else = {
+                    add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                    debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_preclear_cooldown 4"
+                }
+                scope:tca_cs_candidate = { remove_trait = tca_fengci }
+                if = {
+                    limit = {
+                        scope:tca_cs_road = {
+                            tca_circuit_is_preclear_candidate_trigger = { TITLE = scope:tca_cs_road CANDIDATE = scope:tca_cs_candidate TOP_LIEGE = root }
+                        }
+                    }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_preclear_cooldown 5"
+                }
+                else = {
+                    add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                    debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_preclear_cooldown 5"
+                }
+                scope:tca_cs_road = { tca_circuit_preclear_cooldowns_effect = yes }
+                if = {
+                    limit = { scope:tca_cs_candidate = { appointment_timeout_days = 0 } }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_preclear_cooldown 6"
+                }
+                else = {
+                    add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                    debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_preclear_cooldown 6"
+                }
+                if = {
+                    limit = { scope:tca_cs_candidate = { NOT = { has_variable = tca_recent_appointment } } }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_preclear_cooldown 7"
+                }
+                else = {
+                    add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                    debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_preclear_cooldown 7"
+                }
+                scriptedtests_recalculate_succession = yes
+                scope:tca_cs_candidate = { remove_trait = tca_fengci remove_variable = tca_recent_appointment clear_appointment_timeout = yes }
+                every_in_list = { list = tca_circuit_candidate_pool remove_from_list = tca_circuit_candidate_pool }
+                every_in_list = { list = tca_circuit_qualified_candidates remove_from_list = tca_circuit_qualified_candidates }
+                root = { tca_circuit_end_transaction_effect = yes remove_variable = tca_circuit_maintenance_pending remove_variable = tca_circuit_maintenance_running }
+            }
+            else = {
+                add_character_flag = tca_cs_precondition_failed
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+                debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_circuit_preclear_cooldown"
+            }
+        }
+        else = {
+            add_character_flag = tca_cs_precondition_failed
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_circuit_preclear_cooldown"
+        }
+        if = { limit = { has_character_flag = tca_cs_precondition_failed } remove_character_flag = tca_cs_precondition_failed }
+        else_if = {
+            limit = { has_character_flag = tca_test_tca_circuit_succession_test_case_failed }
+            debug_log = "TCA_TEST FAIL tca_test_circuit_preclear_cooldown"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+        }
+        else = {
+            debug_log = "TCA_TEST PASS tca_test_circuit_preclear_cooldown"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } }
+        }
+        remove_character_flag = tca_test_tca_circuit_succession_test_case_failed
+        tca_test_lane_end_effect = { GROUP = tca_circuit_succession_test }
+    }
+}
+
+# 用例11：task-19 默认关闭自动补授 → 维护只保留 pending/登记，不授予、不改 holder。
+# day0：真实路交皇帝并 mark_lapsed；day+2 断言 holder 仍皇帝、pending 保留、登记/kind 不变。
+tca_circuit_succession_test.11 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_circuit_succession_test.11 tca_test_circuit_self_grant_disabled"
+        remove_character_flag = tca_test_tca_circuit_succession_test_case_failed
+        if = {
+            limit = { debug_only = yes is_alive = yes root = { has_title = title:h_china } }
+            if = { limit = { NOT = { has_global_variable_list = tca_circuit_titles } } tca_circuit_rebuild_registry_effect = yes }
+            clear_saved_scope = tca_cs_road
+            random_in_global_list = {
+                variable = tca_circuit_titles
+                limit = { NOT = { holder = root } has_variable = tca_circuit_kind var:tca_circuit_kind = 1 tca_circuit_has_celestial_vassal_holder_trigger = yes }
+                save_scope_as = tca_cs_road
+            }
+            if = {
+                limit = { exists = scope:tca_cs_road }
+                scope:tca_cs_road.holder = { save_scope_as = tca_cs_original_holder }
+                scope:tca_cs_original_holder = {
+                    create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_cs_change }
+                    scope:tca_cs_road = { change_title_holder = { holder = root change = scope:tca_cs_change } }
+                    resolve_title_and_vassal_change = scope:tca_cs_change
+                }
+                scope:tca_cs_road = { tca_circuit_mark_lapsed_title_effect = yes }
+                root = {
+                    set_variable = { name = tca_cs_case11_road value = scope:tca_cs_road }
+                    set_variable = { name = tca_cs_case11_original_holder value = scope:tca_cs_original_holder }
+                }
+                debug_log = "TCA_TEST WAIT tca_test_circuit_self_grant_disabled 2 days"
+                trigger_event = { id = tca_circuit_succession_test.1011 days = 2 }
+            }
+            else = {
+                add_character_flag = tca_cs_precondition_failed
+                debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_circuit_self_grant_disabled"
+            }
+        }
+        else = {
+            add_character_flag = tca_cs_precondition_failed
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_circuit_self_grant_disabled"
+        }
+        if = {
+            limit = { has_character_flag = tca_cs_precondition_failed }
+            remove_character_flag = tca_cs_precondition_failed
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+            tca_test_lane_end_effect = { GROUP = tca_circuit_succession_test }
+        }
+    }
+}
+tca_circuit_succession_test.1011 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            var:tca_cs_case11_road = { save_scope_as = tca_cs_road }
+            var:tca_cs_case11_original_holder = { save_scope_as = tca_cs_original_holder }
+            if = {
+                limit = { scope:tca_cs_road = { holder = root } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_self_grant_disabled 1"
+            }
+            else = { add_character_flag = tca_test_tca_circuit_succession_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_self_grant_disabled 1" }
+            if = {
+                limit = { scope:tca_cs_road = { has_variable = tca_circuit_pending_appointment } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_self_grant_disabled 2"
+            }
+            else = { add_character_flag = tca_test_tca_circuit_succession_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_self_grant_disabled 2" }
+            if = {
+                limit = { scope:tca_cs_road = { is_target_in_global_variable_list = { name = tca_circuit_titles target = this } } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_self_grant_disabled 3"
+            }
+            else = { add_character_flag = tca_test_tca_circuit_succession_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_self_grant_disabled 3" }
+            if = {
+                limit = { scope:tca_cs_road = { has_variable = tca_circuit_kind var:tca_circuit_kind = 1 } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_self_grant_disabled 4"
+            }
+            else = { add_character_flag = tca_test_tca_circuit_succession_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_self_grant_disabled 4" }
+            if = {
+                limit = { scope:tca_cs_road = { exists = holder NOT = { holder = scope:tca_cs_original_holder } } scope:tca_cs_original_holder = { is_alive = yes } }
+                scope:tca_cs_road.holder = { save_scope_as = tca_cs_from }
+                scope:tca_cs_from = {
+                    create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_cs_back }
+                    scope:tca_cs_road = { change_title_holder = { holder = scope:tca_cs_original_holder change = scope:tca_cs_back } }
+                    resolve_title_and_vassal_change = scope:tca_cs_back
+                }
+            }
+            scope:tca_cs_road = { remove_variable = tca_circuit_pending_appointment remove_variable = tca_circuit_processed_serial remove_variable = tca_circuit_prepared_candidate }
+            root = { remove_variable = tca_circuit_maintenance_pending remove_variable = tca_circuit_maintenance_running remove_variable = tca_cs_case11_road remove_variable = tca_cs_case11_original_holder }
+            every_in_list = { list = tca_circuit_candidate_pool remove_from_list = tca_circuit_candidate_pool }
+            every_in_list = { list = tca_circuit_qualified_candidates remove_from_list = tca_circuit_qualified_candidates }
+            root = { tca_circuit_end_transaction_effect = yes }
+            if = { limit = { has_character_flag = tca_test_tca_circuit_succession_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_circuit_self_grant_disabled" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_circuit_self_grant_disabled" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            remove_character_flag = tca_test_tca_circuit_succession_test_case_failed
+            tca_test_lane_end_effect = { GROUP = tca_circuit_succession_test }
+        }
+    }
+}
+
+# ---------------------------------------------------------------------------
+# 用例13-18：在任资格审计与文官路补法（P1/P2/P4）。
+# 全部用例直接调用正式 trigger/effect，期望值用等价脚本条件计算；不修改业务实现。
+# 需要改真实人物功绩等级的用例在写入后跨日再验（原生 merit 等级刷新），结束恢复原等级。
+# 审计用例先清空目标路既有审计变量作为基线；结束清回审计变量、全局变量与维护排队标记。
+# 一人多路用例临时压低全局上限只做信息/策略断言；结束必须移除全局变量与诊断/强制开关。
+# ---------------------------------------------------------------------------
+
+# 用例13：第一顺位继承人的功绩等级门槛（P1）。
+# 取真实登记路的第一顺位继承人：先压到 1 级，断言正式 trigger 判定“第一顺位不合格、有效继承为否、
+# 季度预清命中”；再抬到该头衔等级的期望值，断言恢复“第一顺位合格、有效继承为是、不再预清”。
+# 等级写入后各等一日再验（原生 merit 等级刷新）；结束恢复被改人物的原等级并清掉测试变量。
+tca_circuit_succession_test.13 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_circuit_succession_test.13 tca_test_circuit_heir_level_gate"
+        remove_character_flag = tca_test_tca_circuit_succession_test_case_failed
+        if = {
+            limit = { debug_only = yes is_alive = yes root = { has_title = title:h_china } }
+            if = { limit = { NOT = { has_global_variable_list = tca_circuit_titles } } tca_circuit_rebuild_registry_effect = yes }
+            clear_saved_scope = tca_cs_road
+            clear_saved_scope = tca_cs_heir
+            random_in_global_list = {
+                variable = tca_circuit_titles
+                limit = {
+                    tca_circuit_is_tracked_road_trigger = yes
+                    tca_circuit_has_celestial_vassal_holder_trigger = yes
+                    NOT = { has_variable = tca_circuit_pending_appointment }
+                    exists = current_heir
+                    current_heir = { is_alive = yes NOT = { has_title = title:h_china } }
+                }
+                save_scope_as = tca_cs_road
+            }
+            if = {
+                limit = { exists = scope:tca_cs_road }
+                scope:tca_cs_road = { current_heir = { save_scope_as = tca_cs_heir } }
+                scope:tca_cs_heir = {
+                    set_variable = { name = tca_cs13_original_level value = merit_level }
+                    set_merit_level = 0
+                    set_merit_level = 1
+                }
+                # 与正式 trigger 的 tier 分支同口径计算期望等级，不写死具体数值。
+                if = {
+                    limit = { scope:tca_cs_road = { tier = tier_kingdom } }
+                    scope:tca_cs_heir = { set_variable = { name = tca_cs13_expected value = merit_level_expected_kingdom_value } }
+                }
+                else_if = {
+                    limit = { scope:tca_cs_road = { tier = tier_duchy } }
+                    scope:tca_cs_heir = { set_variable = { name = tca_cs13_expected value = merit_level_expected_duchy_value } }
+                }
+                else = {
+                    scope:tca_cs_heir = { set_variable = { name = tca_cs13_expected value = merit_level_expected_county_value } }
+                }
+                set_variable = { name = tca_cs13_road value = scope:tca_cs_road }
+                set_variable = { name = tca_cs13_heir value = scope:tca_cs_heir }
+                debug_log = "TCA_TEST WAIT tca_test_circuit_heir_level_gate 2 days"
+                trigger_event = { id = tca_circuit_succession_test.1013 days = 2 }
+            }
+            else = {
+                add_character_flag = tca_cs_precondition_failed
+                debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_circuit_heir_level_gate"
+            }
+        }
+        else = {
+            add_character_flag = tca_cs_precondition_failed
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_circuit_heir_level_gate"
+        }
+        if = {
+            limit = { has_character_flag = tca_cs_precondition_failed }
+            remove_character_flag = tca_cs_precondition_failed
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+            tca_test_lane_end_effect = { GROUP = tca_circuit_succession_test }
+        }
+    }
+}
+# 续接：核对低等级下的正式判定，再把第一顺位抬到期望等级等下一日复核。
+tca_circuit_succession_test.1013 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            var:tca_cs13_road = { save_scope_as = tca_cs_road }
+            var:tca_cs13_heir = { save_scope_as = tca_cs_heir }
+            if = {
+                limit = { scope:tca_cs_road = { tca_circuit_heir_meets_level_trigger = no } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_heir_level_gate 1"
+            }
+            else = {
+                add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_heir_level_gate 1"
+            }
+            if = {
+                limit = { scope:tca_cs_road = { NOT = { tca_circuit_has_valid_heir_trigger = yes } } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_heir_level_gate 2"
+            }
+            else = {
+                add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_heir_level_gate 2"
+            }
+            if = {
+                limit = { scope:tca_cs_road = { tca_circuit_should_preclear_trigger = yes } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_heir_level_gate 3"
+            }
+            else = {
+                add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_heir_level_gate 3"
+            }
+            scope:tca_cs_heir = { set_merit_level = 0 set_merit_level = var:tca_cs13_expected }
+            debug_log = "TCA_TEST WAIT tca_test_circuit_heir_level_gate 2 days"
+            trigger_event = { id = tca_circuit_succession_test.2013 days = 2 }
+        }
+    }
+}
+# 续接：核对抬到期望等级后的正式判定，恢复原等级并结束用例。
+tca_circuit_succession_test.2013 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            var:tca_cs13_road = { save_scope_as = tca_cs_road }
+            var:tca_cs13_heir = { save_scope_as = tca_cs_heir }
+            if = {
+                limit = { scope:tca_cs_road = { tca_circuit_heir_meets_level_trigger = yes } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_heir_level_gate 4"
+            }
+            else = {
+                add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_heir_level_gate 4"
+            }
+            if = {
+                limit = { scope:tca_cs_road = { tca_circuit_has_valid_heir_trigger = yes } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_heir_level_gate 5"
+            }
+            else = {
+                add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_heir_level_gate 5"
+            }
+            if = {
+                limit = { scope:tca_cs_road = { NOT = { tca_circuit_should_preclear_trigger = yes } } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_heir_level_gate 6"
+            }
+            else = {
+                add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_heir_level_gate 6"
+            }
+            if = {
+                limit = { scope:tca_cs_heir = { merit_level = var:tca_cs13_expected } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_heir_level_gate 7"
+            }
+            else = {
+                add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_heir_level_gate 7"
+            }
+            # 恢复现场：原等级、测试变量。
+            scope:tca_cs_heir = {
+                set_merit_level = 0
+                set_merit_level = var:tca_cs13_original_level
+                remove_variable = tca_cs13_original_level
+                remove_variable = tca_cs13_expected
+            }
+            remove_variable = tca_cs13_road
+            remove_variable = tca_cs13_heir
+            if = { limit = { has_character_flag = tca_test_tca_circuit_succession_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_circuit_heir_level_gate" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_circuit_heir_level_gate" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            remove_character_flag = tca_test_tca_circuit_succession_test_case_failed
+            tca_test_lane_end_effect = { GROUP = tca_circuit_succession_test }
+        }
+    }
+}
+
+# 用例14：在任持有人功绩等级不足时，审计写 invalid=1 与去重标记；再次审计不重复写。
+# 取真实登记路（持有人仅此一条路、无待补授、未开启强制收回），临时把持有人功绩压到 1，
+# 跨日调用正式 audit 效果核对 invalid=1、audit_reported 存在，再调一次确认变量稳定；
+# 结束清审计变量并恢复原功绩等级，审计默认关闭路径不得产生待处理或改动持有人。
+tca_circuit_succession_test.14 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_circuit_succession_test.14 tca_test_circuit_incumbent_level_audit"
+        remove_character_flag = tca_test_tca_circuit_succession_test_case_failed
+        if = {
+            limit = {
+                debug_only = yes is_alive = yes root = { has_title = title:h_china }
+                NOT = { has_global_variable = tca_circuit_retract_unqualified_enabled }
+            }
+            if = { limit = { NOT = { has_global_variable_list = tca_circuit_titles } } tca_circuit_rebuild_registry_effect = yes }
+            clear_saved_scope = tca_cs_road
+            clear_saved_scope = tca_cs_holder
+            random_in_global_list = {
+                variable = tca_circuit_titles
+                limit = {
+                    tca_circuit_is_tracked_road_trigger = yes
+                    tca_circuit_has_celestial_vassal_holder_trigger = yes
+                    NOT = { has_variable = tca_circuit_pending_appointment }
+                    holder = { tca_circuit_holder_road_count_value = 1 }
+                }
+                save_scope_as = tca_cs_road
+            }
+            if = {
+                limit = { exists = scope:tca_cs_road }
+                scope:tca_cs_road = {
+                    remove_variable = tca_circuit_incumbent_invalid
+                    remove_variable = tca_circuit_audit_reported
+                    remove_variable = tca_circuit_incumbent_pending
+                    holder = { save_scope_as = tca_cs_holder }
+                }
+                scope:tca_cs_holder = {
+                    set_variable = { name = tca_cs14_original_level value = merit_level }
+                    set_merit_level = 0
+                    set_merit_level = 1
+                }
+                set_variable = { name = tca_cs14_road value = scope:tca_cs_road }
+                set_variable = { name = tca_cs14_holder value = scope:tca_cs_holder }
+                debug_log = "TCA_TEST WAIT tca_test_circuit_incumbent_level_audit 2 days"
+                trigger_event = { id = tca_circuit_succession_test.1014 days = 2 }
+            }
+            else = {
+                add_character_flag = tca_cs_precondition_failed
+                debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_circuit_incumbent_level_audit"
+            }
+        }
+        else = {
+            add_character_flag = tca_cs_precondition_failed
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_circuit_incumbent_level_audit"
+        }
+        if = {
+            limit = { has_character_flag = tca_cs_precondition_failed }
+            remove_character_flag = tca_cs_precondition_failed
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+            tca_test_lane_end_effect = { GROUP = tca_circuit_succession_test }
+        }
+    }
+}
+# 续接：跨日核对正式 audit 的 invalid=1 与去重标记，再审计一次确认稳定后清理现场。
+tca_circuit_succession_test.1014 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            var:tca_cs14_road = { save_scope_as = tca_cs_road }
+            var:tca_cs14_holder = { save_scope_as = tca_cs_holder }
+            if = {
+                limit = { scope:tca_cs_road = { NOT = { tca_circuit_incumbent_meets_level_trigger = yes } } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_incumbent_level_audit 1"
+            }
+            else = {
+                add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_incumbent_level_audit 1"
+            }
+            if = {
+                limit = { scope:tca_cs_road = { tca_circuit_incumbent_invalid_trigger = yes } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_incumbent_level_audit 2"
+            }
+            else = {
+                add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_incumbent_level_audit 2"
+            }
+            scope:tca_cs_road = { tca_circuit_audit_incumbent_effect = yes }
+            if = {
+                limit = { scope:tca_cs_road = { has_variable = tca_circuit_incumbent_invalid var:tca_circuit_incumbent_invalid = 1 } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_incumbent_level_audit 3"
+            }
+            else = {
+                add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_incumbent_level_audit 3"
+            }
+            if = {
+                limit = { scope:tca_cs_road = { has_variable = tca_circuit_audit_reported } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_incumbent_level_audit 4"
+            }
+            else = {
+                add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_incumbent_level_audit 4"
+            }
+            # 第二次审计：同一次不合格只记录一次，变量保持稳定。
+            scope:tca_cs_road = { tca_circuit_audit_incumbent_effect = yes }
+            if = {
+                limit = { scope:tca_cs_road = { has_variable = tca_circuit_incumbent_invalid var:tca_circuit_incumbent_invalid = 1 } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_incumbent_level_audit 5"
+            }
+            else = {
+                add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_incumbent_level_audit 5"
+            }
+            if = {
+                limit = { scope:tca_cs_road = { has_variable = tca_circuit_audit_reported } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_incumbent_level_audit 6"
+            }
+            else = {
+                add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_incumbent_level_audit 6"
+            }
+            if = {
+                limit = { scope:tca_cs_road = { holder = scope:tca_cs_holder } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_incumbent_level_audit 7"
+            }
+            else = {
+                add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_incumbent_level_audit 7"
+            }
+            # 恢复现场：审计变量、原功绩等级、测试变量。
+            scope:tca_cs_road = {
+                remove_variable = tca_circuit_incumbent_invalid
+                remove_variable = tca_circuit_audit_reported
+                remove_variable = tca_circuit_incumbent_pending
+            }
+            scope:tca_cs_holder = {
+                set_merit_level = 0
+                set_merit_level = var:tca_cs14_original_level
+                remove_variable = tca_cs14_original_level
+            }
+            remove_variable = tca_cs14_road
+            remove_variable = tca_cs14_holder
+            if = { limit = { has_character_flag = tca_test_tca_circuit_succession_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_circuit_incumbent_level_audit" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_circuit_incumbent_level_audit" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            remove_character_flag = tca_test_tca_circuit_succession_test_case_failed
+            tca_test_lane_end_effect = { GROUP = tca_circuit_succession_test }
+        }
+    }
+}
+
+# 用例15：一人多路只做信息记录，不再判定为不合格（兼任可能是正常机制）。
+# 取持有人已满足等级要求、且当前仅持一条登记路的真实路；临时设置全局上限 tca_circuit_max_kingdom_roads=0
+# 并开启多路诊断开关，调用正式 audit：断言超出阈值、但 incumbent_invalid 不写入、只写 multi_road_reported，
+# 持有人不变；结束移除全局变量与诊断开关并清审计变量。
+tca_circuit_succession_test.15 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_circuit_succession_test.15 tca_test_circuit_incumbent_multi_road"
+        remove_character_flag = tca_test_tca_circuit_succession_test_case_failed
+        if = {
+            limit = {
+                debug_only = yes is_alive = yes root = { has_title = title:h_china }
+                NOT = { has_global_variable = tca_circuit_max_kingdom_roads }
+                NOT = { has_global_variable = tca_circuit_retract_unqualified_enabled }
+                NOT = { has_global_variable = tca_circuit_multi_road_audit_enabled }
+            }
+            if = { limit = { NOT = { has_global_variable_list = tca_circuit_titles } } tca_circuit_rebuild_registry_effect = yes }
+            clear_saved_scope = tca_cs_road
+            clear_saved_scope = tca_cs_holder
+            random_in_global_list = {
+                variable = tca_circuit_titles
+                limit = {
+                    tca_circuit_is_tracked_road_trigger = yes
+                    tca_circuit_has_celestial_vassal_holder_trigger = yes
+                    tca_circuit_incumbent_meets_level_trigger = yes
+                    NOT = { has_variable = tca_circuit_pending_appointment }
+                    holder = { tca_circuit_holder_road_count_value = 1 }
+                }
+                save_scope_as = tca_cs_road
+            }
+            if = {
+                limit = { exists = scope:tca_cs_road }
+                scope:tca_cs_road = {
+                    remove_variable = tca_circuit_incumbent_invalid
+                    remove_variable = tca_circuit_audit_reported
+                    remove_variable = tca_circuit_incumbent_pending
+                    remove_variable = tca_circuit_multi_road_reported
+                    holder = { save_scope_as = tca_cs_holder }
+                }
+                # 一人多路只作为可选信息：临时把上限调 0 构造“超过阈值”，并开启诊断开关。
+                set_global_variable = { name = tca_circuit_max_kingdom_roads value = 0 }
+                set_global_variable = { name = tca_circuit_multi_road_audit_enabled value = yes }
+                if = {
+                    limit = { scope:tca_cs_holder = { tca_circuit_holder_exceeds_road_limit_trigger = yes } }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_incumbent_multi_road 1"
+                }
+                else = {
+                    add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                    debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_incumbent_multi_road 1"
+                }
+                # 一人多路不再是“不合格”：正式 trigger 必须为 no。
+                if = {
+                    limit = { scope:tca_cs_road = { NOT = { tca_circuit_incumbent_invalid_trigger = yes } } }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_incumbent_multi_road 2"
+                }
+                else = {
+                    add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                    debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_incumbent_multi_road 2"
+                }
+                scope:tca_cs_road = { tca_circuit_audit_incumbent_effect = yes }
+                if = {
+                    limit = { scope:tca_cs_road = { NOT = { has_variable = tca_circuit_incumbent_invalid } } }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_incumbent_multi_road 3"
+                }
+                else = {
+                    add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                    debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_incumbent_multi_road 3"
+                }
+                if = {
+                    limit = { scope:tca_cs_road = { has_variable = tca_circuit_multi_road_reported } }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_incumbent_multi_road 4"
+                }
+                else = {
+                    add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                    debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_incumbent_multi_road 4"
+                }
+                if = {
+                    limit = { scope:tca_cs_road = { holder = scope:tca_cs_holder } }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_incumbent_multi_road 5"
+                }
+                else = {
+                    add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                    debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_incumbent_multi_road 5"
+                }
+                # 恢复现场：移除临时全局开关与审计变量。
+                remove_global_variable = tca_circuit_max_kingdom_roads
+                remove_global_variable = tca_circuit_multi_road_audit_enabled
+                scope:tca_cs_road = {
+                    remove_variable = tca_circuit_incumbent_invalid
+                    remove_variable = tca_circuit_audit_reported
+                    remove_variable = tca_circuit_incumbent_pending
+                    remove_variable = tca_circuit_multi_road_reported
+                }
+            }
+            else = {
+                add_character_flag = tca_cs_precondition_failed
+                debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_circuit_incumbent_multi_road"
+            }
+        }
+        else = {
+            add_character_flag = tca_cs_precondition_failed
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_circuit_incumbent_multi_road"
+        }
+        if = { limit = { has_character_flag = tca_cs_precondition_failed } remove_character_flag = tca_cs_precondition_failed if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } }
+        else_if = {
+            limit = { has_character_flag = tca_test_tca_circuit_succession_test_case_failed }
+            debug_log = "TCA_TEST FAIL tca_test_circuit_incumbent_multi_road"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+        }
+        else = {
+            debug_log = "TCA_TEST PASS tca_test_circuit_incumbent_multi_road"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } }
+        }
+        remove_character_flag = tca_test_tca_circuit_succession_test_case_failed
+        tca_test_lane_end_effect = { GROUP = tca_circuit_succession_test }
+    }
+}
+
+# 用例16：默认关闭强制收回时，处置不合格只清待处理、保留审计标记、不改持有人。
+# 取真实登记路（仅一条路、无待补授），把持有人功绩压到 1 并跨日调用正式 audit 得到 invalid=1；
+# 不设置 tca_circuit_retract_unqualified_enabled，直接按“曾排队、处置时开关已关闭”构造 pending，
+# 调用正式处置效果，断言持有人不变、pending 清除、invalid/audit_reported 保留、不产生回落待补授；
+# 结束恢复原功绩等级并清审计变量。
+tca_circuit_succession_test.16 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_circuit_succession_test.16 tca_test_circuit_incumbent_default_kept"
+        remove_character_flag = tca_test_tca_circuit_succession_test_case_failed
+        if = {
+            limit = {
+                debug_only = yes is_alive = yes root = { has_title = title:h_china }
+                NOT = { has_global_variable = tca_circuit_retract_unqualified_enabled }
+            }
+            if = { limit = { NOT = { has_global_variable_list = tca_circuit_titles } } tca_circuit_rebuild_registry_effect = yes }
+            clear_saved_scope = tca_cs_road
+            clear_saved_scope = tca_cs_holder
+            random_in_global_list = {
+                variable = tca_circuit_titles
+                limit = {
+                    tca_circuit_is_tracked_road_trigger = yes
+                    tca_circuit_has_celestial_vassal_holder_trigger = yes
+                    NOT = { has_variable = tca_circuit_pending_appointment }
+                    holder = { tca_circuit_holder_road_count_value = 1 }
+                }
+                save_scope_as = tca_cs_road
+            }
+            if = {
+                limit = { exists = scope:tca_cs_road }
+                scope:tca_cs_road = {
+                    remove_variable = tca_circuit_incumbent_invalid
+                    remove_variable = tca_circuit_audit_reported
+                    remove_variable = tca_circuit_incumbent_pending
+                    holder = { save_scope_as = tca_cs_holder }
+                }
+                scope:tca_cs_holder = {
+                    set_variable = { name = tca_cs16_original_level value = merit_level }
+                    set_merit_level = 0
+                    set_merit_level = 1
+                }
+                set_variable = { name = tca_cs16_road value = scope:tca_cs_road }
+                set_variable = { name = tca_cs16_holder value = scope:tca_cs_holder }
+                debug_log = "TCA_TEST WAIT tca_test_circuit_incumbent_default_kept 2 days"
+                trigger_event = { id = tca_circuit_succession_test.1016 days = 2 }
+            }
+            else = {
+                add_character_flag = tca_cs_precondition_failed
+                debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_circuit_incumbent_default_kept"
+            }
+        }
+        else = {
+            add_character_flag = tca_cs_precondition_failed
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_circuit_incumbent_default_kept"
+        }
+        if = {
+            limit = { has_character_flag = tca_cs_precondition_failed }
+            remove_character_flag = tca_cs_precondition_failed
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+            tca_test_lane_end_effect = { GROUP = tca_circuit_succession_test }
+        }
+    }
+}
+# 续接：跨日造出 invalid=1，构造待处理并核对默认处置路径。
+tca_circuit_succession_test.1016 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            var:tca_cs16_road = { save_scope_as = tca_cs_road }
+            var:tca_cs16_holder = { save_scope_as = tca_cs_holder }
+            if = {
+                limit = { scope:tca_cs_road = { tca_circuit_incumbent_invalid_trigger = yes } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_incumbent_default_kept 1"
+            }
+            else = {
+                add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_incumbent_default_kept 1"
+            }
+            scope:tca_cs_road = { tca_circuit_audit_incumbent_effect = yes }
+            if = {
+                limit = { scope:tca_cs_road = { has_variable = tca_circuit_incumbent_invalid var:tca_circuit_incumbent_invalid = 1 } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_incumbent_default_kept 2"
+            }
+            else = {
+                add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_incumbent_default_kept 2"
+            }
+            if = {
+                limit = { scope:tca_cs_road = { has_variable = tca_circuit_audit_reported } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_incumbent_default_kept 3"
+            }
+            else = {
+                add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_incumbent_default_kept 3"
+            }
+            # 默认关闭强制收回时 audit 不写 pending；这里构造“曾排队、处置前开关已关闭”的待处理状态。
+            scope:tca_cs_road = { set_variable = { name = tca_circuit_incumbent_pending value = yes } }
+            scope:tca_cs_road = { tca_circuit_handle_incumbent_invalid_effect = yes }
+            if = {
+                limit = { scope:tca_cs_road = { holder = scope:tca_cs_holder } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_incumbent_default_kept 4"
+            }
+            else = {
+                add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_incumbent_default_kept 4"
+            }
+            if = {
+                limit = { scope:tca_cs_road = { NOT = { has_variable = tca_circuit_incumbent_pending } } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_incumbent_default_kept 5"
+            }
+            else = {
+                add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_incumbent_default_kept 5"
+            }
+            if = {
+                limit = { scope:tca_cs_road = { has_variable = tca_circuit_incumbent_invalid var:tca_circuit_incumbent_invalid = 1 } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_incumbent_default_kept 6"
+            }
+            else = {
+                add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_incumbent_default_kept 6"
+            }
+            if = {
+                limit = { scope:tca_cs_road = { has_variable = tca_circuit_audit_reported } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_incumbent_default_kept 7"
+            }
+            else = {
+                add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_incumbent_default_kept 7"
+            }
+            if = {
+                limit = { scope:tca_cs_road = { NOT = { has_variable = tca_circuit_pending_appointment } } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_incumbent_default_kept 8"
+            }
+            else = {
+                add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_incumbent_default_kept 8"
+            }
+            # 恢复现场：清审计变量、恢复原功绩等级与测试变量。
+            scope:tca_cs_road = {
+                remove_variable = tca_circuit_incumbent_invalid
+                remove_variable = tca_circuit_audit_reported
+                remove_variable = tca_circuit_incumbent_pending
+            }
+            scope:tca_cs_holder = {
+                set_merit_level = 0
+                set_merit_level = var:tca_cs16_original_level
+                remove_variable = tca_cs16_original_level
+            }
+            remove_variable = tca_cs16_road
+            remove_variable = tca_cs16_holder
+            if = { limit = { has_character_flag = tca_test_tca_circuit_succession_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_circuit_incumbent_default_kept" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_circuit_incumbent_default_kept" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            remove_character_flag = tca_test_tca_circuit_succession_test_case_failed
+            tca_test_lane_end_effect = { GROUP = tca_circuit_succession_test }
+        }
+    }
+}
+
+# 用例17：即使强制收回开关存在，一人多路也不得被判为不合格或收回（默认策略：兼任不干预）。
+# 取持有人已满足等级要求、当前仅持一条登记路的真实路；临时压低全局上限并开启强制收回开关，
+# 调用正式 audit，断言不写 incumbent_invalid/incumbent_pending、不产生回落 pending、持有人不变；
+# 结束关闭开关、移除全局变量、清审计变量与维护排队标记。
+tca_circuit_succession_test.17 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_circuit_succession_test.17 tca_test_circuit_multi_road_no_retract"
+        remove_character_flag = tca_test_tca_circuit_succession_test_case_failed
+        if = {
+            limit = {
+                debug_only = yes is_alive = yes root = { has_title = title:h_china }
+                NOT = { has_global_variable = tca_circuit_max_kingdom_roads }
+                NOT = { has_global_variable = tca_circuit_retract_unqualified_enabled }
+                NOT = { has_global_variable = tca_circuit_multi_road_audit_enabled }
+            }
+            if = { limit = { NOT = { has_global_variable_list = tca_circuit_titles } } tca_circuit_rebuild_registry_effect = yes }
+            clear_saved_scope = tca_cs_road
+            clear_saved_scope = tca_cs_holder
+            random_in_global_list = {
+                variable = tca_circuit_titles
+                limit = {
+                    tca_circuit_is_tracked_road_trigger = yes
+                    tca_circuit_has_celestial_vassal_holder_trigger = yes
+                    tca_circuit_incumbent_meets_level_trigger = yes
+                    NOT = { has_variable = tca_circuit_pending_appointment }
+                    holder = { tca_circuit_holder_road_count_value = 1 }
+                }
+                save_scope_as = tca_cs_road
+            }
+            if = {
+                limit = { exists = scope:tca_cs_road }
+                scope:tca_cs_road = {
+                    remove_variable = tca_circuit_incumbent_invalid
+                    remove_variable = tca_circuit_audit_reported
+                    remove_variable = tca_circuit_incumbent_pending
+                    remove_variable = tca_circuit_multi_road_reported
+                    holder = { save_scope_as = tca_cs_holder }
+                }
+                # 策略用例：即使强制收回开关存在、且临时把上限调 0，一人多路也不得被判为不合格或收回。
+                set_global_variable = { name = tca_circuit_max_kingdom_roads value = 0 }
+                set_global_variable = { name = tca_circuit_retract_unqualified_enabled value = yes }
+                scope:tca_cs_road = { tca_circuit_audit_incumbent_effect = yes }
+                if = {
+                    limit = { scope:tca_cs_road = { NOT = { has_variable = tca_circuit_incumbent_invalid } } }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_multi_road_no_retract 1"
+                }
+                else = {
+                    add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                    debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_multi_road_no_retract 1"
+                }
+                if = {
+                    limit = { scope:tca_cs_road = { NOT = { has_variable = tca_circuit_incumbent_pending } } }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_multi_road_no_retract 2"
+                }
+                else = {
+                    add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                    debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_multi_road_no_retract 2"
+                }
+                if = {
+                    limit = { scope:tca_cs_road = { holder = scope:tca_cs_holder } }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_multi_road_no_retract 3"
+                }
+                else = {
+                    add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                    debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_multi_road_no_retract 3"
+                }
+                if = {
+                    limit = { scope:tca_cs_road = { NOT = { has_variable = tca_circuit_pending_appointment } } }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_multi_road_no_retract 4"
+                }
+                else = {
+                    add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                    debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_multi_road_no_retract 4"
+                }
+                # 恢复现场：移除临时全局开关、清审计变量与维护排队标记。
+                remove_global_variable = tca_circuit_max_kingdom_roads
+                remove_global_variable = tca_circuit_retract_unqualified_enabled
+                scope:tca_cs_road = {
+                    remove_variable = tca_circuit_incumbent_invalid
+                    remove_variable = tca_circuit_audit_reported
+                    remove_variable = tca_circuit_incumbent_pending
+                    remove_variable = tca_circuit_multi_road_reported
+                }
+                remove_variable = tca_circuit_maintenance_pending
+                remove_variable = tca_circuit_maintenance_running
+            }
+            else = {
+                add_character_flag = tca_cs_precondition_failed
+                debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_circuit_multi_road_no_retract"
+            }
+        }
+        else = {
+            add_character_flag = tca_cs_precondition_failed
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_circuit_multi_road_no_retract"
+        }
+        if = { limit = { has_character_flag = tca_cs_precondition_failed } remove_character_flag = tca_cs_precondition_failed if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } }
+        else_if = {
+            limit = { has_character_flag = tca_test_tca_circuit_succession_test_case_failed }
+            debug_log = "TCA_TEST FAIL tca_test_circuit_multi_road_no_retract"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+        }
+        else = {
+            debug_log = "TCA_TEST PASS tca_test_circuit_multi_road_no_retract"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } }
+        }
+        remove_character_flag = tca_test_tca_circuit_succession_test_case_failed
+        tca_test_lane_end_effect = { GROUP = tca_circuit_succession_test }
+    }
+}
+
+# 用例18：文官路补挂文官任命继承法（P4）。
+# 取 kind=1、天朝封臣持有、且“已具备该法”或“契约允许补挂”的真实路。
+# 已具备时 ensure 守卫为无操作，断言调用前后法律状态稳定（有效断言，不跳过）；缺少时断言补挂成功且重复调用幂等。
+# 补挂结果属于正式维护应有状态，测试局一次性，不回滚法条；本用例只清理其它测试状态。
+tca_circuit_succession_test.18 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_circuit_succession_test.18 tca_test_circuit_civil_law_ensure"
+        remove_character_flag = tca_test_tca_circuit_succession_test_case_failed
+        if = {
+            limit = { debug_only = yes is_alive = yes root = { has_title = title:h_china } }
+            if = { limit = { NOT = { has_global_variable_list = tca_circuit_titles } } tca_circuit_rebuild_registry_effect = yes }
+            clear_saved_scope = tca_cs_road
+            clear_saved_scope = tca_cs_holder
+            random_in_global_list = {
+                variable = tca_circuit_titles
+                limit = {
+                    tca_circuit_is_tracked_road_trigger = yes
+                    has_variable = tca_circuit_kind
+                    var:tca_circuit_kind = 1
+                    tca_circuit_has_celestial_vassal_holder_trigger = yes
+                    NOT = { has_variable = tca_circuit_pending_appointment }
+                    holder = {
+                        OR = {
+                            has_realm_law = celestial_appointment_succession_law
+                            AND = {
+                                NOT = { vassal_contract_has_flag = celestial_military_appointment }
+                                NOT = { vassal_contract_has_flag = locked_to_partition }
+                            }
+                        }
+                    }
+                }
+                save_scope_as = tca_cs_road
+            }
+            if = {
+                limit = { exists = scope:tca_cs_road }
+                scope:tca_cs_road = { holder = { save_scope_as = tca_cs_holder } }
+                # P4 默认关闭；用例显式开启补法开关，验证“补充等效”路径。
+                set_global_variable = { name = tca_circuit_civil_law_ensure_enabled value = yes }
+                # 前置已保证两条合法分支之一：已具备任命继承法时 ensure 守卫空操作（调用前后状态不变，
+                # 作为有效断言核对）；缺少且契约允许时 ensure 补挂。两者第一次调用后都应为“已具备”。
+                scope:tca_cs_road = { tca_circuit_ensure_civil_appointment_law_effect = yes }
+                if = {
+                    limit = { scope:tca_cs_holder = { has_realm_law = celestial_appointment_succession_law } }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_civil_law_ensure 1"
+                }
+                else = {
+                    add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                    debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_civil_law_ensure 1"
+                }
+                # 第二次调用仍应稳定（已具备时为空操作，不重复处理）。
+                scope:tca_cs_road = { tca_circuit_ensure_civil_appointment_law_effect = yes }
+                if = {
+                    limit = { scope:tca_cs_holder = { has_realm_law = celestial_appointment_succession_law } }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_civil_law_ensure 2"
+                }
+                else = {
+                    add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                    debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_civil_law_ensure 2"
+                }
+                if = {
+                    limit = { scope:tca_cs_road = { holder = scope:tca_cs_holder } }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_civil_law_ensure 3"
+                }
+                else = {
+                    add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                    debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_civil_law_ensure 3"
+                }
+                # 恢复现场：关闭补法开关。
+                remove_global_variable = tca_circuit_civil_law_ensure_enabled
+            }
+            else = {
+                add_character_flag = tca_cs_precondition_failed
+                debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_circuit_civil_law_ensure"
+            }
+        }
+        else = {
+            add_character_flag = tca_cs_precondition_failed
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_circuit_civil_law_ensure"
+        }
+        if = { limit = { has_character_flag = tca_cs_precondition_failed } remove_character_flag = tca_cs_precondition_failed if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } }
+        else_if = {
+            limit = { has_character_flag = tca_test_tca_circuit_succession_test_case_failed }
+            debug_log = "TCA_TEST FAIL tca_test_circuit_civil_law_ensure"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+        }
+        else = {
+            debug_log = "TCA_TEST PASS tca_test_circuit_civil_law_ensure"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } }
+        }
+        remove_character_flag = tca_test_tca_circuit_succession_test_case_failed
+        tca_test_lane_end_effect = { GROUP = tca_circuit_succession_test }
+    }
+}

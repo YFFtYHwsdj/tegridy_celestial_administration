@@ -1,0 +1,1888 @@
+# 路主任命继承补授（王国级有地头衔）的登记、巡检、补授、递归与生成兜底。
+# 设计唯一依据：docs/appointment/circuit_succession_design.md（处理顺序、排除清单、四层流水线、不交给领主）。
+# 先读 tca_circuit_succession_triggers.txt 的判定；本文件负责状态与副作用。
+#
+# 作用域约定：
+#   - 未标注的都是“头衔作用域”，即当前目标路/头衔；
+#   - 标注“角色作用域”的效果当前 scope 为人物；
+#   - 标注“空作用域”的效果不读取特定当前 scope。
+#
+# 持久状态（随存档保存）：
+#   - 头衔变量 tca_circuit_kind：1文官/2军区/3都护，由持有人契约推导，回落后保留；
+#   - 头衔变量 tca_circuit_pending_appointment：回落待补授标记。回落回调只写不清；
+#     维护按当前持有人判定：皇帝持有→自授；天朝封臣持有→合格落点则接受并清除，不合格则收回皇帝后自授；
+#     其他持有人保留标记等待后续季度（避免回落同 tick 被 AI 再次授予后漏检）。
+#   - 头衔变量 tca_circuit_prepared_candidate：跨日两段式的 day1 记录（人物作用域值），**仅生成兜底使用**。
+#     生成角色 day1 建王朝/家门/领主/政体并写本变量、排队次日维护，当轮不授予；day2 维护消费本变量完成授予
+#     （见 tca_circuit_complete_prepared_grant_effect）。引擎实测：真实角色（含已有家门/同链新建家门）的
+#     真实角色补授路径会销毁有地头衔，因此真实候选要求“已有地或已有家门”same-tick include_vassals 授予；
+#     无家门的真实候选会被跳过（CANDIDATE_UNSAFE_SKIPPED），改走生成兜底。变量在成功/失效/接受既有结果/销毁时清理。
+#   - 全局登记列表 tca_circuit_titles：带标记的路；保存重载若丢失，由 tca_circuit_rebuild_registry_effect 重建。
+#   - 头衔变量 tca_circuit_prepared_mode：1=正式候选（复验候选资格后授予头衔本身）；
+#     2=旧头衔继承人（按继承人资格复验后转交）。day2 维护按 mode 分派完成效果。
+#   - 头衔变量 tca_circuit_prepared_serial：准备当轮序号，防止同轮维护把 day1 刚准备的条目当日授予。
+#   - 全局列表 tca_circuit_prepared_titles：day1 待次日授予的头衔（含不在 tca_circuit_titles 内的旧头衔）；
+#     由重建效果按头衔变量兜底重建，空/残留条目不改变正确性。
+#   - 头衔变量 tca_circuit_incumbent_invalid（1=官品低于头衔等级）、tca_circuit_audit_reported（已记录去重）、
+#     tca_circuit_incumbent_pending（待强制处理）：在任资格审计状态；默认只记录，不改持有人（见第六节）。
+#     一人多路不是不合格：默认不写上述变量，仅在可选诊断开关下写 tca_circuit_multi_road_reported 与日志。
+# 单轮事务状态（只在一次维护内有效，结束即清理）：
+#   - global tca_circuit_run_serial：本轮序号，写入人物的 tca_circuit_used_serial 与头衔的
+#     tca_circuit_processed_serial，用来实现“同一人物同一轮只授一次、同一头衔只处理一次”。
+#     旧序号残留在人物/头衔变量上无害：下一轮序号变化后自然失效；
+#   - global tca_circuit_transaction_depth：递归深度，初版上限 4；
+#   - global tca_circuit_transaction_kind：当前补授路的类型，供旧头衔递归时选择生成模板；
+#   - 局部列表 tca_circuit_candidate_pool / tca_circuit_qualified_candidates：候选基线池与当前合格候选。
+# 第一版启用范围（重要）：
+#   - 默认启用（安全子集）：路类型登记/同步、回落检测与 tca_circuit_pending_appointment 标记、
+#     季度预清近期受任冷却（tca_circuit_preclear_cooldowns_effect）。
+#   - 默认关闭：自动补授（fill_lapsed / handle_pending 的“自授/收回再授”、生成兜底、旧头衔递归授予）。
+#     原因：引擎对脚本 granted 授予（含 include_vassals 与两段式）在部分路径会销毁目标有地头衔；
+#     默认关闭时以上入口只记 TCA_CIRCUIT SELF_GRANT_DISABLED 并保留 pending/登记，不授予、不改 holder。
+#   - 默认只记录（第六节）：在任资格审计写审计状态与日志，不收回、不授予；强制收回需同时存在全局变量
+#     tca_circuit_retract_unqualified_enabled 与 tca_circuit_self_grant_enabled。
+#   - 开关：全局变量 tca_circuit_self_grant_enabled（不存在=关闭；yes=启用）。
+#     仅调试/未来引擎安全方案使用：tca_circuit_enable_self_grant_effect / tca_circuit_disable_self_grant_effect，
+#     不接入玩家入口。待引擎安全方案（原生 appointment 路径或等价方案）验证后再默认启用。
+# 延迟与防重入：
+#   - on_title_gain 只写标记并排队次日维护，不在头衔变更回调内改头衔；
+#   - 人物变量 tca_circuit_maintenance_pending（3 天）合并重复排队；维护结束主动清除；
+#   - 人物变量 tca_circuit_maintenance_running（1 天）防同轮重入；
+#   - 失败只记录 TCA_CIRCUIT 调试日志并保留待补授标记，等待下一季度，不自动重试。
+# 日志前缀统一 TCA_CIRCUIT，便于测试检索。
+
+# ---------------------------------------------------------------------------
+# 一、登记与持有人维护
+# ---------------------------------------------------------------------------
+
+# 头衔作用域；幂等加入全局登记。
+tca_circuit_register_title_effect = {
+    if = {
+        limit = { NOT = { is_target_in_global_variable_list = { name = tca_circuit_titles target = this } } }
+        add_to_global_variable_list = { name = tca_circuit_titles target = this }
+        debug_log = "TCA_CIRCUIT REGISTER"
+    }
+}
+
+# 头衔作用域；头衔销毁时清理追踪状态，避免失效登记残留。
+tca_circuit_unregister_title_effect = {
+    if = {
+        limit = { is_target_in_global_variable_list = { name = tca_circuit_titles target = this } }
+        remove_list_global_variable = { name = tca_circuit_titles target = this }
+    }
+    remove_variable = tca_circuit_kind
+    remove_variable = tca_circuit_pending_appointment
+    remove_variable = tca_circuit_processed_serial
+    remove_variable = tca_circuit_unsafe_skipped_logged
+    # 跨日两段式 day1 记录随头衔一并清理，避免失效候选残留。
+    # 正式诊断：打印被销毁头衔（当前作用域即该头衔）及其待补授/两段式状态，便于定位销毁源。
+    debug_log_scopes = yes
+    if = { limit = { has_variable = tca_circuit_pending_appointment } debug_log = "TCA_CIRCUIT UNREGISTER PENDING" }
+    if = { limit = { has_variable = tca_circuit_prepared_candidate } debug_log = "TCA_CIRCUIT UNREGISTER PREPARED" }
+    remove_variable = tca_circuit_prepared_candidate
+    remove_variable = tca_circuit_prepared_mode
+    remove_variable = tca_circuit_prepared_wait
+    remove_variable = tca_circuit_prepared_serial
+    tca_circuit_remove_prepared_title_effect = yes
+    debug_log = "TCA_CIRCUIT UNREGISTER"
+}
+
+# 头衔作用域；跨日两段式登记。day1 准备后把“待次日授予”的头衔加入全局列表，
+# 供次日维护遍历（旧头衔/无地官署可能不在 tca_circuit_titles 路登记内）。
+tca_circuit_register_prepared_title_effect = {
+    if = {
+        limit = { NOT = { is_target_in_global_variable_list = { name = tca_circuit_prepared_titles target = this } } }
+        add_to_global_variable_list = { name = tca_circuit_prepared_titles target = this }
+    }
+}
+
+# 头衔作用域；结束/失效/销毁时从待授予列表移除。
+tca_circuit_remove_prepared_title_effect = {
+    if = {
+        limit = { is_target_in_global_variable_list = { name = tca_circuit_prepared_titles target = this } }
+        remove_list_global_variable = { name = tca_circuit_prepared_titles target = this }
+    }
+}
+
+# 头衔作用域；由当前天朝封臣持有人的契约推导并写持久类型标记，然后登记。
+# P3：已登记且原 kind=2/3 的军区/都护路，若持有人契约缺军事 flag，先重试补约；
+# 补约失败时保留原 kind 并写日志，绝不静默降为文官；只有原本就是文官/无标记的路才派生为 1。
+# 合同组在授予事务内可能还读不到：此时不做任何改写，保留原标记（待验证：合同组建立时点）。
+tca_circuit_sync_kind_effect = {
+    if = {
+        limit = {
+            tca_circuit_is_road_trigger = yes
+            exists = holder
+            NOT = { holder = { has_title = title:h_china } }
+            holder = {
+                is_alive = yes
+                government_has_flag = government_is_celestial
+            }
+        }
+        if = {
+            limit = { holder = { has_subject_contract_group = celestial_vassal } }
+            if = {
+                limit = { holder = { vassal_contract_has_flag = celestial_province_protectorate } }
+                set_variable = { name = tca_circuit_kind value = 3 }
+            }
+            else_if = {
+                limit = { holder = { vassal_contract_has_flag = celestial_province_military } }
+                set_variable = { name = tca_circuit_kind value = 2 }
+            }
+            else = {
+                if = {
+                    limit = {
+                        has_variable = tca_circuit_kind
+                        OR = {
+                            var:tca_circuit_kind = 3
+                            var:tca_circuit_kind = 2
+                        }
+                    }
+                    # 军事类路但契约缺军事 flag：按冻结 kind 重试补约（都护 level 4 被拒会由应用效果回退军区）。
+                    save_scope_as = tca_circuit_sync_retry_title
+                    if = {
+                        limit = { var:tca_circuit_kind = 3 }
+                        holder = { tca_circuit_apply_road_kind_contract_effect = { KIND = 3 TITLE = scope:tca_circuit_sync_retry_title } }
+                    }
+                    else = {
+                        holder = { tca_circuit_apply_road_kind_contract_effect = { KIND = 2 TITLE = scope:tca_circuit_sync_retry_title } }
+                    }
+                    # 重试后再按契约判定；仍未成功则保留原 kind，不降为文官。
+                    if = {
+                        limit = { holder = { vassal_contract_has_flag = celestial_province_protectorate } }
+                        set_variable = { name = tca_circuit_kind value = 3 }
+                    }
+                    else_if = {
+                        limit = { holder = { vassal_contract_has_flag = celestial_province_military } }
+                        set_variable = { name = tca_circuit_kind value = 2 }
+                    }
+                    else = { debug_log = "TCA_CIRCUIT KIND_CONTRACT_RETRY_FAILED" }
+                }
+                else = {
+                    set_variable = { name = tca_circuit_kind value = 1 }
+                    # P4：文官路补挂文官任命继承法（已有时为空操作；季度维护自然重试）。
+                    tca_circuit_ensure_civil_appointment_law_effect = yes
+                }
+            }
+        }
+        tca_circuit_register_title_effect = yes
+    }
+}
+
+# 空作用域；从 h_china 侧一次性重建类型标记与登记，覆盖开局、旧档与保存后列表丢失。
+# 只在开局与年度执行，是兜底而非唯一登记来源：日常由 on_title_gain 与季度同步维护。
+# 从上到下只遍历皇帝本人及直属的王国级封臣（every_vassal + highest_held_title_tier >= tier_kingdom），
+# 不下探到州（公爵）、县（伯爵）或无地官署封臣；已回落皇帝的路保留既有标记。
+tca_circuit_rebuild_registry_effect = {
+    if = { limit = { has_global_variable_list = tca_circuit_titles } clear_global_variable_list = tca_circuit_titles }
+    title:h_china.holder ?= {
+        # 皇帝名下且已带标记的旧路：保留登记，不主动补授（补授只认待补授标记）。
+        every_held_title = {
+            limit = { tca_circuit_is_road_trigger = yes has_variable = tca_circuit_kind }
+            tca_circuit_register_title_effect = yes
+        }
+        # 天朝直属封臣持有的路：从上到下只到王国级封臣，按当前契约重建类型并登记。
+        every_vassal = {
+            limit = {
+                highest_held_title_tier >= tier_kingdom
+                any_held_title = { tca_circuit_is_road_trigger = yes }
+            }
+            every_held_title = {
+                limit = { tca_circuit_is_road_trigger = yes }
+                tca_circuit_sync_kind_effect = yes
+            }
+        }
+    }
+    # 跨日两段式 day1 记录：仅在开启自动补授且全局列表缺失时按头衔变量兜底重建。
+    # 默认关闭自动补授时不执行，避免年度脉冲无意义遍历封臣头衔。
+    if = {
+        limit = {
+            has_global_variable = tca_circuit_self_grant_enabled
+            NOT = { has_global_variable_list = tca_circuit_prepared_titles }
+        }
+        # add_to_global_variable_list 会在列表不存在时自动创建。
+        title:h_china.holder ?= {
+            every_held_title = {
+                limit = { has_variable = tca_circuit_prepared_candidate }
+                tca_circuit_register_prepared_title_effect = yes
+            }
+            every_vassal = {
+                limit = { highest_held_title_tier >= tier_kingdom }
+                every_held_title = {
+                    limit = { has_variable = tca_circuit_prepared_candidate }
+                    tca_circuit_register_prepared_title_effect = yes
+                }
+            }
+        }
+    }
+    debug_log = "TCA_CIRCUIT REGISTRY_REBUILT"
+}
+
+# 角色作用域（root=新持有人）；scope:title 为本次变更头衔。on_title_gain 追加回调，只写标记/排队。
+# 本效果读取 on_title_gain 提供的 scope:transfer_type / scope:previous_holder，因此只由回调调用，
+# 测试应直接调用两个分支效果（mark_lapsed / register_road_holder_gain），避免缺少原版 scope。
+# 探针结论（1066 观察者局）：
+#   - 正常任命继承 = flag:appointment_succession（新持有人是封臣）；
+#   - 无人继承回落到皇帝 = flag:inheritance（root=皇帝、previous_holder 已死、头衔变量保留）。
+# 分支一按“root=皇帝 + 前任存在且已死 + 前任不是皇帝”识别回落（探针观察到的转移类型是 flag:inheritance）；
+# 不把 flag:inheritance 写成硬条件以保留防御性，也不能依赖 appointment_succession 识别回落。
+# 战争/剥夺/正常授予的前任仍存活，帝位继承的前任是皇帝，均被排除。
+# 分支二：天朝封臣取得带标记的路；待补授未结算时只排队，由维护决定接受还是收回。
+tca_circuit_on_title_gain_effect = {
+    if = {
+        limit = {
+            scope:title = { has_variable = tca_circuit_kind }
+            root = { has_title = title:h_china }
+            exists = scope:previous_holder
+            scope:previous_holder = { is_alive = no }
+            NOT = { scope:previous_holder ?= { has_title = title:h_china } }
+        }
+        scope:title = {
+            save_scope_as = tca_circuit_gain_title
+            debug_log_scopes = yes
+            debug_log = "TCA_CIRCUIT TITLE_GAIN_EMPEROR"
+            tca_circuit_mark_lapsed_title_effect = yes
+        }
+    }
+    else_if = {
+        limit = {
+            scope:title = { tca_circuit_is_road_trigger = yes }
+            NOT = { root = { has_title = title:h_china } }
+            root = { government_has_flag = government_is_celestial }
+        }
+        scope:title = {
+            save_scope_as = tca_circuit_gain_title
+            debug_log_scopes = yes
+            debug_log = "TCA_CIRCUIT TITLE_GAIN_CELESTIAL"
+            tca_circuit_register_road_holder_gain_effect = yes
+        }
+    }
+}
+
+# 头衔作用域；标记“任命继承回落、待补授”并排队次日维护。不读取 on_title_gain 的转移类型，测试可直接调用。
+# 只写标记，不清任何状态、不当场改头衔。探针显示回落约 1 tick 后 AI 可能已再次授予，
+# 因此待补授是否成立由维护按当前持有人判断（见 tca_circuit_handle_pending_title_effect）。
+tca_circuit_mark_lapsed_title_effect = {
+    tca_circuit_register_title_effect = yes
+    if = {
+        limit = { NOT = { has_variable = tca_circuit_pending_appointment } }
+        set_variable = { name = tca_circuit_pending_appointment value = yes }
+        debug_log = "TCA_CIRCUIT LAPSED_DETECTED"
+    }
+    title:h_china.holder ?= { tca_circuit_queue_maintenance_effect = yes }
+}
+
+# 头衔作用域；天朝封臣取得带标记的路。
+# 待补授未结算：保留原类型标记，等维护判断持有人是否为合格落点（不合格则收回后自授）；
+# 回落时已排队，这里不重复排队。
+# 无待补授（正常授予/正常任命继任）：按新持有人契约同步类型并登记。
+# 测试可直接在设置好 holder 后调用。
+tca_circuit_register_road_holder_gain_effect = {
+    if = {
+        limit = { has_variable = tca_circuit_pending_appointment }
+        # 回落时已排队次日维护；这里不重复排队，避免本模组自授后再次触发维护。
+        debug_log = "TCA_CIRCUIT PENDING_GAIN_WAIT"
+    }
+    else = {
+        tca_circuit_sync_kind_effect = yes
+        # P2：正常授予/正常任命继任后审计在任资格（默认只记录，不收回）。
+        tca_circuit_audit_incumbent_effect = yes
+    }
+}
+
+# 角色作用域（root=销毁前持有人）；scope:landed_title 为被销毁头衔。
+tca_circuit_on_title_destroyed_effect = {
+    scope:landed_title = { tca_circuit_unregister_title_effect = yes }
+}
+
+# 角色作用域（应为 h_china 持有人）；合并当日回落请求，次日执行维护。
+# 3 天定时标记只用于合并重复排队；若排队的 on_action 丢失（如保存重载），不会自动重排，
+# 恢复依赖下一季度巡检（pending 路仍满足 needs_maintenance）；维护结束主动清除标记。
+tca_circuit_queue_maintenance_effect = {
+    if = {
+        limit = {
+            is_alive = yes
+            has_title = title:h_china
+            NOT = { has_variable = tca_circuit_maintenance_pending }
+        }
+        set_variable = { name = tca_circuit_maintenance_pending value = yes days = 3 }
+        trigger_event = { on_action = tca_circuit_maintenance_work days = 1 }
+        debug_log = "TCA_CIRCUIT MAINTENANCE_QUEUED"
+    }
+}
+
+# ---------------------------------------------------------------------------
+# 二、单轮事务状态与候选池
+# ---------------------------------------------------------------------------
+
+# 空作用域；调试/后续引擎安全方案用：开启自动补授（默认关闭）。
+# 警告：脚本 granted 授予在部分引擎路径会销毁有地头衔；仅在确认安全方案后使用，不接入玩家入口。
+tca_circuit_enable_self_grant_effect = {
+    set_global_variable = { name = tca_circuit_self_grant_enabled value = yes }
+    debug_log = "TCA_CIRCUIT SELF_GRANT_ENABLED"
+}
+
+# 空作用域；关闭自动补授（第一版默认状态）。
+tca_circuit_disable_self_grant_effect = {
+    remove_global_variable = tca_circuit_self_grant_enabled
+    debug_log = "TCA_CIRCUIT SELF_GRANT_DISABLED"
+}
+
+# 空作用域；建立单轮事务状态。维护入口自动调用；测试若直接调用 fill/preclear 效果，须先调用本效果
+# 并按需调用 tca_circuit_collect_candidate_pool_effect 构造候选池。
+tca_circuit_begin_transaction_effect = {
+    if = { limit = { NOT = { has_global_variable = tca_circuit_run_serial } } set_global_variable = { name = tca_circuit_run_serial value = 0 } }
+    change_global_variable = { name = tca_circuit_run_serial add = 1 }
+    set_global_variable = { name = tca_circuit_transaction_depth value = 0 }
+    set_global_variable = { name = tca_circuit_transaction_kind value = 1 }
+    every_in_list = { list = tca_circuit_candidate_pool remove_from_list = tca_circuit_candidate_pool }
+    every_in_list = { list = tca_circuit_qualified_candidates remove_from_list = tca_circuit_qualified_candidates }
+    # 上一轮异常中断时可能残留的本轮授予参数。
+    remove_global_variable = tca_circuit_grant_kind
+    remove_global_variable = tca_circuit_grant_merit
+}
+
+# 空作用域；清理单轮事务状态（持久标记与登记不在此清理）。
+tca_circuit_end_transaction_effect = {
+    remove_global_variable = tca_circuit_transaction_depth
+    remove_global_variable = tca_circuit_transaction_kind
+    remove_global_variable = tca_circuit_grant_kind
+    remove_global_variable = tca_circuit_grant_merit
+}
+
+# 空作用域；从皇帝侧收集候选基线，不扫描全世界。
+# 遍历皇帝本人、皇帝宫廷、全部封臣（含无地官职 vassal）以及每个封臣的宫廷；参考司法补位的候选收集写法。
+# 每轮维护最多执行一次；逐头衔资格（原生资格、功绩门槛）在选人时另判。
+tca_circuit_collect_candidate_pool_effect = {
+    title:h_china.holder ?= {
+        tca_circuit_collect_candidates_from_character_effect = yes
+        every_vassal_or_below = { tca_circuit_collect_candidates_from_character_effect = yes }
+    }
+}
+
+# 角色作用域；把该统治者本人与其宫廷加入候选基线池。
+# 封臣与其宫廷结构上互不重叠（人物要么是封臣、要么是廷臣），不额外做 O(n²) 去重。
+# 候选池只在同一轮维护内使用，脚本列表不持久保存。
+tca_circuit_collect_candidates_from_character_effect = {
+    if = {
+        limit = { tca_circuit_candidate_base_trigger = yes }
+        add_to_list = tca_circuit_candidate_pool
+    }
+    every_courtier = {
+        if = {
+            limit = { tca_circuit_candidate_base_trigger = yes }
+            add_to_list = tca_circuit_candidate_pool
+        }
+    }
+}
+
+# 角色作用域（h_china 持有人）；季度巡检与次日维护的统一工作入口。
+# 先做一次轻量类型同步（只遍历登记路），仅在确有下次级待办时才扫描世界并执行补授/预清。
+tca_circuit_run_maintenance_effect = {
+    if = {
+        limit = { is_alive = yes has_title = title:h_china NOT = { has_variable = tca_circuit_maintenance_running } }
+        set_variable = { name = tca_circuit_maintenance_running value = yes days = 1 }
+        if = { limit = { NOT = { has_global_variable_list = tca_circuit_titles } } tca_circuit_rebuild_registry_effect = yes }
+        # 轻量同步：登记路的类型随契约变化更新；不接触候选池。
+        # 待补授未结算的路保留原类型（回落同 tick 的 AI 授予不应改路类型），由维护决定接受/收回。
+        if = {
+            limit = { has_global_variable_list = tca_circuit_titles }
+            every_in_global_list = {
+                variable = tca_circuit_titles
+                if = {
+                    limit = {
+                        tca_circuit_has_celestial_vassal_holder_trigger = yes
+                        NOT = { has_variable = tca_circuit_pending_appointment }
+                    }
+                    tca_circuit_sync_kind_effect = yes
+                    # P2：轻量循环内顺带审计在任资格（默认只写状态与日志，不改持有人）。
+                    tca_circuit_audit_incumbent_effect = yes
+                }
+            }
+        }
+        # 有实际待办才建立事务并扫描候选池。
+        if = {
+            limit = {
+                OR = {
+                    AND = {
+                        has_global_variable_list = tca_circuit_titles
+                        any_in_global_list = { variable = tca_circuit_titles tca_circuit_needs_maintenance_trigger = yes }
+                    }
+                    AND = {
+                        has_global_variable_list = tca_circuit_prepared_titles
+                        any_in_global_list = { variable = tca_circuit_prepared_titles has_variable = tca_circuit_prepared_candidate }
+                    }
+                }
+            }
+            tca_circuit_begin_transaction_effect = yes
+            # 仅在确有需要预清冷却的路（或已开启自动补授且有待补授/待收回）时才收集候选池；
+            # 默认关闭自动补授时，单纯的 pending_appointment 路不会触发全帝国人物扫描。
+            if = {
+                limit = {
+                    has_global_variable_list = tca_circuit_titles
+                    any_in_global_list = { variable = tca_circuit_titles tca_circuit_needs_candidate_pool_trigger = yes }
+                }
+                tca_circuit_collect_candidate_pool_effect = yes
+            }
+            every_in_global_list = { variable = tca_circuit_titles tca_circuit_maintain_title_effect = yes }
+            # 跨日两段式 day2：先处理路登记内待授予（含回落路的 pending 分支消费），再处理非路旧头衔。
+            # 列表内条目若已无 prepared 变量（已在上面被消费/接受），顺手移除；遍历中改动列表只影响后续条目，
+            # 最坏情况是残留条目留到下轮再清，不影响正确性。
+            if = {
+                limit = { has_global_variable_list = tca_circuit_prepared_titles }
+                every_in_global_list = {
+                    variable = tca_circuit_prepared_titles
+                    if = { limit = { has_variable = tca_circuit_prepared_candidate } tca_circuit_maintain_title_effect = yes }
+                    else = { tca_circuit_remove_prepared_title_effect = yes }
+                }
+            }
+            tca_circuit_end_transaction_effect = yes
+        }
+        # P14：维护结束才清 running/pending。若期间又有 on_title_gain 请求排队，会被 pending 吸收；
+        # 清理后同日再排队的请求也会在下一季度巡检按 pending 路重新处理，低风险。
+        remove_variable = tca_circuit_maintenance_running
+        remove_variable = tca_circuit_maintenance_pending
+    }
+}
+
+# 头衔作用域；逐路分派（跨日两段式优先）：
+#   1) 有待补授 → 第二层结算（其 accept 会清理已准备候选；retract/fill 会消费该变量）；
+#   2) 无待补授但在任资格不合格已入待处理 → 审计处置（默认只记录，双开关才收回再补授）；
+#   3) 无待补授但 day1 已准备候选 → day2 完成授予；
+#   4) 仍由天朝封臣持有且继承顺位为空 → 第一层预清；其余不动。
+tca_circuit_maintain_title_effect = {
+    # 跨日两段式入口守卫：prepared 候选仍在等次日时，本 tick 处理 pending 也只会等待，不消费/不授予。
+    if = {
+        limit = { has_variable = tca_circuit_prepared_candidate tca_circuit_prepared_wait_next_day_trigger = yes }
+        debug_log = "TCA_CIRCUIT MAINTAIN_WAIT_PREPARED"
+    }
+    else_if = {
+        limit = { tca_circuit_has_pending_appointment_trigger = yes }
+        tca_circuit_handle_pending_title_effect = yes
+    }
+    else_if = {
+        # P2/P3：在任资格审计已入待处理；默认关闭路径只清 pending/留审计标记，不改持有人。
+        limit = { tca_circuit_has_incumbent_pending_trigger = yes }
+        tca_circuit_handle_incumbent_invalid_effect = yes
+    }
+    else_if = {
+        limit = { has_variable = tca_circuit_prepared_candidate }
+        # 第一版默认关闭自动补授：prepared 候选不完成授予（保留变量，等待未来安全方案/调试开启）。
+        if = {
+            limit = { NOT = { has_global_variable = tca_circuit_self_grant_enabled } }
+            debug_log = "TCA_CIRCUIT SELF_GRANT_DISABLED"
+        }
+        else_if = {
+            limit = { var:tca_circuit_prepared_mode ?= 2 }
+            tca_circuit_complete_prepared_heir_effect = yes
+        }
+        else = { tca_circuit_complete_prepared_grant_effect = yes }
+    }
+    else_if = {
+        limit = { tca_circuit_should_preclear_trigger = yes }
+        tca_circuit_preclear_cooldowns_effect = yes
+    }
+}
+
+# 头衔作用域；待补授结算。
+# - 仍由皇帝持有：直接第二层自授；
+# - 已由天朝封臣持有（回落同 tick 内被原生/AI 授予）：合格落点则清待补授、接受结果并同步类型；
+#   不合格则先把头衔收回皇帝，再走第二层自授；被收回者的其他头衔保留、不按第三层处理；
+# - 其他持有人（外部、战争等）：保留待补授等待后续季度，只记录日志。
+tca_circuit_handle_pending_title_effect = {
+    save_scope_as = tca_circuit_pending_title
+    if = {
+        limit = { exists = holder holder = { has_title = title:h_china } }
+        # 第一版默认关闭自动补授：皇帝持有的回落路不自授，只保留 pending/登记等待未来安全方案。
+        if = {
+            limit = { NOT = { has_global_variable = tca_circuit_self_grant_enabled } }
+            debug_log = "TCA_CIRCUIT SELF_GRANT_DISABLED"
+        }
+        else = { scope:tca_circuit_pending_title = { tca_circuit_fill_lapsed_title_effect = yes } }
+    }
+    else_if = {
+        limit = { tca_circuit_has_celestial_vassal_holder_trigger = yes }
+        title:h_china.holder = { save_scope_as = tca_circuit_pending_top_liege }
+        if = {
+            limit = {
+                holder = {
+                    tca_circuit_is_acceptable_road_holder_trigger = {
+                        TITLE = scope:tca_circuit_pending_title
+                        TOP_LIEGE = scope:tca_circuit_pending_top_liege
+                    }
+                }
+            }
+            # 接受既有结果时同时丢弃 day1 已准备候选，避免后续重复授予。
+            remove_variable = tca_circuit_prepared_candidate
+            remove_variable = tca_circuit_prepared_mode
+            remove_variable = tca_circuit_prepared_wait
+            remove_variable = tca_circuit_prepared_serial
+            tca_circuit_remove_prepared_title_effect = yes
+            # P3a：接受原生/AI 结果前，先按 pending 路冻结的 kind 补约（都护 level4 被拒会由应用效果回退军区），
+            # 再清 pending 并同步类型；补约失败时 sync 会保留原 kind，不会静默降为文官。
+            scope:tca_circuit_pending_title = {
+                if = {
+                    limit = { has_variable = tca_circuit_kind var:tca_circuit_kind ?= 3 }
+                    holder ?= { tca_circuit_apply_road_kind_contract_effect = { KIND = 3 TITLE = scope:tca_circuit_pending_title } }
+                }
+                else_if = {
+                    limit = { has_variable = tca_circuit_kind var:tca_circuit_kind ?= 2 }
+                    holder ?= { tca_circuit_apply_road_kind_contract_effect = { KIND = 2 TITLE = scope:tca_circuit_pending_title } }
+                }
+            }
+            remove_variable = tca_circuit_pending_appointment
+            tca_circuit_sync_kind_effect = yes
+            debug_log = "TCA_CIRCUIT ACCEPT_EXISTING_HOLDER"
+        }
+        else = {
+            # 第一版默认关闭自动补授：不收回不合格持有人（避免破坏性操作），只保留 pending/登记。
+            if = {
+                limit = { NOT = { has_global_variable = tca_circuit_self_grant_enabled } }
+                debug_log = "TCA_CIRCUIT SELF_GRANT_DISABLED"
+            }
+            else = {
+                debug_log = "TCA_CIRCUIT RETRACT_UNQUALIFIED_HOLDER"
+                scope:tca_circuit_pending_title = { tca_circuit_retract_title_to_emperor_effect = yes }
+                # 收回后仍由皇帝持有才继续自授；否则保留待补授等待下轮。
+                if = {
+                    limit = { tca_circuit_is_lapsed_trigger = yes }
+                    scope:tca_circuit_pending_title = { tca_circuit_fill_lapsed_title_effect = yes }
+                }
+                else = { debug_log = "TCA_CIRCUIT RETRACT_FAILED" }
+            }
+        }
+    }
+    else = {
+        scope:tca_circuit_pending_title = { if = { limit = { NOT = { tca_circuit_has_celestial_vassal_holder_trigger = yes } } debug_log = "TCA_CIRCUIT PENDING_HOLDER_INVALID" } }
+    }
+}
+
+# 头衔作用域；把待补授路从当前不合格持有人收回皇帝名下（granted 事务，先例见司法精确补位转给上级）。
+# 只转移路本身；被收回者的其他头衔保留，不按第三层处理。
+tca_circuit_retract_title_to_emperor_effect = {
+    save_scope_as = tca_circuit_retract_title
+    if = {
+        limit = { exists = holder NOT = { holder = { has_title = title:h_china } } exists = title:h_china.holder }
+        holder = { save_scope_as = tca_circuit_retract_holder }
+        title:h_china.holder = { save_scope_as = tca_circuit_retract_emperor }
+        # 收回同样由当前持有人发起；目标为皇帝。
+        scope:tca_circuit_retract_holder = {
+            tca_circuit_transfer_title_granted_effect = {
+                TITLE = scope:tca_circuit_retract_title
+                HOLDER = scope:tca_circuit_retract_emperor
+            }
+        }
+        debug_log = "TCA_CIRCUIT RETRACTED_UNQUALIFIED_HOLDER"
+    }
+    else = { if = { limit = { exists = scope:tca_circuit_retract_title } } }
+}
+
+# ---------------------------------------------------------------------------
+# 三、第一层：季度预清近期受任冷却
+# ---------------------------------------------------------------------------
+
+# 头衔作用域；只清理“其余条件合格、只差近期受任冷却”的候选的冷却，让原生继承候选池恢复。
+# 不在本层改头衔；清理后仍无候选人则不处理，等死亡回落进入第二层。
+tca_circuit_preclear_cooldowns_effect = {
+    save_scope_as = tca_circuit_preclear_title
+    title:h_china.holder = { save_scope_as = tca_circuit_preclear_top_liege }
+    # P0：预清前记录“第一顺位不满足头衔功绩等级”的诊断，便于定位季度预清触发原因；随后照常预清。
+    if = {
+        limit = {
+            NOT = { tca_circuit_has_valid_heir_trigger = yes }
+            exists = current_heir
+        }
+        current_heir = { save_scope_as = tca_circuit_preclear_heir }
+        debug_log_scopes = yes
+        debug_log = "TCA_CIRCUIT HEIR_LEVEL_LOW"
+    }
+    every_in_list = {
+        list = tca_circuit_candidate_pool
+        save_scope_as = tca_circuit_preclear_candidate
+        if = {
+            limit = {
+                tca_circuit_is_preclear_candidate_trigger = {
+                    TITLE = scope:tca_circuit_preclear_title
+                    CANDIDATE = scope:tca_circuit_preclear_candidate
+                    TOP_LIEGE = scope:tca_circuit_preclear_top_liege
+                }
+            }
+            tca_circuit_clear_recent_appointment_effect = yes
+        }
+    }
+    # 候选池为空时读取仍会执行，保证 saved scope 在所有路径上都被消费。
+    if = { limit = { exists = scope:tca_circuit_preclear_title exists = scope:tca_circuit_preclear_top_liege } }
+}
+
+# 角色作用域；只清理近期受任类冷却，不无条件清 appointment_timeout_days。
+# 探针已确认：原生任命会写 appointment_timeout_days（1825 起递减），clear_appointment_timeout 能恢复原生按级候选；
+# 原版恢复任命决议也使用该效果。大额辞谢/致仕超时由排除清单过滤。
+tca_circuit_clear_recent_appointment_effect = {
+    if = {
+        limit = { tca_circuit_has_recent_appointment_cooldown_trigger = yes }
+        clear_appointment_timeout = yes
+        remove_variable = tca_recent_appointment
+        debug_log = "TCA_CIRCUIT PRECLEAR_CLEARED"
+    }
+}
+
+# ---------------------------------------------------------------------------
+# 四、第二/三层：回落后加权自授与旧头衔递归
+# ---------------------------------------------------------------------------
+
+# 头衔作用域；第二层入口：带待补授标记、已回落到皇帝的路。测试直接调用时须先写待补授标记。
+tca_circuit_fill_lapsed_title_effect = {
+    # 第一版默认关闭自动补授：未启用时只记录并保留 pending/登记，不授予、不改 holder。
+    if = {
+        limit = { NOT = { has_global_variable = tca_circuit_self_grant_enabled } }
+        debug_log = "TCA_CIRCUIT SELF_GRANT_DISABLED"
+    }
+    # 跨日两段式入口守卫：本头衔 prepared 候选仍在等次日 → 本 tick 不进入填充（同轮二次进入直接等待）。
+    else_if = {
+        limit = { has_variable = tca_circuit_prepared_candidate tca_circuit_prepared_wait_next_day_trigger = yes }
+        debug_log = "TCA_CIRCUIT FILL_WAIT_PREPARED"
+    }
+    else_if = {
+        limit = { NOT = { has_variable = tca_circuit_pending_appointment } }
+        debug_log = "TCA_CIRCUIT FILL_SKIP_NO_PENDING"
+    }
+    else = {
+        # P1：先确保事务存在（begin 会重置 transaction_kind），再冻结本轮路类型。
+        # 事务是否存在以 transaction_depth 为准：run_serial 在 end 后保留，不能用来判断。
+        if = { limit = { NOT = { has_global_variable = tca_circuit_transaction_depth } } tca_circuit_begin_transaction_effect = yes }
+        debug_log = "TCA_CIRCUIT LAPSED_FILL_BEGIN"
+        if = { limit = { has_variable = tca_circuit_kind } set_global_variable = { name = tca_circuit_transaction_kind value = var:tca_circuit_kind } }
+        tca_circuit_fill_vacant_title_effect = yes
+        if = {
+            limit = { tca_circuit_is_lapsed_trigger = yes }
+            debug_log = "TCA_CIRCUIT LAPSED_FILL_FAILED"
+        }
+    }
+}
+
+# 头衔作用域；第二/三层通用补授：先按权重 = 1 + 功绩等级抽人，选不到再生成兜底。
+# 同一轮同一头衔只处理一次（processed_serial）；同一人物只被授职一次（used_serial）；
+# 递归深度上限 4，超限直接生成并记录日志。
+# 头衔作用域；无人可授时递归补位/生成。跨日两段式主流程（互斥分支，defer/消费均是终态）：
+#   A) 本头衔有 prepared 候选且仍在“等次日”闸门 → 只等待；
+#   B) prepared mode 2（旧头衔交继承人）→ 等待维护完成效果；
+#   C) prepared 候选可跨日消费 → 消费并授予同一候选；
+#   D) 其余：清理无效 prepared 后正常选人；选中者需要准备则 defer，否则立即 assign；无人可授则生成兜底。
+# CK3 没有 return，因此所有“做完即结束”的分支都放在 if/else_if/else 链中，分支内不得再落入其他分支。
+tca_circuit_fill_vacant_title_effect = {
+    # 供测试直接调用时容错：没有事务状态先建立（候选池需调用方自行收集）。
+    # 用 transaction_depth 判断，因为 run_serial 在 end 后保留。
+    if = { limit = { NOT = { has_global_variable = tca_circuit_transaction_depth } } tca_circuit_begin_transaction_effect = yes }
+    if = {
+        limit = {
+            AND = {
+                has_variable = tca_circuit_processed_serial
+                has_global_variable = tca_circuit_run_serial
+                var:tca_circuit_processed_serial ?= global_var:tca_circuit_run_serial
+            }
+        }
+        debug_log = "TCA_CIRCUIT SKIP_PROCESSED_TITLE"
+    }
+    else = {
+        set_variable = { name = tca_circuit_processed_serial value = global_var:tca_circuit_run_serial }
+        change_global_variable = { name = tca_circuit_transaction_depth add = 1 }
+        if = {
+            limit = { global_var:tca_circuit_transaction_depth > 4 }
+            debug_log = "TCA_CIRCUIT RECURSION_LIMIT"
+            tca_circuit_generate_holder_effect = yes
+        }
+        else = {
+            # 预先保存本头衔与皇帝作用域，供 A/C/D 分支读取。
+            save_scope_as = tca_circuit_prepared_fill_title
+            clear_saved_scope = tca_circuit_prepared_fill_liege
+            title:h_china.holder ?= { save_scope_as = tca_circuit_prepared_fill_liege }
+            if = {
+                # A) 同轮闸门：本头衔有 prepared 候选且尚未到真正的次日维护入口 → 只等待（终态）。
+                limit = { has_variable = tca_circuit_prepared_candidate tca_circuit_prepared_wait_next_day_trigger = yes }
+                debug_log = "TCA_CIRCUIT PREPARED_WAIT_NEXT_DAY"
+            }
+            else_if = {
+                # B) mode 2（旧头衔交继承人）：由 tca_circuit_complete_prepared_heir_effect 在维护中处理（终态）。
+                limit = { has_variable = tca_circuit_prepared_candidate var:tca_circuit_prepared_mode ?= 2 }
+                debug_log = "TCA_CIRCUIT PREPARED_HEIR_WAIT"
+            }
+            else_if = {
+                # C) 跨日消费：候选仍合格则直接授给同一候选（终态）。
+                limit = {
+                    exists = scope:tca_circuit_prepared_fill_liege
+                    exists = var:tca_circuit_prepared_candidate
+                    var:tca_circuit_prepared_candidate = {
+                        is_alive = yes
+                        tca_circuit_is_qualified_candidate_trigger = {
+                            TITLE = scope:tca_circuit_prepared_fill_title
+                            TOP_LIEGE = scope:tca_circuit_prepared_fill_liege
+                        }
+                    }
+                }
+                # 正式诊断：区分同轮/跨轮消费，便于确认跨日约束是否生效。
+                if = { limit = { tca_circuit_prepared_same_run_trigger = yes } debug_log = "TCA_CIRCUIT PREPARED_CONSUME_SAME_RUN" }
+                else = { debug_log = "TCA_CIRCUIT PREPARED_CONSUME_CROSS_RUN" }
+                var:tca_circuit_prepared_candidate = { save_scope_as = tca_circuit_selected_candidate }
+                remove_variable = tca_circuit_prepared_candidate
+                remove_variable = tca_circuit_prepared_mode
+                remove_variable = tca_circuit_prepared_wait
+                remove_variable = tca_circuit_prepared_serial
+                tca_circuit_remove_prepared_title_effect = yes
+                debug_log = "TCA_CIRCUIT PREPARED_CONSUMED"
+                tca_circuit_assign_selected_candidate_effect = yes
+            }
+            else = {
+                # D) 正常路径（终态）：清无效 prepared 记录 → 重建候选 → 选中后 defer 或 assign。
+                if = {
+                    limit = { has_variable = tca_circuit_prepared_candidate }
+                    remove_variable = tca_circuit_prepared_candidate
+                    remove_variable = tca_circuit_prepared_mode
+                    remove_variable = tca_circuit_prepared_wait
+                    remove_variable = tca_circuit_prepared_serial
+                    tca_circuit_remove_prepared_title_effect = yes
+                    debug_log = "TCA_CIRCUIT PREPARED_INVALID_RECLEAR"
+                }
+                tca_circuit_build_qualified_candidates_effect = yes
+                clear_saved_scope = tca_circuit_selected_candidate
+                random_in_list = {
+                    list = tca_circuit_qualified_candidates
+                    weight = { base = 0 modifier = { add = tca_circuit_candidate_weight_value } }
+                    save_scope_as = tca_circuit_selected_candidate
+                }
+                if = {
+                    limit = { exists = scope:tca_circuit_selected_candidate }
+                    # 安全边界：有地目标 + 无地且无家门的真实候选不再走真实角色两段式（会销毁头衔），
+                    # 也不应出现在合格列表；此处仅防御直接调用路径：跳过并记录，待下一轮/生成兜底。
+                    if = {
+                        limit = {
+                            exists = scope:tca_circuit_prepared_fill_liege
+                            scope:tca_circuit_selected_candidate = {
+                                tca_circuit_needs_recipient_preparation_trigger = { TITLE = scope:tca_circuit_prepared_fill_title }
+                            }
+                        }
+                        debug_log = "TCA_CIRCUIT CANDIDATE_UNSAFE_SKIPPED"
+                    }
+                    else = { tca_circuit_assign_selected_candidate_effect = yes }
+                }
+                else = {
+                    debug_log = "TCA_CIRCUIT NO_CANDIDATE"
+                    tca_circuit_generate_holder_effect = yes
+                }
+            }
+        }
+        change_global_variable = { name = tca_circuit_transaction_depth add = -1 }
+    }
+}
+
+# 头衔作用域；跨日两段式 day2（mode 2）：把 day1 准备的旧头衔继承人正式转交。
+# day1 在 tca_circuit_reassign_old_title_effect 发现“无地 current_heir”时 prepare + 写头衔变量（mode 2）
+# + 排队，不转交；day2 维护无 pending 时进入本效果。资格复验：存活、非皇帝、非头衔领主、仍是 current_heir
+# （current_heir 缺失时接受记录者）；无效则清记录并回退 fill_vacant 重新递归/生成。
+# 成功后与同日交继承人路径一致：processed/used、ensure、请求司法/通判维护、旧路保持契约与类型；
+# 失败只记日志并清记录，pending（如有）保留。
+tca_circuit_complete_prepared_heir_effect = {
+    # 第一版默认关闭自动补授：不完成交接，保留状态等待安全方案/调试开启。
+    if = {
+        limit = { NOT = { has_global_variable = tca_circuit_self_grant_enabled } }
+        debug_log = "TCA_CIRCUIT SELF_GRANT_DISABLED"
+    }
+    # 跨日两段式闸门：同轮刚准备（含 prepare 事务触发的二次维护/新事务）必须等到次日维护入口
+    # 解除 tca_circuit_prepared_wait 后才能转交；本轮只记录等待。
+    else_if = {
+        limit = { tca_circuit_prepared_wait_next_day_trigger = yes }
+        debug_log = "TCA_CIRCUIT PREPARED_WAIT_NEXT_DAY"
+    }
+    else = {
+    if = { limit = { NOT = { has_global_variable = tca_circuit_transaction_depth } } tca_circuit_begin_transaction_effect = yes }
+    save_scope_as = tca_circuit_prepared_title
+    clear_saved_scope = tca_circuit_prepared_top_liege
+    title:h_china.holder ?= { save_scope_as = tca_circuit_prepared_top_liege }
+    # 头衔当前持有人的领主（禁止 holder.liege 反向链）：用于“不交给领主”复验。
+    clear_saved_scope = tca_circuit_prepared_title_liege
+    if = {
+        limit = { exists = holder }
+        holder = { if = { limit = { exists = liege } liege = { save_scope_as = tca_circuit_prepared_title_liege } } }
+    }
+    if = {
+        limit = {
+            exists = scope:tca_circuit_prepared_top_liege
+            exists = var:tca_circuit_prepared_candidate
+            var:tca_circuit_prepared_candidate = { is_alive = yes }
+        }
+        var:tca_circuit_prepared_candidate = { save_scope_as = tca_circuit_prepared_holder }
+        if = {
+            limit = {
+                scope:tca_circuit_prepared_holder = {
+                    is_alive = yes
+                    NOT = { has_title = title:h_china }
+                }
+                OR = {
+                    NOT = { exists = scope:tca_circuit_prepared_title_liege }
+                    NOT = { scope:tca_circuit_prepared_holder ?= scope:tca_circuit_prepared_title_liege }
+                }
+                OR = {
+                    NOT = { exists = current_heir }
+                    current_heir ?= scope:tca_circuit_prepared_holder
+                }
+            }
+            if = {
+                limit = {
+                    exists = holder
+                    OR = {
+                        holder ?= scope:tca_circuit_prepared_holder
+                        tca_circuit_has_celestial_vassal_holder_trigger = yes
+                    }
+                }
+                remove_variable = tca_circuit_prepared_candidate
+                remove_variable = tca_circuit_prepared_mode
+                remove_variable = tca_circuit_prepared_wait
+                remove_variable = tca_circuit_prepared_serial
+                tca_circuit_remove_prepared_title_effect = yes
+                debug_log = "TCA_CIRCUIT PREPARED_ALREADY_HELD"
+            }
+            else = {
+                clear_saved_scope = tca_circuit_prepared_grantor
+                if = { limit = { exists = holder } holder = { save_scope_as = tca_circuit_prepared_grantor } }
+                if = { limit = { NOT = { exists = scope:tca_circuit_prepared_grantor } } scope:tca_circuit_prepared_top_liege = { save_scope_as = tca_circuit_prepared_grantor } }
+                if = {
+                    limit = { exists = scope:tca_circuit_prepared_grantor }
+                    scope:tca_circuit_prepared_grantor = {
+                        tca_circuit_transfer_title_granted_effect = {
+                            TITLE = scope:tca_circuit_prepared_title
+                            HOLDER = scope:tca_circuit_prepared_holder
+                        }
+                    }
+                }
+                if = {
+                    limit = { holder ?= scope:tca_circuit_prepared_holder }
+                    set_variable = { name = tca_circuit_processed_serial value = global_var:tca_circuit_run_serial }
+                    scope:tca_circuit_prepared_holder = {
+                        set_variable = { name = tca_circuit_used_serial value = global_var:tca_circuit_run_serial }
+                        tca_circuit_ensure_holder_state_effect = yes
+                    }
+                    # 旧头衔交由所属模块的既有维护校验专职规则；只请求其公开维护入口。
+                    if = {
+                        limit = { tca_circuit_has_celestial_vassal_holder_trigger = yes }
+                        holder = {
+                            tca_request_judicial_maintenance_effect = yes
+                            tca_request_tongpan_maintenance_effect = yes
+                        }
+                    }
+                    # 旧头衔本身若是带类型的路，转让后仍保持其军事契约与类型。
+                    if = {
+                        limit = { has_variable = tca_circuit_kind }
+                        if = { limit = { var:tca_circuit_kind = 3 } holder ?= { tca_circuit_apply_road_kind_contract_effect = { KIND = 3 TITLE = scope:tca_circuit_prepared_title } } }
+                        else_if = { limit = { var:tca_circuit_kind = 2 } holder ?= { tca_circuit_apply_road_kind_contract_effect = { KIND = 2 TITLE = scope:tca_circuit_prepared_title } } }
+                        tca_circuit_sync_kind_effect = yes
+                    }
+                    remove_variable = tca_circuit_prepared_candidate
+                    remove_variable = tca_circuit_prepared_mode
+                    remove_variable = tca_circuit_prepared_wait
+                    remove_variable = tca_circuit_prepared_serial
+                    tca_circuit_remove_prepared_title_effect = yes
+                    debug_log = "TCA_CIRCUIT OLD_TITLE_TRANSFER_HEIR"
+                    scope:tca_circuit_prepared_holder = { tca_circuit_process_old_titles_effect = yes }
+                }
+                else = {
+                    remove_variable = tca_circuit_prepared_candidate
+                    remove_variable = tca_circuit_prepared_mode
+                    remove_variable = tca_circuit_prepared_wait
+                    remove_variable = tca_circuit_prepared_serial
+                    tca_circuit_remove_prepared_title_effect = yes
+                    debug_log = "TCA_CIRCUIT PREPARED_GRANT_FAILED"
+                }
+            }
+        }
+        else = {
+            # 继承人失效（死亡/不再是继承人/成为皇帝或头衔领主）：清记录并回退到递归/生成。
+            remove_variable = tca_circuit_prepared_candidate
+            remove_variable = tca_circuit_prepared_mode
+            remove_variable = tca_circuit_prepared_wait
+            remove_variable = tca_circuit_prepared_serial
+            tca_circuit_remove_prepared_title_effect = yes
+            remove_variable = tca_circuit_processed_serial
+            debug_log = "TCA_CIRCUIT PREPARED_GRANT_INVALID"
+            tca_circuit_fill_vacant_title_effect = yes
+        }
+    }
+    else = {
+        if = { limit = { exists = scope:tca_circuit_prepared_title } }
+        remove_variable = tca_circuit_prepared_candidate
+        remove_variable = tca_circuit_prepared_mode
+        remove_variable = tca_circuit_prepared_wait
+        remove_variable = tca_circuit_prepared_serial
+        tca_circuit_remove_prepared_title_effect = yes
+        remove_variable = tca_circuit_processed_serial
+        debug_log = "TCA_CIRCUIT PREPARED_GRANT_INVALID"
+        tca_circuit_fill_vacant_title_effect = yes
+    }
+    }
+}
+
+# 头衔作用域；跨日两段式 day2：把 day1 已准备的候选正式授予（无待补授时的维护入口）。
+# 生命周期：day1 在 fill_vacant 选中/生成接收者后调用 prepare + 写头衔变量 tca_circuit_prepared_candidate
+# + 排队次日维护，不授予；day2 维护在无 pending 时进入本效果，用 include_vassals 转移并继续 finalize/旧头衔递归。
+# 失效（变量不存在、候选已死、不再满足资格）：清变量、记 PREPARED_GRANT_INVALID；若是 lapsed 路，pending 仍在，
+# 由后续 pending 分支重试。头衔已由候选本人或合格天朝封臣持有：清变量返回，避免重复授予。
+# 授予失败：只记 PREPARED_GRANT_FAILED 并清变量，pending（如有）保留等待下一轮。
+# KIND：优先头衔自身 tca_circuit_kind（生成/递归时可在 day2 恢复），否则本轮事务路类型，再缺按 1（非路头衔 finalize 不读）。
+# 本效果直接调用时自动建立事务状态（候选池由调用方按需准备）。
+tca_circuit_complete_prepared_grant_effect = {
+    # 第一版默认关闭自动补授：即使有 prepared 遗留也不完成授予，保留状态等待安全方案/调试开启。
+    if = {
+        limit = { NOT = { has_global_variable = tca_circuit_self_grant_enabled } }
+        debug_log = "TCA_CIRCUIT SELF_GRANT_DISABLED"
+    }
+    # mode 2（旧头衔交继承人）由 tca_circuit_complete_prepared_heir_effect 处理；此处防御性等待。
+    else_if = {
+        limit = { has_variable = tca_circuit_prepared_candidate var:tca_circuit_prepared_mode ?= 2 }
+        debug_log = "TCA_CIRCUIT PREPARED_HEIR_WAIT"
+    }
+    # 跨日两段式闸门：同轮刚准备（含 prepare 事务触发的二次维护/新事务）必须等到真正的次日维护入口
+    # 解除 tca_circuit_prepared_wait 后才能授予；本轮只记录等待，不授予。
+    else_if = {
+        limit = { tca_circuit_prepared_wait_next_day_trigger = yes }
+        debug_log = "TCA_CIRCUIT PREPARED_WAIT_NEXT_DAY"
+    }
+    else = {
+    if = { limit = { NOT = { has_global_variable = tca_circuit_transaction_depth } } tca_circuit_begin_transaction_effect = yes }
+    save_scope_as = tca_circuit_prepared_title
+    clear_saved_scope = tca_circuit_prepared_top_liege
+    title:h_china.holder ?= { save_scope_as = tca_circuit_prepared_top_liege }
+    if = {
+        limit = {
+            exists = scope:tca_circuit_prepared_top_liege
+            exists = var:tca_circuit_prepared_candidate
+            var:tca_circuit_prepared_candidate = { is_alive = yes }
+        }
+        var:tca_circuit_prepared_candidate = { save_scope_as = tca_circuit_prepared_holder }
+        if = {
+            limit = {
+                scope:tca_circuit_prepared_holder = {
+                    tca_circuit_is_qualified_candidate_trigger = {
+                        TITLE = scope:tca_circuit_prepared_title
+                        TOP_LIEGE = scope:tca_circuit_prepared_top_liege
+                    }
+                }
+            }
+            if = {
+                limit = {
+                    exists = holder
+                    OR = {
+                        holder ?= scope:tca_circuit_prepared_holder
+                        tca_circuit_has_celestial_vassal_holder_trigger = yes
+                    }
+                }
+                # 已持有或已有合格天朝封臣：丢弃 day1 候选；lapsed 的 pending 交给后续处理。
+                remove_variable = tca_circuit_prepared_candidate
+                remove_variable = tca_circuit_prepared_mode
+                remove_variable = tca_circuit_prepared_wait
+                remove_variable = tca_circuit_prepared_serial
+                tca_circuit_remove_prepared_title_effect = yes
+                debug_log = "TCA_CIRCUIT PREPARED_ALREADY_HELD"
+            }
+            else = {
+                # 恢复 day2 授予的 KIND（有地路用自身标记；旧头衔沿用本轮路类型；缺失按 1）。
+                set_global_variable = { name = tca_circuit_grant_kind value = 1 }
+                if = { limit = { has_variable = tca_circuit_kind } set_global_variable = { name = tca_circuit_grant_kind value = var:tca_circuit_kind } }
+                else_if = { limit = { has_global_variable = tca_circuit_transaction_kind } set_global_variable = { name = tca_circuit_grant_kind value = global_var:tca_circuit_transaction_kind } }
+                # 授予者：当前持有人；缺失时用皇帝（上面已确认存在）。
+                clear_saved_scope = tca_circuit_prepared_grantor
+                if = { limit = { exists = holder } holder = { save_scope_as = tca_circuit_prepared_grantor } }
+                if = { limit = { NOT = { exists = scope:tca_circuit_prepared_grantor } } scope:tca_circuit_prepared_top_liege = { save_scope_as = tca_circuit_prepared_grantor } }
+                if = {
+                    limit = { exists = scope:tca_circuit_prepared_grantor }
+                    scope:tca_circuit_prepared_grantor = {
+                        tca_circuit_transfer_title_granted_effect = {
+                            TITLE = scope:tca_circuit_prepared_title
+                            HOLDER = scope:tca_circuit_prepared_holder
+                        }
+                    }
+                }
+                if = {
+                    limit = { holder ?= scope:tca_circuit_prepared_holder }
+                    scope:tca_circuit_prepared_holder = {
+                        set_variable = { name = tca_circuit_used_serial value = global_var:tca_circuit_run_serial }
+                        tca_circuit_ensure_holder_state_effect = yes
+                        tca_set_official_appointment_cooldown_effect = yes
+                    }
+                    tca_circuit_finalize_title_grant_effect = { KIND = global_var:tca_circuit_grant_kind }
+                    remove_variable = tca_circuit_prepared_candidate
+                    remove_variable = tca_circuit_prepared_mode
+                    remove_variable = tca_circuit_prepared_wait
+                    remove_variable = tca_circuit_prepared_serial
+                    tca_circuit_remove_prepared_title_effect = yes
+                    # 关键：本目标头衔刚授予，必须先标记本轮已处理，否则 process_old_titles 会把它当旧头衔再次交接，
+                    # 引擎在 include_vassals 交接时销毁该路（test.1/2 复现：GRANT_OK → OLD_TITLE_DIAG_HEIR → UNREGISTER）。
+                    set_variable = { name = tca_circuit_processed_serial value = global_var:tca_circuit_run_serial }
+                    debug_log = "TCA_CIRCUIT PREPARED_GRANT"
+                    scope:tca_circuit_prepared_holder = { tca_circuit_process_old_titles_effect = yes }
+                }
+                else = {
+                    remove_variable = tca_circuit_prepared_candidate
+                    remove_variable = tca_circuit_prepared_mode
+                    remove_variable = tca_circuit_prepared_wait
+                    remove_variable = tca_circuit_prepared_serial
+                    tca_circuit_remove_prepared_title_effect = yes
+                    debug_log = "TCA_CIRCUIT PREPARED_GRANT_FAILED"
+                }
+            }
+        }
+        else = {
+            remove_variable = tca_circuit_prepared_candidate
+            remove_variable = tca_circuit_prepared_mode
+            remove_variable = tca_circuit_prepared_wait
+            remove_variable = tca_circuit_prepared_serial
+            tca_circuit_remove_prepared_title_effect = yes
+            debug_log = "TCA_CIRCUIT PREPARED_GRANT_INVALID"
+        }
+    }
+    else = {
+        if = { limit = { exists = scope:tca_circuit_prepared_title } }
+        remove_variable = tca_circuit_prepared_candidate
+        remove_variable = tca_circuit_prepared_mode
+        remove_variable = tca_circuit_prepared_wait
+        remove_variable = tca_circuit_prepared_serial
+        tca_circuit_remove_prepared_title_effect = yes
+        debug_log = "TCA_CIRCUIT PREPARED_GRANT_INVALID"
+    }
+    }
+}
+
+# 头衔作用域；为当前目标头衔重建合格候选列表（先清空列表，再逐个基线候选判定）。
+tca_circuit_build_qualified_candidates_effect = {
+    every_in_list = { list = tca_circuit_qualified_candidates remove_from_list = tca_circuit_qualified_candidates }
+    save_scope_as = tca_circuit_qualify_title
+    title:h_china.holder = { save_scope_as = tca_circuit_qualify_top_liege }
+    every_in_list = {
+        list = tca_circuit_candidate_pool
+        if = {
+            limit = {
+                tca_circuit_is_qualified_candidate_trigger = {
+                    TITLE = scope:tca_circuit_qualify_title
+                    TOP_LIEGE = scope:tca_circuit_qualify_top_liege
+                }
+            }
+            add_to_list = tca_circuit_qualified_candidates
+        }
+        else_if = {
+            # 安全收窄：仅因“无家门且无地”被排除的真实候选，记录一次（每头衔首次，避免刷屏）。
+            limit = {
+                exists = scope:tca_circuit_qualify_title
+                scope:tca_circuit_qualify_title = { NOT = { has_variable = tca_circuit_unsafe_skipped_logged } }
+                tca_circuit_candidate_base_trigger = yes
+                tca_circuit_is_native_appointment_eligible_trigger = {
+                    TITLE = scope:tca_circuit_qualify_title
+                    TOP_LIEGE = scope:tca_circuit_qualify_top_liege
+                }
+                this != scope:tca_circuit_qualify_title.holder
+                tca_circuit_needs_recipient_preparation_trigger = { TITLE = scope:tca_circuit_qualify_title }
+            }
+            scope:tca_circuit_qualify_title = { set_variable = { name = tca_circuit_unsafe_skipped_logged value = yes } }
+            debug_log = "TCA_CIRCUIT CANDIDATE_UNSAFE_SKIPPED"
+        }
+    }
+    # 候选池为空时下面的读取仍会执行，保证 saved scope 在所有路径上都被消费。
+    if = { limit = { exists = scope:tca_circuit_qualify_title exists = scope:tca_circuit_qualify_top_liege } }
+}
+
+# 角色作用域（接收者）；参数：$RULER$ 授予者（目标头衔当前持有人），$TITLE$ 目标头衔作用域。
+# 引擎复测：皇帝持有的“有地头衔”授予无地接收者时，granted 事务 resolve 会销毁目标头衔；接收者已有地则成功。
+# 因此在授予前把“有地目标 + 无地接收者”先做成无地统治者，顺序参考已验证夹具
+# tca_test_create_merit_probe_character_with_age_effect（common/scripted_effects/tests/fixtures/tca_merit_probe_effects.txt）：
+#   低出身建王朝 → 无家门补家门（create_noble_family_effect，覆盖已有 dynasty 的真实候选）→
+#   建立真实领主关系（避免孤立家门被原生维护移入人物池）→ 非天朝改制。
+# 只对“接收者无地 + 目标有地”执行；目标为无地官署（提刑/通判等）保持原路径；已有王朝/家门/领主/政体不重复（幂等）。
+# 注：本效果仅由生成兜底路径在 day1 调用（真实候选走 same-tick include_vassals，不经过本效果新建家门）。
+# 授予者与目标领主作用域先安全保存，禁止 holder.liege 反向链式比较。
+tca_circuit_prepare_landless_recipient_effect = {
+    if = {
+        limit = {
+            is_alive = yes
+            is_landed = no
+            $TITLE$ = { is_landless_type_title = no }
+        }
+        # 1) 低出身先建王朝：天朝行政头衔要求统治者有世族（rulers_should_have_dynasty）。
+        if = { limit = { is_lowborn = yes } create_dynasty = { spread_to_descendants = yes } }
+        # 2) 无家门时补无地家门；孤立家门随后补真实领主。
+        # 不用裸 give_noble_family_title：对“非 lowborn、已有 dynasty、无家门”的真实候选会报
+        # Failed to create a noble family title，接收者仍不是统治者，导致 include_vassals 转移被销毁。
+        # 改走本模组既有入口 create_noble_family_effect（与 ensure_holder_state、司法补位一致）：
+        # 内部处理 house head／cadet 分支，再经原生 give_noble_family_title_effect 按天朝政体创建。
+        if = {
+            limit = { NOT = { any_held_title = { is_noble_family_title = yes } } }
+            create_noble_family_effect = { GOVERNMENT_GIVER = title:h_china.holder }
+        }
+        # 3) 真实领主关系：授予者是 h_china 持有人 → 直接效忠皇帝；否则挂到授予者的领主（缺失时兜底皇帝）。
+        if = {
+            limit = { $RULER$ = { has_title = title:h_china } }
+            if = {
+                limit = { exists = title:h_china.holder NOT = { liege ?= title:h_china.holder } }
+                create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_circuit_recipient_fealty }
+                change_liege = { liege = title:h_china.holder change = scope:tca_circuit_recipient_fealty }
+                resolve_title_and_vassal_change = scope:tca_circuit_recipient_fealty
+            }
+        }
+        else = {
+            clear_saved_scope = tca_circuit_recipient_liege
+            if = {
+                limit = { $RULER$ = { exists = liege } }
+                $RULER$ = { liege = { save_scope_as = tca_circuit_recipient_liege } }
+            }
+            if = {
+                limit = { NOT = { exists = scope:tca_circuit_recipient_liege } }
+                title:h_china.holder ?= { save_scope_as = tca_circuit_recipient_liege }
+            }
+            if = {
+                limit = { exists = scope:tca_circuit_recipient_liege NOT = { liege ?= scope:tca_circuit_recipient_liege } }
+                create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_circuit_recipient_fealty }
+                change_liege = { liege = scope:tca_circuit_recipient_liege change = scope:tca_circuit_recipient_fealty }
+                resolve_title_and_vassal_change = scope:tca_circuit_recipient_fealty
+            }
+        }
+        # 4) 政体：非天朝改为天朝（已是则跳过）。
+        if = { limit = { NOT = { government_has_flag = government_is_celestial } } change_government = celestial_government }
+    }
+}
+
+# 角色作用域（授予者＝目标头衔当前持有人）；参数：$TITLE$ 目标头衔作用域，$HOLDER$ 新持有人作用域。
+# 授予前先按“有地目标 + 无地接收者”做无地统治者准备；随后由当前持有人（授予者）发起 granted 变更。
+# 迁移方式按目标头衔类型分流（引擎对照实测）：
+#   - 有地头衔（路/旧有地头衔）：必须用 change_title_holder_include_vassals 连同封臣一起转移；
+#     用普通 change_title_holder 时，引擎会在“皇帝持有 + 无地接收者”场景销毁目标头衔
+#     （appointment/granted 事务都一样；带封臣后两者都成功）。
+#   - 无地官署（提刑/通判等）：保持 change_title_holder（既有可工作路径，不带封臣）。
+# 事务类型维持 granted：实验证明 granted + include_vassals 可行，也符合设计“不使用 appointment 事务、
+# 避免引擎改用缓存继任人/额外应用原生任命冷却与法律”的约定。授予后的冷却仍由
+# tca_set_official_appointment_cooldown_effect 按实际获任者补齐，不重复、不缩短更长超时。
+# 准备效果在授予前幂等补齐王朝/家门/领主/政体（真实候选此时已 qualified 含家门，通常为 no-op）；
+# include_vassals 再安全转移有地头衔。若当前持有人缺失，调用方回退到“接收者作用域建事务”写法。
+tca_circuit_transfer_title_granted_effect = {
+    save_scope_as = tca_circuit_transfer_grantor
+    $HOLDER$ = {
+        tca_circuit_prepare_landless_recipient_effect = {
+            RULER = scope:tca_circuit_transfer_grantor
+            TITLE = $TITLE$
+        }
+    }
+    # 显式读取，保证即使准备效果整体跳过（接收者已有地）也被视为已消费。
+    if = { limit = { exists = scope:tca_circuit_transfer_grantor } }
+    create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_circuit_transfer_change }
+    if = {
+        limit = { $TITLE$ = { is_landless_type_title = no } }
+        $TITLE$ = {
+            change_title_holder_include_vassals = {
+                holder = $HOLDER$
+                change = scope:tca_circuit_transfer_change
+            }
+        }
+    }
+    else = {
+        $TITLE$ = {
+            change_title_holder = {
+                holder = $HOLDER$
+                change = scope:tca_circuit_transfer_change
+            }
+        }
+    }
+    resolve_title_and_vassal_change = scope:tca_circuit_transfer_change
+}
+
+# 头衔作用域；scope:tca_circuit_selected_candidate 为已选定候选。
+# 跨日两段式防御入口：所有调用路径（fill_vacant 正常选人/消费、直接调用、恢复路径）都先经过这里。
+# 触发条件：有地目标 + 无地候选 + 尚未有家门（即还没被 prepare 过）→ 不得同 tick 授予，改为 day1 准备+记录+排队。
+# 已有家门的无地候选视为“day1 已准备的接收者”，只在跨日消费/完成路径出现，直接进入授予；
+# 若本头衔已有 prepared 记录且仍处于同轮闸门（prepare 事务触发的二次维护），只记等待，不消费不授予。
+# 头衔作用域；scope:tca_circuit_selected_candidate 为已选定候选。
+# 安全边界（task-18 收窄）：合格抽选已要求候选“已有地或已有家门”，因此正常情况下这里不会遇到
+# “无地且无家门”的真实候选。为避免任何直接调用路径重新启用真实角色两段式（会销毁有地头衔），
+# 本入口只做防御：命中即跳过并记录 CANDIDATE_UNSAFE_SKIPPED，不准备、不记录、不授予（等下一轮/生成兜底）。
+tca_circuit_assign_selected_candidate_effect = {
+    save_scope_as = tca_circuit_assign_title
+    if = {
+        limit = {
+            exists = scope:tca_circuit_selected_candidate
+            scope:tca_circuit_selected_candidate = {
+                tca_circuit_needs_recipient_preparation_trigger = { TITLE = scope:tca_circuit_assign_title }
+            }
+        }
+        debug_log = "TCA_CIRCUIT CANDIDATE_UNSAFE_SKIPPED"
+    }
+    else = { tca_circuit_assign_selected_candidate_immediate_effect = yes }
+}
+
+# 头衔作用域；scope:tca_circuit_selected_candidate 为已选定候选（已经过跨日两段式防御）。
+# 顺序：精确 granted 授予 → 新持有人必要状态 → 冷却/近期受任标记 → 路收尾 → 最后处理被授者原有头衔。
+# 旧头衔放在最后，使递归时领主链已稳定，且递归不会回写本层仍需的 saved scope。
+tca_circuit_assign_selected_candidate_immediate_effect = {
+    save_scope_as = tca_circuit_assign_title
+    # 授予前冻结目标类型：授予事务会触发 on_title_gain，回调按新持有人契约重写标记，
+    # 若此处不冻结，军区/都护会在收尾前被误降为文官。
+    # 用全局变量而不是 saved value 传值：全局变量可在 finalize 的 trigger 中直接比较。
+    set_global_variable = { name = tca_circuit_grant_kind value = 0 }
+    if = { limit = { has_variable = tca_circuit_kind } set_global_variable = { name = tca_circuit_grant_kind value = var:tca_circuit_kind } }
+    # P10：记录授予前是否有地，供 ensure_holder_state 决定是否补天朝政体。
+    scope:tca_circuit_selected_candidate = {
+        remove_variable = tca_circuit_pregrant_landed
+        if = { limit = { is_landed = yes } set_variable = { name = tca_circuit_pregrant_landed value = yes } }
+    }
+    # 正式诊断：记录候选关键状态与头衔/候选作用域，供引擎测试取证（仅授予路径，开销可忽略）。
+    debug_log = "TCA_CIRCUIT ASSIGN_DIAG_BEGIN"
+    if = { limit = { scope:tca_circuit_selected_candidate = { is_landed = yes } } debug_log = "TCA_CIRCUIT ASSIGN_DIAG CAND_LANDED" }
+    else = { debug_log = "TCA_CIRCUIT ASSIGN_DIAG CAND_UNLANDED" }
+    if = { limit = { scope:tca_circuit_selected_candidate = { any_held_title = { is_noble_family_title = yes } } } debug_log = "TCA_CIRCUIT ASSIGN_DIAG CAND_FAMILY" }
+    else = { debug_log = "TCA_CIRCUIT ASSIGN_DIAG CAND_NO_FAMILY" }
+    if = { limit = { scope:tca_circuit_selected_candidate = { is_ruler = yes } } debug_log = "TCA_CIRCUIT ASSIGN_DIAG CAND_RULER" }
+    else = { debug_log = "TCA_CIRCUIT ASSIGN_DIAG CAND_NOT_RULER" }
+    if = { limit = { scope:tca_circuit_selected_candidate = { exists = liege } } debug_log = "TCA_CIRCUIT ASSIGN_DIAG CAND_HAS_LIEGE" }
+    else = { debug_log = "TCA_CIRCUIT ASSIGN_DIAG CAND_NO_LIEGE" }
+    if = { limit = { scope:tca_circuit_selected_candidate = { government_has_flag = government_is_celestial } } debug_log = "TCA_CIRCUIT ASSIGN_DIAG CAND_CELESTIAL" }
+    else = { debug_log = "TCA_CIRCUIT ASSIGN_DIAG CAND_OTHER_GOV" }
+    if = { limit = { exists = holder } debug_log = "TCA_CIRCUIT ASSIGN_DIAG TITLE_HELD" }
+    else = { debug_log = "TCA_CIRCUIT ASSIGN_DIAG TITLE_VACANT" }
+    debug_log_scopes = yes
+    # 设计：不使用 appointment 事务，避免引擎改用缓存继任人。
+    # granted 变更由当前持有人（授予者）发起；皇帝持有路时尤其必要，避免引擎把接收者当作变更发起人而销毁头衔。
+    if = {
+        limit = { exists = holder }
+        holder = {
+            tca_circuit_transfer_title_granted_effect = {
+                TITLE = scope:tca_circuit_assign_title
+                HOLDER = scope:tca_circuit_selected_candidate
+            }
+        }
+    }
+    else = {
+        scope:tca_circuit_selected_candidate = {
+            create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_circuit_assign_change }
+            scope:tca_circuit_assign_title = { change_title_holder = { holder = scope:tca_circuit_selected_candidate change = scope:tca_circuit_assign_change } }
+            resolve_title_and_vassal_change = scope:tca_circuit_assign_change
+        }
+    }
+    # 授予失败时不得继续处理被授者旧头衔，也不得给未获职者写冷却。
+    if = {
+        limit = { holder ?= scope:tca_circuit_selected_candidate }
+        scope:tca_circuit_selected_candidate = {
+            # 标记本轮已用，递归选人不再抽中。
+            set_variable = { name = tca_circuit_used_serial value = global_var:tca_circuit_run_serial }
+            tca_circuit_ensure_holder_state_effect = yes
+            # 设计：精确补位不会自动取得原生冷却；复用共享入口补齐并同步持久标记。
+            tca_set_official_appointment_cooldown_effect = yes
+            debug_log = "TCA_CIRCUIT CANDIDATE_GRANTED"
+        }
+        tca_circuit_finalize_title_grant_effect = { KIND = global_var:tca_circuit_grant_kind }
+        # 防御：任何调用路径都先把本目标头衔标记为本轮已处理，避免它被下面的旧头衔递归再次交接。
+        # （fill_vacant 正常路径已在 assign 前写过；跨日 complete 路径也需显式写，见 PREPARED_GRANT 分支。）
+        set_variable = { name = tca_circuit_processed_serial value = global_var:tca_circuit_run_serial }
+        # 第三层：被授者原有非家门头衔逐个按继承顺位/递归/生成处理，任何一步都不交给领主。
+        scope:tca_circuit_selected_candidate = { tca_circuit_process_old_titles_effect = yes }
+    }
+    else = { debug_log = "TCA_CIRCUIT ASSIGN_FAILED" }
+}
+
+# 角色作用域；精确授予后补齐新持有人的必要状态：世族与天朝政体。
+# 只补缺失项，不重建已有世族；低出身先建王朝再建家门。
+# 政体只对“授予前无地”的新贵补 celestial；有地升迁者保留原政体（其资格已要求 administrative），
+# 不满足时记录日志并跳过，不强改。授予前是否有地由调用方写 tca_circuit_pregrant_landed 变量。
+tca_circuit_ensure_holder_state_effect = {
+    if = {
+        limit = { is_alive = yes }
+        if = {
+            limit = { NOT = { any_held_title = { is_noble_family_title = yes } } }
+            if = { limit = { is_lowborn = yes } create_dynasty = { spread_to_descendants = yes } }
+            create_noble_family_effect = { GOVERNMENT_GIVER = title:h_china.holder }
+        }
+        if = {
+            limit = { NOT = { government_has_flag = government_is_celestial } }
+            if = {
+                limit = { has_variable = tca_circuit_pregrant_landed }
+                debug_log = "TCA_CIRCUIT LANDED_CANDIDATE_KEEP_GOVERNMENT"
+            }
+            else = { change_government = celestial_government }
+        }
+    }
+    # 一次性标记，防止残留影响后续判断。
+    remove_variable = tca_circuit_pregrant_landed
+}
+
+# 头衔作用域；精确授予后的收尾。只对“路”做领主/主头衔/军事契约/类型/待补授处理；
+# 旧头衔保持原领主与法理，并交由所属模块维护校验。
+# 参数：$KIND$ 授予前冻结的目标类型（0=非路，1文官/2军区/3都护）。调用方必须在授予前保存，
+# 不能读头衔当前标记——授予回调可能已按新持有人契约改写它。
+tca_circuit_finalize_title_grant_effect = {
+    if = {
+        limit = { tca_circuit_is_road_trigger = yes }
+        save_scope_as = tca_circuit_finalize_title
+        if = {
+            limit = { exists = holder }
+            holder = {
+                # 设计：路的领主保持为 h_china 持有人。授予事务可能让新持有人暂时独立或挂到原领主。
+                if = {
+                    limit = { NOT = { liege ?= title:h_china.holder } }
+                    create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_circuit_finalize_liege_change }
+                    change_liege = { liege = title:h_china.holder change = scope:tca_circuit_finalize_liege_change }
+                    resolve_title_and_vassal_change = scope:tca_circuit_finalize_liege_change
+                }
+                # 路成为新持有人的主头衔（无地新贵与有地升迁者一致）。
+                if = { limit = { NOT = { primary_title ?= scope:tca_circuit_finalize_title } } set_primary_title_to = scope:tca_circuit_finalize_title }
+                # 军区/都护路必须取得对应军事契约，否则路会被当成文官路。
+                if = {
+                    limit = { $KIND$ = 3 }
+                    tca_circuit_apply_road_kind_contract_effect = { KIND = 3 TITLE = scope:tca_circuit_finalize_title }
+                }
+                else_if = {
+                    limit = { $KIND$ = 2 }
+                    tca_circuit_apply_road_kind_contract_effect = { KIND = 2 TITLE = scope:tca_circuit_finalize_title }
+                }
+            }
+        }
+        # 类型标记以当前契约重新同步（军事契约已补时保持军区/都护；文官路按持有人原契约）。
+        scope:tca_circuit_finalize_title = { tca_circuit_sync_kind_effect = yes }
+    }
+    # 授予后请求司法、通判既有维护次日重接（这些模块按现任持有人实时读取辖区/绑定，本机制不直接改其绑定）。
+    # 官署经费按头衔保存预算档、按现任持有人实时读取，由原生月度脉冲处理，无需额外请求入口。
+    if = {
+        limit = { tca_circuit_has_celestial_vassal_holder_trigger = yes }
+        holder = {
+            tca_request_judicial_maintenance_effect = yes
+            tca_request_tongpan_maintenance_effect = yes
+        }
+    }
+    # 待补授仅在持有人已是非皇帝的天朝封臣时清除；失败保留标记等待下一季度。
+    if = {
+        limit = { has_variable = tca_circuit_pending_appointment }
+        if = {
+            limit = { tca_circuit_has_celestial_vassal_holder_trigger = yes }
+            remove_variable = tca_circuit_pending_appointment
+            remove_variable = tca_circuit_unsafe_skipped_logged
+            # 正式诊断：清 pending 前后打印头衔/持有人作用域，便于追踪“GRANT_OK 后又被销毁”的情况。
+            debug_log_scopes = yes
+            debug_log = "TCA_CIRCUIT GRANT_OK"
+        }
+        else = { debug_log = "TCA_CIRCUIT GRANT_FAILED" }
+    }
+}
+
+# 角色作用域；为军区/都护路的新持有人补齐军事契约与军事任命继承法。
+# 参数：$KIND$ 2=军区、3=都护；$TITLE$ 目标路头衔作用域（都护被拒时回退 kind=2 用）。
+# 文官路不调用本效果（不强制改约，避免影响名下其他头衔）。
+# 都护 level=4 缺少直接的原版脚本先例（原版 change_province_protectorate_effect 也设置 level 4），
+# 契约 is_valid 可能因天命循环相位/数量/tier 拒绝：设置后校验 celestial_province_protectorate flag；
+# 不成立则回退 level=3（军区）、把 kind 回落为 2 并记录日志。该取舍待引擎回归验证。
+# 合同组尚未建立时跳过并记录日志；后续季度维护会再按契约同步类型（待验证：授予事务内合同组时点）。
+tca_circuit_apply_road_kind_contract_effect = {
+    if = {
+        limit = { has_subject_contract_group = celestial_vassal }
+        if = {
+            limit = { $KIND$ = 3 }
+            vassal_contract_set_obligation_level = { type = celestial_provinces level = 4 }
+            if = { limit = { NOT = { has_realm_law = celestial_military_appointment_succession_law } } add_realm_law_skip_effects = celestial_military_appointment_succession_law }
+            if = {
+                limit = { NOT = { vassal_contract_has_flag = celestial_province_protectorate } }
+                debug_log = "TCA_CIRCUIT PROTECTORATE_LEVEL4_REJECTED_FALLBACK_MILITARY"
+                vassal_contract_set_obligation_level = { type = celestial_provinces level = 3 }
+                $TITLE$ = { set_variable = { name = tca_circuit_kind value = 2 } }
+            }
+        }
+        else_if = {
+            limit = { $KIND$ = 2 }
+            vassal_contract_set_obligation_level = { type = celestial_provinces level = 3 }
+            if = { limit = { NOT = { has_realm_law = celestial_military_appointment_succession_law } } add_realm_law_skip_effects = celestial_military_appointment_succession_law }
+        }
+    }
+    else = { debug_log = "TCA_CIRCUIT CONTRACT_GROUP_MISSING" }
+}
+
+# 角色作用域（刚被授职者）；第三层：逐个处理其非家门头衔。
+# while + ordered_held_title 每轮取一个未处理头衔；处理后该头衔不再属于本人（或已标记），循环自然收敛。
+tca_circuit_process_old_titles_effect = {
+    while = {
+        limit = {
+            any_held_title = {
+                is_noble_family_title = no
+                NOT = {
+                    AND = {
+                        has_global_variable = tca_circuit_run_serial
+                        has_variable = tca_circuit_processed_serial
+                        var:tca_circuit_processed_serial ?= global_var:tca_circuit_run_serial
+                    }
+                }
+            }
+        }
+        ordered_held_title = {
+            order_by = tier
+            limit = {
+                is_noble_family_title = no
+                NOT = {
+                    AND = {
+                        has_global_variable = tca_circuit_run_serial
+                        has_variable = tca_circuit_processed_serial
+                        var:tca_circuit_processed_serial ?= global_var:tca_circuit_run_serial
+                    }
+                }
+            }
+            tca_circuit_reassign_old_title_effect = yes
+        }
+    }
+}
+
+# 头衔作用域；第三层：处理被授者原有头衔。
+# 规则1：current_heir 可用 → 按原头衔/原领主/原法理转交（无地官职同样走继承顺位）。
+# 规则2/3：无可用继承人 → 对该头衔执行第二层选人；仍无人时生成补授（第四层）。
+# 任何分支都不把该头衔交给领主。
+# 注意：本效果不预先标记 processed_serial，交给继承分支末尾或 fill_vacant 入口标记，
+# 否则会触发 fill_vacant 的去重跳过。
+tca_circuit_reassign_old_title_effect = {
+    save_scope_as = tca_circuit_reassign_title
+    # 先清掉上一头衔/上一轮残留的领主引用，避免 saved scope 跨迭代陈旧。
+    clear_saved_scope = tca_circuit_reassign_liege
+    # 先保存头衔领主作用域再比较；禁止 holder.liege 之类反向链式比较（探针实测会报作用域错误）。
+    if = {
+        limit = { exists = holder }
+        holder = {
+            if = { limit = { exists = liege } liege = { save_scope_as = tca_circuit_reassign_liege } }
+        }
+    }
+    if = {
+        limit = {
+            exists = current_heir
+            # 安全边界：继承人必须“已有地或已有家门”才能 same-tick 交接；
+            # 无家门且无地的真实继承人会被跳过（改走递归/生成），避免跨日真实角色授予销毁旧头衔。
+            current_heir = {
+                is_alive = yes
+                OR = {
+                    is_landed = yes
+                    any_held_title = { is_noble_family_title = yes }
+                }
+            }
+            # 可用继承人不得是头衔领主（候选耗尽时原生顺位只剩领主；路场景领主为皇帝）。
+            OR = {
+                NOT = { exists = scope:tca_circuit_reassign_liege }
+                NOT = { current_heir ?= scope:tca_circuit_reassign_liege }
+            }
+            # 带类型的路额外排除 h_china 持有人，任何一步都不交给领主。
+            OR = {
+                NOT = { has_variable = tca_circuit_kind }
+                NOT = { current_heir = { has_title = title:h_china } }
+            }
+        }
+        current_heir = { save_scope_as = tca_circuit_reassign_heir }
+        # 正式诊断：旧头衔交继承人的作用域与状态，供引擎测试取证。
+        debug_log = "TCA_CIRCUIT OLD_TITLE_DIAG_HEIR"
+        debug_log_scopes = yes
+        scope:tca_circuit_reassign_heir = {
+            # 记录继承前是否有地；ensure 只对无地新贵补政体。
+            remove_variable = tca_circuit_pregrant_landed
+            if = { limit = { is_landed = yes } set_variable = { name = tca_circuit_pregrant_landed value = yes } }
+        }
+        # 转让保持原头衔/原领主/原法理，不显式改领主链；granted 变更由当前持有人（授予者）发起。
+        if = {
+            limit = { exists = holder }
+            holder = {
+                tca_circuit_transfer_title_granted_effect = {
+                    TITLE = scope:tca_circuit_reassign_title
+                    HOLDER = scope:tca_circuit_reassign_heir
+                }
+            }
+        }
+        else = {
+            scope:tca_circuit_reassign_heir = {
+                create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_circuit_reassign_change }
+                scope:tca_circuit_reassign_title = { change_title_holder = { holder = scope:tca_circuit_reassign_heir change = scope:tca_circuit_reassign_change } }
+                resolve_title_and_vassal_change = scope:tca_circuit_reassign_change
+            }
+        }
+        set_variable = { name = tca_circuit_processed_serial value = global_var:tca_circuit_run_serial }
+        scope:tca_circuit_reassign_heir = {
+            set_variable = { name = tca_circuit_used_serial value = global_var:tca_circuit_run_serial }
+            tca_circuit_ensure_holder_state_effect = yes
+        }
+        # 旧头衔交由所属模块的既有维护校验专职规则；只请求其公开维护入口，不复制资格判断。
+        if = {
+            limit = { tca_circuit_has_celestial_vassal_holder_trigger = yes }
+            holder = {
+                tca_request_judicial_maintenance_effect = yes
+                tca_request_tongpan_maintenance_effect = yes
+            }
+        }
+        # 旧头衔本身若是带类型的路，转让后仍保持其军事契约与类型。
+        if = {
+            limit = { has_variable = tca_circuit_kind }
+            if = { limit = { var:tca_circuit_kind = 3 } holder ?= { tca_circuit_apply_road_kind_contract_effect = { KIND = 3 TITLE = scope:tca_circuit_reassign_title } } }
+            else_if = { limit = { var:tca_circuit_kind = 2 } holder ?= { tca_circuit_apply_road_kind_contract_effect = { KIND = 2 TITLE = scope:tca_circuit_reassign_title } } }
+            tca_circuit_sync_kind_effect = yes
+        }
+        debug_log = "TCA_CIRCUIT OLD_TITLE_TRANSFER_HEIR"
+    }
+    else = {
+        # 区分“没有继承人”和“继承人不安全被跳过”，便于测试/日志核对。
+        if = {
+            limit = { exists = current_heir current_heir = { is_alive = yes } }
+            debug_log = "TCA_CIRCUIT HEIR_UNSAFE_SKIP"
+        }
+        else = { debug_log = "TCA_CIRCUIT OLD_TITLE_NO_HEIR_RECURSE" }
+        # 失败/递归路径也读取本层 saved scope，避免“已保存未使用”告警。
+        if = { limit = { exists = scope:tca_circuit_reassign_title } }
+        tca_circuit_fill_vacant_title_effect = yes
+    }
+}
+
+# ---------------------------------------------------------------------------
+# 五、第四层：生成补授
+# ---------------------------------------------------------------------------
+
+# 头衔作用域；仅当前面各层都失败时，为目标头衔生成新角色并授予。
+# 模板按路类型：文官用学者、军区/都护用统帅；功绩按头衔等级起始值；随后建世族、天朝政体与直属关系。
+tca_circuit_generate_holder_effect = {
+    # 类型：优先头衔自己的标记；旧头衔递归时沿用本轮路类型；都没有按文官。
+    # 用全局变量把类型/功绩传给新角色作用域与 finalize（全局变量可在 trigger 中直接比较）。
+    set_global_variable = { name = tca_circuit_grant_kind value = 1 }
+    if = { limit = { var:tca_circuit_kind ?= 3 } set_global_variable = { name = tca_circuit_grant_kind value = 3 } }
+    else_if = { limit = { var:tca_circuit_kind ?= 2 } set_global_variable = { name = tca_circuit_grant_kind value = 2 } }
+    else_if = {
+        limit = { NOT = { has_variable = tca_circuit_kind } has_global_variable = tca_circuit_transaction_kind global_var:tca_circuit_transaction_kind ?= 3 }
+        set_global_variable = { name = tca_circuit_grant_kind value = 3 }
+    }
+    else_if = {
+        limit = { NOT = { has_variable = tca_circuit_kind } has_global_variable = tca_circuit_transaction_kind global_var:tca_circuit_transaction_kind ?= 2 }
+        set_global_variable = { name = tca_circuit_grant_kind value = 2 }
+    }
+    save_scope_as = tca_circuit_generate_title
+    # 当前作用域即目标头衔：生成功绩按头衔等级取原版起始值。
+    set_global_variable = { name = tca_circuit_grant_merit value = tca_circuit_generated_merit_value }
+    clear_saved_scope = tca_circuit_generated_holder
+    title:h_china.holder ?= {
+        save_scope_as = tca_circuit_generate_liege
+        # 模板与信仰/礼仪/文化取领主；无地新贵先作为领主廷臣创建，再精确授予。
+        if = {
+            limit = { global_var:tca_circuit_grant_kind = 1 }
+            create_character = {
+                template = tgp_minister_scholar_template
+                employer = scope:tca_circuit_generate_liege
+                faith = scope:tca_circuit_generate_liege.faith
+                rite = scope:tca_circuit_generate_liege.rite
+                culture = scope:tca_circuit_generate_liege.culture
+                # 天朝官制默认男性（0）；仅领主采用女性专属/优先继承法时 100%，与既有精确补位写法一致。
+                gender_female_chance = {
+                    value = 0
+                    if = {
+                        limit = {
+                            scope:tca_circuit_generate_liege = {
+                                OR = {
+                                    has_realm_law = female_only_law
+                                    has_realm_law = female_preference_law
+                                }
+                            }
+                        }
+                        add = 100
+                    }
+                }
+                save_scope_as = tca_circuit_generated_holder
+            }
+        }
+        else = {
+            create_character = {
+                template = tgp_minister_commander_template
+                employer = scope:tca_circuit_generate_liege
+                faith = scope:tca_circuit_generate_liege.faith
+                rite = scope:tca_circuit_generate_liege.rite
+                culture = scope:tca_circuit_generate_liege.culture
+                # 天朝官制默认男性（0）；仅领主采用女性专属/优先继承法时 100%，与既有精确补位写法一致。
+                gender_female_chance = {
+                    value = 0
+                    if = {
+                        limit = {
+                            scope:tca_circuit_generate_liege = {
+                                OR = {
+                                    has_realm_law = female_only_law
+                                    has_realm_law = female_preference_law
+                                }
+                            }
+                        }
+                        add = 100
+                    }
+                }
+                save_scope_as = tca_circuit_generated_holder
+            }
+        }
+    }
+    if = {
+        limit = { exists = scope:tca_circuit_generated_holder }
+        scope:tca_circuit_generated_holder = {
+            change_merit = global_var:tca_circuit_grant_merit
+            assign_completed_exams_based_on_merit_effect = yes
+            # 低出身建王朝已并入 tca_circuit_prepare_landless_recipient_effect（授予前统一准备，避免重复建王朝）。
+        }
+        # 跨日两段式 day1：有地目标 + 无地新角色先准备并记录，次日再授予；
+        # 同链内新建家门的既有/生成角色被引擎实测证明会被销毁，故不在 day1 transfer。
+        if = {
+            limit = {
+                exists = title:h_china.holder
+                scope:tca_circuit_generated_holder = {
+                    tca_circuit_needs_recipient_preparation_trigger = { TITLE = scope:tca_circuit_generate_title }
+                }
+            }
+            clear_saved_scope = tca_circuit_prepared_defer_ruler
+            if = { limit = { exists = holder } holder = { save_scope_as = tca_circuit_prepared_defer_ruler } }
+            if = { limit = { NOT = { exists = scope:tca_circuit_prepared_defer_ruler } } title:h_china.holder ?= { save_scope_as = tca_circuit_prepared_defer_ruler } }
+            scope:tca_circuit_generated_holder = {
+                tca_circuit_prepare_landless_recipient_effect = {
+                    RULER = scope:tca_circuit_prepared_defer_ruler
+                    TITLE = scope:tca_circuit_generate_title
+                }
+            }
+            set_variable = { name = tca_circuit_prepared_candidate value = scope:tca_circuit_generated_holder }
+            # mode 1：生成的新角色同样按正式候选资格复验后授予头衔本身。
+            set_variable = { name = tca_circuit_prepared_mode value = 1 }
+            # 记录准备轮序号：同日维护遍历时跳过，必须等次日新序号才完成授予。
+            set_variable = { name = tca_circuit_prepared_serial value = global_var:tca_circuit_run_serial }
+            set_variable = { name = tca_circuit_prepared_wait value = yes }
+            tca_circuit_register_prepared_title_effect = yes
+            title:h_china.holder ?= { tca_circuit_queue_maintenance_effect = yes }
+            debug_log = "TCA_CIRCUIT PREPARED_DEFER_GENERATED"
+        }
+        else = {
+            # granted 变更由当前持有人（授予者）发起；路已回落皇帝时避免接收者作用域被引擎判为无效变更。
+            if = {
+                limit = { exists = holder }
+                holder = {
+                    tca_circuit_transfer_title_granted_effect = {
+                        TITLE = scope:tca_circuit_generate_title
+                        HOLDER = scope:tca_circuit_generated_holder
+                    }
+                }
+            }
+            else = {
+                scope:tca_circuit_generated_holder = {
+                    create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_circuit_generate_change }
+                    scope:tca_circuit_generate_title = { change_title_holder = { holder = scope:tca_circuit_generated_holder change = scope:tca_circuit_generate_change } }
+                    resolve_title_and_vassal_change = scope:tca_circuit_generate_change
+                }
+            }
+            if = {
+                limit = { holder ?= scope:tca_circuit_generated_holder }
+                scope:tca_circuit_generated_holder = {
+                    set_variable = { name = tca_circuit_used_serial value = global_var:tca_circuit_run_serial }
+                    tca_circuit_ensure_holder_state_effect = yes
+                    tca_set_official_appointment_cooldown_effect = yes
+                    debug_log = "TCA_CIRCUIT GENERATE"
+                }
+                tca_circuit_finalize_title_grant_effect = { KIND = global_var:tca_circuit_grant_kind }
+            }
+            else = {
+                if = { limit = { exists = scope:tca_circuit_generate_title } debug_log = "TCA_CIRCUIT GENERATE_ASSIGN_FAILED" }
+            }
+        }
+    }
+    else = {
+        if = { limit = { exists = scope:tca_circuit_generate_title } debug_log = "TCA_CIRCUIT GENERATE_FAILED" }
+    }
+}
+
+# ---------------------------------------------------------------------------
+# 六、在任资格审计（P2 默认只记录）、最小强制收回（P3 双开关）与可选文官路补法（P4 默认关闭）
+# ---------------------------------------------------------------------------
+# 头衔持久状态：tca_circuit_incumbent_invalid（1=官品低于头衔等级）、tca_circuit_audit_reported
+# （已记录去重）、tca_circuit_incumbent_pending（待强制处理）。
+# 全局开关：tca_circuit_retract_unqualified_enabled（收回）、tca_circuit_self_grant_enabled（补授）。
+# 默认状态：审计只写状态与日志；任何路径都不得改变头衔持有人（仅双开关同时存在时才收回）。
+
+# 头衔作用域；审计在任持有人资格。
+# 守卫：已登记路 + 天朝封臣持有人 + 无回落待补授（回落结算由第二层 pending 分支负责，避免双路径抢同一头衔）。
+# 合格：清审计状态与去重标记，下一次不合格可重新记录。
+# 不合格（仅等级不足）：写 invalid=1、去重记录日志；一人多路只做可选信息记录，不判定为不合格；
+#   强制收回开关存在时写 pending 并排队维护（写前再判一次 invalid，避免 holder 同 tick 已变更后误排队）。
+tca_circuit_audit_incumbent_effect = {
+    if = {
+        limit = {
+            tca_circuit_is_tracked_road_trigger = yes
+            tca_circuit_has_celestial_vassal_holder_trigger = yes
+            NOT = { has_variable = tca_circuit_pending_appointment }
+        }
+        if = {
+            limit = { NOT = { tca_circuit_incumbent_invalid_trigger = yes } }
+            remove_variable = tca_circuit_incumbent_invalid
+            remove_variable = tca_circuit_audit_reported
+            # 一人多路不是不合格：默认不标记、不排队、不收回；仅在显式开启诊断开关时记一次信息。
+            if = {
+                limit = { holder = { tca_circuit_holder_exceeds_road_limit_trigger = yes } }
+                if = {
+                    limit = {
+                        has_global_variable = tca_circuit_multi_road_audit_enabled
+                        NOT = { has_variable = tca_circuit_multi_road_reported }
+                    }
+                    save_scope_as = tca_circuit_audit_title
+                    clear_saved_scope = tca_circuit_audit_holder
+                    holder ?= { save_scope_as = tca_circuit_audit_holder }
+                    debug_log_scopes = yes
+                    debug_log = "TCA_CIRCUIT INCUMBENT_MULTI_ROAD_INFO"
+                    set_variable = { name = tca_circuit_multi_road_reported value = yes }
+                }
+                else_if = {
+                    limit = { NOT = { has_global_variable = tca_circuit_multi_road_audit_enabled } }
+                    # 诊断开关关闭时清掉旧信息标记，便于以后重新开启时再记录一次。
+                    remove_variable = tca_circuit_multi_road_reported
+                }
+            }
+            else = { remove_variable = tca_circuit_multi_road_reported }
+        }
+        else = {
+            # 等级不足：debug_log_scopes 前先保存头衔与持有人作用域，保证日志能定位到具体路与在任者。
+            save_scope_as = tca_circuit_audit_title
+            clear_saved_scope = tca_circuit_audit_holder
+            holder ?= { save_scope_as = tca_circuit_audit_holder }
+            set_variable = { name = tca_circuit_incumbent_invalid value = 1 }
+            # 去重：同一次不合格只记一次；恢复合格时上面已清标记，可再次记录。
+            if = {
+                limit = { NOT = { has_variable = tca_circuit_audit_reported } }
+                debug_log_scopes = yes
+                debug_log = "TCA_CIRCUIT INCUMBENT_LEVEL_LOW"
+                set_variable = { name = tca_circuit_audit_reported value = yes }
+            }
+            # 默认关闭时到此为止；只有强制收回开关存在才排队等维护处置。
+            if = {
+                limit = {
+                    has_global_variable = tca_circuit_retract_unqualified_enabled
+                    tca_circuit_incumbent_invalid_trigger = yes
+                    NOT = { has_variable = tca_circuit_incumbent_pending }
+                }
+                set_variable = { name = tca_circuit_incumbent_pending value = yes }
+                title:h_china.holder ?= { tca_circuit_queue_maintenance_effect = yes }
+            }
+        }
+    }
+}
+
+# 空作用域；清空全部登记路的审计状态，供开启/关闭强制模式前后重扫。
+# 四条审计/诊断变量一起清，随后由季度/次日维护按当前持有人重新审计。
+tca_circuit_clear_audit_effect = {
+    if = {
+        limit = { has_global_variable_list = tca_circuit_titles }
+        every_in_global_list = {
+            variable = tca_circuit_titles
+            remove_variable = tca_circuit_incumbent_invalid
+            remove_variable = tca_circuit_audit_reported
+            remove_variable = tca_circuit_incumbent_pending
+            remove_variable = tca_circuit_multi_road_reported
+        }
+    }
+}
+
+# 头衔作用域；处置在任不合格（维护分支）。以下分支互斥且各自终态：
+#   - 已恢复合格：清 pending 与 invalid；
+#   - 无强制收回开关（默认）：记 INCUMBENT_KEPT，只清 pending、保留审计标记，绝不收回/授予；
+#   - 有收回开关但无自动补授开关：记 RETRACT_WAIT_SELF_GRANT，保留 pending 等开关；
+#   - 双开关都有：收回皇帝；成功后补记回落 pending 并走既有补授，失败则保留 pending 等下一轮。
+# 收回成功时同时清 invalid 与 audit_reported（头衔已离开不合格持有人，避免审计标记残留）。
+tca_circuit_handle_incumbent_invalid_effect = {
+    save_scope_as = tca_circuit_incumbent_title
+    if = {
+        limit = { NOT = { tca_circuit_incumbent_invalid_trigger = yes } }
+        remove_variable = tca_circuit_incumbent_pending
+        remove_variable = tca_circuit_incumbent_invalid
+        debug_log = "TCA_CIRCUIT INCUMBENT_NOW_VALID"
+    }
+    else_if = {
+        limit = { NOT = { has_global_variable = tca_circuit_retract_unqualified_enabled } }
+        debug_log = "TCA_CIRCUIT INCUMBENT_KEPT"
+        remove_variable = tca_circuit_incumbent_pending
+    }
+    else_if = {
+        limit = { NOT = { has_global_variable = tca_circuit_self_grant_enabled } }
+        debug_log = "TCA_CIRCUIT INCUMBENT_RETRACT_WAIT_SELF_GRANT"
+    }
+    else = {
+        # retract 前保存原持有人作用域，供日志定位（收回后 holder 会变为皇帝）。
+        clear_saved_scope = tca_circuit_incumbent_retract_holder
+        if = { limit = { exists = holder } holder = { save_scope_as = tca_circuit_incumbent_retract_holder } }
+        debug_log_scopes = yes
+        debug_log = "TCA_CIRCUIT INCUMBENT_RETRACT_BEGIN"
+        tca_circuit_retract_title_to_emperor_effect = yes
+        if = {
+            limit = { exists = holder holder = { has_title = title:h_china } }
+            # 审计路径没有回落待补授标记：先补写，既有补授路径（fill_lapsed）才能消费。
+            if = {
+                limit = { NOT = { has_variable = tca_circuit_pending_appointment } }
+                set_variable = { name = tca_circuit_pending_appointment value = yes }
+                debug_log = "TCA_CIRCUIT INCUMBENT_RETRACT_PENDING"
+            }
+            if = {
+                limit = { tca_circuit_is_lapsed_trigger = yes }
+                tca_circuit_fill_lapsed_title_effect = yes
+            }
+            # 补授失败时 pending_appointment 保留，下一季度维护继续兜底；此处只清待处理与审计标记。
+            remove_variable = tca_circuit_incumbent_pending
+            remove_variable = tca_circuit_incumbent_invalid
+            remove_variable = tca_circuit_audit_reported
+        }
+        else = {
+            # 收回异常/失败：保留 incumbent pending，等下一季度维护重试，不改其他状态。
+            debug_log = "TCA_CIRCUIT INCUMBENT_RETRACT_FAILED"
+        }
+    }
+}
+
+# 空作用域；调试开关：开启在任不合格强制收回（默认关闭）。
+# 开启后清空审计状态，由维护按当前持有人重扫；仍需 tca_circuit_self_grant_enabled 同时存在才会真正收回。
+tca_circuit_enable_retract_unqualified_effect = {
+    set_global_variable = { name = tca_circuit_retract_unqualified_enabled value = yes }
+    tca_circuit_clear_audit_effect = yes
+    debug_log = "TCA_CIRCUIT RETRACT_UNQUALIFIED_ENABLED"
+}
+
+# 空作用域；关闭在任不合格强制收回（默认状态）。
+tca_circuit_disable_retract_unqualified_effect = {
+    remove_global_variable = tca_circuit_retract_unqualified_enabled
+    debug_log = "TCA_CIRCUIT RETRACT_UNQUALIFIED_DISABLED"
+}
+
+# 头衔作用域；P4 文官路补挂文官任命继承法（celestial_appointment_succession_law）。
+# 只对 kind=1、天朝封臣持有、未持该法、无军事契约 flag、无 locked_to_partition 的已登记路执行；
+# 已是该法时为空操作。由 tca_circuit_sync_kind_effect 在派生 kind=1 后调用，季度维护自然重试。
+tca_circuit_ensure_civil_appointment_law_effect = {
+    if = {
+        limit = {
+            # P4 默认关闭：补挂会改写既有路持有人的领地继承路径，属于“补充等效”而非默认修正；
+            # 已有兼任/既有继承应保持原状，只有显式开启时才补法。
+            has_global_variable = tca_circuit_civil_law_ensure_enabled
+            tca_circuit_is_tracked_road_trigger = yes
+            var:tca_circuit_kind = 1
+            tca_circuit_has_celestial_vassal_holder_trigger = yes
+            NOT = { holder = { has_realm_law = celestial_appointment_succession_law } }
+            holder = {
+                NOT = { vassal_contract_has_flag = celestial_military_appointment }
+                NOT = { vassal_contract_has_flag = locked_to_partition }
+            }
+        }
+        holder = { add_realm_law_skip_effects = celestial_appointment_succession_law }
+        debug_log = "TCA_CIRCUIT CIVIL_LAW_ENSURED"
+    }
+}
+
+# 空作用域；调试/政策开关：开启文官路补挂任命继承法（默认关闭）。
+# 开启后只影响后续 sync_kind/维护，不追溯已形成的兼任或继承结果。
+tca_circuit_enable_civil_law_ensure_effect = {
+    set_global_variable = { name = tca_circuit_civil_law_ensure_enabled value = yes }
+    debug_log = "TCA_CIRCUIT CIVIL_LAW_ENSURE_ENABLED"
+}
+
+# 空作用域；关闭文官路补挂任命继承法（默认状态）。
+tca_circuit_disable_civil_law_ensure_effect = {
+    remove_global_variable = tca_circuit_civil_law_ensure_enabled
+    debug_log = "TCA_CIRCUIT CIVIL_LAW_ENSURE_DISABLED"
+}
+
+# 空作用域；调试开关：开启“一人多路”信息记录（默认关闭，仅日志）。
+tca_circuit_enable_multi_road_audit_effect = {
+    set_global_variable = { name = tca_circuit_multi_road_audit_enabled value = yes }
+    tca_circuit_clear_audit_effect = yes
+    debug_log = "TCA_CIRCUIT MULTI_ROAD_AUDIT_ENABLED"
+}
+
+# 空作用域；关闭“一人多路”信息记录（默认状态）。
+tca_circuit_disable_multi_road_audit_effect = {
+    remove_global_variable = tca_circuit_multi_road_audit_enabled
+    tca_circuit_clear_audit_effect = yes
+    debug_log = "TCA_CIRCUIT MULTI_ROAD_AUDIT_DISABLED"
+}
+

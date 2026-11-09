@@ -1,0 +1,85 @@
+﻿# 路主任命继承补授的原生回调接线；全部以 on_actions 追加，不替换原版 effect 块。
+# 生命周期：
+#   - 开局/年度：从 h_china 侧重建路类型标记与全局登记（覆盖旧档与保存后列表丢失）；
+#   - 季度：皇帝角色收到原生季度脉冲时巡检登记路（无待办不扫描世界）；
+#   - on_title_gain：只写待补授标记/刷新类型登记，并排队次日维护，不当场改头衔；
+#   - on_title_destroyed：清理失效登记；
+#   - tca_circuit_maintenance_work：由 trigger_event 次日直接触发的维护工作入口。
+# 同一路最多一个待办：排队由人物变量 tca_circuit_maintenance_pending 合并，维护结束清除。
+
+# 空作用域；开局与年度全局脉冲。
+on_game_start_after_lobby = { on_actions = { tca_circuit_startup } }
+yearly_global_pulse = { on_actions = { tca_circuit_startup } }
+
+# 皇帝角色作用域；季度巡检。
+quarterly_playable_pulse = { on_actions = { tca_circuit_quarterly } }
+
+# 新持有人角色作用域；scope:title 为本次变更头衔。
+on_title_gain = { on_actions = { tca_circuit_title_gain } }
+
+# 销毁前持有人角色作用域；scope:landed_title 为被销毁头衔。
+on_title_destroyed = { on_actions = { tca_circuit_title_destroyed } }
+
+# 空作用域；从 h_china 侧重建设路类型标记与登记，不扫描其他国家。
+tca_circuit_startup = {
+    effect = { tca_circuit_rebuild_registry_effect = yes }
+}
+
+# 皇帝角色作用域；季度巡检登记路。回调 root 为收到季度脉冲的角色，不使用其他全局 scope。
+# 跨日两段式：季度入口先解除上一轮“等次日”闸门（day1 准备的候选到下一维护入口才可授予）。
+tca_circuit_quarterly = {
+    trigger = {
+        is_alive = yes
+        has_title = title:h_china
+    }
+    effect = {
+        if = { limit = { has_global_variable_list = tca_circuit_titles } every_in_global_list = { variable = tca_circuit_titles remove_variable = tca_circuit_prepared_wait } }
+        if = { limit = { has_global_variable_list = tca_circuit_prepared_titles } every_in_global_list = { variable = tca_circuit_prepared_titles remove_variable = tca_circuit_prepared_wait } }
+        tca_circuit_run_maintenance_effect = yes
+    }
+}
+
+# 新持有人角色作用域；天朝路或已有类型标记的头衔才进入判定。
+# 实际分支判断在 tca_circuit_on_title_gain_effect 内完成（皇帝回落 vs 天朝封臣取得）。
+tca_circuit_title_gain = {
+    trigger = {
+        scope:title = {
+            OR = {
+                tca_circuit_is_road_trigger = yes
+                has_variable = tca_circuit_kind
+            }
+        }
+    }
+    effect = { tca_circuit_on_title_gain_effect = yes }
+}
+
+# 销毁前持有人角色作用域；scope:landed_title 为被销毁头衔。
+# 只有带类型标记或仍在全局登记中的头衔才清理，避免对每个普通头衔销毁写日志。
+tca_circuit_title_destroyed = {
+    trigger = {
+        scope:landed_title = {
+            OR = {
+                has_variable = tca_circuit_kind
+                is_target_in_global_variable_list = { name = tca_circuit_titles target = this }
+            }
+        }
+    }
+    effect = { tca_circuit_on_title_destroyed_effect = yes }
+}
+
+# 皇帝角色作用域；on_title_gain 排队的次日维护工作入口。
+# 直接触发本 on_action 时 root 为 trigger_event 的调用作用域（队列效果已从皇帝作用域发出）。
+# 跨日两段式：次日入口先解除“等次日”闸门；同 tick 其他路径触发的维护不会解除，避免同日消费 day1 刚准备的候选。
+tca_circuit_maintenance_work = {
+    trigger = {
+        is_alive = yes
+        has_title = title:h_china
+    }
+    effect = {
+        if = { limit = { has_global_variable_list = tca_circuit_titles } every_in_global_list = { variable = tca_circuit_titles remove_variable = tca_circuit_prepared_wait } }
+        if = { limit = { has_global_variable_list = tca_circuit_prepared_titles } every_in_global_list = { variable = tca_circuit_prepared_titles remove_variable = tca_circuit_prepared_wait } }
+        # 正式诊断：次日入口解除两段式闸门（配合 PREPARED_CONSUME_CROSS_RUN 验证跨日约束）。
+        debug_log = "TCA_CIRCUIT PREPARED_GATE_CLEARED"
+        tca_circuit_run_maintenance_effect = yes
+    }
+}

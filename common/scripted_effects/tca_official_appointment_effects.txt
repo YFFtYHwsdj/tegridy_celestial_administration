@@ -22,9 +22,12 @@ tca_ensure_official_title_succession_effect = {
 # 实际获任角色作用域；只在首次／纠错精确授职后调用，日常维护不续期。
 # granted事务不会自动设置原生近期受任超时；补齐原版期限，既有更长的拒任／退休超时不缩短。
 # 不对暂持官署的上级调用，避免给上级附带冷却。
+# 写入冷却的同时写持久标记 tca_recent_appointment（与冷却同期限自动到期）：
+# 路主任命继承补授的季度预清只清带本标记（或原生近期受任区间）的冷却，不无条件清 appointment_timeout_days。
 tca_set_official_appointment_cooldown_effect = {
     if = {
         limit = { appointment_timeout_days < tca_official_appointment_cooldown_days }
         set_appointment_timeout = { days = tca_official_appointment_cooldown_days desc = tca_appointment_recent_office_desc }
+        set_variable = { name = tca_recent_appointment value = yes days = tca_official_appointment_cooldown_days }
     }
 }
