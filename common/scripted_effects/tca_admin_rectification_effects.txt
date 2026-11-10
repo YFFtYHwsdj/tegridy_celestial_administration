@@ -1,0 +1,866 @@
+﻿# 行政整饬系统（归正辖属 & 裁撤兼领）共享效果。
+# 涵盖：
+#   1. 归正辖属书信派发、二次校验与封属调整执行；
+#   2. 裁撤兼领后的继任选拔（current_heir 优先 -> 现有候选池最多重抽 3 次 -> 生成火星人官员）；
+#   3. 新官员（火星人）生成及科举／官品／功绩／家门／天朝政体初始化；
+#   4. 裁撤兼领书信派发、二次校验、头衔直接交接、低级官员跨辖区升迁旧头衔腾退（6.5）及封臣关系善后（第七章）；
+#   5. 宰相奏请皇帝批准的 intermediary 通过／驳回／失效处理。
+
+# ---------------------------------------------------------------------------
+# 一、归正辖属：书信派发与执行（第二章 & 第五章）
+# ---------------------------------------------------------------------------
+
+# 互动上下文（scope:actor, scope:recipient）；派发归正辖属书信事件。
+# 在 recipient 上记录待执行的发起者、原直属上级、拟转入法理上级及其头衔，次日触发书信事件 tca_admin_rectification.10。
+tca_send_rectify_subordination_letter_effect = {
+    if = {
+        limit = {
+            exists = scope:actor
+            exists = scope:recipient
+            scope:recipient = {
+                exists = liege
+                exists = primary_title
+                exists = primary_title.de_jure_liege
+                exists = primary_title.de_jure_liege.holder
+            }
+        }
+        scope:recipient = {
+            liege = { save_scope_as = tca_rectify_old_liege }
+            primary_title.de_jure_liege = {
+                save_scope_as = tca_rectify_new_liege_title
+                holder = { save_scope_as = tca_rectify_new_liege }
+            }
+            set_variable = { name = tca_rectify_pending_actor value = scope:actor days = 30 }
+            set_variable = { name = tca_rectify_pending_old_liege value = scope:tca_rectify_old_liege days = 30 }
+            set_variable = { name = tca_rectify_pending_new_liege value = scope:tca_rectify_new_liege days = 30 }
+            set_variable = { name = tca_rectify_pending_new_liege_title value = scope:tca_rectify_new_liege_title days = 30 }
+            trigger_event = { id = tca_admin_rectification.10 days = 1 }
+        }
+    }
+}
+
+# 角色作用域（recipient = root）；由书信事件 tca_admin_rectification.10 确认选项调用。
+# 执行前二次复验（5.4）：若条件仍成立，则直接将直属上级变更为法理上级头衔持有人，不改变头衔与法理疆界。
+tca_execute_rectify_subordination_effect = {
+    if = {
+        limit = {
+            tca_rectify_subordination_still_valid_trigger = yes
+            exists = primary_title.de_jure_liege.holder
+        }
+        primary_title.de_jure_liege.holder = { save_scope_as = tca_rectify_exec_new_liege }
+        create_title_and_vassal_change = {
+            type = swear_fealty
+            add_claim_on_loss = no
+            save_scope_as = tca_rectify_fealty_change
+        }
+        change_liege = {
+            liege = scope:tca_rectify_exec_new_liege
+            change = scope:tca_rectify_fealty_change
+        }
+        resolve_title_and_vassal_change = scope:tca_rectify_fealty_change
+        debug_log = "TCA_ADMIN_RECTIFY SUBORDINATION_EXECUTED"
+    }
+    else = {
+        debug_log = "TCA_ADMIN_RECTIFY SUBORDINATION_INVALIDATED"
+    }
+    tca_clear_rectify_subordination_pending_effect = yes
+}
+
+# 角色作用域（recipient）；清理归正辖属临时状态。
+tca_clear_rectify_subordination_pending_effect = {
+    remove_variable = tca_rectify_pending_actor
+    remove_variable = tca_rectify_pending_old_liege
+    remove_variable = tca_rectify_pending_new_liege
+    remove_variable = tca_rectify_pending_new_liege_title
+}
+
+# ---------------------------------------------------------------------------
+# 二、裁撤兼领：候选池收集、3 次重抽与生成新官员（第六章 6.1 - 6.4）
+# ---------------------------------------------------------------------------
+
+# 角色作用域；收集本角色及其宫廷成员进入行政整饬候选基线池。
+tca_admin_rectification_collect_candidates_from_char_effect = {
+    if = {
+        limit = {
+            is_alive = yes
+            is_adult = yes
+            merit_level >= merit_level_expected_county_value
+            NOT = { has_variable = tca_admin_rectification_reserved_successor }
+        }
+        add_to_list = tca_admin_rectification_candidate_pool
+    }
+    every_courtier = {
+        limit = {
+            is_alive = yes
+            is_adult = yes
+            merit_level >= merit_level_expected_county_value
+            NOT = { has_variable = tca_admin_rectification_reserved_successor }
+        }
+        add_to_list = tca_admin_rectification_candidate_pool
+    }
+}
+
+# 角色作用域（最高领主）；收集全国候选基线池。
+tca_admin_rectification_build_realm_candidate_pool_effect = {
+    every_in_list = {
+        list = tca_admin_rectification_candidate_pool
+        remove_from_list = tca_admin_rectification_candidate_pool
+    }
+    tca_admin_rectification_collect_candidates_from_char_effect = yes
+    every_vassal_or_below = {
+        tca_admin_rectification_collect_candidates_from_char_effect = yes
+    }
+}
+
+# 头衔作用域（待移交官署）；参数：$TOP_LIEGE$ 最高领主。
+# 生成一名符合 6.4 规则的新官员（火星人），并完成 Day 0 无地统治者准备（王朝、家门、领主、天朝政体），
+# 确保次日书信确认时可直接安全接收有地头衔。
+# 输出：scope:tca_admin_rectification_selected_successor。
+tca_admin_rectification_generate_official_effect = {
+    save_scope_as = tca_ar_gen_title
+    $TOP_LIEGE$ = { save_scope_as = tca_ar_gen_sovereign }
+    clear_saved_scope = tca_ar_generated_char
+    scope:tca_ar_gen_sovereign = {
+        if = {
+            limit = {
+                scope:tca_ar_gen_title = {
+                    has_variable = tca_circuit_kind
+                    var:tca_circuit_kind >= 2
+                }
+            }
+            create_character = {
+                template = tgp_minister_commander_template
+                employer = scope:tca_ar_gen_sovereign
+                faith = scope:tca_ar_gen_sovereign.faith
+                rite = scope:tca_ar_gen_sovereign.rite
+                culture = scope:tca_ar_gen_sovereign.culture
+                gender_female_chance = {
+                    value = 0
+                    if = {
+                        limit = {
+                            scope:tca_ar_gen_sovereign = {
+                                OR = {
+                                    has_realm_law = female_only_law
+                                    has_realm_law = female_preference_law
+                                }
+                            }
+                        }
+                        add = 100
+                    }
+                }
+                save_scope_as = tca_ar_generated_char
+            }
+        }
+        else = {
+            create_character = {
+                template = tgp_minister_scholar_template
+                employer = scope:tca_ar_gen_sovereign
+                faith = scope:tca_ar_gen_sovereign.faith
+                rite = scope:tca_ar_gen_sovereign.rite
+                culture = scope:tca_ar_gen_sovereign.culture
+                gender_female_chance = {
+                    value = 0
+                    if = {
+                        limit = {
+                            scope:tca_ar_gen_sovereign = {
+                                OR = {
+                                    has_realm_law = female_only_law
+                                    has_realm_law = female_preference_law
+                                }
+                            }
+                        }
+                        add = 100
+                    }
+                }
+                save_scope_as = tca_ar_generated_char
+            }
+        }
+    }
+    if = {
+        limit = { exists = scope:tca_ar_generated_char }
+        scope:tca_ar_generated_char = {
+            # Day 0 准备王朝、家门头衔、领主与天朝政体，使次日书信交接时已具备家门头衔与天朝仕宦身份。
+            tca_circuit_prepare_landless_recipient_effect = {
+                RULER = scope:tca_ar_gen_sovereign
+                TITLE = scope:tca_ar_gen_title
+            }
+            # 6.4.2 科举资格：必有童子试、乡试、会试通过记录，10% 概率殿试通过。
+            tca_assign_official_scholar_exams_effect = yes
+            # 6.4.3 初始官品（Merit Level）与对应功绩：
+            if = {
+                limit = { scope:tca_ar_gen_title.tier >= tier_kingdom }
+                random_list = {
+                    75 = {
+                        set_variable = { name = tca_merit_approved_level value = 5 }
+                        set_merit_level = 5
+                        change_merit = kingdom_starting_merit_value
+                    }
+                    20 = {
+                        set_variable = { name = tca_merit_approved_level value = 6 }
+                        set_merit_level = 6
+                        change_merit = merit_level_6_value
+                    }
+                    5 = {
+                        set_variable = { name = tca_merit_approved_level value = 7 }
+                        set_merit_level = 7
+                        change_merit = empire_starting_merit_value
+                    }
+                }
+            }
+            else_if = {
+                limit = { scope:tca_ar_gen_title.tier = tier_duchy }
+                random_list = {
+                    80 = {
+                        set_variable = { name = tca_merit_approved_level value = 3 }
+                        set_merit_level = 3
+                        change_merit = duchy_starting_merit_value
+                    }
+                    20 = {
+                        set_variable = { name = tca_merit_approved_level value = 4 }
+                        set_merit_level = 4
+                        change_merit = merit_level_4_value
+                    }
+                }
+            }
+            else = {
+                random_list = {
+                    80 = {
+                        set_variable = { name = tca_merit_approved_level value = 1 }
+                        set_merit_level = 1
+                        change_merit = county_starting_merit_value
+                    }
+                    20 = {
+                        set_variable = { name = tca_merit_approved_level value = 2 }
+                        set_merit_level = 2
+                        change_merit = merit_level_2_value
+                    }
+                }
+            }
+            add_character_flag = tca_merit_active
+            tca_merit_refresh_cap_effect = yes
+            save_scope_as = tca_admin_rectification_selected_successor
+        }
+        debug_log = "TCA_ADMIN_RECTIFY GENERATED_OFFICIAL"
+    }
+}
+
+# 头衔作用域（待移交官署）；参数：$TOP_LIEGE$ 最高领主。
+# 依据 6.3 继任抽取流程选定合格继任者：
+#   1. 首先检查待移交头衔的 current_heir，若满足全部任职条件，直接作为继任者；
+#   2. 若不存在或不合格，从现有候选池按任官评分加权最多重新抽取 3 次（每次重抽校验完整任职资格）；
+#   3. 三次重抽仍未获得合格人选，则直接生成新官员（火星人）。
+# 输出：scope:tca_admin_rectification_selected_successor。
+tca_admin_rectification_select_or_generate_successor_effect = {
+    save_scope_as = tca_admin_rectification_scoring_title
+    $TOP_LIEGE$ = { save_scope_as = tca_ar_select_top_liege }
+    clear_saved_scope = tca_admin_rectification_selected_successor
+    # 步骤 1：优先检查待移交头衔的 current_heir。
+    if = {
+        limit = {
+            exists = current_heir
+            current_heir = {
+                tca_admin_rectification_is_qualified_candidate_trigger = {
+                    TITLE = scope:tca_admin_rectification_scoring_title
+                    TOP_LIEGE = scope:tca_ar_select_top_liege
+                }
+            }
+        }
+        current_heir = {
+            save_scope_as = tca_admin_rectification_selected_successor
+        }
+        debug_log = "TCA_ADMIN_RECTIFY SELECTED_CURRENT_HEIR"
+    }
+    # 步骤 2：current_heir 不存在或不合格时，从现有候选池最多重抽 3 次。
+    if = {
+        limit = { NOT = { exists = scope:tca_admin_rectification_selected_successor } }
+        scope:tca_ar_select_top_liege = {
+            tca_admin_rectification_build_realm_candidate_pool_effect = yes
+        }
+        set_local_variable = { name = tca_ar_draw_count value = 0 }
+        while = {
+            limit = {
+                local_var:tca_ar_draw_count < 3
+                NOT = { exists = scope:tca_admin_rectification_selected_successor }
+                any_in_list = {
+                    list = tca_admin_rectification_candidate_pool
+                    is_alive = yes
+                }
+            }
+            change_local_variable = { name = tca_ar_draw_count add = 1 }
+            clear_saved_scope = tca_ar_drawn_candidate
+            random_in_list = {
+                list = tca_admin_rectification_candidate_pool
+                limit = {
+                    tca_admin_rectification_is_qualified_candidate_trigger = {
+                        TITLE = scope:tca_admin_rectification_scoring_title
+                        TOP_LIEGE = scope:tca_ar_select_top_liege
+                    }
+                }
+                weight = {
+                    base = 1
+                    modifier = { add = tca_admin_rectification_candidate_weight_value }
+                }
+                save_scope_as = tca_ar_drawn_candidate
+            }
+            if = {
+                limit = {
+                    exists = scope:tca_ar_drawn_candidate
+                    scope:tca_ar_drawn_candidate = {
+                        tca_admin_rectification_is_qualified_candidate_trigger = {
+                            TITLE = scope:tca_admin_rectification_scoring_title
+                            TOP_LIEGE = scope:tca_ar_select_top_liege
+                        }
+                    }
+                }
+                scope:tca_ar_drawn_candidate = {
+                    save_scope_as = tca_admin_rectification_selected_successor
+                }
+                debug_log = "TCA_ADMIN_RECTIFY SELECTED_POOL_CANDIDATE"
+            }
+            else = {
+                # 若本次未能抽出合格者，从池中剔除一名不合格候选（防止空转）并继续下一次抽取，上限 3 次。
+                random_in_list = {
+                    list = tca_admin_rectification_candidate_pool
+                    remove_from_list = tca_admin_rectification_candidate_pool
+                }
+            }
+        }
+    }
+    # 步骤 3：三次重抽仍未获得合格人选，生成新官员（火星人）。
+    if = {
+        limit = { NOT = { exists = scope:tca_admin_rectification_selected_successor } }
+        tca_admin_rectification_generate_official_effect = {
+            TOP_LIEGE = scope:tca_ar_select_top_liege
+        }
+    }
+    if = {
+        limit = { exists = scope:tca_admin_rectification_selected_successor }
+        scope:tca_admin_rectification_selected_successor = {
+            set_variable = {
+                name = tca_admin_rectification_reserved_successor
+                value = scope:tca_admin_rectification_scoring_title
+                days = 30
+            }
+        }
+    }
+}
+
+# ---------------------------------------------------------------------------
+# 三、裁撤兼领：书信派发、头衔交接、升迁腾退与封臣善后（第三、五、六、七章）
+# ---------------------------------------------------------------------------
+
+# 互动上下文（scope:actor, scope:recipient, scope:target）；派发裁撤兼领书信事件。
+# 参数：$APPROVED$ 是否经过天子审批（yes/no）。
+# 在 Day 0 选定或生成继任者（若继任者为有地低级官员且持有拟接任官署法理外的旧头衔，同日为其旧头衔预备替补继任者），
+# 随后向被整理官员触发书信事件 tca_admin_rectification.20（days = 1）。
+tca_send_retract_concurrent_letter_effect = {
+    if = {
+        limit = {
+            exists = scope:actor
+            exists = scope:recipient
+            exists = scope:target
+            scope:recipient = {
+                tca_retract_concurrent_still_valid_trigger = {
+                    ACTOR = scope:actor
+                    TITLE = scope:target
+                }
+            }
+        }
+        scope:actor.top_liege = { save_scope_as = tca_ar_send_top_liege }
+        scope:target = {
+            tca_admin_rectification_select_or_generate_successor_effect = {
+                TOP_LIEGE = scope:tca_ar_send_top_liege
+            }
+        }
+        if = {
+            limit = { exists = scope:tca_admin_rectification_selected_successor }
+            scope:tca_admin_rectification_selected_successor = {
+                save_scope_as = tca_retract_successor
+                # 6.5 若继任者为现有低级有地官员，且持有位于新官署法理范围外的旧实职头衔，
+                # 在 Day 0 为这些需腾退的旧头衔预选或预生成合格接任者（保证次日腾退时接收者已持有家门头衔）。
+                if = {
+                    limit = {
+                        is_landed = yes
+                        scope:target.tier >= tier_duchy
+                    }
+                    every_held_title = {
+                        limit = {
+                            tca_is_secular_local_admin_title_trigger = yes
+                            NOT = { target_is_de_jure_liege_or_above = scope:target }
+                        }
+                        save_scope_as = tca_ar_vacate_old_title
+                        scope:tca_ar_vacate_old_title = {
+                            tca_admin_rectification_select_or_generate_successor_effect = {
+                                TOP_LIEGE = scope:tca_ar_send_top_liege
+                            }
+                            if = {
+                                limit = { exists = scope:tca_admin_rectification_selected_successor }
+                                set_variable = {
+                                    name = tca_ar_vacate_prepared_successor
+                                    value = scope:tca_admin_rectification_selected_successor
+                                    days = 30
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            scope:recipient = {
+                primary_title = { save_scope_as = tca_retract_primary_title }
+                set_variable = { name = tca_retract_pending_actor value = scope:actor days = 30 }
+                set_variable = { name = tca_retract_pending_title value = scope:target days = 30 }
+                set_variable = { name = tca_retract_pending_primary_title value = scope:tca_retract_primary_title days = 30 }
+                set_variable = { name = tca_retract_pending_successor value = scope:tca_retract_successor days = 30 }
+                if = {
+                    limit = { always = $APPROVED$ }
+                    set_variable = { name = tca_retract_pending_approved value = yes days = 30 }
+                }
+                else = {
+                    remove_variable = tca_retract_pending_approved
+                }
+                scope:target = { save_scope_as = tca_retract_target_title }
+                trigger_event = { id = tca_admin_rectification.20 days = 1 }
+            }
+        }
+    }
+}
+
+# 头衔作用域（待腾退旧头衔）；参数：$PROMOTED_HOLDER$ 升迁官员，$TOP_LIEGE$ 最高领主。
+# 6.5 跨辖区升迁处理：低级现职官员升任更高一级地方官署时，位于新官署法理范围外的旧头衔不适用 3.2/3.4 首府例外，
+# 必须腾退并移交合格继任官员，绝不回落皇帝或原上级暂管。
+tca_admin_rectification_vacate_promoted_old_title_effect = {
+    save_scope_as = tca_ar_vacating_title
+    $PROMOTED_HOLDER$ = { save_scope_as = tca_ar_promoted_official }
+    $TOP_LIEGE$ = { save_scope_as = tca_ar_vacate_sovereign }
+    clear_saved_scope = tca_ar_vacate_recipient
+    if = {
+        limit = {
+            has_variable = tca_ar_vacate_prepared_successor
+            var:tca_ar_vacate_prepared_successor = {
+                is_alive = yes
+                this != scope:tca_ar_promoted_official
+                OR = {
+                    is_landed = yes
+                    any_held_title = { is_noble_family_title = yes }
+                }
+            }
+        }
+        var:tca_ar_vacate_prepared_successor = {
+            save_scope_as = tca_ar_vacate_recipient
+        }
+    }
+    else = {
+        # 若预备继任者意外失效，从当前已有家门或有地的合格候选池中即时补抽。
+        tca_admin_rectification_select_or_generate_successor_effect = {
+            TOP_LIEGE = scope:tca_ar_vacate_sovereign
+        }
+        if = {
+            limit = {
+                exists = scope:tca_admin_rectification_selected_successor
+                scope:tca_admin_rectification_selected_successor = {
+                    OR = {
+                        is_landed = yes
+                        any_held_title = { is_noble_family_title = yes }
+                    }
+                }
+            }
+            scope:tca_admin_rectification_selected_successor = {
+                save_scope_as = tca_ar_vacate_recipient
+            }
+        }
+    }
+    if = {
+        limit = {
+            exists = scope:tca_ar_vacate_recipient
+            exists = holder
+            holder = scope:tca_ar_promoted_official
+        }
+        # 记录旧头衔原法理上级持有人（若存在且高于旧头衔级别），以便腾退后理顺封属。
+        clear_saved_scope = tca_ar_vacate_target_liege
+        if = {
+            limit = {
+                exists = de_jure_liege
+                exists = de_jure_liege.holder
+                de_jure_liege.holder = {
+                    is_alive = yes
+                    top_liege = scope:tca_ar_vacate_sovereign
+                    government_has_flag = government_is_celestial
+                    highest_held_title_tier > scope:tca_ar_vacating_title.tier
+                    this != scope:tca_ar_vacate_recipient
+                }
+            }
+            de_jure_liege.holder = { save_scope_as = tca_ar_vacate_target_liege }
+        }
+        else = {
+            scope:tca_ar_vacate_sovereign = { save_scope_as = tca_ar_vacate_target_liege }
+        }
+        scope:tca_ar_promoted_official = {
+            tca_circuit_transfer_title_granted_effect = {
+                TITLE = scope:tca_ar_vacating_title
+                HOLDER = scope:tca_ar_vacate_recipient
+            }
+        }
+        if = {
+            limit = { holder ?= scope:tca_ar_vacate_recipient }
+            scope:tca_ar_vacate_recipient = {
+                remove_variable = tca_admin_rectification_reserved_successor
+                tca_circuit_ensure_holder_state_effect = yes
+                tca_set_official_appointment_cooldown_effect = yes
+                if = {
+                    limit = {
+                        exists = scope:tca_ar_vacate_target_liege
+                        NOT = { liege ?= scope:tca_ar_vacate_target_liege }
+                        scope:tca_ar_vacate_target_liege = {
+                            highest_held_title_tier > prev.highest_held_title_tier
+                            NOT = { target_is_liege_or_above = prev }
+                        }
+                    }
+                    create_title_and_vassal_change = {
+                        type = swear_fealty
+                        add_claim_on_loss = no
+                        save_scope_as = tca_ar_vacate_fealty_change
+                    }
+                    change_liege = {
+                        liege = scope:tca_ar_vacate_target_liege
+                        change = scope:tca_ar_vacate_fealty_change
+                    }
+                    resolve_title_and_vassal_change = scope:tca_ar_vacate_fealty_change
+                }
+            }
+            debug_log = "TCA_ADMIN_RECTIFY PROMOTED_OLD_TITLE_VACATED"
+        }
+    }
+    remove_variable = tca_ar_vacate_prepared_successor
+}
+
+# 角色作用域（recipient = root）；由书信事件 tca_admin_rectification.20 确认选项调用。
+# 执行裁撤兼领：
+#   1. 5.4 二次校验：确认原官员仍持有指定头衔、仍同属同一最高领主、且该头衔仍满足裁撤条件；
+#   2. 检查预选继任者是否仍然存活且合格（若意外失效则即时补选）；
+#   3. 直接将指定头衔由原持有人移交新任官员（不经过皇帝或上级暂管）；
+#   4. 理顺新任官员的直属上级、主头衔、路类型契约与受任冷却；
+#   5. 6.5 若新任官员为跨辖区升迁的低级有地官员，腾退其位于新官署法理外的旧头衔；
+#   6. 第七章 封臣关系善后：将原归于被裁撤官署法理下的直属下级官员改隶新任主官，并确保原持有人保留头衔的法理下级仍归原持有人。
+tca_execute_retract_concurrent_title_effect = {
+    if = {
+        limit = {
+            has_variable = tca_retract_pending_actor
+            has_variable = tca_retract_pending_title
+            exists = var:tca_retract_pending_actor
+            exists = var:tca_retract_pending_title
+        }
+        var:tca_retract_pending_actor = { save_scope_as = tca_retract_exec_actor }
+        var:tca_retract_pending_title = { save_scope_as = tca_retract_exec_title }
+        if = {
+            limit = {
+                tca_retract_concurrent_still_valid_trigger = {
+                    ACTOR = scope:tca_retract_exec_actor
+                    TITLE = scope:tca_retract_exec_title
+                }
+            }
+            top_liege = { save_scope_as = tca_retract_exec_sovereign }
+            clear_saved_scope = tca_retract_exec_successor
+            if = {
+                limit = {
+                    has_variable = tca_retract_pending_successor
+                    exists = var:tca_retract_pending_successor
+                    var:tca_retract_pending_successor = {
+                        is_alive = yes
+                        this != root
+                        this != scope:tca_retract_exec_sovereign
+                        OR = {
+                            is_landed = yes
+                            any_held_title = { is_noble_family_title = yes }
+                        }
+                        tca_circuit_has_title_level_requirement_trigger = { TITLE = scope:tca_retract_exec_title }
+                    }
+                }
+                var:tca_retract_pending_successor = {
+                    save_scope_as = tca_retract_exec_successor
+                }
+            }
+            else = {
+                # 预选继任者若在书信抵达前意外死亡或失格，即时从合格候选池补选。
+                scope:tca_retract_exec_title = {
+                    tca_admin_rectification_select_or_generate_successor_effect = {
+                        TOP_LIEGE = scope:tca_retract_exec_sovereign
+                    }
+                }
+                scope:tca_admin_rectification_selected_successor ?= {
+                    save_scope_as = tca_retract_exec_successor
+                }
+            }
+            if = {
+                limit = { exists = scope:tca_retract_exec_successor }
+                # 记录授予前的路类型标记（若目标头衔为王国级路）。
+                set_local_variable = { name = tca_ar_road_kind value = 0 }
+                if = {
+                    limit = { scope:tca_retract_exec_title = { has_variable = tca_circuit_kind } }
+                    set_local_variable = { name = tca_ar_road_kind value = scope:tca_retract_exec_title.var:tca_circuit_kind }
+                }
+                # 记录继任者受任前是否已有地（用于判断 6.5 跨辖区升迁旧头衔腾退）。
+                set_local_variable = { name = tca_ar_successor_was_landed value = no }
+                if = {
+                    limit = { scope:tca_retract_exec_successor = { is_landed = yes } }
+                    set_local_variable = { name = tca_ar_successor_was_landed value = yes }
+                }
+                # 执行直接头衔转移（由原持有人 root 发起 granted + include_vassals 移交）。
+                tca_circuit_transfer_title_granted_effect = {
+                    TITLE = scope:tca_retract_exec_title
+                    HOLDER = scope:tca_retract_exec_successor
+                }
+                if = {
+                    limit = { scope:tca_retract_exec_title = { holder ?= scope:tca_retract_exec_successor } }
+                    scope:tca_retract_exec_successor = {
+                        remove_variable = tca_admin_rectification_reserved_successor
+                        tca_circuit_ensure_holder_state_effect = yes
+                        tca_set_official_appointment_cooldown_effect = yes
+                        # 若新授头衔高于新任官员原主头衔，则设为主头衔。
+                        if = {
+                            limit = {
+                                OR = {
+                                    NOT = { exists = primary_title }
+                                    scope:tca_retract_exec_title.tier >= primary_title.tier
+                                }
+                            }
+                            set_primary_title_to = scope:tca_retract_exec_title
+                        }
+                        # 理顺新任官员自身的直属上级：
+                        # - 王国级路：直属皇帝；
+                        # - 公国级／伯爵级：若法理上级有持有人且同属本国、级别更高，则隶属法理上级持有人；否则隶属皇帝。
+                        clear_saved_scope = tca_ar_successor_expected_liege
+                        if = {
+                            limit = { scope:tca_retract_exec_title.tier >= tier_kingdom }
+                            scope:tca_retract_exec_sovereign = { save_scope_as = tca_ar_successor_expected_liege }
+                        }
+                        else_if = {
+                            limit = {
+                                exists = scope:tca_retract_exec_title.de_jure_liege
+                                exists = scope:tca_retract_exec_title.de_jure_liege.holder
+                                scope:tca_retract_exec_title.de_jure_liege.holder = {
+                                    is_alive = yes
+                                    top_liege = scope:tca_retract_exec_sovereign
+                                    government_has_flag = government_is_celestial
+                                    highest_held_title_tier > scope:tca_retract_exec_successor.highest_held_title_tier
+                                    this != scope:tca_retract_exec_successor
+                                    NOT = { target_is_liege_or_above = scope:tca_retract_exec_successor }
+                                }
+                            }
+                            scope:tca_retract_exec_title.de_jure_liege.holder = {
+                                save_scope_as = tca_ar_successor_expected_liege
+                            }
+                        }
+                        else = {
+                            scope:tca_retract_exec_sovereign = { save_scope_as = tca_ar_successor_expected_liege }
+                        }
+                        if = {
+                            limit = {
+                                exists = scope:tca_ar_successor_expected_liege
+                                NOT = { liege ?= scope:tca_ar_successor_expected_liege }
+                                scope:tca_ar_successor_expected_liege = {
+                                    highest_held_title_tier > scope:tca_retract_exec_successor.highest_held_title_tier
+                                    NOT = { target_is_liege_or_above = scope:tca_retract_exec_successor }
+                                }
+                            }
+                            create_title_and_vassal_change = {
+                                type = swear_fealty
+                                add_claim_on_loss = no
+                                save_scope_as = tca_ar_successor_liege_change
+                            }
+                            change_liege = {
+                                liege = scope:tca_ar_successor_expected_liege
+                                change = scope:tca_ar_successor_liege_change
+                            }
+                            resolve_title_and_vassal_change = scope:tca_ar_successor_liege_change
+                        }
+                        # 若目标头衔为带类型的王国级路，同步军区／都护契约与路登记。
+                        if = {
+                            limit = { scope:tca_retract_exec_title = { tca_circuit_is_road_trigger = yes } }
+                            if = {
+                                limit = { local_var:tca_ar_road_kind = 3 }
+                                tca_circuit_apply_road_kind_contract_effect = {
+                                    KIND = 3
+                                    TITLE = scope:tca_retract_exec_title
+                                }
+                            }
+                            else_if = {
+                                limit = { local_var:tca_ar_road_kind = 2 }
+                                tca_circuit_apply_road_kind_contract_effect = {
+                                    KIND = 2
+                                    TITLE = scope:tca_retract_exec_title
+                                }
+                            }
+                            scope:tca_retract_exec_title = { tca_circuit_sync_kind_effect = yes }
+                        }
+                        # 6.5 跨辖区升迁旧头衔腾退：
+                        # 若继任者原为低级有地官员且升任公国／王国级官署，其位于新官署法理范围外的旧头衔不适用首府豁免，一律腾退。
+                        if = {
+                            limit = {
+                                local_var:tca_ar_successor_was_landed = yes
+                                scope:tca_retract_exec_title.tier >= tier_duchy
+                            }
+                            every_held_title = {
+                                limit = {
+                                    this != scope:tca_retract_exec_title
+                                    tca_is_secular_local_admin_title_trigger = yes
+                                    NOT = { target_is_de_jure_liege_or_above = scope:tca_retract_exec_title }
+                                }
+                                tca_admin_rectification_vacate_promoted_old_title_effect = {
+                                    PROMOTED_HOLDER = scope:tca_retract_exec_successor
+                                    TOP_LIEGE = scope:tca_retract_exec_sovereign
+                                }
+                            }
+                        }
+                        tca_request_judicial_maintenance_effect = yes
+                        tca_request_tongpan_maintenance_effect = yes
+                    }
+                    # 第七章 封臣关系善后：
+                    # 1) 若原官员（root）名下仍留有主头衔为被裁撤官署直接法理下级的直属封臣，将其转归新任主官统属；
+                    # 2) 若 include_vassals 把属于原官员剩余合法头衔法理下的封臣误带给了新任主官，将其转回原官员名下。
+                    if = {
+                        limit = { scope:tca_retract_exec_title.tier >= tier_duchy }
+                        every_vassal = {
+                            limit = {
+                                is_alive = yes
+                                government_has_flag = government_is_celestial
+                                exists = primary_title
+                                primary_title = {
+                                    tca_is_secular_local_admin_title_trigger = yes
+                                    de_jure_liege ?= scope:tca_retract_exec_title
+                                }
+                                highest_held_title_tier < scope:tca_retract_exec_successor.highest_held_title_tier
+                            }
+                            create_title_and_vassal_change = {
+                                type = swear_fealty
+                                add_claim_on_loss = no
+                                save_scope_as = tca_ar_vassal_to_successor_change
+                            }
+                            change_liege = {
+                                liege = scope:tca_retract_exec_successor
+                                change = scope:tca_ar_vassal_to_successor_change
+                            }
+                            resolve_title_and_vassal_change = scope:tca_ar_vassal_to_successor_change
+                        }
+                        scope:tca_retract_exec_successor = {
+                            every_vassal = {
+                                limit = {
+                                    is_alive = yes
+                                    government_has_flag = government_is_celestial
+                                    exists = primary_title
+                                    primary_title = {
+                                        tca_is_secular_local_admin_title_trigger = yes
+                                        NOT = { target_is_de_jure_liege_or_above = scope:tca_retract_exec_title }
+                                        exists = de_jure_liege
+                                        de_jure_liege.holder ?= root
+                                    }
+                                    highest_held_title_tier < root.highest_held_title_tier
+                                }
+                                create_title_and_vassal_change = {
+                                    type = swear_fealty
+                                    add_claim_on_loss = no
+                                    save_scope_as = tca_ar_vassal_back_to_old_change
+                                }
+                                change_liege = {
+                                    liege = root
+                                    change = scope:tca_ar_vassal_back_to_old_change
+                                }
+                                resolve_title_and_vassal_change = scope:tca_ar_vassal_back_to_old_change
+                            }
+                        }
+                    }
+                    tca_request_judicial_maintenance_effect = yes
+                    tca_request_tongpan_maintenance_effect = yes
+                    debug_log = "TCA_ADMIN_RECTIFY RETRACT_CONCURRENT_EXECUTED"
+                }
+            }
+        }
+        else = {
+            debug_log = "TCA_ADMIN_RECTIFY RETRACT_CONCURRENT_INVALIDATED"
+        }
+    }
+    tca_clear_retract_concurrent_pending_effect = yes
+}
+
+# 角色作用域（recipient）；清理裁撤兼领临时状态与预约标记。
+tca_clear_retract_concurrent_pending_effect = {
+    if = {
+        limit = {
+            has_variable = tca_retract_pending_successor
+            exists = var:tca_retract_pending_successor
+        }
+        var:tca_retract_pending_successor = {
+            remove_variable = tca_admin_rectification_reserved_successor
+            every_held_title = {
+                limit = { has_variable = tca_ar_vacate_prepared_successor }
+                var:tca_ar_vacate_prepared_successor ?= {
+                    remove_variable = tca_admin_rectification_reserved_successor
+                }
+                remove_variable = tca_ar_vacate_prepared_successor
+            }
+        }
+    }
+    remove_variable = tca_retract_pending_actor
+    remove_variable = tca_retract_pending_title
+    remove_variable = tca_retract_pending_primary_title
+    remove_variable = tca_retract_pending_successor
+    remove_variable = tca_retract_pending_approved
+}
+
+# ---------------------------------------------------------------------------
+# 四、天子审批（intermediary）回调处理（第五章 5.1）
+# ---------------------------------------------------------------------------
+
+# 互动上下文；天子准奏宰相裁撤王国级兼领请求时的反馈通知。
+tca_handle_retract_approval_accept_effect = {
+    if = {
+        limit = {
+            exists = scope:actor
+            exists = scope:recipient
+            exists = scope:target
+            scope:recipient = {
+                tca_retract_concurrent_still_valid_trigger = {
+                    ACTOR = scope:actor
+                    TITLE = scope:target
+                }
+            }
+        }
+        scope:actor = {
+            send_interface_message = {
+                type = tca_judicial_arrest_approval_message
+                title = tca_admin_rectification_approved_toast
+                desc = tca_admin_rectification_approved_message
+                left_icon = scope:intermediary
+                right_icon = scope:recipient
+            }
+        }
+        debug_log = "TCA_ADMIN_RECTIFY IMPERIAL_APPROVAL_ACCEPTED"
+    }
+    else = {
+        scope:actor ?= {
+            send_interface_toast = {
+                type = event_toast_effect_neutral
+                title = tca_admin_rectification_invalidated_toast
+                left_icon = scope:recipient
+                custom_tooltip = tca_admin_rectification_invalidated_message
+            }
+        }
+        debug_log = "TCA_ADMIN_RECTIFY IMPERIAL_APPROVAL_INVALIDATED"
+    }
+}
+
+# 互动上下文；天子驳回宰相裁撤王国级兼领请求时的反馈通知。
+tca_handle_retract_approval_decline_effect = {
+    if = {
+        limit = { exists = scope:actor }
+        scope:actor = {
+            send_interface_message = {
+                type = tca_judicial_arrest_veto_message
+                title = tca_admin_rectification_vetoed_toast
+                desc = tca_admin_rectification_vetoed_message
+                left_icon = scope:intermediary
+                right_icon = scope:recipient
+            }
+        }
+    }
+    debug_log = "TCA_ADMIN_RECTIFY IMPERIAL_APPROVAL_VETOED"
+}

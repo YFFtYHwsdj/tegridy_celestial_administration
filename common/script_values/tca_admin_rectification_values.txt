@@ -1,0 +1,25 @@
+﻿# 行政整饬系统（归正辖属 & 裁撤兼领）共享数值。
+# 维护权力天平分档阈值与裁撤兼领后的候选人加权抽选权重。
+
+# 权力天平分档阈值：
+# - diarchy_swing < 40：倾向皇帝（等级 1-2），宰相不可整饬皇帝直属封臣，裁撤王国级兼领须皇帝批准。
+# - 40 <= diarchy_swing < 60：权力均衡（等级 3），宰相可整饬皇帝直属封臣，裁撤王国级兼领须皇帝批准。
+# - diarchy_swing >= 60：倾向宰相（等级 4-6），宰相可整饬皇帝直属封臣，且裁撤王国级兼领无需批准可径行下达。
+tca_admin_rectification_swing_balance_threshold = 40
+tca_admin_rectification_swing_diarch_threshold = 60
+
+# 候选角色作用域；调用方在 scope:tca_admin_rectification_scoring_title 中提供当前有持有人的待移交头衔。
+# 优先读取原生任命候选分 appointment_candidate_score，下限为 1（叠加官品保障正权重），
+# 不额外规定有地或无地官员优先。
+tca_admin_rectification_candidate_weight_value = {
+    value = 1
+    if = {
+        limit = {
+            exists = scope:tca_admin_rectification_scoring_title
+            scope:tca_admin_rectification_scoring_title = { exists = holder }
+        }
+        add = "appointment_candidate_score(scope:tca_admin_rectification_scoring_title)"
+    }
+    min = 1
+    add = merit_level
+}

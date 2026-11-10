@@ -1,0 +1,238 @@
+﻿# 行政整饬系统（归正辖属 & 裁撤兼领）统一书信事件。
+# 所有行政整饬的实际效果均在被整理者确认书信选项时调用共享 scripted effects 完成，
+# 执行前二次复验相关头衔、持有人及法理辖属状态；玩家与 AI 共用同一书信执行链路，不设拒绝选项。
+namespace = tca_admin_rectification
+
+# 归正辖属之命（letter_event）
+# root = 被整理官员（recipient）
+tca_admin_rectification.10 = {
+    type = letter_event
+    opening = {
+        desc = tca_admin_rectification.10.t
+    }
+    desc = {
+        first_valid = {
+            triggered_desc = {
+                trigger = {
+                    exists = scope:actor
+                    scope:actor = { is_independent_ruler = yes }
+                }
+                desc = tca_admin_rectification.10.desc.emperor
+            }
+            desc = tca_admin_rectification.10.desc.diarch
+        }
+    }
+    sender = scope:actor
+
+    immediate = {
+        if = {
+            limit = {
+                has_variable = tca_rectify_pending_actor
+                exists = var:tca_rectify_pending_actor
+            }
+            var:tca_rectify_pending_actor = { save_scope_as = actor }
+        }
+        else = {
+            top_liege = { save_scope_as = actor }
+        }
+        save_scope_as = recipient
+        if = {
+            limit = {
+                has_variable = tca_rectify_pending_old_liege
+                exists = var:tca_rectify_pending_old_liege
+            }
+            var:tca_rectify_pending_old_liege = { save_scope_as = tca_rectify_old_liege }
+        }
+        else_if = {
+            limit = { exists = liege }
+            liege = { save_scope_as = tca_rectify_old_liege }
+        }
+        if = {
+            limit = {
+                has_variable = tca_rectify_pending_new_liege_title
+                exists = var:tca_rectify_pending_new_liege_title
+            }
+            var:tca_rectify_pending_new_liege_title = { save_scope_as = tca_rectify_new_liege_title }
+        }
+        else_if = {
+            limit = {
+                exists = primary_title
+                exists = primary_title.de_jure_liege
+            }
+            primary_title.de_jure_liege = { save_scope_as = tca_rectify_new_liege_title }
+        }
+        if = {
+            limit = {
+                exists = primary_title
+                exists = primary_title.de_jure_liege
+                exists = primary_title.de_jure_liege.holder
+            }
+            primary_title.de_jure_liege.holder = { save_scope_as = tca_rectify_new_liege }
+        }
+        else_if = {
+            limit = {
+                has_variable = tca_rectify_pending_new_liege
+                exists = var:tca_rectify_pending_new_liege
+            }
+            var:tca_rectify_pending_new_liege = { save_scope_as = tca_rectify_new_liege }
+        }
+    }
+
+    # 唯一确认选项（条件仍成立时）
+    option = {
+        name = tca_admin_rectification.10.a
+        trigger = {
+            tca_rectify_subordination_still_valid_trigger = yes
+        }
+        custom_tooltip = tca_admin_rectification.10.a.tt
+        hidden_effect = {
+            tca_execute_rectify_subordination_effect = yes
+        }
+        ai_chance = { base = 100 }
+    }
+
+    # 条件已失效时的安全终止选项（5.4）
+    option = {
+        name = tca_admin_rectification.10.invalid
+        trigger = {
+            NOT = { tca_rectify_subordination_still_valid_trigger = yes }
+        }
+        custom_tooltip = tca_admin_rectification.10.invalid.tt
+        hidden_effect = {
+            tca_clear_rectify_subordination_pending_effect = yes
+        }
+        ai_chance = { base = 100 }
+    }
+}
+
+# 裁撤兼领之命（letter_event）
+# root = 被整理官员（recipient）
+tca_admin_rectification.20 = {
+    type = letter_event
+    opening = {
+        desc = tca_admin_rectification.20.t
+    }
+    desc = {
+        first_valid = {
+            triggered_desc = {
+                trigger = {
+                    exists = scope:actor
+                    scope:actor = { is_independent_ruler = yes }
+                }
+                desc = tca_admin_rectification.20.opening.emperor
+            }
+            triggered_desc = {
+                trigger = {
+                    has_variable = tca_retract_pending_approved
+                }
+                desc = tca_admin_rectification.20.opening.approved
+            }
+            desc = tca_admin_rectification.20.opening.diarch
+        }
+        first_valid = {
+            triggered_desc = {
+                trigger = {
+                    exists = scope:tca_retract_target_title
+                    scope:tca_retract_target_title.tier >= tier_duchy
+                }
+                desc = tca_admin_rectification.20.body.office
+            }
+            triggered_desc = {
+                trigger = {
+                    exists = scope:tca_retract_target_title
+                    scope:tca_retract_target_title.tier = tier_county
+                    NOT = {
+                        any_held_title = {
+                            tier = tier_county
+                            is_landless_type_title = no
+                            is_noble_family_title = no
+                            this != scope:tca_retract_target_title
+                        }
+                    }
+                }
+                desc = tca_admin_rectification.20.body.unlanded
+            }
+            desc = tca_admin_rectification.20.body.county
+        }
+    }
+    sender = scope:actor
+
+    immediate = {
+        if = {
+            limit = {
+                has_variable = tca_retract_pending_actor
+                exists = var:tca_retract_pending_actor
+            }
+            var:tca_retract_pending_actor = { save_scope_as = actor }
+        }
+        else = {
+            top_liege = { save_scope_as = actor }
+        }
+        save_scope_as = recipient
+        if = {
+            limit = {
+                has_variable = tca_retract_pending_title
+                exists = var:tca_retract_pending_title
+            }
+            var:tca_retract_pending_title = { save_scope_as = tca_retract_target_title }
+        }
+        if = {
+            limit = {
+                has_variable = tca_retract_pending_primary_title
+                exists = var:tca_retract_pending_primary_title
+            }
+            var:tca_retract_pending_primary_title = { save_scope_as = tca_retract_primary_title }
+        }
+        else_if = {
+            limit = { exists = primary_title }
+            primary_title = { save_scope_as = tca_retract_primary_title }
+        }
+        if = {
+            limit = {
+                has_variable = tca_retract_pending_successor
+                exists = var:tca_retract_pending_successor
+            }
+            var:tca_retract_pending_successor = { save_scope_as = tca_retract_successor }
+        }
+    }
+
+    # 唯一确认选项（条件仍成立时）
+    option = {
+        name = tca_admin_rectification.20.a
+        trigger = {
+            exists = scope:actor
+            exists = scope:tca_retract_target_title
+            tca_retract_concurrent_still_valid_trigger = {
+                ACTOR = scope:actor
+                TITLE = scope:tca_retract_target_title
+            }
+        }
+        custom_tooltip = tca_admin_rectification.20.a.tt
+        hidden_effect = {
+            tca_execute_retract_concurrent_title_effect = yes
+        }
+        ai_chance = { base = 100 }
+    }
+
+    # 条件已失效时的安全终止选项（5.4）
+    option = {
+        name = tca_admin_rectification.20.invalid
+        trigger = {
+            NOT = {
+                AND = {
+                    exists = scope:actor
+                    exists = scope:tca_retract_target_title
+                    tca_retract_concurrent_still_valid_trigger = {
+                        ACTOR = scope:actor
+                        TITLE = scope:tca_retract_target_title
+                    }
+                }
+            }
+        }
+        custom_tooltip = tca_admin_rectification.20.invalid.tt
+        hidden_effect = {
+            tca_clear_retract_concurrent_pending_effect = yes
+        }
+        ai_chance = { base = 100 }
+    }
+}

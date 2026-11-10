@@ -1,0 +1,440 @@
+﻿# 行政整饬系统（归正辖属 & 裁撤兼领）角色互动。
+# 1. tca_rectify_subordination_interaction：归正辖属（调整实际封属关系至法理上级持有人，无须审批，auto_accept = yes）；
+# 2. tca_retract_concurrent_title_interaction：裁撤兼领（皇帝径行裁撤，或宰相裁撤公国／伯爵级、或权力天平 >= 60 时径行裁撤王国级，auto_accept = yes）；
+# 3. tca_request_retract_concurrent_title_interaction：奏请裁撤兼领（宰相在权力天平 < 60 时奏请皇帝批准裁撤王国级兼领，intermediary = top_liege）。
+
+# ---------------------------------------------------------------------------
+# 一、归正辖属（tca_rectify_subordination_interaction）
+# ---------------------------------------------------------------------------
+tca_rectify_subordination_interaction = {
+    category = interaction_category_vassal
+    common_interaction = yes
+    interface_priority = 118
+    icon = grant_vassal_interaction
+
+    desc = tca_rectify_subordination_interaction_desc
+    send_name = tca_rectify_subordination_interaction_send
+    notification_text = tca_rectify_subordination_notification
+
+    is_shown = {
+        scope:actor != scope:recipient
+        scope:actor = {
+            tca_is_admin_rectification_actor_trigger = yes
+        }
+        scope:recipient = {
+            tca_is_admin_rectification_target_official_trigger = yes
+            top_liege = scope:actor.top_liege
+            primary_title = {
+                OR = {
+                    tier = tier_county
+                    tier = tier_duchy
+                }
+                exists = de_jure_liege
+                exists = de_jure_liege.holder
+            }
+            exists = liege
+            liege != primary_title.de_jure_liege.holder
+            this != primary_title.de_jure_liege.holder
+        }
+    }
+
+    is_valid_showing_failures_only = {
+        scope:actor = {
+            custom_tooltip = {
+                text = tca_rectify_subordination_actor_eligible_tt
+                tca_is_admin_rectification_actor_trigger = yes
+            }
+            tca_admin_rectification_actor_can_target_recipient_trigger = {
+                RECIPIENT = scope:recipient
+            }
+        }
+        scope:recipient = {
+            tca_rectify_subordination_target_valid_trigger = yes
+        }
+    }
+
+    can_send = {
+        scope:actor = {
+            tca_admin_rectification_actor_can_target_recipient_trigger = {
+                RECIPIENT = scope:recipient
+            }
+        }
+        scope:recipient = {
+            tca_rectify_subordination_target_valid_trigger = yes
+        }
+    }
+
+    cooldown_against_recipient = { months = 3 }
+
+    on_accept = {
+        scope:actor = {
+            custom_tooltip = tca_rectify_subordination_effect_tt
+        }
+        hidden_effect = {
+            tca_send_rectify_subordination_letter_effect = yes
+        }
+    }
+
+    auto_accept = yes
+
+    ai_targets = { ai_recipients = vassals chance = 0.25 }
+    ai_frequency_by_tier = {
+        barony = 0
+        county = 0
+        duchy = 24
+        kingdom = 24
+        empire = 24
+        hegemony = 24
+    }
+    ai_will_do = {
+        base = 50
+    }
+}
+
+# ---------------------------------------------------------------------------
+# 二、裁撤兼领（直接执行：tca_retract_concurrent_title_interaction）
+# ---------------------------------------------------------------------------
+tca_retract_concurrent_title_interaction = {
+    category = interaction_category_vassal
+    common_interaction = yes
+    interface_priority = 117
+    icon = revoke_governorship
+
+    desc = tca_retract_concurrent_title_interaction_desc
+    send_name = tca_retract_concurrent_title_interaction_send
+    prompt = tca_retract_concurrent_title_prompt
+    notification_text = tca_retract_concurrent_title_notification
+
+    target_type = title
+    target_filter = recipient_domain_titles
+
+    is_shown = {
+        scope:actor != scope:recipient
+        scope:actor = {
+            tca_is_admin_rectification_actor_trigger = yes
+        }
+        scope:recipient = {
+            tca_is_admin_rectification_target_official_trigger = yes
+            top_liege = scope:actor.top_liege
+            tca_recipient_has_any_retractable_concurrent_title_trigger = yes
+            # 若发起者为宰相且权力天平 < 60，而目标仅持有王国级可裁撤头衔，则由下方的奏请互动显示，避免双入口并列。
+            trigger_if = {
+                limit = {
+                    scope:actor = {
+                        tca_is_grand_chancellor_actor_trigger = yes
+                        NOT = { this = top_liege }
+                        top_liege = { diarchy_swing < tca_admin_rectification_swing_diarch_threshold }
+                    }
+                    NOT = { tca_recipient_has_any_direct_retractable_title_trigger = yes }
+                    tca_recipient_has_any_approval_retractable_title_trigger = yes
+                }
+                always = no
+            }
+        }
+    }
+
+    is_valid_showing_failures_only = {
+        scope:actor = {
+            custom_tooltip = {
+                text = tca_rectify_subordination_actor_eligible_tt
+                tca_is_admin_rectification_actor_trigger = yes
+            }
+            tca_admin_rectification_actor_can_target_recipient_trigger = {
+                RECIPIENT = scope:recipient
+            }
+        }
+        scope:recipient = {
+            custom_tooltip = {
+                text = tca_admin_rectification_pending_in_flight_tt
+                NOT = { has_variable = tca_rectify_pending_actor }
+                NOT = { has_variable = tca_retract_pending_actor }
+            }
+            custom_tooltip = {
+                text = tca_retract_concurrent_has_any_eligible_title_tt
+                tca_recipient_has_any_retractable_concurrent_title_trigger = yes
+            }
+        }
+    }
+
+    can_be_picked_title = {
+        scope:target = {
+            tca_can_pick_retract_concurrent_title_trigger = {
+                HOLDER = scope:recipient
+            }
+            trigger_if = {
+                limit = {
+                    tier = tier_kingdom
+                    scope:actor = {
+                        tca_is_grand_chancellor_actor_trigger = yes
+                        NOT = { this = top_liege }
+                    }
+                }
+                custom_tooltip = {
+                    text = tca_retract_concurrent_kingdom_requires_approval_tt
+                    scope:actor.top_liege = {
+                        diarchy_swing >= tca_admin_rectification_swing_diarch_threshold
+                    }
+                }
+            }
+        }
+    }
+
+    has_valid_target_showing_failures_only = {
+        exists = scope:target
+        scope:target = {
+            tca_can_pick_retract_concurrent_title_trigger = {
+                HOLDER = scope:recipient
+            }
+            trigger_if = {
+                limit = {
+                    tier = tier_kingdom
+                    scope:actor = {
+                        tca_is_grand_chancellor_actor_trigger = yes
+                        NOT = { this = top_liege }
+                    }
+                }
+                custom_tooltip = {
+                    text = tca_retract_concurrent_kingdom_requires_approval_tt
+                    scope:actor.top_liege = {
+                        diarchy_swing >= tca_admin_rectification_swing_diarch_threshold
+                    }
+                }
+            }
+        }
+    }
+
+    can_send = {
+        exists = scope:target
+        scope:actor = {
+            tca_admin_rectification_actor_can_target_recipient_trigger = {
+                RECIPIENT = scope:recipient
+            }
+            NOT = {
+                tca_retract_concurrent_requires_imperial_approval_trigger = {
+                    TITLE = scope:target
+                }
+            }
+        }
+        scope:recipient = {
+            NOT = { has_variable = tca_rectify_pending_actor }
+            NOT = { has_variable = tca_retract_pending_actor }
+        }
+        scope:target = {
+            tca_is_retractable_concurrent_title_trigger = {
+                HOLDER = scope:recipient
+            }
+        }
+    }
+
+    cooldown_against_recipient = { months = 3 }
+
+    on_accept = {
+        scope:actor = {
+            custom_tooltip = tca_retract_concurrent_title_effect_tt
+        }
+        hidden_effect = {
+            tca_send_retract_concurrent_letter_effect = { APPROVED = no }
+        }
+    }
+
+    auto_accept = yes
+
+    ai_targets = { ai_recipients = vassals chance = 0.25 }
+    ai_frequency_by_tier = {
+        barony = 0
+        county = 0
+        duchy = 24
+        kingdom = 24
+        empire = 24
+        hegemony = 24
+    }
+    ai_will_do = {
+        base = 50
+    }
+}
+
+# ---------------------------------------------------------------------------
+# 三、奏请裁撤兼领（宰相在权力天平 < 60 时裁撤王国级兼领：tca_request_retract_concurrent_title_interaction）
+# ---------------------------------------------------------------------------
+tca_request_retract_concurrent_title_interaction = {
+    category = interaction_category_vassal
+    common_interaction = yes
+    interface_priority = 116
+    icon = revoke_governorship
+
+    redirect = {
+        scope:actor.top_liege ?= { save_scope_as = intermediary }
+    }
+
+    desc = tca_request_retract_concurrent_title_interaction_desc
+    send_name = tca_request_retract_concurrent_title_interaction_send
+    prompt = tca_retract_concurrent_title_prompt
+    notification_text = tca_retract_concurrent_title_notification
+
+    intermediary_notification_text = tca_retract_concurrent_title_approval_notification
+    intermediary_breakdown_yes = tca_admin_rectification_approval_yes
+    intermediary_breakdown_no = tca_admin_rectification_approval_no
+    intermediary_breakdown_maybe = tca_admin_rectification_approval_maybe
+    intermediary_answer_accept_key = REPLY_ANSWER_ALLOW
+    intermediary_answer_reject_key = REPLY_ANSWER_VETO
+    ai_intermediary_maybe = yes
+
+    target_type = title
+    target_filter = recipient_domain_titles
+
+    ai_maybe = yes
+    ai_min_reply_days = 1
+    ai_max_reply_days = 3
+    can_send_despite_rejection = yes
+    popup_on_receive = yes
+    pause_on_receive = yes
+
+    pre_answer_maybe_key = ANSWER_MIGHT_SUCCEED
+    pre_answer_no_key = ANSWER_CANT_SUCCEED
+    pre_answer_yes_key = ANSWER_WILL_SUCCEED
+    pre_answer_maybe_breakdown_key = ANSWER_SUM_CHANCE
+
+    is_shown = {
+        exists = scope:intermediary
+        scope:actor != scope:recipient
+        scope:actor != scope:intermediary
+        scope:actor = {
+            tca_is_grand_chancellor_actor_trigger = yes
+            top_liege = {
+                diarchy_swing < tca_admin_rectification_swing_diarch_threshold
+            }
+        }
+        scope:recipient = {
+            tca_is_admin_rectification_target_official_trigger = yes
+            top_liege = scope:actor.top_liege
+            tca_recipient_has_any_approval_retractable_title_trigger = yes
+        }
+    }
+
+    is_valid_showing_failures_only = {
+        scope:actor = {
+            custom_tooltip = {
+                text = tca_rectify_subordination_actor_eligible_tt
+                tca_is_grand_chancellor_actor_trigger = yes
+            }
+            tca_admin_rectification_actor_can_target_recipient_trigger = {
+                RECIPIENT = scope:recipient
+            }
+        }
+        scope:recipient = {
+            custom_tooltip = {
+                text = tca_admin_rectification_pending_in_flight_tt
+                NOT = { has_variable = tca_rectify_pending_actor }
+                NOT = { has_variable = tca_retract_pending_actor }
+            }
+            custom_tooltip = {
+                text = tca_retract_concurrent_has_any_eligible_title_tt
+                tca_recipient_has_any_approval_retractable_title_trigger = yes
+            }
+        }
+    }
+
+    can_be_picked_title = {
+        scope:target = {
+            tier = tier_kingdom
+            tca_can_pick_retract_concurrent_title_trigger = {
+                HOLDER = scope:recipient
+            }
+        }
+    }
+
+    has_valid_target_showing_failures_only = {
+        exists = scope:target
+        scope:target = {
+            tier = tier_kingdom
+            tca_can_pick_retract_concurrent_title_trigger = {
+                HOLDER = scope:recipient
+            }
+        }
+    }
+
+    can_send = {
+        exists = scope:target
+        scope:actor = {
+            tca_admin_rectification_actor_can_target_recipient_trigger = {
+                RECIPIENT = scope:recipient
+            }
+            tca_retract_concurrent_requires_imperial_approval_trigger = {
+                TITLE = scope:target
+            }
+        }
+        scope:recipient = {
+            NOT = { has_variable = tca_rectify_pending_actor }
+            NOT = { has_variable = tca_retract_pending_actor }
+        }
+        scope:target = {
+            tier = tier_kingdom
+            tca_is_retractable_concurrent_title_trigger = {
+                HOLDER = scope:recipient
+            }
+        }
+    }
+
+    cooldown_against_recipient = { months = 3 }
+
+    ai_intermediary_accept = {
+        base = 50
+        modifier = {
+            add = 30
+            desc = tca_admin_rectification_approval_institutional_reason
+        }
+        opinion_modifier = {
+            who = scope:intermediary
+            opinion_target = scope:actor
+            multiplier = 0.25
+            desc = tca_admin_rectification_approval_actor_opinion
+        }
+        opinion_modifier = {
+            who = scope:intermediary
+            opinion_target = scope:recipient
+            multiplier = -0.25
+            desc = tca_admin_rectification_approval_target_opinion
+        }
+    }
+
+    # 被整理官员无权拒绝行政整饬；intermediary 互动不能设顶层 auto_accept = yes（否则会跳过天子审批），
+    # 故通过 ai_accept 恒正使天子批准后自动进入 on_accept 派发行政整饬书信。
+    auto_accept = no
+    ai_accept = {
+        base = 100
+        modifier = {
+            add = 100
+            desc = tca_admin_rectification_cannot_refuse_reason
+        }
+    }
+
+    on_intermediary_accept = {
+        tca_handle_retract_approval_accept_effect = yes
+    }
+
+    on_intermediary_decline = {
+        tca_handle_retract_approval_decline_effect = yes
+    }
+
+    on_accept = {
+        scope:actor = {
+            custom_tooltip = tca_request_retract_concurrent_title_effect_tt
+        }
+        hidden_effect = {
+            tca_send_retract_concurrent_letter_effect = { APPROVED = yes }
+        }
+    }
+
+    ai_targets = { ai_recipients = vassals chance = 0.25 }
+    ai_frequency_by_tier = {
+        barony = 0
+        county = 0
+        duchy = 24
+        kingdom = 24
+        empire = 24
+        hegemony = 24
+    }
+    ai_will_do = {
+        base = 50
+    }
+}

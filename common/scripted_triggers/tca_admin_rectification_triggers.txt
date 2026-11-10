@@ -1,0 +1,470 @@
+﻿# 行政整饬系统（归正辖属 & 裁撤兼领）共享触发器。
+# 涵盖：
+#   1. 皇帝与宰相权限及权力天平三级判定；
+#   2. 世俗地方行政头衔与地方官员范围界定（排除家门、提刑、通判、奉祠致仕与中央部院）；
+#   3. 归正辖属资格、跨辖区兼领限制与书信执行前二次复验；
+#   4. 裁撤兼领头衔判定（主头衔豁免、首府公国豁免、主头衔法理内伯爵领豁免、首府伯爵领有条件豁免）与二次复验；
+#   5. 继任候选池与 current_heir 资格校验。
+
+# ---------------------------------------------------------------------------
+# 一、发起者权限与权力天平（第四章）
+# ---------------------------------------------------------------------------
+
+# 角色作用域；是否为在任天朝宰相（grand_secretariat 共治下的摄政／首辅）。
+tca_is_grand_chancellor_actor_trigger = {
+    is_alive = yes
+    government_has_flag = government_is_celestial
+    exists = top_liege
+    top_liege = {
+        is_alive = yes
+        is_independent_ruler = yes
+        government_has_flag = government_is_celestial
+        has_diarchy_type = grand_secretariat
+        diarch ?= prev
+    }
+}
+
+# 角色作用域；是否为可发起行政整饬的皇帝或宰相。
+tca_is_admin_rectification_actor_trigger = {
+    is_alive = yes
+    government_has_flag = government_is_celestial
+    OR = {
+        AND = {
+            is_independent_ruler = yes
+            this = top_liege
+        }
+        tca_is_grand_chancellor_actor_trigger = yes
+    }
+}
+
+# 角色作用域（actor）；参数：$RECIPIENT$ 被整理官员。
+# 判断发起者是否有权对目标官员发起行政整饬：
+# - 皇帝：对本国官员无直属封臣限制；
+# - 宰相：当权力天平偏向皇帝（diarchy_swing < 40）时，不得整理皇帝直属封臣（recipient.liege = top_liege），
+#   且不得通过请求批准绕过该限制；权力天平达到 40（权力均衡／倾向宰相）时可整理皇帝直属封臣。
+tca_admin_rectification_actor_can_target_recipient_trigger = {
+    tca_is_admin_rectification_actor_trigger = yes
+    $RECIPIENT$ = {
+        is_alive = yes
+        exists = top_liege
+        top_liege = prev.top_liege
+        this != prev
+        this != prev.top_liege
+    }
+    trigger_if = {
+        limit = {
+            tca_is_grand_chancellor_actor_trigger = yes
+            NOT = { this = top_liege }
+            $RECIPIENT$ = { liege ?= prev.top_liege }
+        }
+        custom_tooltip = {
+            text = tca_admin_rectification_diarch_direct_vassal_blocked_tt
+            top_liege = { diarchy_swing >= tca_admin_rectification_swing_balance_threshold }
+        }
+    }
+}
+
+# 角色作用域（actor）；参数：$TITLE$ 待裁撤头衔。
+# 判断本次裁撤兼领是否需要奏请皇帝批准：
+# 仅当发起者为宰相、待裁撤头衔为王国级，且权力天平尚未偏向宰相（diarchy_swing < 60）时，须经皇帝批准。
+tca_retract_concurrent_requires_imperial_approval_trigger = {
+    tca_is_grand_chancellor_actor_trigger = yes
+    NOT = { this = top_liege }
+    $TITLE$ = { tier = tier_kingdom }
+    top_liege = { diarchy_swing < tca_admin_rectification_swing_diarch_threshold }
+}
+
+# ---------------------------------------------------------------------------
+# 二、世俗地方行政头衔与地方官员边界
+# ---------------------------------------------------------------------------
+
+# 头衔作用域；是否为天朝世俗地方实职头衔（伯爵级、公国级或王国级有地头衔，排除家门、神权及专职无地官署）。
+tca_is_secular_local_admin_title_trigger = {
+    tier >= tier_county
+    tier <= tier_kingdom
+    is_landless_type_title = no
+    is_noble_family_title = no
+    is_head_of_faith = no
+    has_clerical_region = no
+    NOT = { has_variable = tca_judicial_title }
+    NOT = { has_variable = tca_tongpan_title }
+    NOT = { has_variable = tca_retirement_title }
+}
+
+# 角色作用域；是否为可作为行政整饬对象的天朝地方实职官员。
+# 排除皇帝本人、中央大臣、奉祠致仕者、提刑官与通判。
+tca_is_admin_rectification_target_official_trigger = {
+    is_alive = yes
+    is_ruler = yes
+    is_landed = yes
+    is_independent_ruler = no
+    government_has_flag = government_is_celestial
+    exists = top_liege
+    top_liege = {
+        is_alive = yes
+        is_independent_ruler = yes
+        government_has_flag = government_is_celestial
+    }
+    NOT = { tgp_is_any_minister = yes }
+    NOT = { tca_retirement_excludes_appointment_trigger = yes }
+    exists = primary_title
+    primary_title = { tca_is_secular_local_admin_title_trigger = yes }
+}
+
+# ---------------------------------------------------------------------------
+# 三、裁撤兼领：头衔判定与法定例外（第三章 3.1 - 3.4）
+# ---------------------------------------------------------------------------
+
+# 角色作用域（官员）；判断本人在主头衔法理管辖范围内是否拥有至少一个亲自直辖的伯爵领。
+# 只统计官员本人持有的世俗伯爵领，不计封臣领地。
+tca_official_holds_county_in_primary_de_jure_trigger = {
+    exists = primary_title
+    any_held_title = {
+        tier = tier_county
+        tca_is_secular_local_admin_title_trigger = yes
+        target_is_de_jure_liege_or_above = prev.primary_title
+    }
+}
+
+# 头衔作用域；参数：$HOLDER$ 头衔持有人。
+# 判断该头衔是否属于 $HOLDER$ 可被【裁撤兼领】收回的不当兼领官署或越辖直辖伯爵领（静默逻辑判定）。
+# 规则：
+#   1. 须为 $HOLDER$ 当前持有的世俗地方实职头衔（王国、公国或伯爵级）；
+#   2. 主头衔（primary_title）始终允许持有，不可裁撤；
+#   3. 王国、公国级主官：领地首府所在的法理公国（capital_county.duchy）允许兼领，其他额外王国／公国级头衔可裁撤；
+#   4. 伯爵级主官：本人的领地首府伯爵领（capital_county）允许持有，其他额外头衔可裁撤；
+#   5. 王国、公国级主官的直辖伯爵领：
+#      - 位于主头衔法理范围内（target_is_de_jure_liege_or_above = primary_title）的伯爵领正常合法；
+#      - 位于主头衔法理范围外的伯爵领可裁撤，但若该伯爵领是本人的领地首府（capital_county），
+#        且本人在主头衔法理范围内完全没有亲自直辖的伯爵领（3.4 首府伯爵领特别例外），则予以豁免。
+tca_is_retractable_concurrent_title_trigger = {
+    exists = holder
+    holder = $HOLDER$
+    tca_is_secular_local_admin_title_trigger = yes
+    this != $HOLDER$.primary_title
+    trigger_if = {
+        limit = {
+            OR = {
+                tier = tier_kingdom
+                tier = tier_duchy
+            }
+        }
+        trigger_if = {
+            limit = {
+                tier = tier_duchy
+                $HOLDER$ = {
+                    exists = capital_county
+                    exists = capital_county.duchy
+                }
+            }
+            this != $HOLDER$.capital_county.duchy
+        }
+    }
+    trigger_else_if = {
+        limit = { tier = tier_county }
+        trigger_if = {
+            limit = { $HOLDER$.primary_title.tier = tier_county }
+            NOT = {
+                AND = {
+                    $HOLDER$ = { exists = capital_county }
+                    this = $HOLDER$.capital_county
+                }
+            }
+        }
+        trigger_else = {
+            NOT = { target_is_de_jure_liege_or_above = $HOLDER$.primary_title }
+            NOT = {
+                AND = {
+                    $HOLDER$ = { exists = capital_county }
+                    this = $HOLDER$.capital_county
+                    NOT = { $HOLDER$ = { tca_official_holds_county_in_primary_de_jure_trigger = yes } }
+                }
+            }
+        }
+    }
+    trigger_else = {
+        always = no
+    }
+}
+
+# 头衔作用域（scope:target）；参数：$HOLDER$ 被整理官员（scope:recipient）。
+# 供互动选头衔界面（can_be_picked_title / has_valid_target_showing_failures_only）使用，带分项制度说明提示。
+tca_can_pick_retract_concurrent_title_trigger = {
+    exists = holder
+    holder = $HOLDER$
+    custom_tooltip = {
+        text = tca_retract_concurrent_title_is_secular_local_tt
+        tca_is_secular_local_admin_title_trigger = yes
+    }
+    custom_tooltip = {
+        text = tca_retract_concurrent_not_primary_title_tt
+        this != $HOLDER$.primary_title
+    }
+    trigger_if = {
+        limit = {
+            tier = tier_duchy
+            $HOLDER$ = {
+                primary_title.tier >= tier_duchy
+                exists = capital_county
+                exists = capital_county.duchy
+            }
+        }
+        custom_tooltip = {
+            text = tca_retract_concurrent_not_capital_duchy_tt
+            this != $HOLDER$.capital_county.duchy
+        }
+    }
+    trigger_if = {
+        limit = {
+            tier = tier_county
+            $HOLDER$.primary_title.tier = tier_county
+            $HOLDER$ = { exists = capital_county }
+        }
+        custom_tooltip = {
+            text = tca_retract_concurrent_county_count_tier_capital_tt
+            this != $HOLDER$.capital_county
+        }
+    }
+    trigger_if = {
+        limit = {
+            tier = tier_county
+            $HOLDER$.primary_title.tier >= tier_duchy
+        }
+        custom_tooltip = {
+            text = tca_retract_concurrent_county_outside_primary_de_jure_tt
+            NOT = { target_is_de_jure_liege_or_above = $HOLDER$.primary_title }
+        }
+        trigger_if = {
+            limit = {
+                NOT = { target_is_de_jure_liege_or_above = $HOLDER$.primary_title }
+                $HOLDER$ = { exists = capital_county }
+                this = $HOLDER$.capital_county
+            }
+            custom_tooltip = {
+                text = tca_retract_concurrent_county_not_sole_capital_tt
+                $HOLDER$ = { tca_official_holds_county_in_primary_de_jure_trigger = yes }
+            }
+        }
+    }
+}
+
+# 角色作用域（recipient）；是否持有至少一个可被裁撤兼领的头衔。
+tca_recipient_has_any_retractable_concurrent_title_trigger = {
+    tca_is_admin_rectification_target_official_trigger = yes
+    any_held_title = {
+        tca_is_retractable_concurrent_title_trigger = { HOLDER = prev }
+    }
+}
+
+# 角色作用域（recipient）；是否持有至少一个无需皇帝批准即可由当前 actor 裁撤的头衔。
+tca_recipient_has_any_direct_retractable_title_trigger = {
+    tca_is_admin_rectification_target_official_trigger = yes
+    any_held_title = {
+        tca_is_retractable_concurrent_title_trigger = { HOLDER = prev }
+        NOT = {
+            scope:actor = {
+                tca_retract_concurrent_requires_imperial_approval_trigger = { TITLE = prev }
+            }
+        }
+    }
+}
+
+# 角色作用域（recipient）；是否持有至少一个须奏请皇帝批准方可由当前宰相 actor 裁撤的王国级兼领头衔。
+tca_recipient_has_any_approval_retractable_title_trigger = {
+    tca_is_admin_rectification_target_official_trigger = yes
+    any_held_title = {
+        tca_is_retractable_concurrent_title_trigger = { HOLDER = prev }
+        scope:actor = {
+            tca_retract_concurrent_requires_imperial_approval_trigger = { TITLE = prev }
+        }
+    }
+}
+
+# 角色作用域（recipient）；参数：$ACTOR$ 发起者，$TITLE$ 待裁撤头衔。
+# 审批回调与裁撤兼领书信事件执行前的二次校验（第五章 5.4）：
+# 确认原官员仍持有指定头衔、双方仍同属同一最高领主、且该头衔仍满足裁撤兼领条件。
+tca_retract_concurrent_still_valid_trigger = {
+    is_alive = yes
+    tca_is_admin_rectification_target_official_trigger = yes
+    $ACTOR$ = {
+        is_alive = yes
+        tca_is_admin_rectification_actor_trigger = yes
+        top_liege = prev.top_liege
+    }
+    $TITLE$ = {
+        exists = holder
+        holder = prev
+        tca_is_retractable_concurrent_title_trigger = { HOLDER = prev }
+    }
+}
+
+# ---------------------------------------------------------------------------
+# 四、归正辖属：资格判定、跨辖区限制与二次复验（第二章 2.1 - 2.3 & 5.4）
+# ---------------------------------------------------------------------------
+
+# 角色作用域（recipient）；判断将该官员归正至主头衔法理上级持有人后，是否不会产生跨辖区兼领错位（2.3）。
+# 规则：
+#   1. 若本人仍持有任何应先通过【裁撤兼领】收回的不当兼领头衔或越辖伯爵领，则不允许直接归正；
+#   2. 若本人持有其他公国级头衔（如首府公国），但该公国的法理上级与主头衔的法理上级不同（跨路兼领公国），
+#      直接转移整个角色仍会导致另一路公国错位，故亦不允许直接归正。
+tca_rectify_subordination_no_cross_jurisdiction_trigger = {
+    NOT = {
+        any_held_title = {
+            tca_is_retractable_concurrent_title_trigger = { HOLDER = prev }
+        }
+    }
+    NOT = {
+        any_held_title = {
+            tier = tier_duchy
+            tca_is_secular_local_admin_title_trigger = yes
+            this != prev.primary_title
+            exists = de_jure_liege
+            exists = prev.primary_title.de_jure_liege
+            de_jure_liege != prev.primary_title.de_jure_liege
+        }
+    }
+}
+
+# 角色作用域（recipient）；归正辖属的目标官员资格检查（带完整 UI 提示）。
+tca_rectify_subordination_target_valid_trigger = {
+    custom_tooltip = {
+        text = tca_admin_rectification_pending_in_flight_tt
+        NOT = { has_variable = tca_rectify_pending_actor }
+        NOT = { has_variable = tca_retract_pending_actor }
+    }
+    custom_tooltip = {
+        text = tca_rectify_subordination_recipient_eligible_tt
+        tca_is_admin_rectification_target_official_trigger = yes
+        primary_title = {
+            OR = {
+                tier = tier_county
+                tier = tier_duchy
+            }
+        }
+    }
+    custom_tooltip = {
+        text = tca_rectify_subordination_de_jure_liege_exists_tt
+        exists = primary_title.de_jure_liege
+        exists = primary_title.de_jure_liege.holder
+        primary_title.de_jure_liege.holder = { is_alive = yes }
+    }
+    trigger_if = {
+        limit = {
+            exists = primary_title.de_jure_liege
+            exists = primary_title.de_jure_liege.holder
+        }
+        custom_tooltip = {
+            text = tca_rectify_subordination_liege_mismatch_tt
+            exists = liege
+            liege != primary_title.de_jure_liege.holder
+            this != primary_title.de_jure_liege.holder
+        }
+        custom_tooltip = {
+            text = tca_rectify_subordination_same_top_liege_tt
+            primary_title.de_jure_liege.holder = {
+                top_liege = prev.top_liege
+                government_has_flag = government_is_celestial
+            }
+        }
+        custom_tooltip = {
+            text = tca_rectify_subordination_valid_tier_tt
+            primary_title.de_jure_liege.holder = {
+                highest_held_title_tier > prev.highest_held_title_tier
+                NOT = { target_is_liege_or_above = prev }
+            }
+        }
+    }
+    custom_tooltip = {
+        text = tca_rectify_subordination_cross_jurisdiction_tt
+        tca_rectify_subordination_no_cross_jurisdiction_trigger = yes
+    }
+}
+
+# 角色作用域（recipient）；归正辖属书信事件执行前的静默二次校验（5.4）。
+tca_rectify_subordination_still_valid_trigger = {
+    tca_is_admin_rectification_target_official_trigger = yes
+    primary_title = {
+        OR = {
+            tier = tier_county
+            tier = tier_duchy
+        }
+    }
+    exists = liege
+    exists = primary_title.de_jure_liege
+    exists = primary_title.de_jure_liege.holder
+    primary_title.de_jure_liege.holder = {
+        is_alive = yes
+        top_liege = prev.top_liege
+        government_has_flag = government_is_celestial
+        highest_held_title_tier > prev.highest_held_title_tier
+        NOT = { target_is_liege_or_above = prev }
+    }
+    liege != primary_title.de_jure_liege.holder
+    this != primary_title.de_jure_liege.holder
+    tca_rectify_subordination_no_cross_jurisdiction_trigger = yes
+}
+
+# ---------------------------------------------------------------------------
+# 五、裁撤后的继任候选池与资格校验（第六章 6.1 - 6.3）
+# ---------------------------------------------------------------------------
+
+# 角色作用域（候选人）；参数：$TITLE$ 待补授头衔，$TOP_LIEGE$ 最高领主。
+# 检查候选人是否满足【裁撤兼领】继任的全部制度条件：
+#   1. 属于同一最高领主统治体系下的成年存活非神职角色，且非最高领主本人、非原持有人；
+#   2. 排除中央大臣、奉祠／致仕、辞谢拒任、应试考生、在任提刑与通判；
+#   3. 排除已被其他未决行政整饬选定为待命继任者的角色（tca_admin_rectification_reserved_successor）；
+#   4. 现有实职头衔级别必须严格低于待任命官署级别（6.2）：
+#      - 王国级官署：允许无实职、伯爵级、公国级官员；
+#      - 公国级官署：允许无实职、伯爵级官员；
+#      - 伯爵级官署：仅允许无实职官员；
+#   5. 必须满足目标官署正常的 Merit Level 门槛（王国级 >= 5，公国级 >= 3，伯爵级 >= 1），不特批放宽；
+#   6. 引擎安全边界：候选人须已有地或已持有家门头衔，确保有地头衔交接不会触发同 tick 建家门销毁风险。
+tca_admin_rectification_is_qualified_candidate_trigger = {
+    is_alive = yes
+    is_adult = yes
+    is_clergy = no
+    is_imprisoned = no
+    this != $TOP_LIEGE$
+    NOT = { this ?= $TITLE$.holder }
+    NOT = { has_variable = tca_admin_rectification_reserved_successor }
+    OR = {
+        liege ?= $TOP_LIEGE$
+        liege_or_court_owner ?= { top_liege ?= $TOP_LIEGE$ }
+    }
+    NOT = { tca_circuit_candidate_excluded_trigger = yes }
+    NOT = {
+        any_held_title = {
+            OR = {
+                has_variable = tca_judicial_title
+                has_variable = tca_tongpan_title
+                has_variable = tca_retirement_title
+            }
+        }
+    }
+    OR = {
+        can_be_granted_titles_by = { RULER = $TOP_LIEGE$ }
+        AND = {
+            is_diarch_of_target = $TOP_LIEGE$
+            $TOP_LIEGE$ = { has_diarchy_active_parameter = diarchy_is_co_rulership }
+        }
+    }
+    trigger_if = {
+        limit = { is_landed = yes }
+        government_has_flag = government_is_celestial
+    }
+    # 6.2 现有候选池级别限制：排除已持有同级或更高级实职的候选人。
+    NOT = {
+        any_held_title = {
+            is_landless_type_title = no
+            is_noble_family_title = no
+            tier >= $TITLE$.tier
+        }
+    }
+    # 6.1 正常 Merit Level 门槛：王国级 5 品、公国级 3 品、伯爵级 1 品。
+    tca_circuit_has_title_level_requirement_trigger = { TITLE = $TITLE$ }
+    # 引擎安全边界：已有地或已持有家门头衔。
+    OR = {
+        is_landed = yes
+        any_held_title = { is_noble_family_title = yes }
+    }
+}

@@ -1,0 +1,1049 @@
+﻿# 行政整饬系统（归正辖属 & 裁撤兼领）原生回归测试事件。
+# 直接调用正式 trigger / effect 与书信事件执行链路，覆盖：
+#   1. 裁撤兼领头衔资格与法定例外（主头衔豁免、首府法理公国豁免、主头衔法理内伯爵领豁免、3.4 首府伯爵领有条件豁免）；
+#   2. 皇帝与宰相权限及权力天平三档约束（倾向皇帝 < 40 禁止干预皇帝直属封臣；均衡 40-59 允许干预但王国级须奏请批准；倾向宰相 >= 60 可直接裁撤王国级）；
+#   3. 归正辖属资格、跨辖区兼领阻断与书信执行调整直属上级；
+#   4. 裁撤兼领书信执行、继任选拔、生成新官员（火星人）科举／官品属性、跨辖区升迁旧头衔腾退（6.5）；
+#   5. 裁撤兼领全自然继任流水线、在途互斥清理与第七章封臣善后跟随改隶。
+namespace = tca_admin_rectification_test
+
+# 用例 1：裁撤兼领头衔判定与 3.2-3.4 法定例外（即时用例）。
+# 验证：
+#   1) 主头衔始终豁免；
+#   2) 领地首府所在的法理公国头衔豁免，非首府的额外公国头衔可裁撤；
+#   3) 主头衔法理范围内的直辖伯爵领豁免；
+#   4) 3.4 首府伯爵领特别例外：当主头衔法理范围内有至少 1 个本人直辖伯爵领时，位于主头衔法理外的首府伯爵领不享豁免（可裁撤）；
+#      当主头衔法理范围内完全没有本人直辖伯爵领时，位于主头衔法理外的首府伯爵领享有豁免（不可裁撤）；
+#   5) 非首府的外部越辖伯爵领始终可裁撤。
+tca_admin_rectification_test.1 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_admin_rectification_test.1 tca_test_admin_rectification_title_eligibility"
+        remove_character_flag = tca_test_tca_admin_rectification_test_case_failed
+        if = {
+            limit = {
+                debug_only = yes
+                is_alive = yes
+                root = { has_title = title:h_china }
+            }
+            clear_saved_scope = tca_art_road_a
+            clear_saved_scope = tca_art_road_b
+            random_vassal = {
+                limit = {
+                    tca_is_admin_rectification_target_official_trigger = yes
+                    primary_title.tier = tier_kingdom
+                    exists = capital_county
+                    capital_county = { target_is_de_jure_liege_or_above = prev.primary_title }
+                }
+                primary_title = { save_scope_as = tca_art_road_a }
+                save_scope_as = tca_art_gov_a
+            }
+            random_vassal = {
+                limit = {
+                    tca_is_admin_rectification_target_official_trigger = yes
+                    primary_title.tier = tier_kingdom
+                    exists = scope:tca_art_road_a
+                    primary_title != scope:tca_art_road_a
+                    any_vassal_or_below = {
+                        primary_title.tier = tier_duchy
+                        is_landed = yes
+                        exists = capital_county
+                        capital_county = {
+                            target_is_de_jure_liege_or_above = prev.primary_title
+                        }
+                    }
+                }
+                primary_title = { save_scope_as = tca_art_road_b }
+                save_scope_as = tca_art_gov_b
+            }
+            if = {
+                limit = {
+                    exists = scope:tca_art_road_a
+                    exists = scope:tca_art_road_b
+                }
+                # 在 road_b 下找一个公国及其下属伯爵领，供兼领与越辖测试后还原。
+                clear_saved_scope = tca_art_ext_duchy
+                clear_saved_scope = tca_art_ext_county
+                scope:tca_art_gov_b = {
+                    random_vassal_or_below = {
+                        limit = {
+                            primary_title.tier = tier_duchy
+                            is_landed = yes
+                            exists = capital_county
+                            capital_county = { target_is_de_jure_liege_or_above = prev.primary_title }
+                        }
+                        primary_title = { save_scope_as = tca_art_ext_duchy }
+                        capital_county = { save_scope_as = tca_art_ext_county }
+                        save_scope_as = tca_art_ext_orig_holder
+                    }
+                }
+                scope:tca_art_gov_a = {
+                    capital_county = { save_scope_as = tca_art_orig_cap_county }
+                }
+                # 断言 1：主头衔（road_a）与主头衔法理内的直辖伯爵领（orig_cap_county）均不可裁撤。
+                if = {
+                    limit = {
+                        NOT = {
+                            scope:tca_art_road_a = {
+                                tca_is_retractable_concurrent_title_trigger = { HOLDER = scope:tca_art_gov_a }
+                            }
+                        }
+                        NOT = {
+                            scope:tca_art_orig_cap_county = {
+                                tca_is_retractable_concurrent_title_trigger = { HOLDER = scope:tca_art_gov_a }
+                            }
+                        }
+                    }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_admin_rectification_title_eligibility 1"
+                }
+                else = {
+                    add_character_flag = tca_test_tca_admin_rectification_test_case_failed
+                    debug_log = "TCA_TEST CHECK_FAIL tca_test_admin_rectification_title_eligibility 1"
+                }
+                # 将外部公国与外部伯爵领临时授给 gov_a。
+                scope:tca_art_ext_orig_holder = {
+                    create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_art_grant_ext }
+                    scope:tca_art_ext_duchy = { change_title_holder = { holder = scope:tca_art_gov_a change = scope:tca_art_grant_ext } }
+                    scope:tca_art_ext_county = { change_title_holder = { holder = scope:tca_art_gov_a change = scope:tca_art_grant_ext } }
+                    resolve_title_and_vassal_change = scope:tca_art_grant_ext
+                }
+                # 断言 2：非首府的外部公国与非首府的外部越辖伯爵领均可被裁撤。
+                if = {
+                    limit = {
+                        scope:tca_art_ext_duchy = {
+                            tca_is_retractable_concurrent_title_trigger = { HOLDER = scope:tca_art_gov_a }
+                        }
+                        scope:tca_art_ext_county = {
+                            tca_is_retractable_concurrent_title_trigger = { HOLDER = scope:tca_art_gov_a }
+                        }
+                    }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_admin_rectification_title_eligibility 2"
+                }
+                else = {
+                    add_character_flag = tca_test_tca_admin_rectification_test_case_failed
+                    debug_log = "TCA_TEST CHECK_FAIL tca_test_admin_rectification_title_eligibility 2"
+                }
+                # 将 gov_a 的首府迁至外部伯爵领 ext_county：
+                # 此时：
+                # - ext_duchy 成为领地首府所在的法理公国（3.2 豁免，不可裁撤）；
+                # - 但 gov_a 在主头衔 road_a 法理内仍持有 orig_cap_county，故 ext_county 不享 3.4 首府伯爵领豁免（仍可裁撤）！
+                scope:tca_art_gov_a = {
+                    set_realm_capital = scope:tca_art_ext_county
+                }
+                if = {
+                    limit = {
+                        NOT = {
+                            scope:tca_art_ext_duchy = {
+                                tca_is_retractable_concurrent_title_trigger = { HOLDER = scope:tca_art_gov_a }
+                            }
+                        }
+                        scope:tca_art_ext_county = {
+                            tca_is_retractable_concurrent_title_trigger = { HOLDER = scope:tca_art_gov_a }
+                        }
+                    }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_admin_rectification_title_eligibility 3"
+                }
+                else = {
+                    add_character_flag = tca_test_tca_admin_rectification_test_case_failed
+                    debug_log = "TCA_TEST CHECK_FAIL tca_test_admin_rectification_title_eligibility 3"
+                }
+                # 再将 gov_a 在主头衔 road_a 法理内的全部直辖伯爵领临时移交给 ext_orig_holder，
+                # 使其在主头衔法理内完全没有本人直辖伯爵领：此时外部首府伯爵领 ext_county 触发 3.4 特别例外（不可裁撤）！
+                every_in_list = { list = tca_art_temp_in_counties remove_from_list = tca_art_temp_in_counties }
+                scope:tca_art_gov_a = {
+                    every_held_title = {
+                        limit = {
+                            tier = tier_county
+                            tca_is_secular_local_admin_title_trigger = yes
+                            target_is_de_jure_liege_or_above = scope:tca_art_road_a
+                        }
+                        add_to_list = tca_art_temp_in_counties
+                    }
+                }
+                scope:tca_art_gov_a = {
+                    create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_art_strip_in }
+                    every_in_list = {
+                        list = tca_art_temp_in_counties
+                        change_title_holder = { holder = scope:tca_art_ext_orig_holder change = scope:tca_art_strip_in }
+                    }
+                    resolve_title_and_vassal_change = scope:tca_art_strip_in
+                }
+                if = {
+                    limit = {
+                        NOT = { scope:tca_art_gov_a = { tca_official_holds_county_in_primary_de_jure_trigger = yes } }
+                        NOT = {
+                            scope:tca_art_ext_county = {
+                                tca_is_retractable_concurrent_title_trigger = { HOLDER = scope:tca_art_gov_a }
+                            }
+                        }
+                    }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_admin_rectification_title_eligibility 4"
+                }
+                else = {
+                    add_character_flag = tca_test_tca_admin_rectification_test_case_failed
+                    debug_log = "TCA_TEST CHECK_FAIL tca_test_admin_rectification_title_eligibility 4"
+                }
+                # 还原所有临时变更。
+                scope:tca_art_ext_orig_holder = {
+                    create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_art_restore_in }
+                    every_in_list = {
+                        list = tca_art_temp_in_counties
+                        change_title_holder = { holder = scope:tca_art_gov_a change = scope:tca_art_restore_in }
+                    }
+                    resolve_title_and_vassal_change = scope:tca_art_restore_in
+                }
+                scope:tca_art_gov_a = {
+                    set_realm_capital = scope:tca_art_orig_cap_county
+                    create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_art_restore_ext }
+                    scope:tca_art_ext_duchy = { change_title_holder = { holder = scope:tca_art_ext_orig_holder change = scope:tca_art_restore_ext } }
+                    scope:tca_art_ext_county = { change_title_holder = { holder = scope:tca_art_ext_orig_holder change = scope:tca_art_restore_ext } }
+                    resolve_title_and_vassal_change = scope:tca_art_restore_ext
+                }
+            }
+            else = {
+                add_character_flag = tca_art_precondition_failed
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+                debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_admin_rectification_title_eligibility"
+            }
+        }
+        else = {
+            add_character_flag = tca_art_precondition_failed
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_admin_rectification_title_eligibility"
+        }
+        if = {
+            limit = { has_character_flag = tca_art_precondition_failed }
+            remove_character_flag = tca_art_precondition_failed
+        }
+        else_if = {
+            limit = { has_character_flag = tca_test_tca_admin_rectification_test_case_failed }
+            debug_log = "TCA_TEST FAIL tca_test_admin_rectification_title_eligibility"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+        }
+        else = {
+            debug_log = "TCA_TEST PASS tca_test_admin_rectification_title_eligibility"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } }
+        }
+        remove_character_flag = tca_test_tca_admin_rectification_test_case_failed
+    }
+}
+
+# 用例 2：皇帝与宰相权限及权力天平三档约束（即时用例）。
+# 验证：
+#   1) 皇帝始终可对直属或间接封臣发起，且裁撤王国级兼领无需审批；
+#   2) 宰相在权力天平 < 40（倾向皇帝）时，不可对皇帝直属封臣发起，对非皇帝直属封臣可发起；
+#   3) 宰相在 40 <= 权力天平 < 60（权力均衡）时，可对皇帝直属封臣发起，但裁撤王国级兼领须奏请皇帝批准（公国／伯爵级无需批准）；
+#   4) 宰相在权力天平 >= 60（倾向宰相）时，可对皇帝直属封臣发起，且裁撤王国级兼领无需皇帝批准。
+tca_admin_rectification_test.2 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_admin_rectification_test.2 tca_test_admin_rectification_diarch_permissions"
+        remove_character_flag = tca_test_tca_admin_rectification_test_case_failed
+        if = {
+            limit = {
+                debug_only = yes
+                is_alive = yes
+                root = {
+                    has_title = title:h_china
+                    has_diarchy_type = grand_secretariat
+                    exists = diarch
+                }
+            }
+            diarch = { save_scope_as = tca_art_diarch }
+            clear_saved_scope = tca_art_direct_vassal
+            clear_saved_scope = tca_art_indirect_vassal
+            clear_saved_scope = tca_art_kingdom_title
+            clear_saved_scope = tca_art_duchy_title
+            random_vassal = {
+                limit = {
+                    this != scope:tca_art_diarch
+                    tca_is_admin_rectification_target_official_trigger = yes
+                    primary_title.tier = tier_kingdom
+                    any_vassal = {
+                        tca_is_admin_rectification_target_official_trigger = yes
+                        primary_title.tier = tier_duchy
+                    }
+                }
+                save_scope_as = tca_art_direct_vassal
+                primary_title = { save_scope_as = tca_art_kingdom_title }
+                random_vassal = {
+                    limit = {
+                        tca_is_admin_rectification_target_official_trigger = yes
+                        primary_title.tier = tier_duchy
+                    }
+                    save_scope_as = tca_art_indirect_vassal
+                    primary_title = { save_scope_as = tca_art_duchy_title }
+                }
+            }
+            if = {
+                limit = {
+                    exists = scope:tca_art_diarch
+                    exists = scope:tca_art_direct_vassal
+                    exists = scope:tca_art_indirect_vassal
+                }
+                save_scope_value_as = { name = tca_art_orig_swing value = diarchy_swing }
+                # 1) 将权力天平调至 20（< 40，倾向皇帝）：
+                change_diarchy_swing = -100
+                change_diarchy_swing = 20
+                if = {
+                    limit = {
+                        diarchy_swing < tca_admin_rectification_swing_balance_threshold
+                        root = {
+                            tca_admin_rectification_actor_can_target_recipient_trigger = { RECIPIENT = scope:tca_art_direct_vassal }
+                            NOT = { tca_retract_concurrent_requires_imperial_approval_trigger = { TITLE = scope:tca_art_kingdom_title } }
+                        }
+                        scope:tca_art_diarch = {
+                            tca_is_grand_chancellor_actor_trigger = yes
+                            NOT = { tca_admin_rectification_actor_can_target_recipient_trigger = { RECIPIENT = scope:tca_art_direct_vassal } }
+                            tca_admin_rectification_actor_can_target_recipient_trigger = { RECIPIENT = scope:tca_art_indirect_vassal }
+                            tca_retract_concurrent_requires_imperial_approval_trigger = { TITLE = scope:tca_art_kingdom_title }
+                        }
+                    }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_admin_rectification_diarch_permissions 1"
+                }
+                else = {
+                    add_character_flag = tca_test_tca_admin_rectification_test_case_failed
+                    debug_log = "TCA_TEST CHECK_FAIL tca_test_admin_rectification_diarch_permissions 1"
+                }
+                # 2) 将权力天平调至 50（40 <= swing < 60，权力均衡）：
+                change_diarchy_swing = -100
+                change_diarchy_swing = 50
+                if = {
+                    limit = {
+                        diarchy_swing >= tca_admin_rectification_swing_balance_threshold
+                        diarchy_swing < tca_admin_rectification_swing_diarch_threshold
+                        scope:tca_art_diarch = {
+                            tca_admin_rectification_actor_can_target_recipient_trigger = { RECIPIENT = scope:tca_art_direct_vassal }
+                            tca_retract_concurrent_requires_imperial_approval_trigger = { TITLE = scope:tca_art_kingdom_title }
+                            NOT = { tca_retract_concurrent_requires_imperial_approval_trigger = { TITLE = scope:tca_art_duchy_title } }
+                        }
+                    }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_admin_rectification_diarch_permissions 2"
+                }
+                else = {
+                    add_character_flag = tca_test_tca_admin_rectification_test_case_failed
+                    debug_log = "TCA_TEST CHECK_FAIL tca_test_admin_rectification_diarch_permissions 2"
+                }
+                # 3) 将权力天平调至 75（>= 60，倾向宰相）：
+                change_diarchy_swing = -100
+                change_diarchy_swing = 75
+                if = {
+                    limit = {
+                        diarchy_swing >= tca_admin_rectification_swing_diarch_threshold
+                        scope:tca_art_diarch = {
+                            tca_admin_rectification_actor_can_target_recipient_trigger = { RECIPIENT = scope:tca_art_direct_vassal }
+                            NOT = { tca_retract_concurrent_requires_imperial_approval_trigger = { TITLE = scope:tca_art_kingdom_title } }
+                            NOT = { tca_retract_concurrent_requires_imperial_approval_trigger = { TITLE = scope:tca_art_duchy_title } }
+                        }
+                    }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_admin_rectification_diarch_permissions 3"
+                }
+                else = {
+                    add_character_flag = tca_test_tca_admin_rectification_test_case_failed
+                    debug_log = "TCA_TEST CHECK_FAIL tca_test_admin_rectification_diarch_permissions 3"
+                }
+                # 还原权力天平。
+                change_diarchy_swing = -100
+                change_diarchy_swing = scope:tca_art_orig_swing
+            }
+            else = {
+                add_character_flag = tca_art_precondition_failed
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+                debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_admin_rectification_diarch_permissions"
+            }
+        }
+        else = {
+            add_character_flag = tca_art_precondition_failed
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_admin_rectification_diarch_permissions"
+        }
+        if = {
+            limit = { has_character_flag = tca_art_precondition_failed }
+            remove_character_flag = tca_art_precondition_failed
+        }
+        else_if = {
+            limit = { has_character_flag = tca_test_tca_admin_rectification_test_case_failed }
+            debug_log = "TCA_TEST FAIL tca_test_admin_rectification_diarch_permissions"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+        }
+        else = {
+            debug_log = "TCA_TEST PASS tca_test_admin_rectification_diarch_permissions"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } }
+        }
+        remove_character_flag = tca_test_tca_admin_rectification_test_case_failed
+    }
+}
+
+# 用例 3：归正辖属跨辖区兼领阻断与书信执行流程（延迟用例）。
+# 验证：
+#   1) 当公国级官员越级直隶于皇帝（与其法理上级路主不同），若其同时持有外部越辖伯爵领，2.3 跨辖区限制阻止直接归正；
+#   2) 移除越辖兼领后，归正辖属资格通过，派发书信 tca_admin_rectification.10（days = 1）；
+#   3) 次日书信到达并由 AI 自动确认后，目标官员的直属上级成功变更为法理上级路主，头衔与法理不变。
+tca_admin_rectification_test.3 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_admin_rectification_test.3 tca_test_rectify_subordination_execution"
+        remove_character_flag = tca_test_tca_admin_rectification_test_case_failed
+        if = {
+            limit = {
+                debug_only = yes
+                is_alive = yes
+                root = { has_title = title:h_china }
+            }
+            clear_saved_scope = tca_art_rectify_duke
+            clear_saved_scope = tca_art_rectify_road_holder
+            clear_saved_scope = tca_art_other_county
+            random_vassal = {
+                limit = {
+                    tca_is_admin_rectification_target_official_trigger = yes
+                    primary_title.tier = tier_kingdom
+                    any_vassal = {
+                        tca_is_admin_rectification_target_official_trigger = yes
+                        primary_title.tier = tier_duchy
+                        primary_title.de_jure_liege ?= prev.primary_title
+                        tca_rectify_subordination_no_cross_jurisdiction_trigger = yes
+                    }
+                }
+                save_scope_as = tca_art_rectify_road_holder
+                random_vassal = {
+                    limit = {
+                        tca_is_admin_rectification_target_official_trigger = yes
+                        primary_title.tier = tier_duchy
+                        primary_title.de_jure_liege ?= prev.primary_title
+                        tca_rectify_subordination_no_cross_jurisdiction_trigger = yes
+                    }
+                    save_scope_as = tca_art_rectify_duke
+                }
+            }
+            random_vassal_or_below = {
+                limit = {
+                    exists = scope:tca_art_rectify_duke
+                    exists = scope:tca_art_rectify_road_holder
+                    this != scope:tca_art_rectify_duke
+                    this != scope:tca_art_rectify_road_holder
+                    primary_title.tier = tier_county
+                    is_landed = yes
+                    NOT = { primary_title = { target_is_de_jure_liege_or_above = scope:tca_art_rectify_road_holder.primary_title } }
+                }
+                primary_title = { save_scope_as = tca_art_other_county }
+                save_scope_as = tca_art_other_county_holder
+            }
+            if = {
+                limit = {
+                    exists = scope:tca_art_rectify_duke
+                    exists = scope:tca_art_rectify_road_holder
+                    exists = scope:tca_art_other_county
+                }
+                # 将该公国官员临时改为直隶于皇帝（制造辖属错位）。
+                scope:tca_art_rectify_duke = {
+                    create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_art_misalign_fealty }
+                    change_liege = { liege = root change = scope:tca_art_misalign_fealty }
+                    resolve_title_and_vassal_change = scope:tca_art_misalign_fealty
+                }
+                # 再临时授给该公国官员一个外部越辖伯爵领，制造 2.3 跨辖区兼领阻断。
+                scope:tca_art_other_county_holder = {
+                    create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_art_grant_cross }
+                    scope:tca_art_other_county = { change_title_holder = { holder = scope:tca_art_rectify_duke change = scope:tca_art_grant_cross } }
+                    resolve_title_and_vassal_change = scope:tca_art_grant_cross
+                }
+                # 断言 1：跨辖区兼领时，tca_rectify_subordination_target_valid_trigger 为假。
+                if = {
+                    limit = {
+                        scope:tca_art_rectify_duke = {
+                            liege = root
+                            NOT = { tca_rectify_subordination_no_cross_jurisdiction_trigger = yes }
+                            NOT = { tca_rectify_subordination_target_valid_trigger = yes }
+                        }
+                    }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_rectify_subordination_execution 1"
+                }
+                else = {
+                    add_character_flag = tca_test_tca_admin_rectification_test_case_failed
+                    debug_log = "TCA_TEST CHECK_FAIL tca_test_rectify_subordination_execution 1"
+                }
+                # 归还外部越辖伯爵领，解除跨辖区兼领。
+                scope:tca_art_rectify_duke = {
+                    create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_art_return_cross }
+                    scope:tca_art_other_county = { change_title_holder = { holder = scope:tca_art_other_county_holder change = scope:tca_art_return_cross } }
+                    resolve_title_and_vassal_change = scope:tca_art_return_cross
+                }
+                # 断言 2：解除跨辖区兼领后，归正辖属资格通过，派发归正辖属书信。
+                if = {
+                    limit = {
+                        scope:tca_art_rectify_duke = {
+                            tca_rectify_subordination_target_valid_trigger = yes
+                        }
+                    }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_rectify_subordination_execution 2"
+                }
+                else = {
+                    add_character_flag = tca_test_tca_admin_rectification_test_case_failed
+                    debug_log = "TCA_TEST CHECK_FAIL tca_test_rectify_subordination_execution 2"
+                }
+                root = { save_scope_as = actor }
+                scope:tca_art_rectify_duke = { save_scope_as = recipient }
+                tca_send_rectify_subordination_letter_effect = yes
+                debug_log = "TCA_TEST WAIT tca_test_rectify_subordination_execution 2 days"
+                trigger_event = { id = tca_admin_rectification_test.103 days = 2 }
+            }
+            else = {
+                debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_rectify_subordination_execution"
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+                tca_test_lane_end_effect = { GROUP = tca_admin_rectification_test }
+            }
+        }
+        else = {
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_rectify_subordination_execution"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+            tca_test_lane_end_effect = { GROUP = tca_admin_rectification_test }
+        }
+    }
+}
+
+tca_admin_rectification_test.103 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            # 断言 3：书信执行后，公国官员直属上级已归正为法理上级路主，且主头衔保持不变。
+            if = {
+                limit = {
+                    exists = scope:tca_art_rectify_duke
+                    exists = scope:tca_art_rectify_road_holder
+                    scope:tca_art_rectify_duke = {
+                        liege = scope:tca_art_rectify_road_holder
+                        NOT = { has_variable = tca_rectify_pending_actor }
+                    }
+                }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_rectify_subordination_execution 3"
+            }
+            else = {
+                add_character_flag = tca_test_tca_admin_rectification_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_rectify_subordination_execution 3"
+            }
+            if = {
+                limit = { has_character_flag = tca_test_tca_admin_rectification_test_case_failed }
+                debug_log = "TCA_TEST FAIL tca_test_rectify_subordination_execution"
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+            }
+            else = {
+                debug_log = "TCA_TEST PASS tca_test_rectify_subordination_execution"
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } }
+            }
+            remove_character_flag = tca_test_tca_admin_rectification_test_case_failed
+            tca_test_lane_end_effect = { GROUP = tca_admin_rectification_test }
+        }
+    }
+}
+
+# 用例 4：裁撤兼领书信执行、生成新官员属性与跨辖区升迁旧头衔腾退（延迟用例）。
+# 验证：
+#   1) 6.4 生成新官员（火星人）具备童子试、乡试、会试通过记录及对应头衔级别的官品（公国级 3 或 4 品、王国级 5-7 品）与家门头衔；
+#   2) 6.5 当指定一名位于外部辖区的伯爵级有地官员（merit_level >= 3）作为待裁撤公国兼领头衔的 current_heir / 预选继任者时，
+#      派发裁撤兼领书信 tca_admin_rectification.20（days = 1）；
+#   3) 次日书信执行后，被裁撤公国移交该升迁官员，原兼领路主保留自身主头衔，且升迁官员位于新公国法理外的旧伯爵领被同步腾退给新官员（不回落皇帝，也不留给升迁官员跨辖区兼领）。
+tca_admin_rectification_test.4 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_admin_rectification_test.4 tca_test_retract_concurrent_and_promotion"
+        remove_character_flag = tca_test_tca_admin_rectification_test_case_failed
+        if = {
+            limit = {
+                debug_only = yes
+                is_alive = yes
+                root = { has_title = title:h_china }
+            }
+            clear_saved_scope = tca_art_retract_gov
+            clear_saved_scope = tca_art_retract_duchy
+            clear_saved_scope = tca_art_retract_duchy_orig_holder
+            clear_saved_scope = tca_art_promote_count
+            clear_saved_scope = tca_art_promote_old_county
+            random_vassal = {
+                limit = {
+                    tca_is_admin_rectification_target_official_trigger = yes
+                    primary_title.tier = tier_kingdom
+                    exists = capital_county
+                    any_vassal = {
+                        tca_is_admin_rectification_target_official_trigger = yes
+                        primary_title.tier = tier_duchy
+                        primary_title != prev.capital_county.duchy
+                    }
+                }
+                save_scope_as = tca_art_retract_gov
+                random_vassal = {
+                    limit = {
+                        tca_is_admin_rectification_target_official_trigger = yes
+                        primary_title.tier = tier_duchy
+                        primary_title != prev.capital_county.duchy
+                    }
+                    save_scope_as = tca_art_retract_duchy_orig_holder
+                    primary_title = { save_scope_as = tca_art_retract_duchy }
+                }
+            }
+            random_vassal_or_below = {
+                limit = {
+                    exists = scope:tca_art_retract_duchy
+                    exists = scope:tca_art_retract_gov
+                    this != scope:tca_art_retract_gov
+                    this != scope:tca_art_retract_duchy_orig_holder
+                    tca_is_admin_rectification_target_official_trigger = yes
+                    primary_title.tier = tier_county
+                    merit_level >= 3
+                    NOT = {
+                        any_held_title = {
+                            is_landless_type_title = no
+                            is_noble_family_title = no
+                            tier >= tier_duchy
+                        }
+                    }
+                    NOT = {
+                        any_held_title = {
+                            is_landless_type_title = no
+                            is_noble_family_title = no
+                            target_is_de_jure_liege_or_above = scope:tca_art_retract_duchy
+                        }
+                    }
+                }
+                save_scope_as = tca_art_promote_count
+                primary_title = { save_scope_as = tca_art_promote_old_county }
+            }
+            if = {
+                limit = { NOT = { exists = scope:tca_art_promote_count } }
+                random_vassal_or_below = {
+                    limit = {
+                        exists = scope:tca_art_retract_duchy
+                        exists = scope:tca_art_retract_gov
+                        this != scope:tca_art_retract_gov
+                        this != scope:tca_art_retract_duchy_orig_holder
+                        tca_is_admin_rectification_target_official_trigger = yes
+                        primary_title.tier = tier_county
+                        NOT = {
+                            any_held_title = {
+                                is_landless_type_title = no
+                                is_noble_family_title = no
+                                tier >= tier_duchy
+                            }
+                        }
+                        NOT = {
+                            any_held_title = {
+                                is_landless_type_title = no
+                                is_noble_family_title = no
+                                target_is_de_jure_liege_or_above = scope:tca_art_retract_duchy
+                            }
+                        }
+                    }
+                    save_scope_as = tca_art_promote_count
+                    primary_title = { save_scope_as = tca_art_promote_old_county }
+                }
+            }
+            if = {
+                limit = {
+                    exists = scope:tca_art_retract_gov
+                    exists = scope:tca_art_retract_duchy
+                    exists = scope:tca_art_promote_count
+                }
+                # 断言 1：直接测试 6.4 生成新官员（火星人）的科举、官品与家门属性。
+                scope:tca_art_retract_duchy = {
+                    tca_admin_rectification_generate_official_effect = { TOP_LIEGE = root }
+                }
+                if = {
+                    limit = {
+                        exists = scope:tca_admin_rectification_selected_successor
+                        scope:tca_admin_rectification_selected_successor = {
+                            has_character_flag = passed_child_exam
+                            has_character_flag = passed_provincial_exam
+                            has_character_flag = passed_metropolitan_exam
+                            var:tca_merit_approved_level >= 3
+                            var:tca_merit_approved_level <= 4
+                            any_held_title = { is_noble_family_title = yes }
+                            government_has_flag = government_is_celestial
+                        }
+                    }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_retract_concurrent_and_promotion 1"
+                }
+                else = {
+                    add_character_flag = tca_test_tca_admin_rectification_test_case_failed
+                    debug_log = "TCA_TEST CHECK_FAIL tca_test_retract_concurrent_and_promotion 1"
+                }
+                # 将非首府公国临时授予路主 retract_gov，形成不当兼领。
+                scope:tca_art_retract_duchy_orig_holder = {
+                    create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_art_make_concurrent }
+                    scope:tca_art_retract_duchy = { change_title_holder = { holder = scope:tca_art_retract_gov change = scope:tca_art_make_concurrent } }
+                    resolve_title_and_vassal_change = scope:tca_art_make_concurrent
+                }
+                # 确保待升迁的外部伯爵官员满足公国级官品要求（>= 3 品）。
+                scope:tca_art_promote_count = {
+                    save_scope_value_as = { name = tca_art_promote_orig_merit_level value = merit_level }
+                    if = {
+                        limit = { exists = var:tca_merit_approved_level }
+                        save_scope_value_as = { name = tca_art_promote_orig_approved_level value = var:tca_merit_approved_level }
+                    }
+                    if = {
+                        limit = { merit_level < 3 }
+                        set_variable = { name = tca_merit_approved_level value = 3 }
+                        change_merit = duchy_starting_merit_value
+                        set_merit_level = 0
+                        set_merit_level = 3
+                        tca_merit_refresh_cap_effect = yes
+                    }
+                }
+                root = { save_scope_as = actor }
+                scope:tca_art_retract_gov = { save_scope_as = recipient }
+                scope:tca_art_retract_duchy = { save_scope_as = target }
+                tca_send_retract_concurrent_letter_effect = { APPROVED = no }
+                # 强制指定外部伯爵 promote_count 为本次裁撤兼领的待命继任者，并为他的旧外部伯爵领预备替补继任者（验证 6.5 跨辖区升迁腾退）。
+                scope:tca_art_promote_old_county = {
+                    tca_admin_rectification_select_or_generate_successor_effect = { TOP_LIEGE = root }
+                    if = {
+                        limit = { exists = scope:tca_admin_rectification_selected_successor }
+                        set_variable = {
+                            name = tca_ar_vacate_prepared_successor
+                            value = scope:tca_admin_rectification_selected_successor
+                            days = 30
+                        }
+                    }
+                }
+                scope:tca_art_retract_gov = {
+                    set_variable = { name = tca_retract_pending_successor value = scope:tca_art_promote_count days = 30 }
+                }
+                debug_log = "TCA_TEST WAIT tca_test_retract_concurrent_and_promotion 2 days"
+                trigger_event = { id = tca_admin_rectification_test.104 days = 2 }
+            }
+            else = {
+                debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_retract_concurrent_and_promotion"
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+                tca_test_lane_end_effect = { GROUP = tca_admin_rectification_test }
+            }
+        }
+        else = {
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_retract_concurrent_and_promotion"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+            tca_test_lane_end_effect = { GROUP = tca_admin_rectification_test }
+        }
+    }
+}
+
+tca_admin_rectification_test.104 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            # 断言 2：被裁撤的兼领公国已移交升迁官员 promote_count，原路主仍保留其主头衔，且新公国主官直隶于法理上级路主（或天子）。
+            if = {
+                limit = {
+                    scope:tca_art_retract_duchy = {
+                        holder = scope:tca_art_promote_count
+                    }
+                    scope:tca_art_retract_gov = {
+                        primary_title.tier = tier_kingdom
+                        NOT = { has_title = scope:tca_art_retract_duchy }
+                    }
+                    scope:tca_art_promote_count = {
+                        primary_title = scope:tca_art_retract_duchy
+                        top_liege = root
+                    }
+                }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_retract_concurrent_and_promotion 2"
+            }
+            else = {
+                add_character_flag = tca_test_tca_admin_rectification_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_retract_concurrent_and_promotion 2"
+            }
+            # 断言 3：6.5 跨辖区升迁旧头衔腾退——promote_count 位于新公国法理范围外的旧伯爵领已移交合格新官员，
+            # 既未留在 promote_count 名下形成越辖直辖，也未回落皇帝。
+            if = {
+                limit = {
+                    scope:tca_art_promote_old_county = {
+                        exists = holder
+                        holder != scope:tca_art_promote_count
+                        holder != root
+                        holder = { government_has_flag = government_is_celestial }
+                    }
+                }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_retract_concurrent_and_promotion 3"
+            }
+            else = {
+                add_character_flag = tca_test_tca_admin_rectification_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_retract_concurrent_and_promotion 3"
+            }
+            # 还原测试移动的头衔，避免影响后续模块。
+            if = {
+                limit = {
+                    exists = scope:tca_art_retract_duchy_orig_holder
+                    scope:tca_art_retract_duchy_orig_holder = { is_alive = yes }
+                    scope:tca_art_retract_duchy = { exists = holder }
+                }
+                scope:tca_art_retract_duchy.holder = {
+                    create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_art_restore_duchy }
+                    scope:tca_art_retract_duchy = { change_title_holder_include_vassals = { holder = scope:tca_art_retract_duchy_orig_holder change = scope:tca_art_restore_duchy } }
+                    resolve_title_and_vassal_change = scope:tca_art_restore_duchy
+                }
+            }
+            if = {
+                limit = {
+                    exists = scope:tca_art_promote_count
+                    scope:tca_art_promote_count = { is_alive = yes }
+                    scope:tca_art_promote_old_county = { exists = holder }
+                }
+                scope:tca_art_promote_old_county.holder = {
+                    create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_art_restore_county }
+                    scope:tca_art_promote_old_county = { change_title_holder_include_vassals = { holder = scope:tca_art_promote_count change = scope:tca_art_restore_county } }
+                    resolve_title_and_vassal_change = scope:tca_art_restore_county
+                }
+                scope:tca_art_promote_count = {
+                    set_merit_level = 0
+                    set_merit_level = scope:tca_art_promote_orig_merit_level
+                    if = {
+                        limit = { exists = scope:tca_art_promote_orig_approved_level }
+                        set_variable = { name = tca_merit_approved_level value = scope:tca_art_promote_orig_approved_level }
+                    }
+                    tca_merit_refresh_cap_effect = yes
+                }
+            }
+            if = {
+                limit = { has_character_flag = tca_test_tca_admin_rectification_test_case_failed }
+                debug_log = "TCA_TEST FAIL tca_test_retract_concurrent_and_promotion"
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+            }
+            else = {
+                debug_log = "TCA_TEST PASS tca_test_retract_concurrent_and_promotion"
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } }
+            }
+            remove_character_flag = tca_test_tca_admin_rectification_test_case_failed
+            tca_test_lane_end_effect = { GROUP = tca_admin_rectification_test }
+        }
+    }
+}
+
+# 用例 5：裁撤兼领全自然继任流水线、在途互斥清理与封臣跟随改隶（延迟用例）。
+# 验证：
+#   1) 派发书信时完全不手动注入继任者，由 tca_send_retract_concurrent_letter_effect 自动执行
+#      tca_admin_rectification_select_or_generate_successor_effect 选定合格继任者并挂载预约标记；
+#   2) 次日书信确认后，兼领公国直接交接给该自然继任者，且新任主官具备合格官品与天朝身份，原路主保留自身主头衔；
+#   3) 第七章封臣善后：原兼领路主名下属于被裁撤公国法理的直属伯爵封臣，自动跟随改隶为新任公国主官统属；
+#   4) 互斥锁清理：执行完毕后被整理官员身上清理干净全部在途挂起变量。
+tca_admin_rectification_test.5 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_admin_rectification_test.5 tca_test_retract_concurrent_natural_pipeline"
+        remove_character_flag = tca_test_tca_admin_rectification_test_case_failed
+        if = {
+            limit = {
+                debug_only = yes
+                is_alive = yes
+                root = { has_title = title:h_china }
+            }
+            clear_saved_scope = tca_art_nat_gov
+            clear_saved_scope = tca_art_nat_duchy
+            clear_saved_scope = tca_art_nat_duchy_orig_holder
+            clear_saved_scope = tca_art_nat_vassal_count
+            random_vassal = {
+                limit = {
+                    tca_is_admin_rectification_target_official_trigger = yes
+                    primary_title.tier = tier_kingdom
+                    exists = capital_county
+                    any_vassal = {
+                        tca_is_admin_rectification_target_official_trigger = yes
+                        primary_title.tier = tier_duchy
+                        primary_title != prev.capital_county.duchy
+                        any_vassal = {
+                            tca_is_admin_rectification_target_official_trigger = yes
+                            primary_title.tier = tier_county
+                            primary_title.de_jure_liege ?= prev.primary_title
+                        }
+                    }
+                }
+                save_scope_as = tca_art_nat_gov
+                random_vassal = {
+                    limit = {
+                        tca_is_admin_rectification_target_official_trigger = yes
+                        primary_title.tier = tier_duchy
+                        primary_title != prev.capital_county.duchy
+                        any_vassal = {
+                            tca_is_admin_rectification_target_official_trigger = yes
+                            primary_title.tier = tier_county
+                            primary_title.de_jure_liege ?= prev.primary_title
+                        }
+                    }
+                    save_scope_as = tca_art_nat_duchy_orig_holder
+                    primary_title = { save_scope_as = tca_art_nat_duchy }
+                    random_vassal = {
+                        limit = {
+                            tca_is_admin_rectification_target_official_trigger = yes
+                            primary_title.tier = tier_county
+                            primary_title.de_jure_liege ?= prev.primary_title
+                        }
+                        save_scope_as = tca_art_nat_vassal_count
+                    }
+                }
+            }
+            if = {
+                limit = {
+                    exists = scope:tca_art_nat_gov
+                    exists = scope:tca_art_nat_duchy
+                    exists = scope:tca_art_nat_duchy_orig_holder
+                    exists = scope:tca_art_nat_vassal_count
+                }
+                # 1) 将非首府公国临时授予路主 nat_gov，制造兼领；同时将下属伯爵 nat_vassal_count 直属上级改为路主。
+                scope:tca_art_nat_duchy_orig_holder = {
+                    create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_art_grant_nat_duchy }
+                    scope:tca_art_nat_duchy = { change_title_holder = { holder = scope:tca_art_nat_gov change = scope:tca_art_grant_nat_duchy } }
+                    resolve_title_and_vassal_change = scope:tca_art_grant_nat_duchy
+                }
+                scope:tca_art_nat_vassal_count = {
+                    create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_art_nat_fealty_gov }
+                    change_liege = { liege = scope:tca_art_nat_gov change = scope:tca_art_nat_fealty_gov }
+                    resolve_title_and_vassal_change = scope:tca_art_nat_fealty_gov
+                }
+                # 2) 发起裁撤兼领书信，完全由正式流程自然抽取或生成继任者。
+                root = { save_scope_as = actor }
+                scope:tca_art_nat_gov = { save_scope_as = recipient }
+                scope:tca_art_nat_duchy = { save_scope_as = target }
+                tca_send_retract_concurrent_letter_effect = { APPROVED = no }
+
+                # 断言 1：系统自然选定或生成了合格的在途继任者，且挂载了预约标记与在途变量。
+                if = {
+                    limit = {
+                        scope:tca_art_nat_gov = {
+                            has_variable = tca_retract_pending_successor
+                            has_variable = tca_retract_pending_actor
+                            has_variable = tca_retract_pending_title
+                            var:tca_retract_pending_successor = {
+                                is_alive = yes
+                                this != scope:tca_art_nat_gov
+                                tca_circuit_has_title_level_requirement_trigger = { TITLE = scope:tca_art_nat_duchy }
+                            }
+                        }
+                    }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_retract_concurrent_natural_pipeline 1"
+                }
+                else = {
+                    add_character_flag = tca_test_tca_admin_rectification_test_case_failed
+                    debug_log = "TCA_TEST CHECK_FAIL tca_test_retract_concurrent_natural_pipeline 1"
+                }
+                debug_log = "TCA_TEST WAIT tca_test_retract_concurrent_natural_pipeline 2 days"
+                trigger_event = { id = tca_admin_rectification_test.105 days = 2 }
+            }
+            else = {
+                debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_retract_concurrent_natural_pipeline"
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+                tca_test_lane_end_effect = { GROUP = tca_admin_rectification_test }
+            }
+        }
+        else = {
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_retract_concurrent_natural_pipeline"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+            tca_test_lane_end_effect = { GROUP = tca_admin_rectification_test }
+        }
+    }
+}
+
+tca_admin_rectification_test.105 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            # 断言 2：书信确认后，兼领公国已成功交接给自然继任者，原路主保留自身王国主头衔。
+            if = {
+                limit = {
+                    exists = scope:tca_art_nat_duchy
+                    exists = scope:tca_art_nat_gov
+                    scope:tca_art_nat_duchy = {
+                        exists = holder
+                        holder != scope:tca_art_nat_gov
+                        holder = {
+                            government_has_flag = government_is_celestial
+                            var:tca_merit_approved_level >= 3
+                        }
+                    }
+                    scope:tca_art_nat_gov = {
+                        primary_title.tier = tier_kingdom
+                        NOT = { has_title = scope:tca_art_nat_duchy }
+                    }
+                }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_retract_concurrent_natural_pipeline 2"
+            }
+            else = {
+                add_character_flag = tca_test_tca_admin_rectification_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_retract_concurrent_natural_pipeline 2"
+            }
+            # 断言 3：第七章封臣善后——属于该被裁撤公国法理的直属伯爵封臣，已自动跟随改隶为新任公国主官统属！
+            if = {
+                limit = {
+                    exists = scope:tca_art_nat_vassal_count
+                    exists = scope:tca_art_nat_duchy.holder
+                    scope:tca_art_nat_vassal_count = {
+                        liege ?= scope:tca_art_nat_duchy.holder
+                    }
+                }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_retract_concurrent_natural_pipeline 3"
+            }
+            else = {
+                add_character_flag = tca_test_tca_admin_rectification_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_retract_concurrent_natural_pipeline 3"
+            }
+            # 断言 4：在途互斥锁清理——被整理官员身上清理干净全部在途挂起变量。
+            if = {
+                limit = {
+                    scope:tca_art_nat_gov = {
+                        NOT = { has_variable = tca_retract_pending_actor }
+                        NOT = { has_variable = tca_retract_pending_title }
+                        NOT = { has_variable = tca_retract_pending_successor }
+                    }
+                }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_retract_concurrent_natural_pipeline 4"
+            }
+            else = {
+                add_character_flag = tca_test_tca_admin_rectification_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_retract_concurrent_natural_pipeline 4"
+            }
+            # 还原测试移动的公国与伯爵封属。
+            if = {
+                limit = {
+                    exists = scope:tca_art_nat_duchy_orig_holder
+                    scope:tca_art_nat_duchy_orig_holder = { is_alive = yes }
+                    scope:tca_art_nat_duchy = { exists = holder }
+                }
+                scope:tca_art_nat_duchy.holder = {
+                    create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_art_restore_nat_duchy }
+                    scope:tca_art_nat_duchy = { change_title_holder_include_vassals = { holder = scope:tca_art_nat_duchy_orig_holder change = scope:tca_art_restore_nat_duchy } }
+                    resolve_title_and_vassal_change = scope:tca_art_restore_nat_duchy
+                }
+            }
+            if = {
+                limit = {
+                    exists = scope:tca_art_nat_vassal_count
+                    exists = scope:tca_art_nat_duchy_orig_holder
+                    scope:tca_art_nat_duchy_orig_holder = { is_alive = yes }
+                }
+                scope:tca_art_nat_vassal_count = {
+                    create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_art_restore_nat_vassal }
+                    change_liege = { liege = scope:tca_art_nat_duchy_orig_holder change = scope:tca_art_restore_nat_vassal }
+                    resolve_title_and_vassal_change = scope:tca_art_restore_nat_vassal
+                }
+            }
+            if = {
+                limit = { has_character_flag = tca_test_tca_admin_rectification_test_case_failed }
+                debug_log = "TCA_TEST FAIL tca_test_retract_concurrent_natural_pipeline"
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+            }
+            else = {
+                debug_log = "TCA_TEST PASS tca_test_retract_concurrent_natural_pipeline"
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } }
+            }
+            remove_character_flag = tca_test_tca_admin_rectification_test_case_failed
+            tca_test_lane_end_effect = { GROUP = tca_admin_rectification_test }
+        }
+    }
+}
