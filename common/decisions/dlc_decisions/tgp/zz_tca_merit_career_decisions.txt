@@ -1,4 +1,385 @@
-﻿# 原版决议仅在effect末尾增加天朝离散退出维护，原生条件与效果保留。
+# 原版文武仕途与辞谢决议覆盖；
+# tgp_choose_career_path_decision: 放宽在任与尚书限制并为AI启用换轨，差遣倒逼为主导，配合军事能力、性格、爵位、尚书与品级阶梯阻遏及5年冷却，原生压力与夙愿结算，同步刷新天朝核定路线；
+# tgp_refuse_appointments_decision / tgp_resume_appointments_decision: 仅在effect末尾增加天朝离散退出维护，原生条件与效果保留。
+tgp_choose_career_path_decision = {
+	decision_group_type = admin
+	title = tgp_choose_career_path_decision
+	desc = tgp_choose_career_path_decision_desc
+	selection_tooltip = tgp_choose_career_path_decision_tooltip
+	picture = {
+		reference = "gfx/interface/illustrations/decisions/tgp_career.dds"
+	}
+	sort_order = 90
+
+	is_shown = {
+		government_allows = merit
+		has_tgp_dlc_trigger = yes
+		this != top_liege
+	}
+
+	is_valid = {
+		custom_tooltip = {
+			text = you_are_not_refusing_appointments_desc
+			trigger_if = {
+				limit = {
+					has_variable = appointment_trait_override
+				}
+				var:appointment_trait_override != trait:intellect_good_3
+			}
+			trigger_else = {
+				always = yes
+			}
+		}
+		custom_tooltip = {
+			text = tca_changed_career_path_recently_tt
+			NOT = { has_character_flag = tca_changed_career_path_recently }
+		}
+	}
+
+	is_valid_showing_failures_only = {
+		is_at_war = no
+		is_adult = yes
+	}
+
+	widget = {
+		gui = "decision_view_widget_generic_multichoice_with_effects"
+		controller = decision_option_list_controller
+		decision_to_second_step_button = "SELECT_ACTION"
+		show_from_start = no
+
+		item = { # Choose a civilian career
+			value = civilian_career
+			is_valid = {
+				custom_tooltip = {
+					text = you_have_a_civilian_career_desc
+					is_civilian_candidate_trigger = no
+				}
+			}
+			current_description = tgp_choose_career_path_civilian_desc
+			localization = tgp_choose_career_path_civilian_name
+			icon = "gfx/interface/icons/celestial_administration_types/icon_game_concept_celestial_standard_administration.dds"
+
+			ai_chance = {
+				value = 0
+
+				# 差遣倒逼
+				if = {
+					limit = {
+						vassal_contract_has_flag = celestial_province_standard
+					}
+					add = 200
+				}
+
+				# 军事属性（两档）
+				if = {
+					limit = { martial <= 8 }
+					add = 30
+				}
+				if = {
+					limit = { martial >= 14 }
+					add = -40
+				}
+
+				# 将领特质（两档）
+				if = {
+					limit = { number_of_commander_traits == 1 }
+					add = -20
+				}
+				if = {
+					limit = { number_of_commander_traits >= 2 }
+					add = -50
+				}
+
+				# 性格特质
+				if = {
+					limit = {
+						OR = {
+							has_trait = craven
+							has_trait = calm
+							has_trait = content
+							has_trait = patient
+						}
+					}
+					add = 20
+				}
+				if = {
+					limit = {
+						OR = {
+							has_trait = brave
+							has_trait = wrathful
+						}
+					}
+					add = -25
+				}
+
+				# 官职级别阶梯阻遏（公爵、王国、帝国不同）
+				if = {
+					limit = { highest_held_title_tier = tier_empire }
+					add = -80
+				}
+				else_if = {
+					limit = { highest_held_title_tier = tier_kingdom }
+					add = -50
+				}
+				else_if = {
+					limit = { highest_held_title_tier = tier_duchy }
+					add = -25
+				}
+
+				# 朝廷部寺大僚（Minister 独立扣分）
+				if = {
+					limit = { tgp_has_minister_title = yes }
+					add = -50
+				}
+
+				# 功绩品级阶梯阻遏
+				if = {
+					limit = { merit_level >= 7 }
+					add = -50
+				}
+				else_if = {
+					limit = { merit_level >= 5 }
+					add = -30
+				}
+				else_if = {
+					limit = { merit_level >= 3 }
+					add = -15
+				}
+			}
+		}
+
+		item = { # Choose a military career
+			value = military_career
+			is_valid = {
+				custom_tooltip = {
+					text = you_have_a_military_career_desc
+					is_military_candidate_trigger = no
+				}
+			}
+			current_description = tgp_choose_career_path_military_desc
+			localization = tgp_choose_career_path_military_name
+			icon = "gfx/interface/icons/celestial_administration_types/icon_game_concept_celestial_military_administration.dds"
+
+			ai_chance = {
+				value = 0
+
+				# 差遣倒逼
+				if = {
+					limit = {
+						vassal_contract_has_flag = celestial_military_appointment
+					}
+					add = 200
+				}
+
+				# 军事属性（两档）
+				if = {
+					limit = { martial >= 12 }
+					add = 25
+				}
+				if = {
+					limit = { martial >= 16 }
+					add = 25
+				}
+				if = {
+					limit = { martial <= 8 }
+					add = -40
+				}
+
+				# 将领特质（两档）
+				if = {
+					limit = { number_of_commander_traits == 1 }
+					add = 20
+				}
+				if = {
+					limit = { number_of_commander_traits >= 2 }
+					add = 45
+				}
+
+				# 性格特质
+				if = {
+					limit = {
+						OR = {
+							has_trait = brave
+							has_trait = wrathful
+							has_trait = ambitious
+						}
+					}
+					add = 20
+				}
+				if = {
+					limit = { has_trait = craven }
+					add = -30
+				}
+				if = {
+					limit = {
+						OR = {
+							has_trait = calm
+							has_trait = content
+						}
+					}
+					add = -15
+				}
+
+				# 官职级别阶梯阻遏（公爵、王国、帝国不同）
+				if = {
+					limit = { highest_held_title_tier = tier_empire }
+					add = -80
+				}
+				else_if = {
+					limit = { highest_held_title_tier = tier_kingdom }
+					add = -50
+				}
+				else_if = {
+					limit = { highest_held_title_tier = tier_duchy }
+					add = -25
+				}
+
+				# 朝廷部寺大僚（Minister 独立扣分）
+				if = {
+					limit = { tgp_has_minister_title = yes }
+					add = -50
+				}
+
+				# 功绩品级阶梯阻遏
+				if = {
+					limit = { merit_level >= 7 }
+					add = -50
+				}
+				else_if = {
+					limit = { merit_level >= 5 }
+					add = -30
+				}
+				else_if = {
+					limit = { merit_level >= 3 }
+					add = -15
+				}
+			}
+		}
+	}
+
+	cost = {
+		influence = {
+			value = 50
+		}
+	}
+
+	effect = {
+		if = {
+			limit = {
+				scope:military_career = yes
+			}
+			custom_tooltip = {
+				text = change_to_military_career_desc
+				set_variable = {
+					name = appointment_trait_override
+					value = trait:education_martial_1
+				}
+			}
+			stress_and_fulfillment_impact = {
+				brave = minor_stress_impact_loss
+				wrathful = minor_stress_impact_loss
+				craven = minor_stress_impact_gain
+				calm = minor_stress_impact_gain
+				content = minor_stress_impact_gain
+			}
+		}
+		else = {
+			custom_tooltip = {
+				text = change_to_civilian_career_desc
+				set_variable = {
+					name = appointment_trait_override
+					value = trait:education_stewardship_1
+				}
+			}
+			stress_and_fulfillment_impact = {
+				craven = minor_stress_impact_loss
+				calm = minor_stress_impact_loss
+				content = minor_stress_impact_loss
+				patient = minor_stress_impact_loss
+				brave = minor_stress_impact_gain
+				impatient = minor_stress_impact_gain
+			}
+		}
+
+		# 顺应差遣奖励（消除职责身份错位，获得身心满足）
+		if = {
+			limit = {
+				OR = {
+					AND = {
+						scope:military_career = yes
+						vassal_contract_has_flag = celestial_military_appointment
+					}
+					AND = {
+						scope:civilian_career = yes
+						vassal_contract_has_flag = celestial_province_standard
+					}
+				}
+			}
+			stress_and_fulfillment_impact = {
+				base = minor_stress_impact_loss
+			}
+		}
+
+		# 高资历大僚晚年换轨动荡压力
+		if = {
+			limit = {
+				merit_level >= 5
+			}
+			stress_and_fulfillment_impact = {
+				base = minor_stress_impact_gain
+			}
+		}
+
+		# 5年防反复横跳冷却标记
+		add_character_flag = {
+			flag = tca_changed_career_path_recently
+			years = 5
+		}
+
+		# TCA 功绩考核与品级限额刷新
+		if = {
+			limit = {
+				government_has_flag = government_is_celestial
+			}
+			tca_merit_after_reward_effect = yes
+		}
+	}
+
+	ai_check_interval = 12
+
+	ai_potential = {
+		is_adult = yes
+		is_alive = yes
+		influence >= 50
+		NOT = { has_character_flag = tca_changed_career_path_recently }
+		OR = {
+			AND = {
+				is_civilian_candidate_trigger = yes
+				vassal_contract_has_flag = celestial_military_appointment
+			}
+			AND = {
+				is_military_candidate_trigger = yes
+				vassal_contract_has_flag = celestial_province_standard
+			}
+			AND = {
+				merit_level <= 4
+				highest_held_title_tier <= tier_county
+				tgp_has_minister_title = no
+				OR = {
+					AND = {
+						is_civilian_candidate_trigger = yes
+						martial >= 12
+					}
+					AND = {
+						is_military_candidate_trigger = yes
+						martial <= 8
+					}
+				}
+			}
+		}
+	}
+}
+
 tgp_refuse_appointments_decision = {
 	decision_group_type = admin
 	title = tgp_refuse_appointments_decision

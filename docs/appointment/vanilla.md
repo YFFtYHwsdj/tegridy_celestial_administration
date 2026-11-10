@@ -1,4 +1,4 @@
-﻿# 原版天朝文官任命继承
+# 原版天朝文官任命继承
 
 > 依据 CK3 1.20.0.4（All Under Heaven，内部前缀 `tgp`）原版脚本整理；路径相对游戏根目录。本文只记录原版机制，模组复用关系见文末；专职选官实现另见[官职任命](README.md)。未在引擎中复现的判断标“待验证”。
 
@@ -205,6 +205,7 @@
 - [通判](../tongpan/README.md)与[司法](../judicial/README.md)的持有人保留原版 `celestial_appointment_succession_law`，官署另装各自的头衔法与任命类型，完整复用本文地方评分底座并调整本职能力／性格，入口见[官职任命](README.md)；`common/laws/tca_judicial_succession_laws.txt` 只为旧存档保留可解析的 `tca_judicial_appointment_succession_law`，不再挂到新官职。
 - 模组不覆盖上述两条原版继承法，也不改 `celestial_governor.txt`、`celestial_minister.txt`。
 - 模组覆盖 `appointment_title_value`（`common/script_values/appointment/zz_tca_appointment_values.txt`，原版基线 `common/script_values/tgp_values.txt:272`），为司法、通判头衔提供价值，并保留原版民政/军政估算。该值决定“已持头衔者是否让位”，改动会影响调任结果，须与通判、司法文档一起复核。
+- 模组覆盖原版文武仕途选择决议 `tgp_choose_career_path_decision`（`common/decisions/dlc_decisions/tgp/zz_tca_merit_career_decisions.txt`，原版基线 `common/decisions/dlc_decisions/tgp/tgp_china_decisions.txt:202`）：解除原版在任官员与部寺尚书无法点击的限制，为 AI 启用换轨（以差遣倒逼为主导，配合军事能力、性格、爵位、尚书与品级阶梯阻遏，引入原生压力与夙愿反馈及 5 年冷却），并在换轨后同步刷新天朝核定路线（`tca_merit_route`），详见[文武换轨与差遣自适应](merit_design.md#文武换轨与差遣自适应)。
 - 原版若调整法律、评分权重、功绩门槛或契约标记，先核对本页再改模组；本页不是覆盖登记，覆盖清单仍以 `tools/upstream_overrides.json` 为准。
 
 ## 待验证

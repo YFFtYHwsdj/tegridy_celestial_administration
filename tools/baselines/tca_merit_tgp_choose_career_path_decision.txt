@@ -1,0 +1,128 @@
+tgp_choose_career_path_decision = {
+	decision_group_type = admin
+	title = tgp_choose_career_path_decision
+	desc = tgp_choose_career_path_decision_desc
+	selection_tooltip = tgp_choose_career_path_decision_tooltip
+	picture = {
+		reference = "gfx/interface/illustrations/decisions/tgp_career.dds"
+	}
+	sort_order = 90
+
+	is_shown = {
+		is_ai = no
+		government_allows = merit
+		has_tgp_dlc_trigger = yes
+		this != top_liege
+	}
+	
+	is_valid = {
+		is_landed = no
+		custom_tooltip = {
+			text = you_are_not_a_minister_desc
+			tgp_has_minister_title = no
+		}
+		custom_tooltip = {
+			text = you_are_not_refusing_appointments_desc
+			trigger_if = {
+				limit = {
+					has_variable = appointment_trait_override
+				}
+				var:appointment_trait_override != trait:intellect_good_3
+			}
+			trigger_else = {
+				always = yes
+			}
+		}
+	}
+
+	is_valid_showing_failures_only = {
+		is_at_war = no
+		is_adult = yes
+	}
+	
+	widget = {
+		gui = "decision_view_widget_generic_multichoice_with_effects"
+		controller = decision_option_list_controller
+		decision_to_second_step_button = "SELECT_ACTION"
+		show_from_start = no
+
+		item = { # Choose a civilian career
+			value = civilian_career
+			is_valid = {
+				custom_tooltip = {
+					text = you_have_a_civilian_career_desc
+					trigger_if = {
+						limit = {
+							has_variable = appointment_trait_override
+						}
+						var:appointment_trait_override != trait:education_stewardship_1
+					}
+					trigger_else = {
+						NOT = { has_trait_with_flag = civilian_province }
+					}
+				}
+			}
+			current_description = tgp_choose_career_path_civilian_desc
+			localization = tgp_choose_career_path_civilian_name
+			icon = "gfx/interface/icons/celestial_administration_types/icon_game_concept_celestial_standard_administration.dds"
+			ai_chance = {
+				value = 0
+			}
+		}
+		item = { # Choose a military career
+			value = military_career
+			is_valid = {
+				custom_tooltip = {
+					text = you_have_a_military_career_desc
+					trigger_if = {
+						limit = {
+							has_variable = appointment_trait_override
+						}
+						var:appointment_trait_override != trait:education_martial_1
+					}
+					trigger_else = {
+						NOT = { has_trait_with_flag = military_province }
+					}
+				}
+			}
+			current_description = tgp_choose_career_path_military_desc
+			localization = tgp_choose_career_path_military_name
+			icon = "gfx/interface/icons/celestial_administration_types/icon_game_concept_celestial_military_administration.dds"
+			ai_chance = {
+				value = 0
+			}
+		}
+	}
+
+	cost = {
+		influence = {
+			value = 50
+		}
+	}
+
+	effect = {
+		if = {
+			limit = {
+				scope:military_career = yes
+			}
+			custom_tooltip = {
+				text = change_to_military_career_desc
+				set_variable = {
+					name = appointment_trait_override
+					value = trait:education_martial_1
+				}
+			}
+		}
+		else = {
+			custom_tooltip = {
+				text = change_to_civilian_career_desc
+				set_variable = {
+					name = appointment_trait_override
+					value = trait:education_stewardship_1
+				}
+			}
+		}
+	}
+	
+	ai_check_interval = 0
+}
