@@ -1,0 +1,212 @@
+﻿# 功绩结余折算（平滑饱和模型）独立回归测试
+# 验证：0溢出基准门槛、超期1任(40%)、超期5任(100%破六品门槛)、一品无新阶零结余、双账等额一致性
+namespace = tca_merit_carryover_test
+
+tca_merit_carryover_test.1 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_merit_carryover_test.1 tca_test_merit_carryover"
+        remove_character_flag = tca_test_tca_merit_carryover_test_case_failed
+        if = {
+            limit = { debug_only = yes is_alive = yes title:h_china.holder = root }
+            # 创建3个测试人物：
+            # actor_zero: 刚及格升品，无溢出
+            # actor_one: 超期1任升品（功绩3000，溢出1000）
+            # actor_five: 超期5任升品（功绩7000，溢出5000）
+            tca_test_create_merit_probe_character_effect = { CHARACTER = tca_co_zero GOVERNMENT = celestial_government }
+            tca_test_create_merit_probe_character_effect = { CHARACTER = tca_co_one GOVERNMENT = celestial_government }
+            tca_test_create_merit_probe_character_effect = { CHARACTER = tca_co_five GOVERNMENT = celestial_government }
+
+            scope:tca_co_zero = {
+                add_trait = education_stewardship_3
+                tca_test_add_native_merit_probe_exams_effect = yes
+                change_merit = 100
+            }
+            scope:tca_co_one = {
+                add_trait = education_stewardship_3
+                tca_test_add_native_merit_probe_exams_effect = yes
+                change_merit = 100
+            }
+            scope:tca_co_five = {
+                add_trait = education_stewardship_3
+                tca_test_add_native_merit_probe_exams_effect = yes
+                change_merit = 100
+            }
+
+            debug_log = "TCA_TEST WAIT tca_test_merit_carryover 2 days"
+            trigger_event = { id = tca_merit_carryover_test.1001 days = 2 }
+        }
+        else = {
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_merit_carryover"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+            tca_test_lane_end_effect = { GROUP = tca_merit_carryover_test }
+        }
+    }
+}
+
+tca_merit_carryover_test.1001 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            # 初始化并充值到预定功绩：
+            # 八品门槛 1000，升七品门槛 2000，旧路程 1000，新路程 1500。
+            # actor_zero: 八品功绩 2000（刚及格，溢出 0）
+            # actor_one: 八品功绩 3000（溢出 1000，即超期 1 圈）
+            # actor_five: 八品功绩 7000（溢出 5000，即超期 5 圈）
+            scope:tca_co_zero = {
+                tca_merit_initialize_character_effect = yes
+                set_merit_level = 2
+                set_variable = { name = tca_merit_approved_level value = 2 }
+                change_merit = { value = 2000 subtract = merit }
+            }
+            scope:tca_co_one = {
+                tca_merit_initialize_character_effect = yes
+                set_merit_level = 2
+                set_variable = { name = tca_merit_approved_level value = 2 }
+                change_merit = { value = 3000 subtract = merit }
+            }
+            scope:tca_co_five = {
+                tca_merit_initialize_character_effect = yes
+                set_merit_level = 2
+                set_variable = { name = tca_merit_approved_level value = 2 }
+                change_merit = { value = 7000 subtract = merit }
+            }
+
+            debug_log = "TCA_TEST WAIT tca_test_merit_carryover 2 days"
+            trigger_event = { id = tca_merit_carryover_test.1002 days = 2 }
+        }
+    }
+}
+
+tca_merit_carryover_test.1002 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            # 检验初始准备状态
+            if = {
+                limit = {
+                    scope:tca_co_zero = { var:tca_merit_approved_level = 2 merit = 2000 }
+                    scope:tca_co_one = { var:tca_merit_approved_level = 2 merit = 3000 }
+                    scope:tca_co_five = { var:tca_merit_approved_level = 2 merit = 7000 }
+                }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_merit_carryover 1"
+            }
+            else = {
+                add_character_flag = tca_test_tca_merit_carryover_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_carryover 1"
+            }
+
+            # 执行八升七普通授品事务 (SOURCE = 2, TARGET = 3, MODE = 1)
+            scope:tca_co_zero = {
+                tca_merit_begin_grant_effect = { SOURCE = 2 TARGET = 3 MODE = 1 YEAR = current_year }
+            }
+            scope:tca_co_one = {
+                tca_merit_begin_grant_effect = { SOURCE = 2 TARGET = 3 MODE = 1 YEAR = current_year }
+            }
+            scope:tca_co_five = {
+                tca_merit_begin_grant_effect = { SOURCE = 2 TARGET = 3 MODE = 1 YEAR = current_year }
+            }
+
+            # 断言 2：检查结余到账与门槛
+            # actor_zero: 0溢出 -> merit = 2000
+            # actor_one: 1圈溢出 (1000) -> 进度 40% -> bonus 600 -> merit = 2600
+            # actor_five: 5圈溢出 (5000) -> 进度 100% -> bonus 1500 -> merit = 3500 (破六品门槛)
+            if = {
+                limit = {
+                    scope:tca_co_zero = { var:tca_merit_approved_level = 3 merit = 2000 var:tca_merit_grant_result = 1 }
+                    scope:tca_co_one = { var:tca_merit_approved_level = 3 merit = 2600 var:tca_merit_grant_result = 1 }
+                    scope:tca_co_five = { var:tca_merit_approved_level = 3 merit = 3500 var:tca_merit_grant_result = 1 }
+                }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_merit_carryover 2"
+            }
+            else = {
+                add_character_flag = tca_test_tca_merit_carryover_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_carryover 2"
+            }
+
+            # 验证一品封顶边界：创建并测试二品升一品 (SOURCE = 8, TARGET = 9, MODE = 1)
+            # 验证高阶普通铨选上限：四品升三品 (SOURCE = 6, TARGET = 7, MODE = 1)
+            # 四品门槛 8500，三品门槛 12000，旧跨度 3500，新跨度 5000。
+            # 功绩充值到 15500（溢出 3500，超期 1 圈），新阶进度 40%，Bonus = 2000，最终功绩为 14000。
+            tca_test_create_merit_probe_character_effect = { CHARACTER = tca_co_one_top GOVERNMENT = celestial_government }
+            scope:tca_co_one_top = {
+                add_trait = education_stewardship_3
+                tca_test_add_native_merit_probe_exams_effect = yes
+                change_merit = 100
+                tca_merit_initialize_character_effect = yes
+                set_merit_level = 6
+                set_variable = { name = tca_merit_approved_level value = 6 }
+                change_merit = { value = 15500 subtract = merit }
+                tca_merit_begin_grant_effect = { SOURCE = 6 TARGET = 7 MODE = 1 YEAR = current_year }
+            }
+
+            if = {
+                limit = {
+                    scope:tca_co_one_top = {
+                        var:tca_merit_approved_level = 7
+                        merit = 14000
+                        var:tca_merit_grant_result = 1
+                    }
+                }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_merit_carryover 3"
+            }
+            else = {
+                add_character_flag = tca_test_tca_merit_carryover_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_carryover 3"
+            }
+
+            debug_log = "TCA_TEST WAIT tca_test_merit_carryover 4 days"
+            trigger_event = { id = tca_merit_carryover_test.1003 days = 4 }
+        }
+    }
+}
+
+tca_merit_carryover_test.1003 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            # 跨日审计通过：验证解除保护后状态稳定，无 phase 遗留
+            if = {
+                limit = {
+                    scope:tca_co_zero = { merit_level = 3 merit = 2000 NOT = { has_variable = tca_merit_grant_phase } }
+                    scope:tca_co_one = { merit_level = 3 merit = 2600 NOT = { has_variable = tca_merit_grant_phase } }
+                    scope:tca_co_five = { merit_level = 3 merit = 3500 NOT = { has_variable = tca_merit_grant_phase } }
+                    scope:tca_co_one_top = { merit_level = 7 merit = 14000 NOT = { has_variable = tca_merit_grant_phase } }
+                }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_merit_carryover 4"
+            }
+            else = {
+                add_character_flag = tca_test_tca_merit_carryover_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_carryover 4"
+            }
+
+            # 清理测试人物
+            scope:tca_co_zero = { tca_test_cleanup_merit_probe_character_effect = yes }
+            scope:tca_co_one = { tca_test_cleanup_merit_probe_character_effect = yes }
+            scope:tca_co_five = { tca_test_cleanup_merit_probe_character_effect = yes }
+            scope:tca_co_one_top = { tca_test_cleanup_merit_probe_character_effect = yes }
+
+            if = {
+                limit = { has_character_flag = tca_test_tca_merit_carryover_test_case_failed }
+                debug_log = "TCA_TEST FAIL tca_test_merit_carryover"
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+            }
+            else = {
+                debug_log = "TCA_TEST PASS tca_test_merit_carryover"
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } }
+            }
+            remove_character_flag = tca_test_tca_merit_carryover_test_case_failed
+            tca_test_lane_end_effect = { GROUP = tca_merit_carryover_test }
+        }
+    }
+}

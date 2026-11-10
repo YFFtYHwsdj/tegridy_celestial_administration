@@ -62,3 +62,81 @@ tca_merit_native_cap_base_value = {
 # 原版倍率保持非负且与旧存档快照兼容；廷臣的一档差额由独立正修正补齐。
 tca_merit_approved_reduction_value = { value = 9 subtract = var:tca_merit_approved_level }
 tca_merit_courtier_cap_compensation_value = { value = 2 subtract = tca_merit_native_cap_base_value }
+
+# 功绩结余折算：理论最大饱和上限（百分比，当前档位A定为 160%）
+tca_merit_carryover_max_rate_value = 160
+
+# 功绩结余折算：阻尼常数 k（控制起步平缓度，档位A设为 3）
+tca_merit_carryover_scale_value = 3
+
+# 来源品级跨度 D_old (复用原版 merit_upgrade_level_X_value)
+tca_merit_source_span_value = {
+    value = merit_upgrade_level_1_value
+    if = { limit = { var:tca_merit_grant_source = 2 } value = merit_upgrade_level_2_value }
+    else_if = { limit = { var:tca_merit_grant_source = 3 } value = merit_upgrade_level_3_value }
+    else_if = { limit = { var:tca_merit_grant_source = 4 } value = merit_upgrade_level_4_value }
+    else_if = { limit = { var:tca_merit_grant_source = 5 } value = merit_upgrade_level_5_value }
+    else_if = { limit = { var:tca_merit_grant_source = 6 } value = merit_upgrade_level_6_value }
+    else_if = { limit = { var:tca_merit_grant_source = 7 } value = merit_upgrade_level_7_value }
+    else_if = { limit = { var:tca_merit_grant_source = 8 } value = merit_upgrade_level_8_value }
+}
+
+# 目标品级基准门槛 V_target
+tca_merit_target_threshold_value = {
+    value = 1000
+    if = { limit = { var:tca_merit_grant_target = 2 } value = merit_level_2_value }
+    else_if = { limit = { var:tca_merit_grant_target = 3 } value = merit_level_3_value }
+    else_if = { limit = { var:tca_merit_grant_target = 4 } value = merit_level_4_value }
+    else_if = { limit = { var:tca_merit_grant_target = 5 } value = merit_level_5_value }
+    else_if = { limit = { var:tca_merit_grant_target = 6 } value = merit_level_6_value }
+    else_if = { limit = { var:tca_merit_grant_target = 7 } value = merit_level_7_value }
+    else_if = { limit = { var:tca_merit_grant_target = 8 } value = merit_level_8_value }
+    else_if = { limit = { var:tca_merit_grant_target = 9 } value = merit_level_9_value }
+}
+
+# 目标品级新跨度 D_new (复用原版对象，一品为 0)
+tca_merit_target_span_value = {
+    value = 0
+    if = { limit = { var:tca_merit_grant_target = 2 } value = merit_upgrade_level_2_value }
+    else_if = { limit = { var:tca_merit_grant_target = 3 } value = merit_upgrade_level_3_value }
+    else_if = { limit = { var:tca_merit_grant_target = 4 } value = merit_upgrade_level_4_value }
+    else_if = { limit = { var:tca_merit_grant_target = 5 } value = merit_upgrade_level_5_value }
+    else_if = { limit = { var:tca_merit_grant_target = 6 } value = merit_upgrade_level_6_value }
+    else_if = { limit = { var:tca_merit_grant_target = 7 } value = merit_upgrade_level_7_value }
+    else_if = { limit = { var:tca_merit_grant_target = 8 } value = merit_upgrade_level_8_value }
+}
+
+# 人物作用域：计算结余相对进度百分比 (0..160)
+tca_merit_carryover_rate_percent_value = {
+    value = 0
+    if = {
+        limit = {
+            exists = scope:tca_merit_before
+            var:tca_merit_grant_source >= 1
+            var:tca_merit_grant_target < 9
+            var:tca_merit_grant_mode = 1
+            scope:tca_merit_before > tca_merit_target_threshold_value
+        }
+        # 分子: E * MaxRate (最大约 30000 * 160 = 4.8e6，安全不溢出)
+        value = scope:tca_merit_before
+        subtract = tca_merit_target_threshold_value
+        multiply = tca_merit_carryover_max_rate_value
+        # 分母: E + k * D_old
+        divide = {
+            value = scope:tca_merit_before
+            subtract = tca_merit_target_threshold_value
+            add = {
+                value = tca_merit_source_span_value
+                multiply = tca_merit_carryover_scale_value
+            }
+            min = 1
+        }
+    }
+}
+
+# 人物作用域：计算最终注入新阶的 Merit 点数
+tca_merit_carryover_bonus_value = {
+    value = tca_merit_carryover_rate_percent_value
+    multiply = tca_merit_target_span_value
+    divide = 100
+}

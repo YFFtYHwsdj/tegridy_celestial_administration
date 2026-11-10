@@ -113,6 +113,8 @@ tca_merit_commit_grant_effect = {
         }
         if = {
             limit = { var:tca_merit_grant_valid = 1 }
+            # 暂存升品前原始功绩供结余折算求值
+            save_scope_value_as = { name = tca_merit_before value = merit }
             add_character_flag = tca_merit_grant_suppress
             # 归零后重建来源经验，再刷新目标cap；只让解除保护后的异步上限刷新产生合法gain。
             set_merit_level = 0
@@ -137,6 +139,12 @@ tca_merit_commit_grant_effect = {
             else_if = { limit = { var:tca_merit_grant_target = 7 } change_merit_no_experience = { value = merit_level_7_value subtract = merit } }
             else_if = { limit = { var:tca_merit_grant_target = 8 } change_merit_no_experience = { value = merit_level_8_value subtract = merit } }
             else_if = { limit = { var:tca_merit_grant_target = 9 } change_merit_no_experience = { value = merit_level_9_value subtract = merit } }
+            # 结余折算：计算并注入新阶超额继承功绩（同时推进余额与经验，保持双账严格等额）
+            save_scope_value_as = { name = tca_merit_carryover_bonus value = tca_merit_carryover_bonus_value }
+            if = {
+                limit = { scope:tca_merit_carryover_bonus > 0 }
+                change_merit = scope:tca_merit_carryover_bonus
+            }
             remove_character_flag = tca_merit_grant_suppress
             set_variable = { name = tca_merit_last_ordinary_year value = current_year }
             # 反馈/面板专用的最近一轮普通获准标记；中央授品不写，避免把中央迁秩当成普通落选或普通成功。
