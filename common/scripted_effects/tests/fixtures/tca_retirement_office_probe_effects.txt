@@ -83,7 +83,13 @@ tca_retirement_candidate_step_down_offices_effect = {
     every_held_title = {
         limit = { OR = { has_variable = tca_tongpan_title has_variable = tca_judicial_title } }
         save_scope_as = tca_ro_candidate_title
-        holder.liege = { save_scope_as = tca_ro_candidate_liege }
+        if = {
+            limit = { exists = holder.liege }
+            holder.liege = { save_scope_as = tca_ro_candidate_liege }
+        }
+        else = {
+            title:h_china.holder = { save_scope_as = tca_ro_candidate_liege }
+        }
         clear_saved_scope = tca_ro_candidate_heir
         current_heir ?= {
             if = {
@@ -99,8 +105,8 @@ tca_retirement_candidate_step_down_offices_effect = {
         if = { limit = { has_variable = tca_tongpan_title } tca_stop_tongpan_diarchy_effect = yes }
         if = {
             limit = { exists = scope:tca_ro_candidate_heir }
-            scope:tca_ro_candidate_heir = {
-                create_title_and_vassal_change = { type = appointment add_claim_on_loss = no save_scope_as = tca_ro_candidate_change }
+            scope:tca_ro_candidate_liege = {
+                create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_ro_candidate_change }
                 scope:tca_ro_candidate_title = { change_title_holder = { holder = scope:tca_ro_candidate_heir change = scope:tca_ro_candidate_change } }
                 resolve_title_and_vassal_change = scope:tca_ro_candidate_change
             }
