@@ -4,12 +4,12 @@
 
 ## 实现入口
 
-规则集中在原版隐藏契约 `celestial_salary_rank` 的县级义务 `celestial_salary_rank_county`，由[模组覆盖文件](../../common/subject_contracts/contracts/zz_tca_retirement_salary_rank.txt)承载；该覆盖同时负责排除退休身份取得普通等级基础额。
+规则集中在原版隐藏契约 `celestial_salary_rank` 的县级义务 `celestial_salary_rank_county`（由[模组覆盖文件](../../common/subject_contracts/contracts/zz_tca_retirement_salary_rank.txt)承载）与原版省份类型契约 `celestial_provinces`（由[模组覆盖文件](../../common/subject_contracts/contracts/zz_tca_celestial_provinces.txt)承载）。
 
 - 原版对象：`game/common/subject_contracts/contracts/celestial.txt` 的 `celestial_salary_rank` 与 `celestial_provinces`
 - 契约组覆盖：`common/subject_contracts/groups/zz_tca_celestial_contract_group.txt`
 - 原版政体：`game/common/governments/00_government_types.txt` 的 `celestial_government`
-- 覆盖登记与基线：`tools/upstream_overrides.json`
+- 覆盖登记与基线：`tools/upstream_overrides.json`、`tools/baselines/tca_retirement_salary_rank.txt` 与 `tools/baselines/tca_celestial_provinces.txt`
 
 ## 当前规则
 
@@ -20,8 +20,9 @@
 | 头衔兵士军团数 | `men_at_arms_title_cap = -1`（原版已有） | 伯爵级基数 2 − 1 = 1 队 |
 | 头衔兵士单军团规模 | `men_at_arms_title_limit = -2`（模组新增） | 规模基数 3 − 2 = 1 级（每级 100 人） |
 | 中央军事预算份额 | `monthly_treasury_from_military_budget_base = -1.0`（原版 -0.6） | 军制省 +1.0 − 1.0 = 0 |
+| 在任考绩保底 | `monthly_merit = 1`（模组新增） | 伯爵级在任基础考绩保底 1.0/月 |
 
-公爵级及以上保持原版：公爵级军制净 +0.7，王国／帝国级净 +1.0。本规则只压伯爵级，维持官职层级差异。
+军制省（知军、帅臣）与边防军区在契约 `celestial_provinces` 覆盖中追加了 `monthly_merit_per_liege_tax = 0.3` 纳税功绩，使武臣兼理地方赋税民政时同样获得合理考课资望，消除小军州或暂无常备军时的零功绩死锁。公爵级及以上保持原版军事预算与常备军基准：公爵级军制净 +0.7，王国／帝国级净 +1.0。
 
 ## 基数与叠加
 
