@@ -52,68 +52,31 @@
 
 ## 二、军事宫廷差遣与待阙官员流转
 
-为解决待阙武官员多阙少、无差遣难以迁转且不适宜滥设无地头衔的问题，系统基于 CK3 宫廷职位复用为**兵马监押、兵马都监与都虞候**三级军事差遣，建立固定 Merit 培养与重要度单向流转晋升机制。
+以原生宫廷职位承载兵马监押、兵马都监与都虞候，为已入品、尚未持有正式官职头衔的待阙武官提供差遣与考绩。职位不新增独立领地或军队，朝廷按季度集中补缺，满任期者可参与更高一级差遣的铨选。
 
-### 1. 差遣定位与架构
+### 1. 规则与维护位置
 
-| 职位 | 适用宫廷层级 | 职掌定位 | 常驻基础效果（优秀称职度） | 月度功绩 |
-|---|---|---|---|---|
-| **兵马监押** | 伯爵级及以上地方官署 | 地方兵员与驻军管理、寨堡防务 | 控制力增长 +0.2、征召兵补员 +10%、防御优势 +2 | +1.5/月 |
-| **兵马都监** | 公爵、王国及帝国级地方督抚 | 军队操练、兵甲整备、高级营防 | 军队维护费 −5%、军队坚韧 +3%、军队伤害 +2% | +2.5/月 |
-| **都虞候** | 枢密使与王国级以上高级军路 | 将校管理、军令行纪、精锐行伍 | 骑士战斗力 +8%、骑士数量 +3 | +3.5/月 |
+- [差遣与流转设计](court_positions_design.md)维护官署准入、职位及专项任务、任职资格、待遇、评分与跨署流转。待阙池沿用原版全职排他；任职期间只豁免本署军事差遣兼任本主君的军事内阁，其他内阁、税吏及全职杂职仍排他。
+- [地方军事内阁联动](military_council_integration.md)维护同署选席、防撤职保护、离任与主君更替、玩家补位和内阁任务交接。同署可设置多种差遣，但同一人物不能兼领；唯一军事内阁按都虞候、都监、监押的顺序选择兼任者。
+- 功绩入品、资格档位和正式头衔任官由[官职任命模块](../appointment/README.md)维护，本模块不另建升品或官职继承体系。
 
-- **官署准入底线（实地基础 + 地方专属 + 军职白名单）**：
-  - 彻底依托原生 `is_landed = yes` 守门：排除提刑司、六部尚书、宰相省部等纯无地中央文职设立军事差遣；
-  - **天朝独立最高皇帝全面排除**：中央独立皇帝不设立地方军事差遣，保留中央殿中省乘舆掌管（尚乘奉御）；
-  - **兵马监押**：必须为非独立实土地方领主（`is_landed = yes` 且 `is_independent_ruler = no`，最高头衔 $\ge$ 伯爵级）；
-  - **兵马都监**：必须为非独立实土地方长官（`is_landed = yes` 且 `is_independent_ruler = no`，涵盖公国级、王国级及帝国级地方督抚）；
-  - **都虞候**：极度尊崇，仅开放给**枢密使**（持有官方枢密院头衔 `title:e_minister_grand_marshal`）及**高级军路**（有地王国级及以上长官 + 军制省或都护府契约，`is_independent_ruler = no`）。
-- **专属任务体系**：每职设 3 项专属任务（共 9 项），支持主官自由指派与 AI 稳健切换。
-- **专职排他底线**：复用原版全职排他（`court_position_does_not_already_have_a_job_trigger`），排除内阁大臣、税吏及原版杂职；三军事差遣内部两两互斥。
-- **严格限定待阙廷臣**：必须满足入品在籍（`merit_level >= 1`）、无地实官（`is_ruler = no`）且为本署待阙廷臣（`is_courtier_of = scope:liege`）；世族族长与有地封臣领主彻底排他。
-- **纯官库财政支出（免除领主威望损耗）**：三大差遣定位为国家公职差遣，雇主维护费（`salary`）仅支出 `treasury`（有内库）或 `gold`（无内库），完全免除原版普通宫廷职位模板中的每月领主威望扣减；任职官员的考绩与声望成长由其自身 `modifier` 赋予。
-- **封锁日常自主任免**：采用系统专属授权 Flag 锁（`tca_military_appointment_allowed`）限制自主任命，撤职消耗朝廷影响力（`revoke_cost` 依职级消耗微量至大量影响力，AI 与系统调拔自动免单），统一由朝廷系统按季铨选除授。
+### 2. 实现入口
 
-### 2. 动态重要度与单向晋升通道
+- 职位及专项任务：[职位定义](../../common/court_positions/types/tca_military_court_positions.txt)、[差遣任务](../../common/court_positions/tasks/tca_military_court_position_tasks.txt)。
+- 资格及评分：[官署与人物资格](../../common/scripted_triggers/tca_military_court_position_triggers.txt)、[全职排他名单](../../common/scripted_triggers/tca_military_full_time_job_triggers.txt)、[铨选与重要度数值](../../common/script_values/tca_military_court_position_values.txt)。
+- 调任及内阁生命周期：[正式效果](../../common/scripted_effects/tca_military_court_position_effects.txt)、[任务交接](../../common/scripted_effects/tca_military_council_task_effects.txt)、[原生回调追加](../../common/on_action/tca_military_court_positions_on_actions.txt)、[主君死亡后定向重绑事件](../../events/tca_military_council_events.txt)。
+- 表现与兼容：[动态称谓](../../common/customizable_localization/tca_military_council_custom_loc.txt)、[地方御马官覆盖](../../common/court_positions/types/zz_tca_court_position_overrides.txt)；双语文本位于 `localization/`，覆盖及原版依赖统一登记于 `tools/upstream_overrides.json`。
 
-官署战略动态重要度量纲由 7 维构成，总区间 $0 \sim 82$ 分：
-- 体制军区（+15）、外国接壤（+15）、要塞城防（最高 +15）、辖区体量（最高 +10）、总军力人头（最高 +4）、头衔常备深度（最高 +11）、任职宫廷位阶（伯爵 0 / 公爵 3 / 王国 6 / 帝国 9 / 霸权 12，最高 +12）。
+### 3. 实现与验收
 
-**单向阀门量纲铁律**：
-- 兵马监押（100 ~ 182） < 兵马都监（200 ~ 282） < 都虞候（300 ~ 382）。
-- 绝不发生同级平调或逆流贬黜；任期磨勘满 2 年（730 天冷却期）方可参与上一级差遣铨选。
-- 季度除授时滞防雪崩：本季预先锁定出缺名单，拔擢后腾退的原职位留待下季自然补齐。
+职位、铨选、内阁联动及任务交接均已实现；综合验收仍有未执行项目，不能将实现完成等同于全部验收完成。
 
-### 3. 实现入口清单
+原生用例统一维护于 [军事测试事件](../../events/tests/tca_military_court_positions_test_events.txt)，由 `military_court_positions` 和 `military_council` 两个模块登记。前者覆盖资格、评分、任免与补位，后者覆盖任务、同署优先级及独占延迟生命周期。用 `--list` 读取实际范围，不在文档维护断言总数或逐轮成绩。
 
-- 职位定义：`common/court_positions/types/tca_military_court_positions.txt`
-- 职位任务：`common/court_positions/tasks/tca_military_court_position_tasks.txt`
-- 原版覆盖（屏蔽地方御马官）：`common/court_positions/types/zz_tca_court_position_overrides.txt`
-- 资格与判定触发器：`common/scripted_triggers/tca_military_court_position_triggers.txt`
-- 战略权重与重要度宏：`common/script_values/tca_military_court_position_values.txt`
-- 铨选调任与清理效果：`common/scripted_effects/tca_military_court_position_effects.txt`
-- 季度心跳与离任挂载：`common/on_action/tca_military_court_positions_on_actions.txt`
-- 中英本地化：`localization/simp_chinese/tca_military_court_positions_l_simp_chinese.yml` 与 `localization/english/tca_military_court_positions_l_english.yml`
+定向回归入口、验证边界及尚未执行的玩家界面、自然 AI、完整跨署升迁、旧存档与保存重载验收，统一见[联动验收](military_council_integration.md#回归与验收)。全模组回归按[测试运行说明](../testing/README.md)执行，军事定向结果不能替代全量结论。
 
-### 4. 自动化测试与验证
+## 三、相关模块
 
-自动化回归用例维护于 [events/tests/tca_military_court_positions_test_events.txt](../../events/tests/tca_military_court_positions_test_events.txt)，由模块效果 [common/scripted_effects/tests/modules/tca_test_modules_military_court_positions_effects.txt](../../common/scripted_effects/tests/modules/tca_test_modules_military_court_positions_effects.txt) 登记至全局测试目录。
-
-- 回归套件代号：`--suite military_court_positions`
-- 涵盖用例：
-  1. `tca_test_military_court_positions_validity`：待阙资格过滤、权限 Flag 锁及封臣排他性校验；
-  2. `tca_test_military_court_positions_importance_tier`：动态重要度量纲阶梯、宫廷位阶加分与单向阀门校验；
-  3. `tca_test_military_court_positions_cooldown_and_cleanup`：两年任期磨勘锁定、离任清理与状态防残留校验；
-  4. `tca_test_military_court_positions_exclusivity_and_rank`：全职职位排他（内阁/税吏）、知兵底线与在籍品级守门校验；
-  5. `tca_test_military_court_positions_vanilla_override`：原版御马官（牧监）覆盖验证，地方封臣屏蔽与中央皇帝保留；
-  6. `tca_test_military_court_positions_cooldown_and_empty_pool`：任期磨勘冷却拦截与待阙池耗尽（宁缺毋滥）安全熔断校验。
-- 验收口径：在真实 CK3 引擎中保持 6/6 PASS、17/17 断言全绿、0 引擎错误。
-
----
-
-## 三、相关设计与模块文档
-
-- [差遣与流转系统设计](court_positions_design.md)：详细数值公式、称职度特质权重、AI 倾向与调度性能保障机制。
 - [官制与名称](../court/README.md)：伯爵级省类型分类与官名。
-- [官职任命](../appointment/README.md)：地方任命、品级铨叙与退休待遇。
-- [测试框架说明](../testing/README.md)：原生自动化测试套件运行规范。
+- [官职任命](../appointment/README.md)：天朝文武品级晋升模型与任官资格。
+- [测试框架](../testing/framework.md)：原生用例登记、并发 lane 与清理契约。

@@ -12,6 +12,8 @@ python3 tools/check_upstream_overrides.py
 
 检查清单位于 `tools/upstream_overrides.json`，其中每个 `overrides` 项记录原版文件、模组覆盖文件、对象 ID 和已审阅基线。脚本比较安装游戏中的原版对象与基线；若某覆盖还单独保留了未修改的原版逻辑（例如拘捕 trigger 的 `tca_judicial_arrest_native_common_valid_trigger`），也会核对这份副本。脚本不会要求完整覆盖定义等于原版，因为它们通常含有有意的模组改动。
 
+独立 ID 的裁剪规则用 `script_dependencies` 登记原版 `key`、模组 `mod_key`、文件、基线与裁剪理由。检查器比较原版基线并确认消费者存在，不将其计为覆盖，也不要求裁剪版本与原版一致；有意差异由原生回归约束。
+
 脚本还会扫描模组与安装游戏 `common/` 下同类型、同名的顶层定义，以及 `events/` 下同 ID 的事件，包括 `名称 = { ... }`、`名称 = 数值` 和 `名称 = @[算式]`。对象类型按 `common/` 下第一层目录区分；普通子目录仍属于同一类型，`subject_contracts/contracts` 与 `subject_contracts/groups` 则分别处理。同名 trigger 与 effect 不算互相覆盖，文件内的 `@变量` 和事件文件的 `namespace` 声明也不算全局覆盖。
 
 没有登记的同类型同名定义会报告出来，要求分类并登记，防止新增覆盖漏出清单。`known_extensions` 用来标记同名但只追加回调的 on_action；检查其原版和模组定义仍存在；可选 `baseline` 用于核对依赖的原版回调内容，未提供基线时仅检查存在性。追加定义本身不当作整段原版覆盖。

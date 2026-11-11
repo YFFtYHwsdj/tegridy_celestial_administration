@@ -1,0 +1,67 @@
+﻿# 玩家地方军事内阁任务交接；各入口均为官署主君作用域，无额外扫描或轮询。
+# 映射四种已核对的原版任务ID，不将其等同于所有任务条件组合都经过引擎验收。
+# capture输出主君变量tca_military_marshal_task及可选省份引用tca_military_marshal_target。
+# 有现任司马时先清旧快照并记录当前差事；无司马时保留已有快照，避免无人补位时丢失交接状态。
+# 因此正式差遣到任前再次采集时，玩家在空档期新任司马及新指派的任务优先。
+tca_military_capture_marshal_task_effect = {
+    if = {
+        limit = {
+            OR = { is_ai = no has_character_flag = tca_test_force_player_governor }
+            tca_is_landed_celestial_governor_trigger = yes
+            exists = cp:councillor_marshal
+        }
+        remove_variable = tca_military_marshal_task
+        remove_variable = tca_military_marshal_target
+        if = { limit = { cp:councillor_marshal = { is_performing_council_task = task_organize_levies } } set_variable = { name = tca_military_marshal_task value = flag:task_organize_levies } }
+        else_if = { limit = { cp:councillor_marshal = { is_performing_council_task = task_train_commanders } } set_variable = { name = tca_military_marshal_task value = flag:task_train_commanders } }
+        else_if = { limit = { cp:councillor_marshal = { is_performing_council_task = task_manage_guards } } set_variable = { name = tca_military_marshal_task value = flag:task_manage_guards } }
+        else_if = {
+            limit = { cp:councillor_marshal = { is_performing_council_task = task_increase_control exists = councillor_task_target } }
+            set_variable = { name = tca_military_marshal_task value = flag:task_increase_control }
+            set_variable = { name = tca_military_marshal_target value = cp:councillor_marshal.councillor_task_target }
+        }
+    }
+}
+
+# 主君作用域；调用者须先确认本次系统任命成功。本入口读取并消费主君的任务快照。
+# 一般任务仅在原生资格允许时改派；县级目标失效时显式启动默认差事。
+# 已在执行同任务与目标时不重启；完成消费后清理两项变量及本入口的tca_military_task_owner scope。
+# 无任职者时不消费快照；下一次系统任命前仍须先采集玩家最新任务。
+tca_military_restore_marshal_task_effect = {
+    if = {
+        limit = { has_variable = tca_military_marshal_task exists = cp:councillor_marshal }
+        save_scope_as = tca_military_task_owner
+        if = { limit = { var:tca_military_marshal_task = flag:task_organize_levies } tca_military_restore_general_marshal_task_effect = { TASK = task_organize_levies } }
+        else_if = { limit = { var:tca_military_marshal_task = flag:task_train_commanders } tca_military_restore_general_marshal_task_effect = { TASK = task_train_commanders } }
+        else_if = { limit = { var:tca_military_marshal_task = flag:task_manage_guards } tca_military_restore_general_marshal_task_effect = { TASK = task_manage_guards } }
+        else_if = {
+            limit = { var:tca_military_marshal_task = flag:task_increase_control exists = var:tca_military_marshal_target }
+            cp:councillor_marshal = {
+                if = {
+                    limit = {
+                        NOT = { is_performing_council_task = task_increase_control councillor_task_target = scope:tca_military_task_owner.var:tca_military_marshal_target }
+                        is_council_task_valid = { task_type = task_increase_control target = scope:tca_military_task_owner.var:tca_military_marshal_target }
+                    }
+                    set_council_task = { task_type = task_increase_control target = scope:tca_military_task_owner.var:tca_military_marshal_target }
+                }
+                else_if = {
+                    limit = { NOT = { is_council_task_valid = { task_type = task_increase_control target = scope:tca_military_task_owner.var:tca_military_marshal_target } } }
+                    start_default_task = yes
+                }
+            }
+        }
+        remove_variable = tca_military_marshal_task
+        remove_variable = tca_military_marshal_target
+        clear_saved_scope = tca_military_task_owner
+    }
+}
+
+# 主君作用域；TASK为静态原生任务ID，仅由上面的已知映射调用，不接收动态任务对象。
+tca_military_restore_general_marshal_task_effect = {
+    cp:councillor_marshal = {
+        if = {
+            limit = { NOT = { is_performing_council_task = $TASK$ } is_council_task_valid = { task_type = $TASK$ } }
+            set_council_task = { task_type = $TASK$ }
+        }
+    }
+}

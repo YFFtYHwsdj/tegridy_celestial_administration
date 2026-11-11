@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """对已审阅的 CK3 原版对象覆盖执行只读漂移检查。
 
-登记表显式列出替换的原版对象及同名追加的 on_action 扩展。
+登记表覆盖同名对象、on_action追加、本地化与整文件覆盖，以及独立ID裁剪规则的原版依赖。
 绝不自动刷新已审阅基线。
 """
 import argparse
@@ -110,8 +110,12 @@ def load_registry(mod_dir):
         raise ValueError("auxiliary_extensions must be a list")
     if not isinstance(data.get("file_overrides", []), list):
         raise ValueError("file_overrides must be a list")
-    for section in ("overrides", "known_extensions", "localization_overrides", "auxiliary_extensions", "file_overrides"):
-        required = ("key", "mod", "vanilla", "baseline") if section in ("overrides", "localization_overrides", "auxiliary_extensions", "file_overrides") else ("key", "mod", "vanilla")
+    if not isinstance(data.get("script_dependencies", []), list):
+        raise ValueError("script_dependencies must be a list")
+    for section in ("overrides", "known_extensions", "localization_overrides", "auxiliary_extensions", "file_overrides", "script_dependencies"):
+        required = ("key", "mod", "vanilla", "baseline") if section != "known_extensions" else ("key", "mod", "vanilla")
+        if section == "script_dependencies":
+            required += ("mod_key",)
         for index, entry in enumerate(data.get(section, [])):
             label = f"{section}[{index}]"
             if not isinstance(entry, dict):
@@ -231,6 +235,16 @@ def check(game_dir, mod_dir):
     registry = load_registry(mod_dir)
     known = {}
     changed = check_localization_overrides(registry, game_dir, mod_dir)
+    # 独立 ID 的裁剪版本也依赖原版规则；比较原版基线，但不伪称同名覆盖。
+    # mod_key 只核对消费者存在；其有意保留的差异由登记理由和原生回归维护。
+    for entry in registry.get("script_dependencies", []):
+        baseline = entry_definitions(entry, mod_dir / entry["baseline"]).get(entry["key"])
+        if baseline is None:
+            raise ValueError(f"script dependency baseline missing {entry['key']}")
+        changed |= _compare_entry(entry, f"installed-game:{entry['key']}", baseline,
+                                  game_dir / entry["vanilla"], entry["key"])
+        if entry["mod_key"] not in read_definitions(mod_dir / entry["mod"]):
+            raise ValueError(f"script dependency consumer missing {entry['mod_key']}")
     for entry in registry.get("file_overrides", []):
         native = (game_dir / entry["vanilla"]).read_bytes()
         baseline = (mod_dir / entry["baseline"]).read_bytes()
@@ -302,6 +316,7 @@ def check(game_dir, mod_dir):
               f"{len(registry.get('localization_overrides', []))} localization overrides checked; "
               f"{len(registry.get('auxiliary_extensions', []))} auxiliary extensions checked; "
               f"{len(registry.get('file_overrides', []))} file overrides checked; "
+              f"{len(registry.get('script_dependencies', []))} script dependencies checked; "
               "no unregistered same-name definitions found.")
     return int(bool(changed))
 

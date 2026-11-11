@@ -1,4 +1,5 @@
-﻿# 军事差遣测试：验证三大军职（监押、都监、都虞候）任职资格、重要度量纲与冷却清理。
+﻿# 军事差遣原生回归：资格、重要度与冷却，以及地方军事内阁保护、补位、任务与生命周期。
+# 用例分别登记于military_court_positions与military_council；自然迁廷、死亡及改制用例跨日独占执行。
 # 直接维护的原生 CK3 测试脚本；直接编辑本文件，不使用生成器。
 # 仅显式调试入口，无正常玩法自动调用者。
 namespace = tca_military_court_positions_test
@@ -472,6 +473,7 @@ tca_military_court_positions_test.5 = {
 						limit = {
 							highest_held_title_tier >= tier_duchy
 							government_has_flag = government_is_celestial
+							is_landed = yes
 						}
 						save_scope_as = tca_test_high_tier_vassal
 					}
@@ -488,6 +490,34 @@ tca_military_court_positions_test.5 = {
 				else = {
 					add_character_flag = tca_test_tca_military_court_positions_test_case_failed
 					debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_vanilla_override 2"
+				}
+
+				# 3. 验证天朝有地地方官判据（皇帝排除，地方封臣生效）
+				if = {
+					limit = {
+						scope:tca_test_emperor = {
+							tca_is_landed_celestial_governor_trigger = no
+						}
+					}
+					debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_vanilla_override 3"
+				}
+				else = {
+					add_character_flag = tca_test_tca_military_court_positions_test_case_failed
+					debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_vanilla_override 3"
+				}
+
+				if = {
+					limit = {
+						exists = scope:tca_test_high_tier_vassal
+						scope:tca_test_high_tier_vassal = {
+							tca_is_landed_celestial_governor_trigger = yes
+						}
+					}
+					debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_vanilla_override 4"
+				}
+				else = {
+					add_character_flag = tca_test_tca_military_court_positions_test_case_failed
+					debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_vanilla_override 4"
 				}
 
 				# 结果汇报
@@ -600,6 +630,7 @@ tca_military_court_positions_test.6 = {
 						save_scope_as = target_liege
 						tca_military_fill_single_position_effect = {
 							POSITION = tca_military_inspector_court_position
+                            KEEP_CURRENT = tca_military_marshal_higher_than_inspector_trigger
 						}
 					}
 				}
@@ -640,4 +671,419 @@ tca_military_court_positions_test.6 = {
 			remove_character_flag = tca_test_tca_military_court_positions_test_case_failed
 		}
 	}
+}
+
+# 用例7：真实除授/撤职回调、正常任免规则与精确兼职豁免。
+tca_military_court_positions_test.7 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_military_court_positions_test.7 tca_test_military_court_positions_council_integration"
+        remove_character_flag = tca_test_tca_military_court_positions_test_case_failed
+        tca_test_military_council_prepare_effect = yes
+        if = {
+            limit = { exists = scope:tca_mcp_governor exists = scope:tca_mcp_officer scope:tca_mcp_governor = { tca_is_landed_celestial_governor_trigger = yes } scope:tca_mcp_officer = { merit_level >= 1 } }
+            tca_test_military_council_appoint_effect = yes
+            if = { limit = { scope:tca_mcp_officer = { has_court_position = tca_military_supervisor_court_position is_councillor_of = scope:tca_mcp_governor has_council_position = councillor_marshal has_variable = block_fire_councillor var:block_fire_councillor ?= scope:tca_mcp_governor can_be_fired_from_council_trigger = { COURT_OWNER = scope:tca_mcp_governor } } } debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_council_integration 1" add_character_flag = tca_test_tca_military_court_positions_test_case_failed }
+            else_if = { limit = { scope:tca_mcp_officer = { has_court_position = tca_military_supervisor_court_position is_councillor_of = scope:tca_mcp_governor has_council_position = councillor_marshal has_variable = block_fire_councillor var:block_fire_councillor ?= scope:tca_mcp_governor } } debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_council_integration 1" }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_council_integration 1" }
+            scope:tca_mcp_governor = { save_scope_as = liege }
+            scope:tca_mcp_officer = { save_scope_as = employee }
+            if = { limit = { scope:tca_mcp_officer = { tca_military_supervisor_validity_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_council_integration 2" }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_council_integration 2" }
+            # 强制换到另一内阁，只用于暴露任职持续资格的非法兼任；不冒充玩家可操作路径。
+            scope:tca_mcp_governor = { assign_councillor_type = { type = councillor_chancellor target = scope:tca_mcp_officer remove_existing_councillor = yes } }
+            scope:tca_mcp_governor = { save_scope_as = liege }
+            if = { limit = { scope:tca_mcp_officer = { has_council_position = councillor_chancellor tca_military_supervisor_validity_trigger = no } } debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_council_integration 3" }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_council_integration 3" }
+            tca_test_military_council_revoke_effect = yes
+            if = { limit = { scope:tca_mcp_officer = { NOT = { has_variable = block_fire_councillor } NOT = { has_court_position = tca_military_supervisor_court_position } } } debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_council_integration 4" }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_council_integration 4" }
+            # 其他全职宫廷职位仍排他：先解除内阁，再构造一名有杂职的已授权候选。
+            scope:tca_mcp_governor = { fire_councillor = scope:tca_mcp_officer appoint_court_position = { recipient = scope:tca_mcp_officer court_position = seneschal_court_position } save_scope_as = liege }
+            scope:tca_mcp_officer = { add_character_flag = tca_military_appointment_allowed save_scope_as = employee }
+            if = { limit = { scope:tca_mcp_officer = { has_court_position = seneschal_court_position tca_military_supervisor_validity_trigger = no } } debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_council_integration 5" }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_council_integration 5" }
+            scope:tca_mcp_governor = { add_character_flag = free_revoke_cost revoke_court_position = { recipient = scope:tca_mcp_officer court_position = seneschal_court_position } remove_character_flag = free_revoke_cost }
+            scope:tca_mcp_officer = { remove_character_flag = tca_military_appointment_allowed }
+            if = { limit = { has_character_flag = tca_test_tca_military_court_positions_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_military_court_positions_council_integration" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_military_court_positions_council_integration" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_military_court_positions_council_integration" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } }
+        tca_test_military_council_cleanup_effect = yes
+        clear_saved_scope = liege
+        clear_saved_scope = employee
+        remove_character_flag = tca_test_tca_military_court_positions_test_case_failed
+    }
+}
+
+# 用例8：玩家补位排除离任者、不替换已有司马、无人可选不生成；所有正例必须实际任命。
+tca_military_court_positions_test.8 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_military_court_positions_test.8 tca_test_military_court_positions_player_fallback_marshal"
+        remove_character_flag = tca_test_tca_military_court_positions_test_case_failed
+        tca_test_military_council_prepare_effect = yes
+        if = {
+            limit = { exists = scope:tca_mcp_governor exists = scope:tca_mcp_officer exists = scope:tca_mcp_backup scope:tca_mcp_officer = { merit_level >= 1 } scope:tca_mcp_backup = { can_be_marshal_trigger = { COURT_OWNER = scope:tca_mcp_governor } } }
+            scope:tca_mcp_governor = { add_character_flag = tca_test_force_player_governor }
+            tca_test_military_council_appoint_effect = yes
+            if = { limit = { scope:tca_mcp_officer = { has_court_position = tca_military_supervisor_court_position has_council_position = councillor_marshal } } debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_player_fallback_marshal 1" }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_player_fallback_marshal 1" }
+            tca_test_military_council_revoke_effect = yes
+            if = { limit = { scope:tca_mcp_governor = { exists = cp:councillor_marshal cp:councillor_marshal = scope:tca_mcp_backup } scope:tca_mcp_officer = { NOT = { has_council_position = councillor_marshal } NOT = { has_variable = block_fire_councillor } } scope:tca_mcp_backup = { NOT = { has_variable = block_fire_councillor } can_be_fired_from_council_trigger = { COURT_OWNER = scope:tca_mcp_governor } } } debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_player_fallback_marshal 2" }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_player_fallback_marshal 2" }
+            scope:tca_mcp_governor = { tca_military_player_fallback_marshal_effect = yes }
+            if = { limit = { scope:tca_mcp_governor = { exists = cp:councillor_marshal cp:councillor_marshal = scope:tca_mcp_backup } } debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_player_fallback_marshal 3" }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_player_fallback_marshal 3" }
+            scope:tca_mcp_governor = { if = { limit = { scope:tca_mcp_backup = { is_councillor_of = scope:tca_mcp_governor } } fire_councillor = scope:tca_mcp_backup } }
+            if = { limit = { scope:tca_mcp_governor = { NOT = { exists = cp:councillor_marshal } } } debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_player_fallback_marshal 4" }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_player_fallback_marshal 4" }
+            # 两人均未成年，因此不得补位。年龄改变只作用于本例生成的人物。
+            scope:tca_mcp_officer = { set_age = 10 }
+            scope:tca_mcp_backup = { set_age = 10 }
+            scope:tca_mcp_governor = { tca_military_player_fallback_marshal_effect = yes }
+            if = { limit = { scope:tca_mcp_governor = { NOT = { exists = cp:councillor_marshal } } } debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_player_fallback_marshal 5" }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_player_fallback_marshal 5" }
+            if = { limit = { has_character_flag = tca_test_tca_military_court_positions_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_military_court_positions_player_fallback_marshal" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_military_court_positions_player_fallback_marshal" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_military_court_positions_player_fallback_marshal" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } }
+        tca_test_military_council_cleanup_effect = yes
+        remove_character_flag = tca_test_tca_military_court_positions_test_case_failed
+    }
+}
+
+# 用例9：外部保护不得被覆盖或误删；同主君的既有保护也不能冒充模块所有。
+tca_military_court_positions_test.9 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_military_court_positions_test.9 tca_test_military_court_positions_external_lock"
+        remove_character_flag = tca_test_tca_military_court_positions_test_case_failed
+        tca_test_military_council_prepare_effect = yes
+        if = {
+            limit = { exists = scope:tca_mcp_governor exists = scope:tca_mcp_officer scope:tca_mcp_officer = { merit_level >= 1 } }
+            scope:tca_mcp_officer = { set_variable = { name = block_fire_councillor value = scope:tca_mcp_governor } }
+            tca_test_military_council_appoint_effect = yes
+            if = { limit = { scope:tca_mcp_officer = { has_court_position = tca_military_supervisor_court_position has_council_position = councillor_marshal } } debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_external_lock 1" }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_external_lock 1" }
+            tca_test_military_council_revoke_effect = yes
+            if = { limit = { scope:tca_mcp_officer = { has_variable = block_fire_councillor var:block_fire_councillor ?= scope:tca_mcp_governor } } debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_external_lock 2" }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_external_lock 2" }
+            scope:tca_mcp_officer = { remove_variable = block_fire_councillor }
+            scope:tca_mcp_governor = { if = { limit = { scope:tca_mcp_officer = { is_councillor_of = scope:tca_mcp_governor } } fire_councillor = scope:tca_mcp_officer } }
+            tca_test_military_council_appoint_effect = yes
+            # 模拟其他机制在任期内重新写入保护，离任不能删除别人的新值。
+            scope:tca_mcp_officer = { set_variable = { name = block_fire_councillor value = root } }
+            tca_test_military_council_revoke_effect = yes
+            if = { limit = { scope:tca_mcp_officer = { has_variable = block_fire_councillor var:block_fire_councillor ?= root } } debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_external_lock 3" }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_external_lock 3" }
+            scope:tca_mcp_governor = { save_scope_as = liege }
+            scope:tca_mcp_officer = { save_scope_as = employee add_character_flag = tca_military_appointment_allowed }
+            if = { limit = { scope:tca_mcp_officer = { tca_military_supervisor_validity_trigger = no } } debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_external_lock 4" }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_external_lock 4" }
+            scope:tca_mcp_officer = { remove_variable = block_fire_councillor remove_character_flag = tca_military_appointment_allowed }
+            if = { limit = { has_character_flag = tca_test_tca_military_court_positions_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_military_court_positions_external_lock" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_military_court_positions_external_lock" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_military_court_positions_external_lock" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } }
+        tca_test_military_council_cleanup_effect = yes
+        clear_saved_scope = liege
+        clear_saved_scope = employee
+        remove_character_flag = tca_test_tca_military_court_positions_test_case_failed
+    }
+}
+
+# 用例10：一般内阁任务交接；通过正式差遣任免检查直接换人与离任补位。
+# 本例使用训练指挥官任务；县级目标、玩家新选择与自然离任分别由后续用例覆盖。
+tca_military_court_positions_test.10 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_military_court_positions_test.10 tca_test_military_court_positions_task_continuity"
+        remove_character_flag = tca_test_tca_military_court_positions_test_case_failed
+        tca_test_military_council_prepare_effect = yes
+        if = {
+            limit = { exists = scope:tca_mcp_governor exists = scope:tca_mcp_officer exists = scope:tca_mcp_backup }
+            scope:tca_mcp_governor = {
+                add_character_flag = tca_test_force_player_governor
+                assign_councillor_type = { type = councillor_marshal target = scope:tca_mcp_backup fire_on_actions = yes }
+            }
+            scope:tca_mcp_backup = { set_council_task = { task_type = task_train_commanders } }
+            if = { limit = { scope:tca_mcp_backup = { is_performing_council_task = task_train_commanders } } debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_task_continuity 1" }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_task_continuity 1" }
+            tca_test_military_council_appoint_effect = yes
+            if = { limit = { scope:tca_mcp_officer = { has_court_position = tca_military_supervisor_court_position has_council_position = councillor_marshal is_performing_council_task = task_train_commanders } } debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_task_continuity 2" }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_task_continuity 2" }
+            tca_test_military_council_revoke_effect = yes
+            if = { limit = { scope:tca_mcp_governor = { exists = cp:councillor_marshal cp:councillor_marshal = scope:tca_mcp_backup } scope:tca_mcp_backup = { is_performing_council_task = task_train_commanders } } debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_task_continuity 3" }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_task_continuity 3" }
+            if = { limit = { has_character_flag = tca_test_tca_military_court_positions_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_military_court_positions_task_continuity" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_military_court_positions_task_continuity" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_military_court_positions_task_continuity" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } }
+        tca_test_military_council_cleanup_effect = yes
+        remove_character_flag = tca_test_tca_military_court_positions_test_case_failed
+    }
+}
+
+# 用例11：通过真实迁廷、死亡和改制入口触发生命周期，跨日核对最终状态，不直接调用离任清理。
+tca_military_court_positions_test.11 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_military_court_positions_test.11 tca_test_military_court_positions_native_departure"
+        remove_character_flag = tca_test_tca_military_court_positions_test_case_failed
+        tca_test_military_council_prepare_effect = yes
+        if = { limit = { exists = scope:tca_mcp_governor exists = scope:tca_mcp_officer exists = scope:tca_mcp_backup }
+            scope:tca_mcp_governor = { add_character_flag = tca_test_force_player_governor }
+            tca_test_military_council_appoint_effect = yes
+            if = { limit = { scope:tca_mcp_officer = { has_court_position = tca_military_supervisor_court_position has_council_position = councillor_marshal } } debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_native_departure 1" }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_native_departure 1" }
+            # 自然迁廷；非默认任务必须随正式回调保留，不能只证明出现了一个默认司马。
+            scope:tca_mcp_officer = { set_council_task = { task_type = task_train_commanders } }
+            add_courtier = scope:tca_mcp_officer
+            debug_log = "TCA_TEST WAIT tca_test_military_court_positions_native_departure 2 days"
+            trigger_event = { id = tca_military_court_positions_test.110 days = 2 }
+        }
+        else = {
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_military_court_positions_native_departure"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+            tca_test_military_council_cleanup_effect = yes
+            tca_test_lane_end_effect = { GROUP = tca_military_court_positions_test }
+        }
+    }
+}
+tca_military_court_positions_test.110 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_mcp_officer = { NOT = { has_court_position = tca_military_supervisor_court_position } NOT = { has_variable = block_fire_councillor } NOT = { has_variable = tca_military_council_lock_owner } } scope:tca_mcp_governor = { exists = cp:councillor_marshal cp:councillor_marshal = scope:tca_mcp_backup } scope:tca_mcp_backup = { is_performing_council_task = task_train_commanders } } debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_native_departure 2" }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_native_departure 2" }
+            # 新一轮任职后真实死亡；移除夹具保护，不调用worker伪造出缺。
+            scope:tca_mcp_governor = { add_courtier = scope:tca_mcp_officer }
+            tca_test_military_council_appoint_effect = yes
+            scope:tca_mcp_county = { save_scope_value_as = { name = tca_mcp_native_old_control value = county_control } change_county_control = -50 }
+            scope:tca_mcp_officer = { set_council_task = { task_type = task_increase_control target = scope:tca_mcp_governor.capital_province } tca_test_restore_character_effect = yes death = { death_reason = death_natural_causes } }
+            debug_log = "TCA_TEST WAIT tca_test_military_court_positions_native_departure 2 days"
+            trigger_event = { id = tca_military_court_positions_test.111 days = 2 }
+        }
+    }
+}
+tca_military_court_positions_test.111 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_mcp_officer = { is_alive = no } scope:tca_mcp_governor = { NOT = { employs_court_position = tca_military_supervisor_court_position } exists = cp:councillor_marshal cp:councillor_marshal = scope:tca_mcp_backup } scope:tca_mcp_backup = { is_performing_council_task = task_increase_control councillor_task_target = scope:tca_mcp_governor.capital_province } } debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_native_departure 3" }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_native_departure 3" }
+            scope:tca_mcp_county = { change_county_control = { value = scope:tca_mcp_native_old_control subtract = county_control } }
+            # 换一名新武官，地方官改制后应经正式政府变更回调撤销失格差遣并清理模块保护。
+            scope:tca_mcp_governor = { tca_test_military_council_create_officer_effect = { ACTOR = tca_mcp_officer MARTIAL = 30 } }
+            tca_test_military_council_appoint_effect = yes
+            scope:tca_mcp_governor = { change_government = feudal_government }
+            debug_log = "TCA_TEST WAIT tca_test_military_court_positions_native_departure 2 days"
+            trigger_event = { id = tca_military_court_positions_test.112 days = 2 }
+        }
+    }
+}
+tca_military_court_positions_test.112 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_mcp_governor = { NOT = { employs_court_position = tca_military_supervisor_court_position } } scope:tca_mcp_officer = { NOT = { has_variable = block_fire_councillor } NOT = { has_variable = tca_military_council_lock_owner } } } debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_native_departure 4" }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_native_departure 4" }
+            if = { limit = { has_character_flag = tca_test_tca_military_court_positions_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_military_court_positions_native_departure" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_military_court_positions_native_departure" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        }
+        tca_test_military_council_cleanup_effect = yes
+        remove_character_flag = tca_test_tca_military_court_positions_test_case_failed
+        tca_test_lane_end_effect = { GROUP = tca_military_court_positions_test }
+    }
+}
+
+# 用例12：地方主官真实死亡。新持有人以引擎结果为准；不能遗留指向死者的模块锁。
+tca_military_court_positions_test.12 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_military_court_positions_test.12 tca_test_military_court_positions_governor_succession"
+        remove_character_flag = tca_test_tca_military_court_positions_test_case_failed
+        tca_test_military_council_prepare_effect = yes
+        if = { limit = { exists = scope:tca_mcp_governor exists = scope:tca_mcp_officer exists = scope:tca_mcp_office }
+            tca_test_military_council_appoint_effect = yes
+            if = { limit = { scope:tca_mcp_officer = { has_court_position = tca_military_supervisor_court_position has_variable = block_fire_councillor var:block_fire_councillor ?= scope:tca_mcp_governor } } debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_governor_succession 1" }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_governor_succession 1" }
+            scope:tca_mcp_governor = { tca_test_restore_character_effect = yes death = { death_reason = death_natural_causes } }
+            debug_log = "TCA_TEST WAIT tca_test_military_court_positions_governor_succession 2 days"
+            trigger_event = { id = tca_military_court_positions_test.120 days = 2 }
+        }
+        else = {
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_military_court_positions_governor_succession"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+            tca_test_military_council_cleanup_effect = yes
+            tca_test_lane_end_effect = { GROUP = tca_military_court_positions_test }
+        }
+    }
+}
+tca_military_court_positions_test.120 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_mcp_governor = { is_alive = no } scope:tca_mcp_office = { exists = holder holder = { is_alive = yes } } } debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_governor_succession 2" }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_governor_succession 2" }
+            # 直接核对保留引用是否存活，不通过与死去主君做安全相等比较来推断旧锁已清理。
+            if = { limit = { scope:tca_mcp_officer = {
+                trigger_if = { limit = { has_variable = tca_military_council_lock_owner } exists = var:tca_military_council_lock_owner var:tca_military_council_lock_owner ?= { is_alive = yes } }
+                trigger_if = { limit = { has_variable = block_fire_councillor } exists = var:block_fire_councillor var:block_fire_councillor ?= { is_alive = yes } }
+            } } debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_governor_succession 3" }
+            else = {
+                add_character_flag = tca_test_tca_military_court_positions_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_governor_succession 3"
+                scope:tca_mcp_officer = { debug_log_scopes = yes var:tca_military_council_lock_owner ?= { debug_log_scopes = yes } var:block_fire_councillor ?= { debug_log_scopes = yes } }
+            }
+            clear_saved_scope = tca_mcp_successor_employer
+            scope:tca_mcp_officer = { random_court_position_employer = { limit = { court_position:tca_military_supervisor_court_position ?= scope:tca_mcp_officer } save_scope_as = tca_mcp_successor_employer } }
+            if = { limit = {
+                OR = {
+                    scope:tca_mcp_officer = { NOT = { has_court_position = tca_military_supervisor_court_position } }
+                    AND = {
+                        exists = scope:tca_mcp_successor_employer
+                        scope:tca_mcp_successor_employer = { tca_is_landed_celestial_governor_trigger = yes exists = cp:councillor_marshal cp:councillor_marshal = scope:tca_mcp_officer }
+                        scope:tca_mcp_officer = { has_variable = block_fire_councillor var:block_fire_councillor ?= scope:tca_mcp_successor_employer has_variable = tca_military_council_lock_owner var:tca_military_council_lock_owner ?= scope:tca_mcp_successor_employer }
+                    }
+                }
+            } debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_governor_succession 4" }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_governor_succession 4" }
+            if = { limit = { has_character_flag = tca_test_tca_military_court_positions_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_military_court_positions_governor_succession" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_military_court_positions_governor_succession" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        }
+        tca_test_military_council_cleanup_effect = yes
+        remove_character_flag = tca_test_tca_military_court_positions_test_case_failed
+        tca_test_lane_end_effect = { GROUP = tca_military_court_positions_test }
+    }
+}
+
+# 用例13：县级任务目标、玩家新选择与无人补位期间目标失效；不复制县级任务合法性规则。
+tca_military_court_positions_test.13 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_military_court_positions_test.13 tca_test_military_court_positions_county_task"
+        remove_character_flag = tca_test_tca_military_court_positions_test_case_failed
+        tca_test_military_council_prepare_effect = yes
+        if = { limit = { exists = scope:tca_mcp_governor exists = scope:tca_mcp_officer exists = scope:tca_mcp_backup }
+            scope:tca_mcp_county = { save_scope_value_as = { name = tca_mcp_old_control value = county_control } change_county_control = -50 }
+            scope:tca_mcp_governor = { add_character_flag = tca_test_force_player_governor assign_councillor_type = { type = councillor_marshal target = scope:tca_mcp_backup fire_on_actions = yes } }
+            scope:tca_mcp_backup = { set_council_task = { task_type = task_increase_control target = scope:tca_mcp_governor.capital_province } }
+            if = { limit = { scope:tca_mcp_backup = { is_performing_council_task = task_increase_control councillor_task_target = scope:tca_mcp_governor.capital_province } } debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_county_task 1" }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_county_task 1" }
+            tca_test_military_council_appoint_effect = yes
+            if = { limit = { scope:tca_mcp_officer = { has_court_position = tca_military_supervisor_court_position has_council_position = councillor_marshal is_performing_council_task = task_increase_control councillor_task_target = scope:tca_mcp_governor.capital_province } } debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_county_task 2" }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_county_task 2" }
+            tca_test_military_council_revoke_effect = yes
+            if = { limit = { scope:tca_mcp_governor = { exists = cp:councillor_marshal cp:councillor_marshal = scope:tca_mcp_backup } scope:tca_mcp_backup = { is_performing_council_task = task_increase_control councillor_task_target = scope:tca_mcp_governor.capital_province } } debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_county_task 3" }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_county_task 3" }
+            # 玩家主动改变临时司马的差事；新正式差遣必须服从这一最新选择。
+            scope:tca_mcp_backup = { set_council_task = { task_type = task_train_commanders } }
+            tca_test_military_council_appoint_effect = yes
+            if = { limit = { scope:tca_mcp_officer = { has_council_position = councillor_marshal is_performing_council_task = task_train_commanders } scope:tca_mcp_governor = { NOT = { has_variable = tca_military_marshal_task } NOT = { has_variable = tca_military_marshal_target } } } debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_county_task 4" }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_county_task 4" }
+            scope:tca_mcp_officer = { set_council_task = { task_type = task_increase_control target = scope:tca_mcp_governor.capital_province } }
+            scope:tca_mcp_backup = { set_age = 10 }
+            tca_test_military_council_revoke_effect = yes
+            if = { limit = { scope:tca_mcp_governor = { NOT = { exists = cp:councillor_marshal } has_variable = tca_military_marshal_task var:tca_military_marshal_task = flag:task_increase_control has_variable = tca_military_marshal_target } } debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_county_task 5" }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_county_task 5" }
+            scope:tca_mcp_county = { change_county_control = 100 }
+            tca_test_military_council_appoint_effect = yes
+            if = { limit = { scope:tca_mcp_officer = { has_court_position = tca_military_supervisor_court_position has_council_position = councillor_marshal NOT = { is_performing_council_task = task_increase_control } } scope:tca_mcp_governor = { NOT = { has_variable = tca_military_marshal_task } NOT = { has_variable = tca_military_marshal_target } } } debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_county_task 6" }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_county_task 6" }
+            scope:tca_mcp_county = { change_county_control = { value = scope:tca_mcp_old_control subtract = county_control } }
+            if = { limit = { has_character_flag = tca_test_tca_military_court_positions_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_military_court_positions_county_task" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_military_court_positions_county_task" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_military_court_positions_county_task" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } }
+        tca_test_military_council_cleanup_effect = yes
+        remove_character_flag = tca_test_tca_military_court_positions_test_case_failed
+    }
+}
+
+# 用例14：同署可有三种差遣，单一军事内阁按都虞候/都监/监押排序，不由到任先后决定。
+tca_military_court_positions_test.14 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_military_court_positions_test.14 tca_test_military_court_positions_marshal_priority"
+        remove_character_flag = tca_test_tca_military_court_positions_test_case_failed
+        tca_test_military_council_prepare_effect = yes
+        if = { limit = { exists = scope:tca_mcp_governor exists = scope:tca_mcp_officer exists = scope:tca_mcp_backup }
+            scope:tca_mcp_governor = {
+                vassal_contract_set_obligation_level = { type = celestial_provinces level = celestial_province_military }
+                tca_test_military_council_create_officer_effect = { ACTOR = tca_mcp_third MARTIAL = 40 }
+            }
+            scope:tca_mcp_third = { add_character_flag = tca_military_appointment_allowed }
+            scope:tca_mcp_governor = { appoint_court_position = { recipient = scope:tca_mcp_third court_position = tca_corps_inspector_court_position } }
+            scope:tca_mcp_third = { remove_character_flag = tca_military_appointment_allowed }
+            # 故意先任高职再任低职，低职不得抢走军事内阁。
+            scope:tca_mcp_backup = { add_character_flag = tca_military_appointment_allowed }
+            scope:tca_mcp_governor = { appoint_court_position = { recipient = scope:tca_mcp_backup court_position = tca_military_inspector_court_position } }
+            scope:tca_mcp_backup = { remove_character_flag = tca_military_appointment_allowed }
+            tca_test_military_council_appoint_effect = yes
+            if = { limit = { scope:tca_mcp_governor = { court_position:tca_corps_inspector_court_position = scope:tca_mcp_third court_position:tca_military_inspector_court_position = scope:tca_mcp_backup court_position:tca_military_supervisor_court_position = scope:tca_mcp_officer cp:councillor_marshal = scope:tca_mcp_third } } debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_marshal_priority 1" }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_marshal_priority 1" }
+            if = { limit = { scope:tca_mcp_officer = { NOT = { has_variable = tca_military_council_lock_owner } NOT = { has_variable = block_fire_councillor } } scope:tca_mcp_backup = { NOT = { has_variable = tca_military_council_lock_owner } NOT = { has_variable = block_fire_councillor } } scope:tca_mcp_third = { has_variable = block_fire_councillor var:block_fire_councillor ?= scope:tca_mcp_governor } } debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_marshal_priority 2" }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_marshal_priority 2" }
+            scope:tca_mcp_governor = { add_character_flag = free_revoke_cost revoke_court_position = { recipient = scope:tca_mcp_third court_position = tca_corps_inspector_court_position } remove_character_flag = free_revoke_cost }
+            if = { limit = { scope:tca_mcp_governor = { exists = cp:councillor_marshal cp:councillor_marshal = scope:tca_mcp_backup } scope:tca_mcp_third = { NOT = { has_variable = block_fire_councillor } } } debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_marshal_priority 3" }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_marshal_priority 3" }
+            scope:tca_mcp_governor = { add_character_flag = free_revoke_cost revoke_court_position = { recipient = scope:tca_mcp_backup court_position = tca_military_inspector_court_position } remove_character_flag = free_revoke_cost }
+            if = { limit = { scope:tca_mcp_governor = { exists = cp:councillor_marshal cp:councillor_marshal = scope:tca_mcp_officer } } debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_marshal_priority 4" }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_marshal_priority 4" }
+            tca_test_military_council_revoke_effect = yes
+            if = { limit = { scope:tca_mcp_governor = { NOT = { exists = cp:councillor_marshal } } } debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_marshal_priority 5" }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_marshal_priority 5" }
+            scope:tca_mcp_third = { tca_test_restore_character_effect = yes }
+            if = { limit = { has_character_flag = tca_test_tca_military_court_positions_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_military_court_positions_marshal_priority" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_military_court_positions_marshal_priority" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_military_court_positions_marshal_priority" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } }
+        tca_test_military_council_cleanup_effect = yes
+        remove_character_flag = tca_test_tca_military_court_positions_test_case_failed
+    }
+}
+
+# 用例15：受原版保护的高职不阻断低职补缺；目标过滤耗尽时不得复用上次选中scope。
+tca_military_court_positions_test.15 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_military_court_positions_test.15 tca_test_military_court_positions_protected_high_officer"
+        remove_character_flag = tca_test_tca_military_court_positions_test_case_failed
+        tca_test_military_council_prepare_effect = yes
+        if = { limit = { exists = scope:tca_mcp_governor exists = scope:tca_mcp_officer exists = scope:tca_mcp_backup }
+            scope:tca_mcp_governor = { vassal_contract_set_obligation_level = { type = celestial_provinces level = celestial_province_military } tca_test_military_council_create_officer_effect = { ACTOR = tca_mcp_third MARTIAL = 40 } save_scope_as = target_liege }
+            scope:tca_mcp_third = { set_variable = { name = block_fire_councillor value = scope:tca_mcp_governor } add_character_flag = tca_military_appointment_allowed }
+            scope:tca_mcp_governor = { appoint_court_position = { recipient = scope:tca_mcp_third court_position = tca_corps_inspector_court_position } }
+            scope:tca_mcp_third = { remove_character_flag = tca_military_appointment_allowed }
+            if = { limit = { scope:tca_mcp_governor = { cp:councillor_marshal = scope:tca_mcp_third } scope:tca_mcp_third = { NOT = { has_variable = tca_military_council_lock_owner } has_variable = block_fire_councillor } } debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_protected_high_officer 1" }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_protected_high_officer 1" }
+            scope:tca_mcp_officer = { add_to_list = tca_military_candidate_pool }
+            scope:tca_mcp_governor = { tca_military_fill_single_position_effect = { POSITION = tca_military_supervisor_court_position KEEP_CURRENT = tca_military_marshal_higher_than_supervisor_trigger } }
+            if = { limit = { scope:tca_mcp_officer = { has_court_position = tca_military_supervisor_court_position } scope:tca_mcp_governor = { cp:councillor_marshal = scope:tca_mcp_third } } debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_protected_high_officer 2" }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_protected_high_officer 2" }
+            scope:tca_mcp_backup = { add_trait = incapable add_to_list = tca_military_candidate_pool }
+            scope:tca_mcp_third = { save_scope_as = tca_chosen_officer }
+            scope:tca_mcp_governor = { tca_military_fill_single_position_effect = { POSITION = tca_military_inspector_court_position KEEP_CURRENT = tca_military_marshal_higher_than_inspector_trigger } }
+            if = { limit = { NOT = { exists = scope:tca_chosen_officer } scope:tca_mcp_governor = { NOT = { employs_court_position = tca_military_inspector_court_position } cp:councillor_marshal = scope:tca_mcp_third } } debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_protected_high_officer 3" }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_protected_high_officer 3" }
+            if = { limit = { scope:tca_mcp_third = { has_variable = block_fire_councillor var:block_fire_councillor ?= scope:tca_mcp_governor NOT = { has_variable = tca_military_council_lock_owner } } } debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_protected_high_officer 4" }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_protected_high_officer 4" }
+            every_in_list = { list = tca_military_candidate_pool remove_from_list = tca_military_candidate_pool }
+            scope:tca_mcp_backup = { remove_trait = incapable }
+            scope:tca_mcp_third = { remove_variable = block_fire_councillor }
+            scope:tca_mcp_governor = { add_character_flag = free_revoke_cost revoke_court_position = { recipient = scope:tca_mcp_third court_position = tca_corps_inspector_court_position } remove_character_flag = free_revoke_cost }
+            scope:tca_mcp_third = { tca_test_restore_character_effect = yes }
+            if = { limit = { has_character_flag = tca_test_tca_military_court_positions_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_military_court_positions_protected_high_officer" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_military_court_positions_protected_high_officer" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_military_court_positions_protected_high_officer" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } }
+        tca_test_military_council_cleanup_effect = yes
+        remove_character_flag = tca_test_tca_military_court_positions_test_case_failed
+    }
 }

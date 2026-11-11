@@ -29,6 +29,36 @@ class UpstreamCheckTests(unittest.TestCase):
             result = check(self.game, self.mod)
         return result, output.getvalue()
 
+    def test_script_dependency_detects_drift_without_claiming_override(self):
+        entry = {"key": "native_job_trigger", "mod_key": "tca_job_trigger",
+                 "vanilla": "common/scripted_triggers/jobs.txt",
+                 "mod": "common/scripted_triggers/tca_jobs.txt",
+                 "baseline": "tools/baselines/jobs.txt", "reason": "只豁免军事内阁"}
+        self.write(self.mod / "tools/upstream_overrides.json", json.dumps({
+            "schema_version": 1, "overrides": [], "known_extensions": [],
+            "script_dependencies": [entry]}))
+        self.write(self.game / entry["vanilla"], "native_job_trigger = { is_councillor = no }")
+        self.write(self.mod / entry["baseline"], "native_job_trigger = { is_councillor = no }")
+        self.write(self.mod / entry["mod"], "tca_job_trigger = { always = yes }")
+        self.assertEqual(self.run_check()[0], 0)
+        original = (self.mod / entry["baseline"]).read_bytes()
+        self.write(self.game / entry["vanilla"], "native_job_trigger = { is_councillor = no is_tax_collector = no }")
+        result, output = self.run_check()
+        self.assertEqual(result, 1)
+        self.assertIn("NEEDS REVIEW", output)
+        self.assertEqual((self.mod / entry["baseline"]).read_bytes(), original)
+        self.write(self.mod / entry["mod"], "tca_other_trigger = { always = yes }")
+        with self.assertRaisesRegex(ValueError, "script dependency.*missing"):
+            self.run_check()
+
+    def test_script_dependency_requires_nonempty_mod_key(self):
+        self.write(self.mod / "tools/upstream_overrides.json", json.dumps({
+            "schema_version": 1, "overrides": [], "known_extensions": [],
+            "script_dependencies": [{"key": "native", "mod_key": "", "vanilla": "native.txt",
+                                     "mod": "mod.txt", "baseline": "baseline.txt"}]}))
+        with self.assertRaisesRegex(ValueError, "mod_key"):
+            self.run_check()
+
     def test_file_override_detects_drift_and_missing_replacement(self):
         self.write(self.game / "common/empty.txt", "")
         self.write(self.mod / "common/empty.txt", "")

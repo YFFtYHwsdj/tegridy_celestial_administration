@@ -1,0 +1,25 @@
+﻿# 主君死亡后的定向重绑；root为原主君的实际差遣员工，只由死亡子回调排队。
+# 接收时清理tca_military_council_rebind_pending，再访问该员工当前真实职位雇主，不扫描世界。
+namespace = tca_military_council
+
+# 次日读取原生结算后的真实雇主；差遣可能撤销、转移或随家门保留，不能预设头衔继任者。
+tca_military_council.1 = {
+    type = character_event hidden = yes
+    immediate = {
+        remove_character_flag = tca_military_council_rebind_pending
+        if = {
+            limit = { is_alive = yes }
+            every_court_position_employer = {
+                limit = {
+                    OR = {
+                        employs_court_position = tca_military_supervisor_court_position
+                        employs_court_position = tca_military_inspector_court_position
+                        employs_court_position = tca_corps_inspector_court_position
+                    }
+                }
+                tca_military_validate_office_after_government_change_effect = yes
+                tca_military_sync_local_marshal_effect = yes
+            }
+        }
+    }
+}

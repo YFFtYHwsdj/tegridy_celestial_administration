@@ -1,0 +1,101 @@
+﻿# 军事内阁夹具；仅供独立可丢弃测试局，报告者为天朝皇帝。
+# 自备王国级地方主官和廷臣；借用一个真实路及治所并保存持有人，清理时归还。
+# 输出scope:tca_mcp_governor、tca_mcp_officer、tca_mcp_backup、tca_mcp_county与tca_mcp_office。
+# 同链保存两名原持有人及tca_mcp_auto_courtiers列表；无合适路及无腐败治所时不创建人物，由用例报前置失败。
+tca_test_military_council_prepare_effect = {
+    clear_saved_scope = tca_mcp_governor
+    clear_saved_scope = tca_mcp_officer
+    clear_saved_scope = tca_mcp_backup
+    clear_saved_scope = tca_mcp_county
+    clear_saved_scope = tca_mcp_office
+    random_vassal_or_below = {
+        limit = { is_landed = yes government_has_flag = government_is_celestial highest_held_title_tier = tier_kingdom liege = root capital_county = { has_county_corruption_trigger = no } }
+        primary_title = { save_scope_as = tca_mcp_office }
+        capital_county = { save_scope_as = tca_mcp_county }
+    }
+    if = {
+        limit = { exists = scope:tca_mcp_county exists = scope:tca_mcp_office }
+        scope:tca_mcp_county.holder = { save_scope_as = tca_mcp_old_holder }
+        scope:tca_mcp_office.holder = { save_scope_as = tca_mcp_old_office_holder }
+        create_character = { age = 40 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_mcp_governor }
+        create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_mcp_grant }
+        scope:tca_mcp_county = { change_title_holder = { holder = scope:tca_mcp_governor change = scope:tca_mcp_grant } }
+        scope:tca_mcp_office = { change_title_holder = { holder = scope:tca_mcp_governor change = scope:tca_mcp_grant } }
+        resolve_title_and_vassal_change = scope:tca_mcp_grant
+        scope:tca_mcp_governor = {
+            change_government = celestial_government
+            create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_mcp_fealty }
+            change_liege = { liege = root change = scope:tca_mcp_fealty }
+            resolve_title_and_vassal_change = scope:tca_mcp_fealty
+            tca_test_protect_character_effect = yes
+            set_appointment_timeout = { years = 150 desc = appointment_timeout_desc_refusing }
+            add_character_flag = ai_will_not_convert
+            # 新主官可能自动得到原生生成的宫廷人物；暂存至报告者宫廷，避免干扰两名自备候选。
+            every_courtier = { add_to_list = tca_mcp_auto_courtiers }
+        }
+        every_in_list = { list = tca_mcp_auto_courtiers root = { add_courtier = prev } }
+        scope:tca_mcp_governor = {
+            tca_test_military_council_create_officer_effect = { ACTOR = tca_mcp_officer MARTIAL = 30 }
+            tca_test_military_council_create_officer_effect = { ACTOR = tca_mcp_backup MARTIAL = 20 }
+        }
+    }
+}
+
+# 主官作用域；ACTOR为输出scope，MARTIAL为生成时固定基础武力。
+# 原版create_character支持固定技能范围，生成时准备以确保知兵前置；后加技能的即时派生刷新未确认。
+# 教育、品级和功绩仍走真实原生接口。
+tca_test_military_council_create_officer_effect = {
+    create_character = { age = 30 gender_female_chance = 0 random_traits = no dynasty = none employer = this culture = this.culture faith = this.faith rite = this.rite martial = { $MARTIAL$ $MARTIAL$ } stewardship = { 20 20 } learning = { 20 20 } save_scope_as = $ACTOR$ }
+    scope:$ACTOR$ = {
+        add_trait = education_martial_3
+        set_merit_level = 1
+        tca_merit_initialize_character_effect = yes
+        tca_test_protect_character_effect = yes
+        set_appointment_timeout = { years = 150 desc = appointment_timeout_desc_refusing }
+        add_character_flag = ai_will_not_convert
+    }
+}
+
+# 报告者作用域；暂时授权只覆盖正式除授调用，不在人物上遗留任免权限。
+tca_test_military_council_appoint_effect = {
+    scope:tca_mcp_officer = { add_character_flag = tca_military_appointment_allowed }
+    scope:tca_mcp_governor = { appoint_court_position = { recipient = scope:tca_mcp_officer court_position = tca_military_supervisor_court_position } }
+    scope:tca_mcp_officer = { remove_character_flag = tca_military_appointment_allowed }
+}
+tca_test_military_council_revoke_effect = {
+    scope:tca_mcp_governor = {
+        add_character_flag = free_revoke_cost
+        revoke_court_position = { recipient = scope:tca_mcp_officer court_position = tca_military_supervisor_court_position }
+        remove_character_flag = free_revoke_cost
+    }
+}
+
+# 报告者作用域；关闭新主官的玩家仿真后撤职，避免清理时重新补位。
+# 归还暂存廷臣及借用头衔，恢复新人物的测试保护；用例自行撤销其额外创建的高级差遣并恢复县级控制力。
+tca_test_military_council_cleanup_effect = {
+    if = { limit = { exists = scope:tca_mcp_governor scope:tca_mcp_governor = { is_alive = yes } }
+    scope:tca_mcp_governor = {
+        remove_character_flag = tca_test_force_player_governor
+        if = { limit = { employs_court_position = tca_military_supervisor_court_position } tca_test_military_council_revoke_effect = yes }
+        if = { limit = { exists = cp:councillor_marshal } cp:councillor_marshal = { save_scope_as = tca_mcp_cleanup_councillor } fire_councillor = scope:tca_mcp_cleanup_councillor }
+        if = { limit = { exists = cp:councillor_chancellor } cp:councillor_chancellor = { save_scope_as = tca_mcp_cleanup_councillor } fire_councillor = scope:tca_mcp_cleanup_councillor }
+    }
+    }
+    # 归还暂存的自动宫廷人物；主官死亡时交还原生实际继任者，不指定继承结果。
+    every_in_list = {
+        list = tca_mcp_auto_courtiers
+        if = { limit = { scope:tca_mcp_governor = { is_alive = yes } } scope:tca_mcp_governor = { add_courtier = prev } }
+        else_if = { limit = { scope:tca_mcp_office = { exists = holder } } scope:tca_mcp_office.holder = { add_courtier = prev } }
+        remove_from_list = tca_mcp_auto_courtiers
+    }
+    if = {
+        limit = { exists = scope:tca_mcp_county exists = scope:tca_mcp_old_holder scope:tca_mcp_old_holder = { is_alive = yes } }
+        create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_mcp_restore }
+        scope:tca_mcp_county = { change_title_holder = { holder = scope:tca_mcp_old_holder change = scope:tca_mcp_restore } }
+        scope:tca_mcp_office = { change_title_holder = { holder = scope:tca_mcp_old_office_holder change = scope:tca_mcp_restore } }
+        resolve_title_and_vassal_change = scope:tca_mcp_restore
+    }
+    scope:tca_mcp_officer ?= { tca_test_restore_character_effect = yes }
+    scope:tca_mcp_backup ?= { tca_test_restore_character_effect = yes }
+    scope:tca_mcp_governor ?= { tca_test_restore_character_effect = yes }
+}

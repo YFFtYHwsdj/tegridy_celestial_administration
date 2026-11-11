@@ -1,7 +1,7 @@
 ﻿# 军事宫廷职位任职资格与专职排他 Trigger
 #
 # 本文件维护天朝三大军事差遣（兵马监押、兵马都监、都虞候）的任职资格判断。
-# 包含身心健全底线、两两互斥检查，并复用原版全职职位排他机制。
+# 包含官署准入、同人多差遣排他、待阙池全职排他，以及任职期间精确的本署军事内阁兼任豁免。
 
 # -------------------------------------------------------------------
 # 官署准入 Trigger（Office Validity）
@@ -9,6 +9,15 @@
 # 必须持有实际领地（is_landed = yes，枢密使特许除外），彻底杜绝无地纯文官、提刑司、六部尚书等设立军事差遣；
 # 叠加白名单：都虞候仅向枢密使及王国级以上高级军制路分开放。
 # -------------------------------------------------------------------
+
+# 天朝有地地方长官统一判据（涵盖知州、路帅至帝国级地方督抚，排除天朝独立最高君主）
+# 作用域：领主（Character）
+tca_is_landed_celestial_governor_trigger = {
+	is_ruler = yes
+	is_landed = yes
+	is_independent_ruler = no
+	government_has_flag = government_is_celestial
+}
 
 # 兵马监押官署准入（州县级以上实土地方官署，排除独立皇帝）
 # 作用域：领主（Character）
@@ -86,14 +95,33 @@ tca_military_is_frontier_office_trigger = {
 }
 
 # 军事差遣官员通用基础资格（带职位参数宏，单点维护，杜绝代码重复）
-# 参数：$POSITION$（当前判定的职位对象）
-# 作用域：scope:employee（Character）
+# 当前作用域须为任职人物；参数POSITION为正在判定的宫廷职位ID。
+# 必需scope:liege为该职位雇主；原生valid_character从scope:employee进入，直接调用者须提供同一上下文。
+# 无永久状态写入；新任依赖临时授权，已任本职则按持续资格检查。
 tca_military_court_position_base_validity_trigger = {
 	is_adult = yes
 	NOT = { has_trait = incapable }
 	NOT = { is_imprisoned = yes }
-	# 1. 复用原版全职排他：排除总管、试毒官、侍从、小丑等全部杂职，且排除正式内阁成员（is_councillor）与税吏（is_tax_collector）
-	court_position_does_not_already_have_a_job_trigger = yes
+	# 1. 其他全职岗位与税吏始终排他；只允许本署差遣兼任本主君的军事内阁。
+	tca_military_has_no_other_full_time_job_trigger = yes
+	OR = {
+		is_councillor = no
+		AND = {
+			has_court_position = $POSITION$
+			is_councillor_of = scope:liege
+			has_council_position = councillor_marshal
+		}
+	}
+	# 地方兼任必须持续符合原生军事内阁资格；中央差遣仍沿用原有规则。
+	trigger_if = {
+		limit = { exists = scope:liege scope:liege = { tca_is_landed_celestial_governor_trigger = yes } }
+		can_be_marshal_trigger = { COURT_OWNER = scope:liege }
+	}
+	# 不借军事差遣覆盖另一个主君已有的内阁保护。
+	trigger_if = {
+		limit = { has_variable = block_fire_councillor }
+		var:block_fire_councillor = scope:liege
+	}
 
 	# 2. 军事差遣专职排他：未担任本体系内其他军事差遣职位
 	custom_tooltip = {
@@ -125,7 +153,7 @@ tca_military_court_position_base_validity_trigger = {
 		martial >= 6
 	}
 
-	# 6. 朝廷敕命专任（第四阶段：封锁手动自主任免，仅限朝廷系统铨选除授）
+	# 6. 新任须朝廷系统授权；此标记不用于阻止撤职，也不用于维持已任本职。
 	custom_tooltip = {
 		text = tca_cannot_appoint_military_court_position_manually
 		trigger_if = {
@@ -176,3 +204,30 @@ tca_military_eligible_unassigned_officer_trigger = {
 	court_position_does_not_already_have_a_job_trigger = yes
 	tca_does_not_hold_any_military_court_position_trigger = yes
 }
+
+# 官署作用域；原生保护的司马不能被系统强行替换。模块自己的保护可在高职接任时释放。
+# 参数KEEP_CURRENT为当前军事内阁是否高于拟补职位的只读trigger。
+# 铨选出手前调用；不并入官署valid_position，避免外部保护变化反过来撤销既有合法差遣。
+tca_military_linked_council_available_trigger = {
+    trigger_if = {
+        limit = { tca_is_landed_celestial_governor_trigger = yes }
+        save_temporary_scope_as = tca_military_availability_liege
+        OR = {
+            NOT = { exists = cp:councillor_marshal }
+            cp:councillor_marshal ?= {
+                OR = {
+                    $KEEP_CURRENT$ = yes
+                    can_be_fired_from_council_trigger = { COURT_OWNER = scope:tca_military_availability_liege }
+                    AND = { has_variable = tca_military_council_lock_owner var:tca_military_council_lock_owner ?= scope:tca_military_availability_liege }
+                }
+            }
+        }
+    }
+}
+
+# 当前军事内阁任职者作用域；只读映射与正式选席优先级一致，低职补缺不触碰高职席位。
+tca_military_marshal_higher_than_supervisor_trigger = {
+    OR = { has_court_position = tca_corps_inspector_court_position has_court_position = tca_military_inspector_court_position }
+}
+tca_military_marshal_higher_than_inspector_trigger = { has_court_position = tca_corps_inspector_court_position }
+tca_military_marshal_higher_than_corps_trigger = { always = no }
