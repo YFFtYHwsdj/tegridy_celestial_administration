@@ -115,17 +115,10 @@ tca_fill_tongpan_office_effect = {
                 if = {
                     limit = { is_ruler = no }
                     if = { limit = { is_lowborn = yes } create_dynasty = { spread_to_descendants = yes } }
-                    create_noble_family_effect = { GOVERNMENT_GIVER = scope:tca_tp_liege }
+                    tca_prepare_official_family_effect = { GOVERNMENT_GIVER = scope:tca_tp_liege }
                 }
-                # 加权抽取已选定该人；原生任命
-                # 事务可能替换为缓存继任者，因此先授予官职
-                # 给选定官员，再保留正常任命继承。
-                create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_tp_appointment }
-                scope:tca_tp_office = { change_title_holder = { holder = scope:tca_tp_candidate change = scope:tca_tp_appointment } }
-                resolve_title_and_vassal_change = scope:tca_tp_appointment
-                change_government = celestial_government
-                set_primary_title_to = scope:tca_tp_office
-                tca_set_official_appointment_cooldown_effect = yes
+                # 已按评分选定；共用原生授职事务，不让任命缓存替换人选。
+                tca_grant_official_title_effect = { TITLE = scope:tca_tp_office LIEGE = scope:tca_tp_liege }
             }
             every_in_list = { list = tca_tp_candidates remove_from_list = tca_tp_candidates }
             clear_saved_scope = tca_tp_candidate
@@ -187,6 +180,7 @@ tca_refresh_tongpan_county_effect = {
                     }
                     tca_ensure_official_title_succession_effect = yes
                     holder ?= {
+                        primary_title = { set_variable = { name = tca_official_family_policy_office value = yes } }
                         if = {
                             limit = { NOT = { liege ?= scope:tca_tp_liege } }
                             create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_tp_fealty }

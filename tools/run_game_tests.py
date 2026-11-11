@@ -211,7 +211,8 @@ def prepare_run(repo, run_root, settings, selected_case=None, suites=(), cases=(
     status = subprocess.run(['git', '-C', str(repo), 'status', '--porcelain'], capture_output=True, text=True)
     write_json(run / 'metadata.json', {'run_id': run.name, 'source_root': str(repo),
                'commit': git.stdout.strip() if git.returncode == 0 else None,
-               'working_tree_status': status.stdout.splitlines() if status.returncode == 0 else None})
+               'working_tree_status': status.stdout.splitlines() if status.returncode == 0 else None,
+               'start_date': (execution or {}).get('start_date', '1066.9.15')})
     if execution is not None:
         write_json(run / 'execution.json', execution)
     seal_run(run, repo)
@@ -493,6 +494,14 @@ def stop_owned_process(process, require_running=False):
             raise ValueError('Checkpoint process exit cannot be attributed to the requested stop')
 
 
+def start_date_issues(execution, log):
+    """实际开局必须与冻结计划相符；旧任务没有日期字段时保留兼容。"""
+    expected = execution.get('start_date')
+    if expected and set(re.findall(r'TCA_CLI START_DATE (\d+\.\d+\.\d+)', log)) != {expected}:
+        return ['Actual start date missing or different from frozen execution plan']
+    return []
+
+
 def game_command(args, run, save_name=None):
     executable = game_executable(args.game_dir)
     command = [str(executable), '-debug_mode', '-develop', '-skip',
@@ -504,7 +513,13 @@ def game_command(args, run, save_name=None):
         # 指定存档仍需选择测试君主才自动进入游戏；随后由原有CLI观察者入口接管。
         # 不重新生成世界、指定书签或重置随机种子。
         return command + [f'-loadsave={save_name}.ck3', '-play=h_china']
-    command[4:4] = ['-bookmark=bm_1066_china', '-play=h_china']
+    # 每局从封存配置取书签；双开局任务和重载不得误用父任务参数。
+    execution_path = run / 'execution.json'
+    execution = json.loads(execution_path.read_text(encoding='utf-8')) if execution_path.is_file() else {}
+    bookmark = execution.get('bookmark', 'bm_1066_china')
+    if bookmark not in {'bm_1066_china', 'bm_1178_china'}:
+        raise ValueError('不支持的测试书签')
+    command[4:4] = [f'-bookmark={bookmark}', '-play=h_china']
     seed = getattr(args, 'seed', None)
     if seed is not None:
         if not 0 <= seed <= 0xFFFFFFFF:
@@ -676,6 +691,9 @@ def run_game(args, run):
     checker = subprocess.run(checker_command, capture_output=True, text=True)
     (run / 'result.txt').write_text(checker.stdout + checker.stderr, encoding='utf-8')
     snapshot_issues = verify_snapshot(run)
+    execution_file = run / 'execution.json'
+    execution = json.loads(execution_file.read_text(encoding='utf-8')) if execution_file.is_file() else {}
+    snapshot_issues += start_date_issues(execution, log)
     code = outcome(condition, state['observer_confirmed'], checker.returncode)
     if not state['observer_confirmed']:
         with (run / 'result.txt').open('a') as result:
@@ -713,6 +731,8 @@ def main(argv=None):
     parser.add_argument('--settings', type=Path, default=DEFAULT_SETTINGS, help='只读图形与游戏偏好来源')
     parser.add_argument('--timeout', type=float, default=240, help='每局启动及执行超时秒数，不包含排队')
     parser.add_argument('--prepare-only', action='store_true', help='封存任务但不启动游戏')
+    parser.add_argument('--start-date', choices=('1066', '1178', 'both'), default='1066',
+                        help='测试开局；both 顺序运行两个独立世界，默认1066')
     parser.add_argument('--seed', type=int, help='原生新局随机种子')
     parser.add_argument('--parallel', type=int, default=1,
                         help='同一进程内并发延迟用例上限（1–32，默认 1 保持串行语义）')
@@ -744,17 +764,22 @@ def main(argv=None):
         execution = {'environment': game_environment(args.game_dir), 'seed': args.seed,
                      'strict_title_heir': args.strict_title_heir, 'timeout': args.timeout,
                      'parallel': args.parallel}
-        base = prepare_run(ROOT, args.run_root, args.settings.expanduser(), suites=args.suite, cases=args.case,
-                           execution=execution, parallel=args.parallel)
-        rows = json.loads((base / 'selection.json').read_text(encoding='utf-8'))['cases']
-        if args.isolate == 'suite':
-            for suite in dict.fromkeys(row['suite'] for row in rows):
-                runs.append(clone_run(base, args.run_root, [row for row in rows if row['suite'] == suite]))
-        else:
-            runs = [base]
+        dates = ('1066', '1178') if args.start_date == 'both' else (args.start_date,)
+        for date in dates:
+            dated_execution = dict(execution, start_date={'1066': '1066.9.15', '1178': '1178.10.1'}[date],
+                                   bookmark=f'bm_{date}_china')
+            dated = prepare_run(ROOT, args.run_root, args.settings.expanduser(), suites=args.suite, cases=args.case,
+                                execution=dated_execution, parallel=args.parallel)
+            base = base or dated
+            rows = json.loads((dated / 'selection.json').read_text(encoding='utf-8'))['cases']
+            if args.isolate == 'suite':
+                for suite in dict.fromkeys(row['suite'] for row in rows):
+                    runs.append(clone_run(dated, args.run_root, [row for row in rows if row['suite'] == suite]))
+            else:
+                runs.append(dated)
         task = {'task_id': base.name, 'execution': 'isolated' if args.isolate == 'suite' else 'same_world',
                 'scope': json.loads((base / 'selection.json').read_text(encoding='utf-8'))['scope'],
-                'parallel': args.parallel,
+                'parallel': args.parallel, 'start_dates': list(dates),
                 'runs': [str(run) for run in runs], 'state': 'prepared'}
         write_json(base / 'task.json', task)
         print(f'Task {base.name}: {base}', flush=True)

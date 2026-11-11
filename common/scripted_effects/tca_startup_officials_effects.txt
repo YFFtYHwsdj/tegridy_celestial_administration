@@ -1,0 +1,141 @@
+﻿# 角色作用域；参数NOBLE为yes/no，GOVERNMENT_GIVER为有效天朝角色作用域。
+# 为独立小家族落实一次世族选择；不撤销既有世族，不创造配偶子女。
+# 调用者须先确定本次选择；标记供后续维护读取，禁止重新抽样补建。
+tca_set_official_family_policy_effect = {
+    if = { limit = { is_lowborn = yes } create_dynasty = { spread_to_descendants = no } }
+    if = {
+        limit = { NOT = { has_variable = tca_official_family_decided } any_held_title = { is_noble_family_title = yes } }
+        set_variable = { name = tca_official_family_preexisting_noble value = yes }
+    }
+    set_variable = { name = tca_official_family_decided value = yes }
+    if = {
+        limit = { always = $NOBLE$ }
+        set_variable = { name = tca_official_family_wants_noble value = yes }
+        if = {
+            limit = { NOT = { any_held_title = { is_noble_family_title = yes } } }
+            create_noble_family_effect = { GOVERNMENT_GIVER = $GOVERNMENT_GIVER$ }
+        }
+    }
+}
+
+# 角色作用域；首次／纠错补位共用，参数GOVERNMENT_GIVER为天朝上级。
+# 有家族不等于有世族头衔；仅10%建立世族，选择随人物持久保存。
+tca_prepare_official_family_effect = {
+    if = {
+        limit = { NOT = { has_variable = tca_official_family_decided } }
+        random_list = {
+            10 = { tca_set_official_family_policy_effect = { NOBLE = yes GOVERNMENT_GIVER = $GOVERNMENT_GIVER$ } }
+            90 = { tca_set_official_family_policy_effect = { NOBLE = no GOVERNMENT_GIVER = $GOVERNMENT_GIVER$ } }
+        }
+    }
+}
+
+# 预配置官员角色作用域；开局资产入口以固定参数调用，每角色仅初始化一次。
+# 不授予官署，不改变原版历史人物的亲属与性格；不允许旧存档补接时重置功绩。
+tca_initialize_startup_official_effect = {
+    if = {
+        limit = {
+            NOT = { has_variable = tca_startup_official_initialized }
+            exists = primary_title
+            is_alive = yes
+        }
+        set_variable = { name = tca_startup_official_initialized value = yes }
+        # 这是新局预设的正式初始品级；原生getter同链可能仍读初始化前等级。
+        # 功绩屏障消费此来源后清除，普通人物仍完整保留原生品级快照。
+        set_variable = { name = tca_merit_preset_initial_level value = $LEVEL$ }
+        set_variable = { name = tca_merit_approved_level value = $LEVEL$ }
+        set_merit_level = $LEVEL$
+        # 预设官员没有初始功绩时补足；不清零原版人物既有功绩。
+        if = { limit = { merit < $MERIT$ } change_merit = $MERIT$ }
+        add_character_flag = passed_child_exam
+        add_character_flag = passed_provincial_exam
+        add_character_modifier = { modifier = tgp_passed_provincial_exam_modifier }
+        add_character_flag = passed_metropolitan_exam
+        add_character_modifier = { modifier = tgp_passed_metropolitan_exam_modifier }
+        if = {
+            limit = { always = $PALACE$ }
+            add_character_flag = passed_palace_exam
+            add_character_modifier = { modifier = tgp_passed_palace_exam_modifier }
+        }
+        add_character_flag = tca_merit_active
+        tca_set_official_family_policy_effect = { NOBLE = $NOBLE$ GOVERNMENT_GIVER = liege }
+        tca_merit_refresh_cap_effect = yes
+        tca_set_official_appointment_cooldown_effect = yes
+    }
+}
+
+# 全局作用域；两职正常开局维护均完成后，只在debug局捕获一次原始结果。
+# 先捕获再由测试事件读取；不得调用修复满足快照。正式游玩不保存测试统计。
+tca_capture_startup_officials_effect = {
+    if = {
+        limit = {
+            debug_only = yes
+            has_global_variable = tca_startup_judicial_finished
+            has_global_variable = tca_startup_tongpan_finished
+            NOT = { has_global_variable = tca_startup_snapshot_finished }
+            has_global_variable_list = tca_startup_offices
+        }
+        set_global_variable = { name = tca_startup_snapshot_finished value = yes }
+        title:h_china.holder = {
+            set_variable = { name = tca_startup_snapshot_count value = 0 }
+            set_variable = { name = tca_startup_snapshot_bad_holder value = 0 }
+            set_variable = { name = tca_startup_snapshot_bad_noble value = 0 }
+            set_variable = { name = tca_startup_snapshot_missing value = 0 }
+        }
+        every_in_global_list = {
+            variable = tca_startup_offices
+            title:h_china.holder = { change_variable = { name = tca_startup_snapshot_count add = 1 } }
+            if = {
+                limit = {
+                    OR = {
+                        NOT = { holder ?= var:tca_startup_expected_holder }
+                        AND = {
+                            has_variable = tca_tongpan_title
+                            OR = {
+                                NOT = { tca_is_valid_tongpan_holder_trigger = yes }
+                                NOT = { var:tca_startup_jurisdiction.holder = { tca_has_active_tongpan_trigger = yes } }
+                            }
+                        }
+                        AND = { has_variable = tca_judicial_title NOT = { tca_is_valid_judicial_holder_trigger = yes } }
+                    }
+                }
+                debug_log = "TCA_STARTUP unexpected holder"
+                debug_log_scopes = yes
+                title:h_china.holder = { change_variable = { name = tca_startup_snapshot_bad_holder add = 1 } }
+            }
+            holder ?= {
+                if = {
+                    limit = {
+                        OR = {
+                            AND = { has_variable = tca_official_family_wants_noble NOT = { any_held_title = { is_noble_family_title = yes } } }
+                            AND = { NOT = { has_variable = tca_official_family_wants_noble } NOT = { has_variable = tca_official_family_preexisting_noble } any_held_title = { is_noble_family_title = yes } }
+                        }
+                    }
+                    debug_log = "TCA_STARTUP unexpected noble family"
+                    debug_log_scopes = yes
+                    title:h_china.holder = { change_variable = { name = tca_startup_snapshot_bad_noble add = 1 } }
+                }
+            }
+        }
+        # 用正式适用资格扫描实际辖区，补上“配置名单本身漏了官署”的反向检查。
+        title:h_china.holder = {
+            every_vassal_or_below = {
+                if = {
+                    limit = { primary_title = { tca_is_tongpan_county_trigger = yes } }
+                    if = {
+                        limit = { OR = { NOT = { tca_has_active_tongpan_trigger = yes } NOT = { primary_title.var:tca_tongpan_office = { has_variable = tca_startup_expected_holder } } } }
+                        title:h_china.holder = { change_variable = { name = tca_startup_snapshot_missing add = 1 } }
+                    }
+                }
+                every_held_title = {
+                    limit = { tca_is_judicial_circuit_trigger = yes }
+                    if = {
+                        limit = { OR = { NOT = { tca_has_judicial_title_trigger = yes } NOT = { var:song_judicial_title = { has_variable = tca_startup_expected_holder } } } }
+                        title:h_china.holder = { change_variable = { name = tca_startup_snapshot_missing add = 1 } }
+                    }
+                }
+            }
+        }
+        debug_log = "TCA_STARTUP snapshot captured"
+    }
+}

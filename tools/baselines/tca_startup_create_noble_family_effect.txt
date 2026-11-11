@@ -1,0 +1,115 @@
+﻿# 新增覆盖的已审阅原版对象；不刷新既有基线。
+create_noble_family_effect = {
+	debug_log = create_noble_family_title
+	save_scope_as = new_noble_family_holder
+	$GOVERNMENT_GIVER$ = { save_scope_as = government_giver }
+	if = {
+		limit = { scope:government_giver ?= { government_allows = noble_families } }
+		if = {
+			limit = {
+				is_ruler = no
+			}
+			if = {
+				limit = {
+					scope:government_giver = { is_ruler = yes }
+				}
+				scope:government_giver = {
+					if = {
+						limit = {
+							highest_held_title_tier <= tier_duchy
+						}
+						top_liege = {
+							save_scope_as = liege
+						}
+					}
+					else = {
+						save_scope_as = liege
+					}
+				}
+			}
+			else = {
+				liege_or_court_owner ?= {
+					save_scope_as = liege
+				}
+			}
+		}
+		hidden_effect = { # NF can only be held by house heads
+			if = { # Start by checking that we are not the house head already
+				limit = {
+					exists = house.house_head
+					NOT = { house.house_head = scope:new_noble_family_holder }
+				}
+				if = { # If not, let's see if it would be reasonable to become house head...
+					limit = {
+						house.house_head ?= {
+							is_ai = yes # Don't steal house head from a player
+							OR = {
+								# Within same realm but less important
+								AND = {
+									top_liege = scope:new_noble_family_holder.top_liege
+									OR = {
+										is_ruler = no
+										highest_held_title_tier < scope:new_noble_family_holder.highest_held_title_tier
+									}
+								}
+								# Wanderer
+								NOT = { exists = liege }
+							}
+						}
+					}
+					house = { set_house_head = scope:new_noble_family_holder }
+				}
+				else = { # ... Otherwise, we create a cadet branch
+					create_cadet_house_with_name_effect = yes
+				}
+			}
+		}
+		scope:new_noble_family_holder = {
+			if = {
+				limit = {
+					NOT = {
+						any_held_title = { is_noble_family_title = yes }
+					}
+				}
+				give_noble_family_title_effect = { GOVERNMENT_GIVER = scope:government_giver }
+			}
+			scope:new_title.holder ?= {
+				if = {
+					limit = {
+						is_landed = no
+						exists = scope:liege
+						scope:liege.highest_held_title_tier > highest_held_title_tier
+					}
+					create_title_and_vassal_change = {
+						type = swear_fealty
+						save_scope_as = change
+					}
+					change_liege = {
+						liege = scope:liege
+						change = scope:change
+					}
+					resolve_title_and_vassal_change = scope:change
+				}
+			}
+			custom_description = { text = create_noble_family_tt }
+
+			#Notifications
+			every_player = {
+				limit = {
+					top_liege = scope:new_noble_family_holder.top_liege
+					this != scope:new_noble_family_holder
+					# China has hundreds of Noble Families, it gets spammy
+					NOT = { government_allows = merit }
+				}
+				trigger_event = {
+					id = ep3_emperor_yearly.2410
+					days = 1
+				}
+			}
+		}
+	}
+	else = {
+		debug_log = "try create NF title but goverment does not allow"
+	}
+	debug_log_scopes = yes
+}

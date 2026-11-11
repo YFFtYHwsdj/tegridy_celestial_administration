@@ -92,3 +92,22 @@ tca_initialize_new_judicial_scholar_effect = {
     add_character_flag = tca_merit_active
     tca_merit_refresh_cap_effect = yes
 }
+
+# 实际获任角色作用域；TITLE为官署，LIEGE为同国更高阶天朝上级。
+# 授职与隶属在同一事务提交，保持官署及封臣关系一致。
+# 原版仍可能请求世族，是否允许由独立创建入口按已记录策略判断。
+# 不创建家族、不选候选；调用者先落实家族策略。完成后设主头衔、政体和任职冷却。
+tca_grant_official_title_effect = {
+    save_scope_as = tca_official_grant_candidate
+    create_title_and_vassal_change = {
+        type = granted
+        save_scope_as = tca_official_grant_change
+        add_claim_on_loss = no
+    }
+    $TITLE$ = { set_variable = { name = tca_official_family_policy_office value = yes } change_title_holder = { holder = scope:tca_official_grant_candidate change = scope:tca_official_grant_change } }
+    change_liege = { liege = $LIEGE$ change = scope:tca_official_grant_change }
+    resolve_title_and_vassal_change = scope:tca_official_grant_change
+    change_government = celestial_government
+    set_primary_title_to = $TITLE$
+    tca_set_official_appointment_cooldown_effect = yes
+}

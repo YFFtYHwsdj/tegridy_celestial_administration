@@ -7,7 +7,7 @@
 游戏根目录：/Users/tegridy/Library/Application Support/Steam/steamapps/common/Crusader Kings III。本次读取launcher/launcher-settings.json，版本1.20.1.1（Crozier）。模组descriptor.mod声明1.20.0.4；声明版本与实装版本不同，不代表兼容验收。
 
 - 本机上述绝对目录下game/common/on_action/game_start.txt的1066.9.15分支设河北、关内、岭西为军路；河北重复一次，不是第四路。
-- 模组history/titles/tca_judicial_titles.txt有15个固定机构及15处holder = 0，不含三军路。本次未修改；占位不表示史实空缺。
+- 原研究时固定机构以空任职占位，不表示史实空缺。当前任职由 `history/titles/tca_startup_office_titles.txt` 统一配置，采用状态见[主题入口](README.md)；研究阶段与游戏实现状态分开。
 - 地理和人物ID沿用前次本机game/common/landed_titles/02_china.txt、game/history/titles/e_china.txt、game/history/characters/han.txt等静态核查，本次未再逐县逐人检查。蔡延庆han_7847、程濬han_6513的记录实施前重核；后者另有原版棣州任职冲突。
 - 固定机构及资格行为见[实现说明](../../../docs/judicial/offices.md)。研究纳入军路不表示已经开放军路司法办公室。未运行引擎、补位或任命验证。
 

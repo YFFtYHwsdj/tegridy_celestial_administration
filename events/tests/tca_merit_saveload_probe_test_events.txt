@@ -41,7 +41,8 @@ tca_merit_saveload_probe_test.1000 = {
                 # 主模组GUI读取CLI适配器变量；此处声明默认值，满足可执行脚本契约。
                 # CLI/人类适配器已先写入1或0时不会覆盖。
                 title:h_china = { if = { limit = { NOT = { has_variable = tca_cli_ready } } set_variable = { name = tca_cli_ready value = 0 } } }
-                title:h_china = { remove_variable = tca_msl_transaction_restore_checked remove_variable = tca_msl_transaction_restore_valid }
+                # 未发生重载时快照有效值保持0，断言11正常失败，不额外制造未设置变量的引擎错误。
+                title:h_china = { remove_variable = tca_msl_transaction_restore_checked set_variable = { name = tca_msl_transaction_restore_valid value = 0 } }
                 tca_test_prepare_retirement_saveload_effect = yes
                 tca_test_create_merit_interface_character_effect = { CHARACTER = tca_msl_actor GOVERNMENT = celestial_government }
                 scope:tca_msl_actor = {
@@ -127,6 +128,9 @@ tca_merit_saveload_probe_test.1001 = {
                 set_variable = { name = tca_merit_reset_probe_loss_count value = 0 }
                 tca_merit_prepare_grant_effect = { SOURCE = 1 TARGET = 2 MODE = 1 YEAR = current_year }
                 save_scope_value_as = { name = tca_msl_formal_token value = var:tca_merit_grant_token }
+                # 在原事件链排队前冻结正式结余折算预期；跨重载沿用同一saved value，不按提交结果反推。
+                save_scope_value_as = { name = tca_merit_before value = merit }
+                save_scope_value_as = { name = tca_msl_formal_expected_merit value = { value = tca_merit_target_threshold_value add = tca_merit_carryover_bonus_value } }
             }
             # 闲退原生六品准备也须跨日刷新后再核定、加恩；沿同一保存检查点运行。
             scope:tca_rsl_retired = { tca_merit_initialize_character_effect = yes tca_retirement_candidate_honor_effect = { APPROVE = no } tca_retirement_candidate_register_effect = yes tca_retirement_candidate_settle_effect = yes set_variable = { name = tca_rsl_payment_first_date value = var:tca_retirement_probe_attempted } }
@@ -143,6 +147,8 @@ tca_merit_saveload_probe_test.1001 = {
             debug_log = "TCA_TEST WAIT tca_test_merit_saveload_contract 60 days"
             trigger_event = { id = tca_merit_saveload_probe_test.1002 days = 60 }
             title:h_china = { set_variable = { name = tca_merit_saveload_phase value = 1 } }
+            # 与60日验收同源排队；GUI只改状态，不负责从控制台建立角色事件上下文。
+            trigger_event = { id = tca_merit_saveload_probe_test.9000 days = 1 }
             remove_variable = tca_local_domain_reform_cooldown
             add_realm_law = tca_local_domain_civil_law
             debug_log = "TCA_MERIT_SAVELOAD GUI_ARMED"
@@ -215,7 +221,7 @@ tca_merit_saveload_probe_test.1002 = {
             } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_saveload_contract 15" }
             else = { add_character_flag = tca_test_tca_merit_saveload_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 15" }
             scope:tca_msl_formal = { tca_merit_commit_grant_effect = { TOKEN = scope:tca_msl_formal_token } }
-            if = { limit = { scope:tca_msl_formal = { var:tca_merit_grant_result = 1 var:tca_merit_grant_phase = 2 var:tca_merit_approved_level = 2 merit = 1000 var:tca_merit_last_ordinary_year = current_year } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_saveload_contract 17" }
+            if = { limit = { scope:tca_msl_formal = { var:tca_merit_grant_result = 1 var:tca_merit_grant_phase = 2 var:tca_merit_approved_level = 2 merit = scope:tca_msl_formal_expected_merit var:tca_merit_last_ordinary_year = current_year } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_saveload_contract 17" }
             else = { add_character_flag = tca_test_tca_merit_saveload_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 17" }
             scope:tca_msl_transaction = { tca_test_commit_merit_transaction_probe_effect = yes }
             # 保留已保存的零倍率考试修正，只移除锁品修正；高经验只能兑现到 Level 2。
@@ -286,17 +292,43 @@ tca_merit_saveload_probe_test.1003 = {
     }
 }
 
-# 必须在破坏存档后现场断言；该日志位于存档外，重载不能消除。
-# 若 GUI 只改到保存阶段便中止，缺失第9项会使整例失败，不能靠旧状态假通过。
-tca_merit_saveload_probe_test.9001 = {
-    # 入口位于GUI控制台字符串，原生静态事件调用图不能发现。
-    orphan = yes
+# 原报告者的原生事件链观察GUI实际破坏阶段；不保存、不破坏、不重派worker。
+# 保存中的待排事件也会恢复；续局GUI把phase置4后本链停止，绝不补做现场破坏。
+# 原60日验收照常执行；GUI未完成时只会在原有断言失败，不延长验收等待。
+tca_merit_saveload_probe_test.9000 = {
     type = character_event hidden = yes
     immediate = {
         tca_test_validate_environment_effect = yes
         if = {
             limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
-            # GUI 动画续接可能重复发出同一动作；第一份现场断言永久记入本轮日志。
+            if = {
+                limit = { title:h_china = { has_variable = tca_merit_saveload_phase } }
+                if = {
+                    limit = { title:h_china = { var:tca_merit_saveload_phase = 3 } }
+                    debug_log = "TCA_MERIT_SAVELOAD CORRUPTION_OBSERVED reporter=[THIS.Char.GetID]"
+                    title:h_china.holder = { debug_log = "TCA_MERIT_SAVELOAD CORRUPTION_HOLDER id=[THIS.Char.GetID]" }
+                    trigger_event = tca_merit_saveload_probe_test.9001
+                }
+                else_if = {
+                    limit = { title:h_china = { var:tca_merit_saveload_phase >= 1 var:tca_merit_saveload_phase <= 2 } }
+                    trigger_event = { id = tca_merit_saveload_probe_test.9000 days = 1 }
+                }
+            }
+        }
+    }
+}
+
+# 必须在破坏存档后现场断言；该日志位于存档外，重载不能消除。
+# 若 GUI 只改到保存阶段便中止，缺失第9项会使整例失败，不能靠旧状态假通过。
+tca_merit_saveload_probe_test.9001 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            # 环境校验通过后记录入口，现场去重与断言仍由原事件处理。
+            debug_log = "TCA_MERIT_SAVELOAD CORRUPTION_CHECK_ENTERED"
+            # 原生观察链可能从保存态恢复；第一份现场断言永久记入本轮日志，不能重复报告。
             if = {
                 limit = { NOT = { has_character_flag = tca_merit_saveload_corruption_logged } }
                 add_character_flag = tca_merit_saveload_corruption_logged
@@ -324,6 +356,8 @@ tca_merit_saveload_probe_test.9001 = {
                 trigger_event = tca_retirement_saveload_probe.9001
                 title:h_china = { set_variable = { name = tca_merit_saveload_reload_ready value = 1 } }
                 debug_log = "TCA_CLI RELOAD_SAVE tca_merit_saveload_probe"
+                # 原生排队事件完成现场断言后才撤下GUI；不能在请求投递时提前撤防。
+                title:h_china = { set_variable = { name = tca_cli_ready value = 0 } }
             }
         }
     }
@@ -339,7 +373,7 @@ tca_merit_saveload_probe_test.1004 = {
             # 在清理其他夹具改变预算分母前冻结同次原生基准率，报告者明确取当前天子。
             title:h_china.holder = { save_scope_value_as = { name = tca_rt_native_salary_rate value = tca_retirement_test_salary_rate_value } debug_log = "TCA_RETIREMENT_SAVELOAD native_rate=[THIS.Char.MakeScope.ScriptValue('tca_retirement_test_salary_rate_value')]" }
             if = { limit = { scope:tca_msl_formal = {
-                merit_level = 2 merit = 1000 var:tca_merit_approved_level = 2
+                merit_level = 2 merit = scope:tca_msl_formal_expected_merit var:tca_merit_approved_level = 2
                 var:tca_merit_grant_token = scope:tca_msl_formal_token
                 var:tca_merit_reset_probe_gain_count = 1 var:tca_merit_reset_probe_loss_count = 0
                 NOT = { has_variable = tca_merit_grant_phase } NOT = { has_variable = tca_merit_grant_notified_token }
@@ -350,7 +384,7 @@ tca_merit_saveload_probe_test.1004 = {
                 tca_merit_audit_grant_effect = { TOKEN = scope:tca_msl_formal_token }
             }
             if = { limit = { scope:tca_msl_formal = {
-                merit = 1000 var:tca_merit_approved_level = 2
+                merit = scope:tca_msl_formal_expected_merit var:tca_merit_approved_level = 2
                 var:tca_merit_reset_probe_gain_count = 1 var:tca_merit_reset_probe_loss_count = 0
                 NOT = { has_variable = tca_merit_grant_phase } NOT = { has_variable = tca_merit_grant_notified_token }
             } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_saveload_contract 19" }
@@ -364,7 +398,7 @@ tca_merit_saveload_probe_test.1004 = {
             }
             if = { limit = { title:h_china.var:tca_merit_saveload_formal_actor = {
                 NOT = { has_character_flag = tca_merit_active } NOT = { has_variable = tca_merit_grant_phase }
-                var:tca_merit_grant_token = scope:tca_msl_formal_token merit = 1000
+                var:tca_merit_grant_token = scope:tca_msl_formal_token merit = scope:tca_msl_formal_expected_merit
             } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_saveload_contract 20" }
             else = { add_character_flag = tca_test_tca_merit_saveload_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 20" }
             # 反馈本人去重状态与最近一轮快照必须随原存档恢复；不重新排队、不重写变量。

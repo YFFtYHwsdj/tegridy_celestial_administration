@@ -253,7 +253,12 @@ tca_merit_grant_test.2002 = {
             scope:tca_gc_actor = {
                 set_variable = { name = tca_merit_reset_probe_gain_count value = 0 }
                 set_variable = { name = tca_merit_reset_probe_loss_count value = 0 }
-                tca_merit_begin_grant_effect = { SOURCE = 1 TARGET = 2 MODE = 1 YEAR = current_year }
+                # 保留三万功绩压力；提交前按正式结余接口冻结余额预期，不能沿用旧版清零预期。
+                tca_merit_prepare_grant_effect = { SOURCE = 1 TARGET = 2 MODE = 1 YEAR = current_year }
+                save_scope_value_as = { name = tca_merit_before value = merit }
+                save_scope_value_as = { name = tca_gc_expected_merit value = { value = merit_level_2_value add = tca_merit_carryover_bonus_value } }
+                save_scope_value_as = { name = tca_gc_transferred_merit value = { value = scope:tca_gc_expected_merit add = 20000 } }
+                tca_merit_commit_grant_effect = { TOKEN = var:tca_merit_grant_token }
             }
             trigger_event = { id = tca_merit_grant_test.2003 days = 12 }
         }
@@ -264,7 +269,7 @@ tca_merit_grant_test.2003 = {
     immediate = {
         tca_test_validate_environment_effect = yes
         if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
-            if = { limit = { scope:tca_gc_actor = { merit_level = 2 merit = 1000 NOT = { has_variable = tca_merit_grant_phase } var:tca_merit_reset_probe_gain_count = 1 var:tca_merit_reset_probe_loss_count = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_courtier_grant 2" }
+            if = { limit = { scope:tca_gc_actor = { merit_level = 2 merit = scope:tca_gc_expected_merit NOT = { has_variable = tca_merit_grant_phase } var:tca_merit_reset_probe_gain_count = 1 var:tca_merit_reset_probe_loss_count = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_courtier_grant 2" }
             else = { add_character_flag = tca_test_tca_merit_grant_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_courtier_grant 2" }
             # 本例使用原子普通官职转授；原版家门生成的两步路径由.3/.4分别验证。
             # 大额经验锁在八品，用于捕捉基数变化时临时多一档造成的伪gain。
@@ -284,7 +289,7 @@ tca_merit_grant_test.2004 = {
     immediate = {
         tca_test_validate_environment_effect = yes
         if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
-            if = { limit = { scope:tca_gc_actor = { is_ruler = yes merit_level = 2 merit = 21000 var:tca_merit_reset_probe_gain_count = 1 var:tca_merit_reset_probe_loss_count = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_courtier_grant 3" }
+            if = { limit = { scope:tca_gc_actor = { is_ruler = yes merit_level = 2 merit = scope:tca_gc_transferred_merit var:tca_merit_reset_probe_gain_count = 1 var:tca_merit_reset_probe_loss_count = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_courtier_grant 3" }
             else = { add_character_flag = tca_test_tca_merit_grant_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_courtier_grant 3" scope:tca_gc_actor = { tca_test_log_merit_cap_state_effect = yes } }
             create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_gc_unland }
             scope:tca_gc_family = { change_title_holder = { holder = root change = scope:tca_gc_unland } }
@@ -299,7 +304,7 @@ tca_merit_grant_test.2005 = {
     immediate = {
         tca_test_validate_environment_effect = yes
         if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
-            if = { limit = { scope:tca_gc_actor = { is_ruler = yes merit_level = 2 merit = 21000 var:tca_merit_reset_probe_gain_count = 1 var:tca_merit_reset_probe_loss_count = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_courtier_grant 4" }
+            if = { limit = { scope:tca_gc_actor = { is_ruler = yes merit_level = 2 merit = scope:tca_gc_transferred_merit var:tca_merit_reset_probe_gain_count = 1 var:tca_merit_reset_probe_loss_count = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_courtier_grant 4" }
             else = { add_character_flag = tca_test_tca_merit_grant_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_courtier_grant 4" scope:tca_gc_actor = { tca_test_log_merit_cap_state_effect = yes } }
             scope:tca_gc_actor = {
                 # 最高品的扣减倍率仍须非负；边界准备屏蔽夹具产生的伪回调。
@@ -364,7 +369,12 @@ tca_merit_grant_test.3002 = {
             scope:tca_gf_actor = {
                 set_variable = { name = tca_merit_reset_probe_gain_count value = 0 }
                 set_variable = { name = tca_merit_reset_probe_loss_count value = 0 }
-                tca_merit_begin_grant_effect = { SOURCE = 1 TARGET = 2 MODE = 1 YEAR = current_year }
+                # 保留三万功绩压力；提交前按正式结余接口冻结余额预期，不能沿用旧版清零预期。
+                tca_merit_prepare_grant_effect = { SOURCE = 1 TARGET = 2 MODE = 1 YEAR = current_year }
+                save_scope_value_as = { name = tca_merit_before value = merit }
+                save_scope_value_as = { name = tca_gf_expected_merit value = { value = merit_level_2_value add = tca_merit_carryover_bonus_value } }
+                save_scope_value_as = { name = tca_gf_transferred_merit value = { value = scope:tca_gf_expected_merit add = 20000 } }
+                tca_merit_commit_grant_effect = { TOKEN = var:tca_merit_grant_token }
             }
             trigger_event = { id = tca_merit_grant_test.3003 days = 12 }
         }
@@ -375,7 +385,7 @@ tca_merit_grant_test.3003 = {
     immediate = {
         tca_test_validate_environment_effect = yes
         if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
-            if = { limit = { scope:tca_gf_actor = { merit_level = 2 merit = 1000 NOT = { has_variable = tca_merit_grant_phase } var:tca_merit_reset_probe_gain_count = 1 var:tca_merit_reset_probe_loss_count = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_family_cap_transfer 2" }
+            if = { limit = { scope:tca_gf_actor = { merit_level = 2 merit = scope:tca_gf_expected_merit NOT = { has_variable = tca_merit_grant_phase } var:tca_merit_reset_probe_gain_count = 1 var:tca_merit_reset_probe_loss_count = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_family_cap_transfer 2" }
             else = { add_character_flag = tca_test_tca_merit_grant_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_family_cap_transfer 2" }
             scope:tca_gf_actor = {
                 change_merit = 20000
@@ -394,7 +404,7 @@ tca_merit_grant_test.3004 = {
     immediate = {
         tca_test_validate_environment_effect = yes
         if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
-            if = { limit = { scope:tca_gf_actor = { is_ruler = yes merit_level = 2 merit = 21000 var:tca_merit_reset_probe_gain_count = 1 var:tca_merit_reset_probe_loss_count = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_family_cap_transfer 3" }
+            if = { limit = { scope:tca_gf_actor = { is_ruler = yes merit_level = 2 merit = scope:tca_gf_transferred_merit var:tca_merit_reset_probe_gain_count = 1 var:tca_merit_reset_probe_loss_count = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_family_cap_transfer 3" }
             else = { add_character_flag = tca_test_tca_merit_grant_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_family_cap_transfer 3" scope:tca_gf_actor = { tca_test_log_merit_cap_state_effect = yes } }
             scope:tca_gf_actor = { destroy_title = scope:tca_gf_family }
             if = { limit = { scope:tca_gf_actor = { NOT = { employer ?= root } } } add_courtier = scope:tca_gf_actor }
@@ -407,7 +417,7 @@ tca_merit_grant_test.3005 = {
     immediate = {
         tca_test_validate_environment_effect = yes
         if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
-            if = { limit = { scope:tca_gf_actor = { is_ruler = no merit_level = 2 merit = 21000 var:tca_merit_reset_probe_gain_count = 1 var:tca_merit_reset_probe_loss_count = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_family_cap_transfer 4" }
+            if = { limit = { scope:tca_gf_actor = { is_ruler = no merit_level = 2 merit = scope:tca_gf_transferred_merit var:tca_merit_reset_probe_gain_count = 1 var:tca_merit_reset_probe_loss_count = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_family_cap_transfer 4" }
             else = { add_character_flag = tca_test_tca_merit_grant_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_family_cap_transfer 4" scope:tca_gf_actor = { tca_test_log_merit_cap_state_effect = yes } }
             scope:tca_gf_actor = {
                 # 最高品的扣减倍率仍须非负；边界准备屏蔽夹具产生的伪回调。

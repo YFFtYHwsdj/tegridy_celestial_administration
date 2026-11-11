@@ -83,30 +83,16 @@ tca_fill_initial_judicial_holder_effect = {
         if = {
             limit = { exists = scope:tca_appointment_candidate }
             scope:tca_appointment_candidate = {
-                # 非统治者需要原生世族家门初始化，才能进入天朝仕宦流程。
+                # 非统治者补齐家族，并仅在首次选择命中10%时建立世族。
                 if = {
                     limit = { is_ruler = no }
                     if = {
                         limit = { is_lowborn = yes }
                         create_dynasty = { spread_to_descendants = yes }
                     }
-                    create_noble_family_effect = { GOVERNMENT_GIVER = scope:tca_appointment_liege }
+                    tca_prepare_official_family_effect = { GOVERNMENT_GIVER = scope:tca_appointment_liege }
                 }
-                create_title_and_vassal_change = {
-                    # 已按本职原生评分选定人选，避免appointment事务再次使用缓存继任人。
-                    type = granted
-                    save_scope_as = tca_appointment_change
-                    add_claim_on_loss = no
-                }
-                scope:tca_appointment_title = {
-                    change_title_holder = {
-                        holder = scope:tca_appointment_candidate
-                        change = scope:tca_appointment_change
-                    }
-                }
-                resolve_title_and_vassal_change = scope:tca_appointment_change
-                change_government = celestial_government
-                tca_set_official_appointment_cooldown_effect = yes
+                tca_grant_official_title_effect = { TITLE = scope:tca_appointment_title LIEGE = scope:tca_appointment_liege }
             }
             scope:tca_appointment_title = {
                 tca_sync_judicial_holder_liege_effect = yes
@@ -136,7 +122,7 @@ tca_test_judicial_initial_appointment_effect = {
 }
 
 # 角色作用域；tca_circuit 由头衔维护建立。
-# 修复此前已任命但家门初始化失败的出身低微持有人。
+# 兼容未记录家族策略的旧官员；已有选择不得在维护时重抽或补建世族。
 tca_ensure_judicial_holder_family_effect = {
     if = {
         limit = {
@@ -148,7 +134,7 @@ tca_ensure_judicial_holder_family_effect = {
             limit = { is_lowborn = yes }
             create_dynasty = { spread_to_descendants = yes }
         }
-        create_noble_family_effect = { GOVERNMENT_GIVER = scope:tca_circuit.holder }
+        tca_prepare_official_family_effect = { GOVERNMENT_GIVER = scope:tca_circuit.holder }
     }
 }
 
@@ -242,7 +228,10 @@ tca_refresh_judicial_position_effect = {
             save_scope_as = tca_circuit
             tca_fill_initial_judicial_holder_effect = yes
         }
-        holder ?= { tca_ensure_judicial_holder_family_effect = yes }
+        holder ?= {
+            primary_title = { set_variable = { name = tca_official_family_policy_office value = yes } }
+            tca_ensure_judicial_holder_family_effect = yes
+        }
         tca_sync_judicial_holder_liege_effect = yes
         holder ?= { tca_ensure_native_judicial_realm_succession_effect = yes }
         holder ?= { tca_ensure_official_contract_effect = yes }

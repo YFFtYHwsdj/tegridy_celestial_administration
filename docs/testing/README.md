@@ -4,7 +4,7 @@
 
 ## 运行一次回归
 
-从仓库根目录执行。先启动Steam，确认CK3、所需DLC和图形会话可用；工具会新建可丢弃的1066中国观察者局，只加载主模组及CLI适配，不使用普通播放集或正常游玩存档。
+从仓库根目录执行。先启动Steam，确认CK3、所需DLC和图形会话可用；工具默认新建可丢弃的1066中国观察者局；`--start-date 1178`选择1178，`--start-date both`顺序建立两个独立观察者局，各自封存日期并核对实际日期。工具只加载主模组及CLI适配，不使用普通播放集或正常游玩存档。
 
 ```sh
 # 查看可选择的正式用例，不启动游戏
@@ -144,3 +144,12 @@ python tools/run_game_tests.py --timeout 1800
 [通判生命周期](../tongpan/implementation.md#未解决的生命周期一致性)及[经费请求](../office_funding/interactions.md#待复核的请求状态)存在尚未归因的跨执行范围差异。实际失败场景、源码入口和复核方法由所属模块维护；测试运行文档不保留另一份历史成绩表。已知WIP flaky项的对比处理见[并行运行](#并行运行)。真实 Windows 引擎、测试窗口显示、保存重载与长期 AI 仍需专门验收。
 
 用例编写、生命周期及观察者手工入口见[框架契约](framework.md)；重要证据的筛选和保存由[开发规范](../development/README.md)维护。
+
+## 双开局官员验证
+
+```sh
+python3 tools/build_startup_officials.py --check
+python3 tools/run_game_tests.py --start-date both --suite startup_officials --suite tongpan --timeout 600
+```
+
+双开局不共用世界；每局继续遵循K=1权威验收。原始开局快照在其它夹具前读取；家族测试使用正式策略和授职入口，季度等待不等于存档重载。现有用例仍保留各自前置，未执行不能算1178通过；当前差异见[开局官员验证](../appointment/startup_officials_verification.md)。

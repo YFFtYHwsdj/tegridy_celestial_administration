@@ -1,0 +1,187 @@
+﻿# 双开局原生验收；读取正常开局快照，不先调用维护来修复被测状态。
+namespace = tca_startup_officials_test
+
+tca_startup_officials_test.1 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_startup_officials_test.1 tca_test_startup_officials"
+        remove_character_flag = tca_test_tca_startup_officials_test_case_failed
+        if = {
+            limit = { has_variable = tca_startup_snapshot_count var:tca_startup_snapshot_count > 0 }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_startup_officials 1"
+        }
+        else = { add_character_flag = tca_test_tca_startup_officials_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_startup_officials 1" }
+        if = {
+            limit = { has_variable = tca_startup_snapshot_bad_holder var:tca_startup_snapshot_bad_holder = 0 }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_startup_officials 2"
+        }
+        else = { add_character_flag = tca_test_tca_startup_officials_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_startup_officials 2" }
+        if = {
+            limit = { has_variable = tca_startup_snapshot_bad_noble var:tca_startup_snapshot_bad_noble = 0 }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_startup_officials 3"
+        }
+        else = { add_character_flag = tca_test_tca_startup_officials_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_startup_officials 3" }
+        if = {
+            limit = { has_variable = tca_startup_snapshot_missing var:tca_startup_snapshot_missing = 0 }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_startup_officials 4"
+        }
+        else = { add_character_flag = tca_test_tca_startup_officials_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_startup_officials 4" }
+        # 再次正式维护后仍应保留预设人选及世族选择。
+        tca_refresh_all_judicial_titles_effect = yes
+        tca_refresh_tongpan_realm_effect = yes
+        if = {
+            limit = { NOT = { has_global_variable_list = tca_startup_offices } }
+            add_character_flag = tca_test_tca_startup_officials_test_case_failed
+        }
+        every_in_global_list = {
+            variable = tca_startup_offices
+            if = {
+                limit = {
+                    OR = {
+                        NOT = { holder ?= var:tca_startup_expected_holder }
+                        NOT = { holder = { merit_level = var:tca_merit_approved_level NOT = { has_variable = tca_merit_preset_initial_level } } }
+                    }
+                }
+                root = { add_character_flag = tca_test_tca_startup_officials_test_case_failed }
+            }
+        }
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_tca_startup_officials_test_case_failed } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_startup_officials 5"
+        }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_startup_officials 5" }
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_tca_startup_officials_test_case_failed } }
+            debug_log = "TCA_TEST PASS tca_test_startup_officials"
+            change_variable = { name = tca_test_suite_passed add = 1 }
+        }
+        else = { debug_log = "TCA_TEST FAIL tca_test_startup_officials" change_variable = { name = tca_test_suite_failed add = 1 } }
+        remove_character_flag = tca_test_tca_startup_officials_test_case_failed
+    }
+}
+
+# 家族策略两分支直接调用正式入口；再次补位准备不得重抽无世族选择。
+tca_startup_officials_test.2 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_startup_officials_test.2 tca_test_official_family_policy"
+        remove_character_flag = tca_test_tca_startup_officials_test_case_failed
+        create_character = { template = tgp_minister_scholar_template employer = root culture = root.culture faith = root.faith save_scope_as = tca_test_startup_without_family }
+        create_dynamic_title = { tier = duchy name = tca_test_arrest_office_name }
+        scope:new_title = { save_scope_as = tca_test_startup_no_office set_capital_county = title:c_hongzhou set_landless_title = yes set_delete_on_destroy = no }
+        scope:tca_test_startup_without_family = {
+            tca_set_official_family_policy_effect = { NOBLE = no GOVERNMENT_GIVER = root }
+            tca_grant_official_title_effect = { TITLE = scope:tca_test_startup_no_office LIEGE = title:k_jiangxi.holder }
+            tca_prepare_official_family_effect = { GOVERNMENT_GIVER = root }
+        }
+        if = {
+            limit = { scope:tca_test_startup_without_family = { is_lowborn = no has_variable = tca_official_family_decided NOT = { has_variable = tca_official_family_wants_noble } NOT = { any_held_title = { is_noble_family_title = yes } } } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_official_family_policy 1"
+        }
+        else = { add_character_flag = tca_test_tca_startup_officials_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_official_family_policy 1" }
+        create_character = { template = tgp_minister_scholar_template employer = root culture = root.culture faith = root.faith save_scope_as = tca_test_startup_with_family }
+        create_dynamic_title = { tier = duchy name = tca_test_arrest_office_name }
+        scope:new_title = { save_scope_as = tca_test_startup_yes_office set_capital_county = title:c_hongzhou set_landless_title = yes set_delete_on_destroy = no }
+        scope:tca_test_startup_with_family = {
+            tca_set_official_family_policy_effect = { NOBLE = yes GOVERNMENT_GIVER = root }
+            tca_grant_official_title_effect = { TITLE = scope:tca_test_startup_yes_office LIEGE = title:k_jiangxi.holder }
+            tca_prepare_official_family_effect = { GOVERNMENT_GIVER = root }
+        }
+        if = {
+            limit = { scope:tca_test_startup_with_family = { is_lowborn = no has_variable = tca_official_family_wants_noble any_held_title = { is_noble_family_title = yes } } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_official_family_policy 2"
+        }
+        else = { add_character_flag = tca_test_tca_startup_officials_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_official_family_policy 2" }
+        # 模拟首次选择之后继承世族；当前已有世族必须允许原版补齐庄园。
+        scope:tca_test_startup_with_family = {
+            remove_variable = tca_official_family_wants_noble
+            remove_variable = tca_official_family_preexisting_noble
+        }
+        if = {
+            limit = { scope:tca_test_startup_with_family = { tca_official_noble_family_creation_allowed_trigger = yes } root = { tca_official_noble_family_creation_allowed_trigger = yes } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_official_family_policy 3"
+        }
+        else = { add_character_flag = tca_test_tca_startup_officials_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_official_family_policy 3" }
+        # 夹具只销毁自身临时官署与家族，不改写开局家族。
+        destroy_title = scope:tca_test_startup_no_office
+        destroy_title = scope:tca_test_startup_yes_office
+        scope:tca_test_startup_with_family = {
+            every_held_title = { limit = { is_noble_family_title = yes } save_scope_as = tca_test_startup_family_title }
+            destroy_title = scope:tca_test_startup_family_title
+            death = { death_reason = death_fight }
+        }
+        scope:tca_test_startup_without_family = { death = { death_reason = death_fight } }
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_tca_startup_officials_test_case_failed } }
+            debug_log = "TCA_TEST PASS tca_test_official_family_policy"
+            change_variable = { name = tca_test_suite_passed add = 1 }
+        }
+        else = { debug_log = "TCA_TEST FAIL tca_test_official_family_policy" change_variable = { name = tca_test_suite_failed add = 1 } }
+        remove_character_flag = tca_test_tca_startup_officials_test_case_failed
+    }
+}
+
+# 真实等待跨越季度；检查正常回调没有把无世族在任者补成世族。
+tca_startup_officials_test.3 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_startup_officials_test.3 tca_test_official_family_persistence"
+        remove_character_flag = tca_test_tca_startup_officials_test_case_failed
+        clear_saved_scope = tca_test_startup_no_noble
+        clear_saved_scope = tca_test_startup_yes_noble
+        random_vassal_or_below = {
+            limit = { has_variable = tca_official_family_decided NOT = { has_variable = tca_official_family_wants_noble } NOT = { any_held_title = { is_noble_family_title = yes } } primary_title = { OR = { tca_is_valid_judicial_holder_trigger = yes tca_is_valid_tongpan_holder_trigger = yes } } }
+            save_scope_as = tca_test_startup_no_noble
+        }
+        random_vassal_or_below = {
+            limit = { has_variable = tca_official_family_wants_noble primary_title = { OR = { tca_is_valid_judicial_holder_trigger = yes tca_is_valid_tongpan_holder_trigger = yes } } }
+            save_scope_as = tca_test_startup_yes_noble
+        }
+        if = {
+            limit = { exists = scope:tca_test_startup_no_noble exists = scope:tca_test_startup_yes_noble }
+            scope:tca_test_startup_no_noble = { tca_test_protect_character_effect = yes }
+            scope:tca_test_startup_yes_noble = { tca_test_protect_character_effect = yes }
+            debug_log = "TCA_TEST WAIT tca_test_official_family_persistence 100 days"
+            trigger_event = { id = tca_startup_officials_test.1003 days = 100 }
+        }
+        else = {
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_official_family_persistence"
+            change_variable = { name = tca_test_suite_skipped add = 1 }
+            tca_test_lane_end_effect = { GROUP = tca_startup_officials_test }
+        }
+    }
+}
+
+tca_startup_officials_test.1003 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = {
+                limit = { scope:tca_test_startup_no_noble = { is_alive = yes has_variable = tca_official_family_decided NOT = { any_held_title = { is_noble_family_title = yes } } primary_title = { OR = { tca_is_valid_judicial_holder_trigger = yes tca_is_valid_tongpan_holder_trigger = yes } } } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_official_family_persistence 1"
+            }
+            else = { add_character_flag = tca_test_tca_startup_officials_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_official_family_persistence 1" }
+            if = {
+                limit = { scope:tca_test_startup_yes_noble = { is_alive = yes any_held_title = { is_noble_family_title = yes } primary_title = { OR = { tca_is_valid_judicial_holder_trigger = yes tca_is_valid_tongpan_holder_trigger = yes } } } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_official_family_persistence 2"
+            }
+            else = { add_character_flag = tca_test_tca_startup_officials_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_official_family_persistence 2" }
+            scope:tca_test_startup_no_noble ?= { tca_test_restore_character_effect = yes }
+            scope:tca_test_startup_yes_noble ?= { tca_test_restore_character_effect = yes }
+            if = {
+                limit = { NOT = { has_character_flag = tca_test_tca_startup_officials_test_case_failed } }
+                debug_log = "TCA_TEST PASS tca_test_official_family_persistence"
+                change_variable = { name = tca_test_suite_passed add = 1 }
+            }
+            else = { debug_log = "TCA_TEST FAIL tca_test_official_family_persistence" change_variable = { name = tca_test_suite_failed add = 1 } }
+            remove_character_flag = tca_test_tca_startup_officials_test_case_failed
+            tca_test_lane_end_effect = { GROUP = tca_startup_officials_test }
+        }
+    }
+}
