@@ -1,0 +1,319 @@
+﻿# 原版宫廷职位天朝适配覆盖
+#
+# 本文件通过同名顶层对象覆盖 master_of_horse_court_position（御马官/牧监）：
+# 仅对天朝地方封臣领主（知州、知府、安抚使等）隐藏并禁用地方御马官（牧监）；
+# 天朝最高独立领主（皇帝）仍保留中央殿中省乘舆掌管（尚乘奉御）。
+# 已在 tools/upstream_overrides.json 登记审阅基线。
+
+master_of_horse_court_position = {
+	sort_order = 280
+	max_available_positions = 1
+	minimum_rank = duchy # Should only be available for dukes or higher tiers
+	skill = martial
+
+	court_position_asset = {
+		trigger = {
+			is_independent_ruler = yes
+			highest_held_title_tier >= tier_empire
+			government_has_flag = government_is_celestial
+		}
+		animation = throne_room_two_handed_passive_1
+		background = "gfx/interface/illustrations/event_scenes/tgp_courtyard_asia.dds"
+		localization_key = master_of_horse_celestial_imperial
+	}
+
+	court_position_asset = {
+		trigger = {
+			is_independent_ruler = no
+			highest_held_title_tier <= tier_empire
+			government_has_flag = government_is_celestial
+		}
+		animation = throne_room_two_handed_passive_1
+		background = "gfx/interface/illustrations/event_scenes/tgp_courtyard_asia.dds"
+		localization_key = master_of_horse_celestial
+	}
+
+	court_position_asset = {
+		trigger = {
+			culture_has_east_asian_heritage_pillar_trigger = yes
+		}
+		animation = throne_room_two_handed_passive_1
+		background = "gfx/interface/illustrations/event_scenes/tgp_courtyard_asia.dds"
+	}
+
+	court_position_asset = {
+		trigger = {
+			culture_has_south_asian_heritage_pillar_trigger = yes
+		}
+		animation = throne_room_two_handed_passive_1
+		background = "gfx/interface/illustrations/event_scenes/bp1_courtyard_indian.dds"
+	}
+
+	court_position_asset = {
+		trigger = {
+			culture_has_mena_heritage_pillar_trigger = yes
+		}
+		animation = throne_room_two_handed_passive_1
+		background = "gfx/interface/illustrations/event_scenes/bp1_courtyard_mena.dds"
+	}
+
+	court_position_asset = {
+		trigger = {
+			culture_has_south_european_heritage_pillar_trigger = yes
+		}
+		animation = throne_room_two_handed_passive_1
+		background = "gfx/interface/illustrations/event_scenes/fp2_courtyard.dds"
+	}
+
+	court_position_asset = {
+		animation = throne_room_two_handed_passive_1
+		background = "gfx/interface/illustrations/event_scenes/courtyard.dds"
+	}
+
+	opinion = {
+		value = ceremonial_court_position_opinion
+	}
+
+	# How high the aptitude has to be to reach the 5 different modifier levels
+	aptitude_level_breakpoints = { 20 40 60 80 }
+
+	# How good is this character in this position? root scope is the holder of the court position
+	aptitude = {
+		value = 25
+		add = {
+			value = martial
+			multiply = 2.5
+			max = 50
+			desc = court_position_skill_martial
+		}
+		add = {
+			value = prowess
+			multiply = 2
+			max = 50
+			desc = court_position_skill_prowess
+		}
+		if = {
+			limit = {
+				has_trait = calm
+			}
+			add = {
+				value = 15
+				desc = court_position_calm_trait
+			}
+		}
+		if = {
+			limit = { has_trait = overseer }
+			add = {
+				value = 15
+				desc = court_position_overseer_trait
+			}
+		}
+		if = {
+			limit = { has_trait = gallant }
+			add = {
+				value = 15
+				desc = court_position_gallant_trait
+			}
+		}
+		# Estate - Owner bonus from stables
+		if = {
+			limit = {
+				liege ?= {
+					domicile ?= { has_domicile_parameter = estate_increase_master_of_horse_aptitude }
+				}
+			}
+			add = {
+				value = estate_increase_master_of_horse_aptitude_value
+				desc = estate_increase_master_of_horse_aptitude_desc
+			}
+		}
+
+		# Bonus from court.8311
+		if = {
+			limit = { var:bonus_aptitude_role ?= flag:master_of_horse }
+			add = {
+				value = cp_bonus_aptitude_value
+				desc = cp_bonus_aptitude
+			}
+		}
+
+		add = court_position_aptitude_high_penalty_value
+		add = general_aptitude_bonus
+	}
+
+	is_shown = {
+		is_landed_or_landless_administrative_or_theocratic = yes
+		NOT = { government_has_flag = government_is_nomadic }
+		# 天朝封臣（路州帅臣知州）排除原版地方御马官（牧监），职能由兵马差遣承载
+		trigger_if = {
+			limit = {
+				government_has_flag = government_is_celestial
+				is_independent_ruler = no
+			}
+			always = no
+		}
+		trigger_if = {
+			limit = {
+				is_ai = yes
+				highest_held_title_tier <= tier_county
+			}
+			always = no
+		}
+	}
+
+	# Is this an available position for this court? (root is court owner)
+	valid_position = {
+		is_landed_or_landless_administrative_or_theocratic = yes
+		highest_held_title_tier >= tier_duchy
+		trigger_if = {
+			limit = {
+				government_has_flag = government_is_celestial
+				is_independent_ruler = no
+			}
+			always = no
+		}
+	}
+
+	is_shown_character = {
+		scope:employee = {
+			court_position_employee_shown_trigger = yes
+		}
+	}
+
+	valid_character = {
+		scope:employee = {
+			master_of_horse_validity_trigger = { EMPLOYER = scope:liege }
+		}
+	}
+
+	revoke_cost = { # root is the liege, no other scopes are passed here!
+		prestige =  {
+			value = major_court_position_prestige_revoke_cost
+			if = {
+				limit = { free_court_position_revoke_trigger = { POS = master_of_horse } }
+				multiply = 0
+			}
+			#Lowering for LAAMPS, to match Camp Officer revoke cost
+			if = {
+				limit = {
+					exists = this
+					government_has_flag = government_is_landless_adventurer
+				}
+				value = minor_court_position_prestige_revoke_cost
+			}
+		}
+	}
+
+	salary = {
+		gold = {
+			value = 0
+			if = {
+				limit = {
+					scope:liege = {
+						has_treasury = no
+					}
+				}
+				add = master_of_horse_total_salary_value
+			}
+		}
+		treasury = {
+			value = 0
+			if = {
+				limit = {
+					scope:liege = {
+						has_treasury = yes
+					}
+				}
+				add = master_of_horse_total_salary_value
+			}
+		}
+		prestige = {
+			value = master_of_horse_prestige_salary_value
+		}
+		round = no
+	}
+
+	received_salary = {
+		gold = {
+			value = master_of_horse_total_salary_value
+		}
+		prestige = {
+			value = master_of_horse_prestige_salary_value
+		}
+		round = no
+	}
+
+	# These modifiers are employed based on what level the aptitude reaches (levels are defined as breakpoints)
+	scaling_employer_modifiers = {
+		terrible = {
+			knight_effectiveness_mult = 0.01
+			character_travel_speed_mult = 0.01
+		}
+		poor = {
+			knight_effectiveness_mult = 0.02
+			character_travel_speed_mult = 0.02
+			knight_limit = 1
+		}
+		average = {
+			knight_effectiveness_mult = 0.03
+			character_travel_speed_mult = 0.03
+			knight_limit = 2
+		}
+		good = {
+			knight_effectiveness_mult = 0.05
+			character_travel_speed_mult = 0.05
+			knight_limit = 2
+		}
+		excellent = {
+			knight_effectiveness_mult = 0.08
+			character_travel_speed_mult = 0.08
+			knight_limit = 3
+		}
+	}
+
+	modifier = {
+		monthly_martial_lifestyle_xp_gain_mult = 0.15
+		knight_effectiveness_mult = 0.15
+	}
+
+	on_court_position_received = {
+		master_of_horse_title_accepted_effect = yes
+	}
+	on_court_position_revoked = {
+		master_of_horse_title_revoked_effect = yes
+	}
+	on_court_position_invalidated = {
+		master_of_horse_title_invalidated_effect = yes
+	}
+	on_court_position_vacated = {
+		court_position_vacated_event_effect = {
+			COURT_POSITION_TYPE = master_of_horse_court_position
+		}
+	}
+
+	# Scripted value to determine whether an AI will hire/fire a position or not. Hires over 0, fires under -50. Look in _court_positions.info for more extensive documentation!
+	ai_position_score = {
+		value = 50
+		if = {
+			limit = {
+				scope:liege = {
+					ai_has_warlike_personality = yes
+				}
+			}
+			add = 200
+		}
+		add = court_position_debt_considerations_value
+	}
+	ai_candidate_score = {
+		value = 50
+		add = scope:base_value
+		add = court_position_candidate_score_base_value
+		add = court_position_candidate_aptitude_value
+		if = { # To stop petitioned positions immediately being fired by the AI
+			limit = {
+				court_position_petition_ai_weight_trigger = { ROLE = master_of_horse }
+			}
+			add = 1000
+		}
+	}
+}

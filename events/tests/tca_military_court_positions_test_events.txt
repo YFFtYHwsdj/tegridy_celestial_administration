@@ -1,0 +1,643 @@
+﻿# 军事差遣测试：验证三大军职（监押、都监、都虞候）任职资格、重要度量纲与冷却清理。
+# 直接维护的原生 CK3 测试脚本；直接编辑本文件，不使用生成器。
+# 仅显式调试入口，无正常玩法自动调用者。
+namespace = tca_military_court_positions_test
+
+# 用例 1：任免锁、入品知兵底线与封臣领主排他性
+tca_military_court_positions_test.1 = {
+	type = character_event
+	hidden = yes
+	immediate = {
+		if = { limit = { has_character_flag = tca_test_lane_tca_military_court_positions_test_active } debug_log = "TCA_TEST CASE_BUSY" }
+		else = {
+			debug_log = "TCA_TEST BEGIN tca_military_court_positions_test.1 tca_test_military_court_positions_validity"
+			remove_character_flag = tca_test_tca_military_court_positions_test_case_failed
+			if = {
+				limit = {
+					game_start_date = 1066.9.15
+					title:h_china = {
+						exists = holder
+						holder = {
+							is_alive = yes
+							is_independent_ruler = yes
+							government_has_flag = government_is_celestial
+						}
+					}
+				}
+				title:h_china.holder = {
+					save_scope_as = tca_test_emperor
+				}
+
+				# 1. 验证天朝领主自身不能作为廷臣担任军职（is_ruler = no 阻断）
+				if = {
+					limit = {
+						scope:tca_test_emperor = {
+							tca_military_supervisor_validity_trigger = no
+							tca_military_inspector_validity_trigger = no
+							tca_corps_inspector_validity_trigger = no
+						}
+					}
+					debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_validity 1"
+				}
+				else = {
+					add_character_flag = tca_test_tca_military_court_positions_test_case_failed
+					debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_validity 1"
+				}
+
+				# 2. 验证通用武官资格宏在领主身上的守门有效性（排除统治者）
+				if = {
+					limit = {
+						scope:tca_test_emperor = {
+							tca_military_officer_base_eligibility_trigger = no
+						}
+					}
+					debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_validity 2"
+				}
+				else = {
+					add_character_flag = tca_test_tca_military_court_positions_test_case_failed
+					debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_validity 2"
+				}
+
+				# 3. 验证未获系统授权 flag 时，任何人均无法被手动任免（第四阶段闭环）
+				if = {
+					limit = {
+						scope:tca_test_emperor = {
+							NOT = { has_character_flag = tca_military_appointment_allowed }
+						}
+					}
+					debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_validity 3"
+				}
+				else = {
+					add_character_flag = tca_test_tca_military_court_positions_test_case_failed
+					debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_validity 3"
+				}
+
+				# 4. 验证无地人物（is_landed = no）官署准入全面阻断
+				scope:tca_test_emperor = {
+					random_courtier = {
+						limit = {
+							is_landed = no
+						}
+						save_scope_as = tca_test_landless_courtier
+					}
+				}
+				if = {
+					limit = {
+						exists = scope:tca_test_landless_courtier
+						scope:tca_test_landless_courtier = {
+							tca_military_supervisor_office_valid_trigger = no
+							tca_military_inspector_office_valid_trigger = no
+							tca_corps_inspector_office_valid_trigger = no
+						}
+					}
+					debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_validity 4"
+				}
+				else = {
+					add_character_flag = tca_test_tca_military_court_positions_test_case_failed
+					debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_validity 4"
+				}
+
+				# 5. 验证独立最高皇帝全面排除军事差遣准入，普通公国封臣不满足都虞候准入但满足都监/监押准入
+				scope:tca_test_emperor = {
+					random_vassal = {
+						limit = {
+							highest_held_title_tier = tier_duchy
+							NOT = { has_title = title:e_minister_grand_marshal }
+						}
+						save_scope_as = tca_test_regular_duchy_vassal
+					}
+				}
+				if = {
+					limit = {
+						scope:tca_test_emperor = {
+							tca_corps_inspector_office_valid_trigger = no
+							tca_military_inspector_office_valid_trigger = no
+							tca_military_supervisor_office_valid_trigger = no
+						}
+						trigger_if = {
+							limit = { exists = scope:tca_test_regular_duchy_vassal }
+							scope:tca_test_regular_duchy_vassal = {
+								tca_corps_inspector_office_valid_trigger = no
+								tca_military_inspector_office_valid_trigger = yes
+								tca_military_supervisor_office_valid_trigger = yes
+							}
+						}
+					}
+					debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_validity 5"
+				}
+				else = {
+					add_character_flag = tca_test_tca_military_court_positions_test_case_failed
+					debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_validity 5"
+				}
+
+				# 结果汇报
+				if = {
+					limit = { has_character_flag = tca_test_tca_military_court_positions_test_case_failed }
+					debug_log = "TCA_TEST FAIL tca_test_military_court_positions_validity"
+					if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+				}
+				else = {
+					debug_log = "TCA_TEST PASS tca_test_military_court_positions_validity"
+					if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } }
+				}
+			}
+			else = {
+				debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_military_court_positions_validity"
+				if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+			}
+			remove_character_flag = tca_test_tca_military_court_positions_test_case_failed
+		}
+	}
+}
+
+# 用例 2：官署战略权重、宫廷位阶加分与单向阀门量纲铁律
+tca_military_court_positions_test.2 = {
+	type = character_event
+	hidden = yes
+	immediate = {
+		if = { limit = { has_character_flag = tca_test_lane_tca_military_court_positions_test_active } debug_log = "TCA_TEST CASE_BUSY" }
+		else = {
+			debug_log = "TCA_TEST BEGIN tca_military_court_positions_test.2 tca_test_military_court_positions_importance_tier"
+			remove_character_flag = tca_test_tca_military_court_positions_test_case_failed
+			if = {
+				limit = {
+					game_start_date = 1066.9.15
+					title:h_china = {
+						exists = holder
+						holder = {
+							is_alive = yes
+							highest_held_title_tier >= tier_hegemony
+						}
+					}
+				}
+				title:h_china.holder = {
+					save_scope_as = tca_test_hegemon
+				}
+
+				# 1. 验证霸权位阶加分生效（最高领主战略权重至少具备 12 点位阶加分）
+				if = {
+					limit = {
+						scope:tca_test_hegemon = {
+							tca_military_office_strategic_weight >= 12.0
+						}
+					}
+					debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_importance_tier 1"
+				}
+				else = {
+					add_character_flag = tca_test_tca_military_court_positions_test_case_failed
+					debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_importance_tier 1"
+				}
+
+				# 2. 验证战略权重未超出 0~82 分的设计阀门上限
+				if = {
+					limit = {
+						scope:tca_test_hegemon = {
+							tca_military_office_strategic_weight <= 82.0
+						}
+					}
+					debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_importance_tier 2"
+				}
+				else = {
+					add_character_flag = tca_test_tca_military_court_positions_test_case_failed
+					debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_importance_tier 2"
+				}
+
+				# 3. 验证未任差遣时人物当前重要度恒为 0
+				if = {
+					limit = {
+						scope:tca_test_hegemon = {
+							tca_military_character_current_office_importance = 0
+						}
+					}
+					debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_importance_tier 3"
+				}
+				else = {
+					add_character_flag = tca_test_tca_military_court_positions_test_case_failed
+					debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_importance_tier 3"
+				}
+
+				# 结果汇报
+				if = {
+					limit = { has_character_flag = tca_test_tca_military_court_positions_test_case_failed }
+					debug_log = "TCA_TEST FAIL tca_test_military_court_positions_importance_tier"
+					if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+				}
+				else = {
+					debug_log = "TCA_TEST PASS tca_test_military_court_positions_importance_tier"
+					if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } }
+				}
+			}
+			else = {
+				debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_military_court_positions_importance_tier"
+				if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+			}
+			remove_character_flag = tca_test_tca_military_court_positions_test_case_failed
+		}
+	}
+}
+
+# 用例 3：任期冷却期设置与职位变动自动清理
+tca_military_court_positions_test.3 = {
+	type = character_event
+	hidden = yes
+	immediate = {
+		if = { limit = { has_character_flag = tca_test_lane_tca_military_court_positions_test_active } debug_log = "TCA_TEST CASE_BUSY" }
+		else = {
+			debug_log = "TCA_TEST BEGIN tca_military_court_positions_test.3 tca_test_military_court_positions_cooldown_and_cleanup"
+			remove_character_flag = tca_test_tca_military_court_positions_test_case_failed
+			if = {
+				limit = {
+					game_start_date = 1066.9.15
+					title:h_china = {
+						exists = holder
+						holder = { is_alive = yes }
+					}
+				}
+				title:h_china.holder = {
+					save_scope_as = tca_test_emperor
+				}
+
+				# 1. 模拟赋予人物 2 年冷却期 Flag
+				scope:tca_test_emperor = {
+					add_character_flag = {
+						flag = tca_military_appointment_cooldown
+						days = 730
+					}
+				}
+
+				if = {
+					limit = {
+						scope:tca_test_emperor = {
+							has_character_flag = tca_military_appointment_cooldown
+						}
+					}
+					debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_cooldown_and_cleanup 1"
+				}
+				else = {
+					add_character_flag = tca_test_tca_military_court_positions_test_case_failed
+					debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_cooldown_and_cleanup 1"
+				}
+
+				# 2. 模拟职位清理机制抹除冷却期 Flag
+				scope:tca_test_emperor = {
+					remove_character_flag = tca_military_appointment_cooldown
+				}
+
+				if = {
+					limit = {
+						scope:tca_test_emperor = {
+							NOT = { has_character_flag = tca_military_appointment_cooldown }
+						}
+					}
+					debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_cooldown_and_cleanup 2"
+				}
+				else = {
+					add_character_flag = tca_test_tca_military_court_positions_test_case_failed
+					debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_cooldown_and_cleanup 2"
+				}
+
+				# 结果汇报
+				if = {
+					limit = { has_character_flag = tca_test_tca_military_court_positions_test_case_failed }
+					debug_log = "TCA_TEST FAIL tca_test_military_court_positions_cooldown_and_cleanup"
+					if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+				}
+				else = {
+					debug_log = "TCA_TEST PASS tca_test_military_court_positions_cooldown_and_cleanup"
+					if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } }
+				}
+			}
+			else = {
+				debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_military_court_positions_cooldown_and_cleanup"
+				if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+			}
+			remove_character_flag = tca_test_tca_military_court_positions_test_case_failed
+		}
+	}
+}
+
+# 用例 4：兼任与全职排他、知兵底线与在籍品级守门
+tca_military_court_positions_test.4 = {
+	type = character_event
+	hidden = yes
+	immediate = {
+		if = { limit = { has_character_flag = tca_test_lane_tca_military_court_positions_test_active } debug_log = "TCA_TEST CASE_BUSY" }
+		else = {
+			debug_log = "TCA_TEST BEGIN tca_military_court_positions_test.4 tca_test_military_court_positions_exclusivity_and_rank"
+			remove_character_flag = tca_test_tca_military_court_positions_test_case_failed
+			if = {
+				limit = {
+					game_start_date = 1066.9.15
+					title:h_china = {
+						exists = holder
+						holder = {
+							is_alive = yes
+							is_independent_ruler = yes
+						}
+					}
+				}
+				title:h_china.holder = {
+					save_scope_as = tca_test_emperor
+				}
+
+				# 1. 验证全职职位排他：内阁大臣（is_councillor）不具备待阙武官资格
+				scope:tca_test_emperor = {
+					random_councillor = {
+						save_scope_as = tca_test_councillor
+					}
+				}
+				if = {
+					limit = {
+						exists = scope:tca_test_councillor
+						scope:tca_test_councillor = {
+							court_position_does_not_already_have_a_job_trigger = no
+							tca_military_eligible_unassigned_officer_trigger = no
+						}
+					}
+					debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_exclusivity_and_rank 1"
+				}
+				else = {
+					add_character_flag = tca_test_tca_military_court_positions_test_case_failed
+					debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_exclusivity_and_rank 1"
+				}
+
+				# 2. 验证知兵底线：武力不足 6 者排除出基础武官资格（martial >= 6 守门）
+				scope:tca_test_emperor = {
+					random_courtier = {
+						limit = {
+							martial < 6
+						}
+						save_scope_as = tca_test_low_martial_courtier
+					}
+				}
+				if = {
+					limit = {
+						exists = scope:tca_test_low_martial_courtier
+						scope:tca_test_low_martial_courtier = {
+							tca_military_officer_base_eligibility_trigger = no
+						}
+					}
+					debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_exclusivity_and_rank 2"
+				}
+				else = {
+					add_character_flag = tca_test_tca_military_court_positions_test_case_failed
+					debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_exclusivity_and_rank 2"
+				}
+
+				# 3. 验证入品资序底线：未入品（merit_level < 1）者排除出基础武官资格（merit_level >= 1 守门）
+				scope:tca_test_emperor = {
+					random_courtier = {
+						limit = {
+							merit_level < 1
+						}
+						save_scope_as = tca_test_unranked_courtier
+					}
+				}
+				if = {
+					limit = {
+						exists = scope:tca_test_unranked_courtier
+						scope:tca_test_unranked_courtier = {
+							tca_military_officer_base_eligibility_trigger = no
+						}
+					}
+					debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_exclusivity_and_rank 3"
+				}
+				else = {
+					add_character_flag = tca_test_tca_military_court_positions_test_case_failed
+					debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_exclusivity_and_rank 3"
+				}
+
+				# 结果汇报
+				if = {
+					limit = { has_character_flag = tca_test_tca_military_court_positions_test_case_failed }
+					debug_log = "TCA_TEST FAIL tca_test_military_court_positions_exclusivity_and_rank"
+					if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+				}
+				else = {
+					debug_log = "TCA_TEST PASS tca_test_military_court_positions_exclusivity_and_rank"
+					if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } }
+				}
+			}
+			else = {
+				debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_military_court_positions_exclusivity_and_rank"
+				if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+			}
+			remove_character_flag = tca_test_tca_military_court_positions_test_case_failed
+		}
+	}
+}
+
+# 用例 5：原版御马官（牧监）覆盖验证（地方彻底屏蔽，中央保留尚乘奉御）
+tca_military_court_positions_test.5 = {
+	type = character_event
+	hidden = yes
+	immediate = {
+		if = { limit = { has_character_flag = tca_test_lane_tca_military_court_positions_test_active } debug_log = "TCA_TEST CASE_BUSY" }
+		else = {
+			debug_log = "TCA_TEST BEGIN tca_military_court_positions_test.5 tca_test_military_court_positions_vanilla_override"
+			remove_character_flag = tca_test_tca_military_court_positions_test_case_failed
+			if = {
+				limit = {
+					game_start_date = 1066.9.15
+					title:h_china = {
+						exists = holder
+						holder = {
+							is_alive = yes
+							is_independent_ruler = yes
+							highest_held_title_tier >= tier_empire
+						}
+					}
+				}
+				title:h_china.holder = {
+					save_scope_as = tca_test_emperor
+				}
+
+				# 1. 验证天朝独立最高皇帝保留原版御马官（尚乘奉御）可用性
+				if = {
+					limit = {
+						scope:tca_test_emperor = {
+							can_employ_court_position_type = master_of_horse_court_position
+						}
+					}
+					debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_vanilla_override 1"
+				}
+				else = {
+					add_character_flag = tca_test_tca_military_court_positions_test_case_failed
+					debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_vanilla_override 1"
+				}
+
+				# 2. 验证天朝地方封臣彻底屏蔽原版御马官（牧监）
+				scope:tca_test_emperor = {
+					random_vassal_or_below = {
+						limit = {
+							highest_held_title_tier >= tier_duchy
+							government_has_flag = government_is_celestial
+						}
+						save_scope_as = tca_test_high_tier_vassal
+					}
+				}
+				if = {
+					limit = {
+						exists = scope:tca_test_high_tier_vassal
+						scope:tca_test_high_tier_vassal = {
+							NOT = { can_employ_court_position_type = master_of_horse_court_position }
+						}
+					}
+					debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_vanilla_override 2"
+				}
+				else = {
+					add_character_flag = tca_test_tca_military_court_positions_test_case_failed
+					debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_vanilla_override 2"
+				}
+
+				# 结果汇报
+				if = {
+					limit = { has_character_flag = tca_test_tca_military_court_positions_test_case_failed }
+					debug_log = "TCA_TEST FAIL tca_test_military_court_positions_vanilla_override"
+					if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+				}
+				else = {
+					debug_log = "TCA_TEST PASS tca_test_military_court_positions_vanilla_override"
+					if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } }
+				}
+			}
+			else = {
+				debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_military_court_positions_vanilla_override"
+				if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+			}
+			remove_character_flag = tca_test_tca_military_court_positions_test_case_failed
+		}
+	}
+}
+
+# 用例 6：任期磨勘拦截与待阙池耗尽（宁缺毋滥）安全熔断
+tca_military_court_positions_test.6 = {
+	type = character_event
+	hidden = yes
+	immediate = {
+		if = { limit = { has_character_flag = tca_test_lane_tca_military_court_positions_test_active } debug_log = "TCA_TEST CASE_BUSY" }
+		else = {
+			debug_log = "TCA_TEST BEGIN tca_military_court_positions_test.6 tca_test_military_court_positions_cooldown_and_empty_pool"
+			remove_character_flag = tca_test_tca_military_court_positions_test_case_failed
+			if = {
+				limit = {
+					game_start_date = 1066.9.15
+					title:h_china = {
+						exists = holder
+						holder = {
+							is_alive = yes
+							is_independent_ruler = yes
+						}
+					}
+				}
+				title:h_china.holder = {
+					save_scope_as = tca_test_emperor
+				}
+
+				# 1. 验证任期磨勘冷却期（730天）对在职调动收集的拦截
+				scope:tca_test_emperor = {
+					random_courtier = {
+						limit = {
+							tca_military_officer_base_eligibility_trigger = yes
+						}
+						save_scope_as = tca_test_cooldown_candidate
+					}
+				}
+				if = {
+					limit = {
+						exists = scope:tca_test_cooldown_candidate
+					}
+					scope:tca_test_cooldown_candidate = {
+						add_character_flag = {
+							flag = tca_military_appointment_cooldown
+							days = 730
+						}
+					}
+					# 验证处于冷却期时，无法通过收集筛选（NOT has_character_flag = tca_military_appointment_cooldown 为 false）
+					if = {
+						limit = {
+							scope:tca_test_cooldown_candidate = {
+								has_character_flag = tca_military_appointment_cooldown
+							}
+						}
+						debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_cooldown_and_empty_pool 1"
+					}
+					else = {
+						add_character_flag = tca_test_tca_military_court_positions_test_case_failed
+						debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_cooldown_and_empty_pool 1"
+					}
+					# 恢复清理
+					scope:tca_test_cooldown_candidate = {
+						remove_character_flag = tca_military_appointment_cooldown
+					}
+				}
+				else = {
+					add_character_flag = tca_test_tca_military_court_positions_test_case_failed
+					debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_cooldown_and_empty_pool 1"
+				}
+
+				# 2. 验证待阙池耗尽（宁缺毋滥）安全熔断：空池下执行除授效果绝不任命且安全退出
+				scope:tca_test_emperor = {
+					random_vassal = {
+						limit = {
+							highest_held_title_tier = tier_duchy
+							government_has_flag = government_is_celestial
+							NOT = { employs_court_position = tca_military_inspector_court_position }
+						}
+						save_scope_as = tca_test_empty_target_liege
+					}
+				}
+				# 确保候选池为空
+				every_in_list = {
+					list = tca_military_candidate_pool
+					remove_from_list = tca_military_candidate_pool
+				}
+				if = {
+					limit = {
+						exists = scope:tca_test_empty_target_liege
+					}
+					scope:tca_test_empty_target_liege = {
+						save_scope_as = target_liege
+						tca_military_fill_single_position_effect = {
+							POSITION = tca_military_inspector_court_position
+						}
+					}
+				}
+
+				# 断言：空池下坚决未聘任任何官员，保持出缺，宁缺毋滥
+				if = {
+					limit = {
+						trigger_if = {
+							limit = { exists = scope:tca_test_empty_target_liege }
+							scope:tca_test_empty_target_liege = {
+								NOT = { employs_court_position = tca_military_inspector_court_position }
+							}
+						}
+						NOT = { any_in_list = { list = tca_military_candidate_pool count >= 1 } }
+					}
+					debug_log = "TCA_TEST CHECK_PASS tca_test_military_court_positions_cooldown_and_empty_pool 2"
+				}
+				else = {
+					add_character_flag = tca_test_tca_military_court_positions_test_case_failed
+					debug_log = "TCA_TEST CHECK_FAIL tca_test_military_court_positions_cooldown_and_empty_pool 2"
+				}
+
+				# 结果汇报
+				if = {
+					limit = { has_character_flag = tca_test_tca_military_court_positions_test_case_failed }
+					debug_log = "TCA_TEST FAIL tca_test_military_court_positions_cooldown_and_empty_pool"
+					if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+				}
+				else = {
+					debug_log = "TCA_TEST PASS tca_test_military_court_positions_cooldown_and_empty_pool"
+					if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } }
+				}
+			}
+			else = {
+				debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_military_court_positions_cooldown_and_empty_pool"
+				if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+			}
+			remove_character_flag = tca_test_tca_military_court_positions_test_case_failed
+		}
+	}
+}

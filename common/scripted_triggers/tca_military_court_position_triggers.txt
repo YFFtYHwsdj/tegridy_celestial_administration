@@ -1,0 +1,178 @@
+﻿# 军事宫廷职位任职资格与专职排他 Trigger
+#
+# 本文件维护天朝三大军事差遣（兵马监押、兵马都监、都虞候）的任职资格判断。
+# 包含身心健全底线、两两互斥检查，并复用原版全职职位排他机制。
+
+# -------------------------------------------------------------------
+# 官署准入 Trigger（Office Validity）
+# 基础底线：必须为非独立的天朝地方领主（is_independent_ruler = no），中央独立皇帝彻底排除设立三大军事差遣（保留原版尚乘奉御）；
+# 必须持有实际领地（is_landed = yes，枢密使特许除外），彻底杜绝无地纯文官、提刑司、六部尚书等设立军事差遣；
+# 叠加白名单：都虞候仅向枢密使及王国级以上高级军制路分开放。
+# -------------------------------------------------------------------
+
+# 兵马监押官署准入（州县级以上实土地方官署，排除独立皇帝）
+# 作用域：领主（Character）
+tca_military_supervisor_office_valid_trigger = {
+	is_ruler = yes
+	government_has_flag = government_is_celestial
+	is_landed = yes
+	is_independent_ruler = no
+	highest_held_title_tier >= tier_county
+}
+
+# 兵马都监官署准入（公国、王国及帝国级有地地方官署，排除独立皇帝）
+# 作用域：领主（Character）
+tca_military_inspector_office_valid_trigger = {
+	is_ruler = yes
+	government_has_flag = government_is_celestial
+	is_landed = yes
+	is_independent_ruler = no
+	highest_held_title_tier >= tier_duchy
+}
+
+# 都虞候官署准入（枢密使与王国级以上高级军路，排除独立皇帝）
+# 作用域：领主（Character）
+tca_corps_inspector_office_valid_trigger = {
+	is_ruler = yes
+	government_has_flag = government_is_celestial
+	is_independent_ruler = no
+	OR = {
+		# 1. 枢密使（持有官方枢密院头衔）
+		has_title = title:e_minister_grand_marshal
+		# 2. 高级军路（王国级及以上有地军制省或都护府契约）
+		AND = {
+			is_landed = yes
+			highest_held_title_tier >= tier_kingdom
+			tca_military_is_military_province_trigger = yes
+		}
+	}
+}
+
+# 检查角色是否未担任本体系内任何军事差遣
+tca_does_not_hold_any_military_court_position_trigger = {
+	NOR = {
+		has_court_position = tca_military_supervisor_court_position
+		has_court_position = tca_military_inspector_court_position
+		has_court_position = tca_corps_inspector_court_position
+	}
+}
+
+# 检查领主官署是否属于体制军区（军制省或都护府契约）
+tca_military_is_military_province_trigger = {
+	OR = {
+		vassal_contract_has_flag = celestial_province_military
+		vassal_contract_has_flag = celestial_province_protectorate
+	}
+}
+
+# 检查领主官署辖区是否与天朝帝国以外的外国政权直接接壤
+tca_military_is_foreign_border_trigger = {
+	save_temporary_scope_as = tca_border_check_ruler
+	any_sub_realm_county = {
+		any_neighboring_county = {
+			holder ?= {
+				top_liege != scope:tca_border_check_ruler.top_liege
+			}
+		}
+	}
+}
+
+# 统合沿边与军区判定（满足其一即属国防重镇）
+tca_military_is_frontier_office_trigger = {
+	OR = {
+		tca_military_is_military_province_trigger = yes
+		tca_military_is_foreign_border_trigger = yes
+	}
+}
+
+# 军事差遣官员通用基础资格（带职位参数宏，单点维护，杜绝代码重复）
+# 参数：$POSITION$（当前判定的职位对象）
+# 作用域：scope:employee（Character）
+tca_military_court_position_base_validity_trigger = {
+	is_adult = yes
+	NOT = { has_trait = incapable }
+	NOT = { is_imprisoned = yes }
+	# 1. 复用原版全职排他：排除总管、试毒官、侍从、小丑等全部杂职，且排除正式内阁成员（is_councillor）与税吏（is_tax_collector）
+	court_position_does_not_already_have_a_job_trigger = yes
+
+	# 2. 军事差遣专职排他：未担任本体系内其他军事差遣职位
+	custom_tooltip = {
+		text = tca_cannot_hold_multiple_military_court_positions
+		trigger_if = {
+			limit = {
+				NOT = { has_court_position = $POSITION$ }
+			}
+			tca_does_not_hold_any_military_court_position_trigger = yes
+		}
+	}
+
+	# 3. 身份资格：必须在籍入品（至少从九品）
+	custom_tooltip = {
+		text = tca_must_be_in_official_rank
+		merit_level >= 1
+	}
+
+	# 4. 身份状态：待阙官员（必须为本署待阙廷臣，严禁封臣或有地实官兼领）
+	custom_tooltip = {
+		text = tca_must_be_unlanded_official
+		is_ruler = no
+		is_courtier_of = scope:liege
+	}
+
+	# 5. 能力底线：通晓兵略（军事能力不低于6）
+	custom_tooltip = {
+		text = tca_must_have_basic_martial
+		martial >= 6
+	}
+
+	# 6. 朝廷敕命专任（第四阶段：封锁手动自主任免，仅限朝廷系统铨选除授）
+	custom_tooltip = {
+		text = tca_cannot_appoint_military_court_position_manually
+		trigger_if = {
+			limit = {
+				NOT = { has_court_position = $POSITION$ }
+			}
+			has_character_flag = tca_military_appointment_allowed
+		}
+	}
+}
+
+# 兵马监押任职资格
+tca_military_supervisor_validity_trigger = {
+	tca_military_court_position_base_validity_trigger = {
+		POSITION = tca_military_supervisor_court_position
+	}
+}
+
+# 兵马都监任职资格
+tca_military_inspector_validity_trigger = {
+	tca_military_court_position_base_validity_trigger = {
+		POSITION = tca_military_inspector_court_position
+	}
+}
+
+# 都虞候任职资格
+tca_corps_inspector_validity_trigger = {
+	tca_military_court_position_base_validity_trigger = {
+		POSITION = tca_corps_inspector_court_position
+	}
+}
+
+# 武官全国铨选通用人选资格（身心、入品、知兵守门，单点维护，杜绝重复判定）
+tca_military_officer_base_eligibility_trigger = {
+	is_alive = yes
+	is_adult = yes
+	is_ruler = no
+	government_has_flag = government_is_celestial
+	merit_level >= 1
+	martial >= 6
+	NOT = { has_trait = incapable }
+	NOT = { is_imprisoned = yes }
+}
+
+# 待阙武官全国选拔通用资格（判断某人是否具备入选全国待阙武官池的资格）
+tca_military_eligible_unassigned_officer_trigger = {
+	tca_military_officer_base_eligibility_trigger = yes
+	court_position_does_not_already_have_a_job_trigger = yes
+	tca_does_not_hold_any_military_court_position_trigger = yes
+}

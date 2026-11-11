@@ -1,0 +1,579 @@
+﻿# 军事宫廷职位（第一阶段：职位基础搭建）
+#
+# 本文件维护天朝三大军事差遣宫廷职位定义：
+# 1. 兵马监押（tca_military_supervisor_court_position）：伯爵级及以上（知州、知府、知军）
+# 2. 兵马都监（tca_military_inspector_court_position）：公爵及王国级（路主、帅臣）
+# 3. 都虞候（tca_corps_inspector_court_position）：公爵及王国级（大路、都部署司）
+#
+# 第一阶段保留手动测试任免入口，AI 基础分设为 0 防止自动滥招。
+
+tca_military_supervisor_court_position = {
+	sort_order = 285
+	max_available_positions = 1
+	minimum_rank = county
+	skill = martial
+
+	court_position_asset = {
+		trigger = {
+			government_has_flag = government_is_celestial
+		}
+		animation = throne_room_two_handed_passive_1
+		background = "gfx/interface/illustrations/event_scenes/tgp_courtyard_asia.dds"
+	}
+
+	opinion = {
+		value = regular_court_position_opinion
+	}
+
+	aptitude_level_breakpoints = { 20 40 60 80 }
+
+	# 称职度：军事为主，管理为辅，勇武仅作基础门槛
+	aptitude = {
+		value = 1
+		add = {
+			value = martial
+			multiply = 2.0
+			max = 40
+			desc = court_position_skill_martial
+		}
+		add = {
+			value = stewardship
+			multiply = 1.0
+			max = 20
+			desc = court_position_skill_stewardship
+		}
+		add = {
+			value = prowess
+			multiply = 0.5
+			max = 10
+			desc = court_position_skill_prowess
+		}
+		if = {
+			limit = { has_trait = diligent }
+			add = { value = 5 desc = court_position_diligent_trait }
+		}
+		if = {
+			limit = { has_trait = brave }
+			add = { value = 5 desc = court_position_brave_trait }
+		}
+		if = {
+			limit = { has_trait = lazy }
+			add = { value = -5 desc = court_position_lazy_trait }
+		}
+		if = {
+			limit = { has_trait = craven }
+			add = { value = -5 desc = court_position_craven_trait }
+		}
+		if = {
+			limit = { has_trait = greedy }
+			add = { value = -5 desc = court_position_greedy_trait }
+		}
+		add = court_position_aptitude_low_penalty_value
+		add = general_aptitude_bonus
+	}
+
+	is_shown = {
+		tca_military_supervisor_office_valid_trigger = yes
+	}
+
+	valid_position = {
+		tca_military_supervisor_office_valid_trigger = yes
+	}
+
+	is_shown_character = {
+		scope:employee = {
+			is_courtier_of = scope:liege
+			court_position_employee_shown_trigger = yes
+		}
+	}
+
+	# 第一阶段：专职排他与基础身心健全资格（限定本署在籍待阙廷臣，严禁封臣实官）
+	valid_character = {
+		scope:employee = {
+			tca_military_supervisor_validity_trigger = yes
+		}
+	}
+
+	on_court_position_revoked = {
+		scope:employee = {
+			remove_character_flag = tca_military_appointment_cooldown
+		}
+	}
+
+	on_court_position_invalidated = {
+		scope:employee = {
+			remove_character_flag = tca_military_appointment_cooldown
+		}
+	}
+
+	salary = {
+		gold = {
+			value = 0
+			if = {
+				limit = {
+					scope:liege = { has_treasury = no }
+				}
+				add = minor_court_position_salary
+			}
+		}
+		treasury = {
+			value = 0
+			if = {
+				limit = {
+					scope:liege = { has_treasury = yes }
+				}
+				add = minor_court_position_salary
+			}
+		}
+		prestige = {
+			value = minor_court_position_prestige_salary
+		}
+		round = no
+	}
+
+	received_salary = {
+		gold = { value = minor_court_position_salary }
+		prestige = { value = minor_court_position_prestige_salary }
+		round = no
+	}
+
+	revoke_cost = {
+		influence = {
+			value = tca_minor_court_position_influence_revoke_cost
+			if = {
+				limit = { free_court_position_revoke_trigger = { POS = tca_military_supervisor } }
+				multiply = 0
+			}
+		}
+	}
+
+	# 常驻基础效果（优秀档标定：控制力增长+25%，征召补员+10%，防御优势+2）
+	base_employer_modifier = {
+	}
+
+	# 任职者个人效果（第三阶段：每月固定考绩与个人历练成长）
+	modifier = {
+		monthly_merit = 1.5
+		monthly_martial_lifestyle_xp_gain_mult = 0.05
+		monthly_prestige = 0.05
+	}
+
+	scaling_employer_modifiers = {
+		terrible = {
+			monthly_county_control_growth_factor = 0.05
+			levy_reinforcement_rate = 0.02
+		}
+		poor = {
+			monthly_county_control_growth_factor = 0.10
+			levy_reinforcement_rate = 0.04
+			defender_advantage = 1
+		}
+		average = {
+			monthly_county_control_growth_factor = 0.15
+			levy_reinforcement_rate = 0.06
+			defender_advantage = 1
+		}
+		good = {
+			monthly_county_control_growth_factor = 0.20
+			levy_reinforcement_rate = 0.08
+			defender_advantage = 2
+		}
+		excellent = {
+			monthly_county_control_growth_factor = 0.25
+			levy_reinforcement_rate = 0.10
+			defender_advantage = 2
+		}
+	}
+
+	ai_position_score = {
+		value = 0
+	}
+
+	ai_candidate_score = {
+		value = 100
+		add = court_position_candidate_score_base_value
+		add = court_position_candidate_aptitude_value
+	}
+}
+
+tca_military_inspector_court_position = {
+	sort_order = 286
+	max_available_positions = 1
+	minimum_rank = duchy
+	skill = martial
+
+	court_position_asset = {
+		trigger = {
+			government_has_flag = government_is_celestial
+		}
+		animation = throne_room_two_handed_passive_1
+		background = "gfx/interface/illustrations/event_scenes/tgp_courtyard_asia.dds"
+	}
+
+	opinion = {
+		value = regular_court_position_opinion
+	}
+
+	aptitude_level_breakpoints = { 20 40 60 80 }
+
+	# 称职度：军事大头、正规教育、指挥官经验、适度勇武
+	aptitude = {
+		value = 1
+		add = {
+			value = martial
+			multiply = 3.0
+			max = 60
+			desc = court_position_skill_martial
+		}
+		add = {
+			value = prowess
+			multiply = 0.75
+			max = 15
+			desc = court_position_skill_prowess
+		}
+		if = {
+			limit = { has_trait = education_martial_4 }
+			add = { value = 12 desc = court_position_education_martial_4_trait }
+		}
+		else_if = {
+			limit = { has_trait = education_martial_3 }
+			add = { value = 9 desc = court_position_education_martial_3_trait }
+		}
+		else_if = {
+			limit = { has_trait = education_martial_2 }
+			add = { value = 6 desc = court_position_education_martial_2_trait }
+		}
+		else_if = {
+			limit = { has_trait = education_martial_1 }
+			add = { value = 3 desc = court_position_education_martial_1_trait }
+		}
+		if = {
+			limit = { has_trait_with_flag = commander_trait_flag }
+			add = { value = 8 desc = tca_court_position_commander_trait }
+		}
+		if = {
+			limit = { has_trait = diligent }
+			add = { value = 5 desc = court_position_diligent_trait }
+		}
+		if = {
+			limit = { has_trait = ambitious }
+			add = { value = 5 desc = court_position_ambitious_trait }
+		}
+		if = {
+			limit = { has_trait = lazy }
+			add = { value = -6 desc = court_position_lazy_trait }
+		}
+		if = {
+			limit = { has_trait = craven }
+			add = { value = -6 desc = court_position_craven_trait }
+		}
+		add = court_position_aptitude_low_penalty_value
+		add = general_aptitude_bonus
+	}
+
+	is_shown = {
+		tca_military_inspector_office_valid_trigger = yes
+	}
+
+	valid_position = {
+		tca_military_inspector_office_valid_trigger = yes
+	}
+
+	is_shown_character = {
+		scope:employee = {
+			is_courtier_of = scope:liege
+			court_position_employee_shown_trigger = yes
+		}
+	}
+
+	# 第一阶段：专职排他与基础身心健全资格（限定本署在籍待阙廷臣，严禁封臣实官）
+	valid_character = {
+		scope:employee = {
+			tca_military_inspector_validity_trigger = yes
+		}
+	}
+
+	on_court_position_revoked = {
+		scope:employee = {
+			remove_character_flag = tca_military_appointment_cooldown
+		}
+	}
+
+	on_court_position_invalidated = {
+		scope:employee = {
+			remove_character_flag = tca_military_appointment_cooldown
+		}
+	}
+
+	salary = {
+		gold = {
+			value = 0
+			if = {
+				limit = {
+					scope:liege = { has_treasury = no }
+				}
+				add = medium_court_position_salary
+			}
+		}
+		treasury = {
+			value = 0
+			if = {
+				limit = {
+					scope:liege = { has_treasury = yes }
+				}
+				add = medium_court_position_salary
+			}
+		}
+		prestige = {
+			value = medium_court_position_prestige_salary
+		}
+		round = no
+	}
+
+	received_salary = {
+		gold = { value = medium_court_position_salary }
+		prestige = { value = medium_court_position_prestige_salary }
+		round = no
+	}
+
+	revoke_cost = {
+		influence = {
+			value = tca_medium_court_position_influence_revoke_cost
+			if = {
+				limit = { free_court_position_revoke_trigger = { POS = tca_military_inspector } }
+				multiply = 0
+			}
+		}
+	}
+
+	# 常驻基础效果（优秀档标定：坚韧+3%，维护费-5%，伤害+2%）
+	base_employer_modifier = {
+	}
+
+	# 任职者个人效果（第三阶段：每月固定考绩与个人历练成长）
+	modifier = {
+		monthly_merit = 2.5
+		monthly_martial_lifestyle_xp_gain_mult = 0.10
+		monthly_prestige = 0.10
+	}
+
+	scaling_employer_modifiers = {
+		terrible = {
+			army_toughness_mult = 0.01
+			army_maintenance_mult = -0.01
+		}
+		poor = {
+			army_toughness_mult = 0.015
+			army_maintenance_mult = -0.02
+			army_damage_mult = 0.01
+		}
+		average = {
+			army_toughness_mult = 0.02
+			army_maintenance_mult = -0.03
+			army_damage_mult = 0.01
+		}
+		good = {
+			army_toughness_mult = 0.025
+			army_maintenance_mult = -0.04
+			army_damage_mult = 0.015
+		}
+		excellent = {
+			army_toughness_mult = 0.03
+			army_maintenance_mult = -0.05
+			army_damage_mult = 0.02
+		}
+	}
+
+	ai_position_score = {
+		value = 0
+	}
+
+	ai_candidate_score = {
+		value = 100
+		add = court_position_candidate_score_base_value
+		add = court_position_candidate_aptitude_value
+	}
+}
+
+tca_corps_inspector_court_position = {
+	sort_order = 287
+	max_available_positions = 1
+	minimum_rank = duchy
+	skill = martial
+
+	court_position_asset = {
+		trigger = {
+			government_has_flag = government_is_celestial
+		}
+		animation = throne_room_two_handed_passive_1
+		background = "gfx/interface/illustrations/event_scenes/tgp_courtyard_asia.dds"
+	}
+
+	opinion = {
+		value = regular_court_position_opinion
+	}
+
+	aptitude_level_breakpoints = { 20 40 60 80 }
+
+	# 称职度：军事统御、法度纪律、指挥官实战经验、适度勇武
+	aptitude = {
+		value = 1
+		add = {
+			value = martial
+			multiply = 2.5
+			max = 50
+			desc = court_position_skill_martial
+		}
+		add = {
+			value = prowess
+			multiply = 1.0
+			max = 20
+			desc = court_position_skill_prowess
+		}
+		if = {
+			limit = { has_trait_with_flag = commander_trait_flag }
+			add = { value = 8 desc = tca_court_position_commander_trait }
+		}
+		if = {
+			limit = { has_trait = just }
+			add = { value = 8 desc = court_position_just_trait }
+		}
+		if = {
+			limit = { has_trait = brave }
+			add = { value = 5 desc = court_position_brave_trait }
+		}
+		if = {
+			limit = { has_trait = honest }
+			add = { value = 5 desc = court_position_honest_trait }
+		}
+		if = {
+			limit = { has_trait = deceitful }
+			add = { value = -6 desc = court_position_deceitful_trait }
+		}
+		if = {
+			limit = { has_trait = craven }
+			add = { value = -8 desc = court_position_craven_trait }
+		}
+		add = court_position_aptitude_low_penalty_value
+		add = general_aptitude_bonus
+	}
+
+	is_shown = {
+		tca_corps_inspector_office_valid_trigger = yes
+	}
+
+	valid_position = {
+		tca_corps_inspector_office_valid_trigger = yes
+	}
+
+	is_shown_character = {
+		scope:employee = {
+			is_courtier_of = scope:liege
+			court_position_employee_shown_trigger = yes
+		}
+	}
+
+	# 第一阶段：专职排他与基础身心健全资格（限定本署在籍待阙廷臣，严禁封臣实官）
+	valid_character = {
+		scope:employee = {
+			tca_corps_inspector_validity_trigger = yes
+		}
+	}
+
+	on_court_position_revoked = {
+		scope:employee = {
+			remove_character_flag = tca_military_appointment_cooldown
+		}
+	}
+
+	on_court_position_invalidated = {
+		scope:employee = {
+			remove_character_flag = tca_military_appointment_cooldown
+		}
+	}
+
+	salary = {
+		gold = {
+			value = 0
+			if = {
+				limit = {
+					scope:liege = { has_treasury = no }
+				}
+				add = medium_court_position_salary
+			}
+		}
+		treasury = {
+			value = 0
+			if = {
+				limit = {
+					scope:liege = { has_treasury = yes }
+				}
+				add = medium_court_position_salary
+			}
+		}
+		prestige = {
+			value = medium_court_position_prestige_salary
+		}
+		round = no
+	}
+
+	received_salary = {
+		gold = { value = medium_court_position_salary }
+		prestige = { value = medium_court_position_prestige_salary }
+		round = no
+	}
+
+	revoke_cost = {
+		influence = {
+			value = tca_major_court_position_influence_revoke_cost
+			if = {
+				limit = { free_court_position_revoke_trigger = { POS = tca_corps_inspector } }
+				multiply = 0
+			}
+		}
+	}
+
+	# 常驻基础效果（优秀档标定：骑士战力+8%，骑士数量+3）
+	base_employer_modifier = {
+	}
+
+	# 任职者个人效果（第三阶段：每月固定考绩与个人历练成长）
+	modifier = {
+		monthly_merit = 3.5
+		monthly_martial_lifestyle_xp_gain_mult = 0.15
+		monthly_prestige = 0.15
+	}
+
+	scaling_employer_modifiers = {
+		terrible = {
+			knight_effectiveness_mult = 0.02
+			knight_limit = 1
+		}
+		poor = {
+			knight_effectiveness_mult = 0.03
+			knight_limit = 1
+		}
+		average = {
+			knight_effectiveness_mult = 0.05
+			knight_limit = 2
+		}
+		good = {
+			knight_effectiveness_mult = 0.065
+			knight_limit = 2
+		}
+		excellent = {
+			knight_effectiveness_mult = 0.08
+			knight_limit = 3
+		}
+	}
+
+	ai_position_score = {
+		value = 0
+	}
+
+	ai_candidate_score = {
+		value = 100
+		add = court_position_candidate_score_base_value
+		add = court_position_candidate_aptitude_value
+	}
+}

@@ -1,0 +1,175 @@
+﻿# 天朝军事差遣官员铨选综合打分模型
+#
+# 本文件维护朝廷铨选待阙武官时的资历计算。
+# 全天下待阙武官统一使用同一种资历评价标准：
+# 1. 资历基石：在籍官品等级（merit_level * 6.0，九品 6 分，一品 54 分，宋代以阶定除资历先拔）
+# 2. 资历波动项：微量军事能力（每点 0.2 封顶 5）、勇武（每点 0.1 封顶 3）与指挥官实战特质（+2），使同品武官资历产生自然分化
+# 3. 官德品行微调：勤勉/勇敢各 +2，怠惰/怯懦各 -2（±2 分）
+
+# 全国武官通用资历评分
+tca_military_officer_seniority_value = {
+	# 资历基石：朝廷品阶（每品 6 分）
+	value = merit_level
+	multiply = 6.0
+
+	# 资历波动：军事、勇武与实战特质（0 ～ 10 分微调，使资历产生自然分化波动）
+	add = {
+		value = martial
+		multiply = 0.2
+		max = 5
+	}
+	add = {
+		value = prowess
+		multiply = 0.1
+		max = 3
+	}
+	if = {
+		limit = { has_trait_with_flag = commander_trait_flag }
+		add = 2
+	}
+
+	# 官德品行微调波动（±2 分）
+	if = {
+		limit = { has_trait = diligent }
+		add = 2
+	}
+	if = {
+		limit = { has_trait = brave }
+		add = 2
+	}
+	if = {
+		limit = { has_trait = lazy }
+		add = -2
+	}
+	if = {
+		limit = { has_trait = craven }
+		add = -2
+	}
+}
+
+# -------------------------------------------------------------------
+# 第六阶段：官署军事差遣重要度综合评分（Office Importance）
+#
+# 重要度专门用于控制武官晋升与跨官署调任的“单向阀门（One-Way Valve）”：
+# 仅允许武官从低重要度官署向更高重要度官署流转（Target Importance > Current Importance）。
+# 绝对保证：监押最大重要度 (182) < 都监最低重要度 (200) < 都虞候最低重要度 (300)。
+# -------------------------------------------------------------------
+
+# 官署战略动态权重（Office Strategic Dynamic Weight）
+# 作用域：领主（Character）
+# 综合得分区间：0 ～ 82 分
+tca_military_office_strategic_weight = {
+	value = 0
+
+	# 1. 体制军区：军制省或都护府契约（+15 分）
+	if = {
+		limit = {
+			tca_military_is_military_province_trigger = yes
+		}
+		add = 15
+	}
+
+	# 2. 地缘沿边：实际辖区与外国势力直接接壤（+15 分）
+	if = {
+		limit = {
+			tca_military_is_foreign_border_trigger = yes
+		}
+		add = 15
+	}
+
+	# 3. 首府城防：支持到 30 级要塞，每级 0.5 分（最高 30 级封顶 +15 分）
+	if = {
+		limit = {
+			exists = capital_province
+		}
+		add = {
+			value = capital_province.fort_level
+			multiply = 0.5
+			max = 15.0
+		}
+	}
+
+	# 4. 辖区体量：管辖伯爵领数量，每州 0.5 分（最高 20 州封顶 +10 分）
+	add = {
+		value = sub_realm_size
+		multiply = 0.5
+		max = 10.0
+	}
+
+	# 5. 战备兵力（头衔常备精锐兵士为主，总军力人头体量为辅，最高 +15 分）
+	# 5.1 总军力规模（辅助人头数）：每 2000 人 1 分（8000 兵满分 +4 分）
+	add = {
+		value = max_military_strength
+		divide = 2000.0
+		max = 4.0
+	}
+	# 5.2 头衔常备兵士精锐深度（核心战备资产）：统计各常备军团 maa_size 总等级（每 2.5 级 1 分，最高约 28 级满分 +11 分）
+	add = {
+		value = 0
+		every_maa_regiment = {
+			add = maa_size
+		}
+		divide = 2.5
+		max = 11.0
+	}
+
+	# 6. 任职宫廷位阶：伯爵/公爵/王国/帝国/霸权（0 / 3 / 6 / 9 / 12 分）
+	if = {
+		limit = {
+			highest_held_title_tier >= tier_hegemony
+		}
+		add = 12
+	}
+	else_if = {
+		limit = {
+			highest_held_title_tier >= tier_empire
+		}
+		add = 9
+	}
+	else_if = {
+		limit = {
+			highest_held_title_tier >= tier_kingdom
+		}
+		add = 6
+	}
+	else_if = {
+		limit = {
+			highest_held_title_tier >= tier_duchy
+		}
+		add = 3
+	}
+}
+
+# -------------------------------------------------------------------
+# 官员当前任职重要度读取（Character Current Office Importance）
+# 作用域：角色（Character）
+# 若待阙无差遣则返回 0；若在任则读取对应职位的阶梯基础分（100/200/300）与雇主官署实际战略权重。
+# -------------------------------------------------------------------
+tca_military_character_current_office_importance = {
+	value = 0
+	if = {
+		limit = {
+			has_court_position = tca_corps_inspector_court_position
+			exists = liege
+		}
+		value = 300
+		add = liege.tca_military_office_strategic_weight
+	}
+	else_if = {
+		limit = {
+			has_court_position = tca_military_inspector_court_position
+			exists = liege
+		}
+		value = 200
+		add = liege.tca_military_office_strategic_weight
+	}
+	else_if = {
+		limit = {
+			has_court_position = tca_military_supervisor_court_position
+			exists = liege
+		}
+		value = 100
+		add = liege.tca_military_office_strategic_weight
+	}
+}
+

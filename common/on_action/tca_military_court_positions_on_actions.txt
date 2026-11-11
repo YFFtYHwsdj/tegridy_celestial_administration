@@ -1,0 +1,42 @@
+﻿# 军事宫廷差遣自动补缺 on_action 挂载
+#
+# 1. 开局自动初始化：挂载于 on_game_start_after_lobby，遍历独立天朝最高领主（皇帝）执行一次开局补缺。
+# 2. 季度脉冲自动补缺：挂载于 quarterly_playable_pulse，由独立天朝最高领主每季度统筹执行一次。
+
+on_game_start_after_lobby = {
+	on_actions = {
+		tca_military_court_positions_startup
+	}
+}
+
+quarterly_playable_pulse = {
+	on_actions = {
+		tca_military_court_positions_quarterly_pulse
+	}
+}
+
+# 开局全局回调：定位天朝独立皇帝并触发开局首次补缺
+tca_military_court_positions_startup = {
+	effect = {
+		every_independent_ruler = {
+			limit = {
+				is_alive = yes
+				government_has_flag = government_is_celestial
+				highest_held_title_tier >= tier_empire
+			}
+			tca_military_quarterly_fill_vacancies_effect = yes
+		}
+	}
+}
+
+# 季度脉冲回调：仅独立天朝最高皇帝触发，杜绝各级封臣重复执行
+tca_military_court_positions_quarterly_pulse = {
+	trigger = {
+		is_independent_ruler = yes
+		highest_held_title_tier >= tier_empire
+		government_has_flag = government_is_celestial
+	}
+	effect = {
+		tca_military_quarterly_fill_vacancies_effect = yes
+	}
+}
