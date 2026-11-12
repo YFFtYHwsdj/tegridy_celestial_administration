@@ -1,0 +1,73 @@
+﻿# 外交／财政原生任务交接；主君作用域。只处理玩家，AI沿用原生任务调度。
+# 快照按席保存在tca_court_<COUNCIL>_task及target；静态映射原版任务，不保存动态任务类型对象。
+# VISITOR接收COUNCIL、TASK、TARGET（no一般／yes目标任务），各访问器消费相同参数。
+tca_civil_visit_chancellor_tasks_effect = {
+    $VISITOR$ = { COUNCIL = councillor_chancellor TASK = task_foreign_affairs TARGET = no }
+    $VISITOR$ = { COUNCIL = councillor_chancellor TASK = task_domestic_affairs TARGET = no }
+    $VISITOR$ = { COUNCIL = councillor_chancellor TASK = task_integrate_title TARGET = yes }
+    $VISITOR$ = { COUNCIL = councillor_chancellor TASK = task_bestow_royal_favor TARGET = yes }
+}
+tca_civil_visit_steward_tasks_effect = {
+    $VISITOR$ = { COUNCIL = councillor_steward TASK = task_collect_taxes TARGET = no }
+    $VISITOR$ = { COUNCIL = councillor_steward TASK = task_develop_county TARGET = yes }
+    $VISITOR$ = { COUNCIL = councillor_steward TASK = task_promote_culture TARGET = yes }
+    $VISITOR$ = { COUNCIL = councillor_steward TASK = task_accept_culture TARGET = yes }
+    $VISITOR$ = { COUNCIL = councillor_steward TASK = task_convince_dejure TARGET = yes }
+}
+tca_civil_capture_chancellor_task_effect = { tca_court_capture_linked_task_effect = { COUNCIL = councillor_chancellor VISIT = tca_civil_visit_chancellor_tasks_effect } }
+tca_civil_capture_steward_task_effect = { tca_court_capture_linked_task_effect = { COUNCIL = councillor_steward VISIT = tca_civil_visit_steward_tasks_effect } }
+tca_civil_restore_chancellor_task_effect = { tca_court_restore_linked_task_effect = { COUNCIL = councillor_chancellor VISIT = tca_civil_visit_chancellor_tasks_effect } }
+tca_civil_restore_steward_task_effect = { tca_court_restore_linked_task_effect = { COUNCIL = councillor_steward VISIT = tca_civil_visit_steward_tasks_effect } }
+
+# 主君作用域；有现任者才刷新快照，无人时保留空档期快照。无临时scope输出。
+tca_court_capture_linked_task_effect = {
+    if = { limit = {
+        OR = { is_ai = no has_character_flag = tca_test_force_player_governor }
+        tca_is_landed_celestial_governor_trigger = yes exists = cp:$COUNCIL$
+    }
+        remove_variable = tca_court_$COUNCIL$_task remove_variable = tca_court_$COUNCIL$_target
+        $VISIT$ = { VISITOR = tca_court_capture_one_linked_task_effect }
+    }
+}
+tca_court_capture_one_linked_task_effect = {
+    if = { limit = { cp:$COUNCIL$ = { is_performing_council_task = $TASK$ } }
+        set_variable = { name = tca_court_$COUNCIL$_task value = flag:$TASK$ }
+        if = { limit = { always = $TARGET$ cp:$COUNCIL$ = { exists = councillor_task_target } }
+            set_variable = { name = tca_court_$COUNCIL$_target value = cp:$COUNCIL$.councillor_task_target }
+        }
+    }
+}
+# 主君作用域；确认新任成功后调用。目标失效退默认，已执行同任务不重启；消费后清空快照。
+# tca_court_task_owner由这里建立并清理，访问器不另改写它。
+tca_court_restore_linked_task_effect = {
+    if = { limit = { has_variable = tca_court_$COUNCIL$_task exists = cp:$COUNCIL$ }
+        save_scope_as = tca_court_task_owner
+        $VISIT$ = { VISITOR = tca_court_restore_one_linked_task_effect }
+        remove_variable = tca_court_$COUNCIL$_task remove_variable = tca_court_$COUNCIL$_target
+        clear_saved_scope = tca_court_task_owner
+    }
+}
+tca_court_restore_one_linked_task_effect = {
+    if = { limit = { var:tca_court_$COUNCIL$_task = flag:$TASK$ }
+        if = { limit = { NOT = { always = $TARGET$ } }
+            cp:$COUNCIL$ = {
+                if = { limit = { NOT = { is_performing_council_task = $TASK$ } is_council_task_valid = { task_type = $TASK$ } }
+                    set_council_task = { task_type = $TASK$ }
+                }
+            }
+        }
+        else = {
+            if = { limit = { exists = var:tca_court_$COUNCIL$_target }
+                cp:$COUNCIL$ = {
+                    if = { limit = { is_council_task_valid = { task_type = $TASK$ target = scope:tca_court_task_owner.var:tca_court_$COUNCIL$_target } }
+                        if = { limit = { NOT = { is_performing_council_task = $TASK$ councillor_task_target = scope:tca_court_task_owner.var:tca_court_$COUNCIL$_target } }
+                            set_council_task = { task_type = $TASK$ target = scope:tca_court_task_owner.var:tca_court_$COUNCIL$_target }
+                        }
+                    }
+                    else = { start_default_task = yes }
+                }
+            }
+            else = { cp:$COUNCIL$ = { start_default_task = yes } }
+        }
+    }
+}

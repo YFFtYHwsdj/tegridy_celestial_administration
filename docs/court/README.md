@@ -48,6 +48,7 @@
 
 ## 入口与原版依据
 
+- [宫廷差遣与文武流转](../court_positions/README.md)：地方文官职位、文武统一流转及地方殿中监禁用的设计与实现。
 - [原版随机纹章机制](vanilla_coa.md)：模板、素材列表、中国姓氏印章及生成／动态切换入口的只读核对与验证边界。
 - common/law_groups/tca_court_system_law_groups.txt、common/laws/tca_court_system_laws.txt：三个现行法律组及旧法解析。
 - common/scripted_triggers/tca_court_system_triggers.txt：默认、外部接管与独立司法开关。

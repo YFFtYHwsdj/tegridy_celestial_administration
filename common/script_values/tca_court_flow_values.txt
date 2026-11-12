@@ -1,0 +1,67 @@
+﻿# 共用分值；仅在铨选链读取目标倾向、原生档位与品级，不复制称职度原始公式。
+tca_court_civil_supplement = {
+    value = 0
+    add = { value = stewardship multiply = 0.2 max = 5 }
+    add = { value = learning multiply = 0.1 max = 3 }
+    if = { limit = { has_trait = diligent } add = 2 }
+    if = { limit = { has_trait = just } add = 2 }
+    if = { limit = { has_trait = lazy } add = -2 }
+    if = { limit = { has_trait = arbitrary } add = -2 }
+}
+tca_court_personal_selection_value = {
+    value = merit_level multiply = 10
+    if = { limit = { scope:tca_court_bias = 1 }
+        add = tca_court_civil_supplement
+        if = { limit = { tca_court_military_route_trigger = yes } add = -10 }
+    }
+    else = {
+        add = tca_court_military_supplement
+        if = { limit = { tca_court_civil_route_trigger = yes } add = -10 }
+    }
+}
+tca_court_military_supplement = {
+    value = 0
+    add = { value = martial multiply = 0.2 max = 5 }
+    add = { value = prowess multiply = 0.1 max = 3 }
+    if = { limit = { has_trait_with_flag = commander_trait_flag } add = 2 }
+    if = { limit = { has_trait = diligent } add = 2 }
+    if = { limit = { has_trait = brave } add = 2 }
+    if = { limit = { has_trait = lazy } add = -2 }
+    if = { limit = { has_trait = craven } add = -2 }
+}
+tca_court_civil_office_weight = {
+    value = monthly_character_treasury_income min = 0 divide = 2 max = 40
+    if = { limit = { exists = capital_county } add = { value = capital_county.development_level divide = 2 max = 40 } }
+}
+# 人物当前差遣重要度只依实际持职及实际雇主；待阙为0。
+tca_court_current_importance = {
+    value = 0
+    if = { limit = { has_court_position = tca_corps_inspector_court_position exists = liege_or_court_owner } value = tca_court_importance_rank_4 add = liege_or_court_owner.tca_military_office_strategic_weight }
+    else_if = { limit = { has_court_position = tca_military_inspector_court_position exists = liege_or_court_owner } value = tca_court_importance_rank_3 add = liege_or_court_owner.tca_military_office_strategic_weight }
+    else_if = { limit = { has_court_position = tca_civil_adjutant_court_position exists = liege_or_court_owner } value = tca_court_importance_rank_2 add = liege_or_court_owner.tca_court_civil_office_weight }
+    else_if = { limit = { has_court_position = tca_army_judge_court_position exists = liege_or_court_owner } value = tca_court_importance_rank_2 add = liege_or_court_owner.tca_court_civil_office_weight }
+    else_if = { limit = { has_court_position = tca_household_registrar_court_position exists = liege_or_court_owner } value = tca_court_importance_rank_1 add = liege_or_court_owner.tca_court_civil_office_weight }
+    else_if = { limit = { has_court_position = tca_judicial_advisor_court_position exists = liege_or_court_owner } value = tca_court_importance_rank_1 add = liege_or_court_owner.tca_court_civil_office_weight }
+    else_if = { limit = { has_court_position = tca_military_supervisor_court_position exists = liege_or_court_owner } value = tca_court_importance_rank_1 add = liege_or_court_owner.tca_military_office_strategic_weight }
+}
+# 官署作用域；只读本轮冻结空缺的最高重要度，每处理一个空缺便移除对应变量。
+tca_court_next_vacancy_value = {
+    value = 0
+    if = { limit = { has_variable = tca_court_vacant_tca_corps_inspector_court_position } max = var:tca_court_vacant_tca_corps_inspector_court_position }
+    if = { limit = { has_variable = tca_court_vacant_tca_military_inspector_court_position } max = var:tca_court_vacant_tca_military_inspector_court_position }
+    if = { limit = { has_variable = tca_court_vacant_tca_civil_adjutant_court_position } max = var:tca_court_vacant_tca_civil_adjutant_court_position }
+    if = { limit = { has_variable = tca_court_vacant_tca_army_judge_court_position } max = var:tca_court_vacant_tca_army_judge_court_position }
+    if = { limit = { has_variable = tca_court_vacant_tca_household_registrar_court_position } max = var:tca_court_vacant_tca_household_registrar_court_position }
+    if = { limit = { has_variable = tca_court_vacant_tca_judicial_advisor_court_position } max = var:tca_court_vacant_tca_judicial_advisor_court_position }
+    if = { limit = { has_variable = tca_court_vacant_tca_military_supervisor_court_position } max = var:tca_court_vacant_tca_military_supervisor_court_position }
+}
+tca_court_salary_1 = { value = 0.12 }
+tca_court_salary_2 = { value = 0.18 }
+tca_court_salary_3 = { value = 0.25 }
+tca_court_salary_4 = { value = 0.35 }
+
+# 四档基础重要度供目录与人物现职读取共用。
+tca_court_importance_rank_1 = { value = 100 }
+tca_court_importance_rank_2 = { value = 200 }
+tca_court_importance_rank_3 = { value = 300 }
+tca_court_importance_rank_4 = { value = 400 }

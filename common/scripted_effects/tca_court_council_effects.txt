@@ -1,0 +1,97 @@
+﻿# 文武差遣共用内阁选席与离任。各席独立，只访问本署职位，不扫描世界。
+# 主君作用域；COUNCIL为原生内阁ID，SELECT输出scope:tca_military_selected_marshal；
+# CAPTURE／RESTORE为任务快照接口，FALLBACK只在无正式选中者时尝试补位。
+# 沿用军事变量及临时scope名称以兼容既有存档／调用；现为文武共用，不表示只处理军事。
+# 本入口创建并清理tca_military_council_liege及tca_military_selected_marshal；离任排除scope由下方入口维护。
+# 只清理本席落选者的自有保护，不能释放其他文武内阁的锁；外部原生保护不取得所有权。
+tca_court_sync_linked_council_effect = {
+    if = {
+        limit = { is_alive = yes tca_is_landed_celestial_governor_trigger = yes }
+        save_scope_as = tca_military_council_liege
+        clear_saved_scope = tca_military_selected_marshal
+        $SELECT$ = yes
+        # 低职不得保留旧锁；移除模块保护后，原生任免规则仍可独立阻止替换。
+        every_court_position_holder = {
+            limit = {
+                has_variable = tca_military_council_lock_owner
+                has_council_position = $COUNCIL$
+                trigger_if = { limit = { exists = scope:tca_military_selected_marshal } NOT = { this = scope:tca_military_selected_marshal } }
+            }
+            tca_military_release_council_lock_effect = { OWNER = scope:tca_military_council_liege }
+        }
+        if = {
+            limit = { exists = scope:tca_military_selected_marshal }
+            if = {
+                limit = {
+                    NOT = { scope:tca_military_selected_marshal = { is_councillor_of = scope:tca_military_council_liege has_council_position = $COUNCIL$ } }
+                    OR = {
+                        NOT = { exists = cp:$COUNCIL$ }
+                        cp:$COUNCIL$ ?= { can_be_fired_from_council_trigger = { COURT_OWNER = scope:tca_military_council_liege } }
+                    }
+                }
+                $CAPTURE$ = yes
+                assign_councillor_type = { type = $COUNCIL$ target = scope:tca_military_selected_marshal fire_on_actions = yes remove_existing_councillor = yes }
+            }
+            if = {
+                limit = { exists = cp:$COUNCIL$ cp:$COUNCIL$ = scope:tca_military_selected_marshal }
+                $RESTORE$ = yes
+                scope:tca_military_selected_marshal = {
+                    if = {
+                        limit = { NOT = { has_variable = block_fire_councillor } }
+                        set_variable = { name = block_fire_councillor value = scope:tca_military_council_liege }
+                        set_variable = { name = tca_military_council_lock_owner value = scope:tca_military_council_liege }
+                    }
+                }
+            }
+        }
+        else = { $FALLBACK$ = yes }
+        clear_saved_scope = tca_military_selected_marshal
+        clear_saved_scope = tca_military_council_liege
+    }
+}
+
+# 原生职位回调作用域；scope:employee／liege必需。COUNCIL、CAPTURE和SYNC对应同一席位。
+# 先结束差遣状态，再只释放自己拥有的保护，捕获任务后正常解职；排除离任者以免立即返聘。
+# 可被revoked／invalidated／vacated重复调用；不覆盖外部锁，不读写死亡人物变量。
+tca_court_linked_council_departure_effect = {
+    tca_court_on_departure_effect = yes
+    scope:employee = {
+        save_scope_as = tca_military_departing_officer
+        if = {
+            limit = { is_alive = yes }
+            remove_character_flag = tca_military_appointment_cooldown
+            tca_military_release_council_lock_effect = { OWNER = scope:liege }
+            if = {
+                limit = { liege_or_court_owner = scope:liege is_councillor_of = scope:liege has_council_position = $COUNCIL$ can_be_fired_from_council_trigger = { COURT_OWNER = scope:liege } }
+                scope:liege = { $CAPTURE$ = yes fire_councillor = scope:employee }
+            }
+        }
+    }
+    scope:liege = { $SYNC$ = yes }
+    clear_saved_scope = tca_military_departing_officer
+}
+
+# 主君作用域；只为玩家真正空缺临时补位，无正式对应差遣才执行，不锁定临时内阁。
+# COUNCIL为席位，HAS_POSITION为本署差遣判据，ELIGIBILITY采用原生人物trigger，SKILL只用于排序。
+# RESTORE消费玩家该席任务快照；临时scope在本入口结束清理，排除离任者避免立即返聘。
+tca_court_player_fallback_council_effect = {
+    if = { limit = {
+        is_alive = yes OR = { is_ai = no has_character_flag = tca_test_force_player_governor }
+        tca_is_landed_celestial_governor_trigger = yes
+        NOT = { exists = cp:$COUNCIL$ } $HAS_POSITION$ = no
+    }
+        save_scope_as = tca_player_fallback_liege
+        clear_saved_scope = tca_temporary_acting_councillor
+        ordered_courtier = {
+            limit = { $ELIGIBILITY$ = { COURT_OWNER = scope:tca_player_fallback_liege } is_councillor = no
+                trigger_if = { limit = { exists = scope:tca_military_departing_officer } this != scope:tca_military_departing_officer }
+            }
+            order_by = $SKILL$ max = 1 save_scope_as = tca_temporary_acting_councillor
+        }
+        if = { limit = { exists = scope:tca_temporary_acting_councillor }
+            assign_councillor_type = { type = $COUNCIL$ target = scope:tca_temporary_acting_councillor fire_on_actions = yes }
+            if = { limit = { cp:$COUNCIL$ ?= scope:tca_temporary_acting_councillor } $RESTORE$ = yes }
+        }
+        clear_saved_scope = tca_temporary_acting_councillor clear_saved_scope = tca_player_fallback_liege
+    }
+}

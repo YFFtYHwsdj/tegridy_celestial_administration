@@ -1,0 +1,49 @@
+﻿# 地方文官差遣内阁映射；只维护文职选席，任免、保护与清理复用文武共用流程。
+# 就任／离任入口接收原生scope:liege及employee；主君作用域入口只访问本署已有职位。
+tca_civil_chancellor_on_received_effect = { tca_court_on_received_effect = yes scope:liege = { tca_civil_sync_chancellor_effect = yes } }
+tca_civil_steward_on_received_effect = { tca_court_on_received_effect = yes scope:liege = { tca_civil_sync_steward_effect = yes } }
+tca_civil_chancellor_on_departure_effect = { tca_court_linked_council_departure_effect = { COUNCIL = councillor_chancellor CAPTURE = tca_civil_capture_chancellor_task_effect SYNC = tca_civil_sync_chancellor_effect } }
+tca_civil_steward_on_departure_effect = { tca_court_linked_council_departure_effect = { COUNCIL = councillor_steward CAPTURE = tca_civil_capture_steward_task_effect SYNC = tca_civil_sync_steward_effect } }
+tca_civil_sync_chancellor_effect = {
+    tca_court_sync_linked_council_effect = { COUNCIL = councillor_chancellor SELECT = tca_civil_select_chancellor_effect CAPTURE = tca_civil_capture_chancellor_task_effect RESTORE = tca_civil_restore_chancellor_task_effect FALLBACK = tca_civil_player_fallback_chancellor_effect }
+}
+tca_civil_sync_steward_effect = {
+    tca_court_sync_linked_council_effect = { COUNCIL = councillor_steward SELECT = tca_civil_select_steward_effect CAPTURE = tca_civil_capture_steward_task_effect RESTORE = tca_civil_restore_steward_task_effect FALLBACK = tca_civil_player_fallback_steward_effect }
+}
+tca_civil_select_chancellor_effect = { tca_court_select_linked_officer_effect = { POSITION = tca_civil_adjutant_court_position SKILL = diplomacy } }
+tca_civil_select_steward_effect = {
+    # 军判与司户在不同编制；切换契约的过渡期若暂有两者，先取军判。
+    tca_court_select_linked_officer_effect = { POSITION = tca_army_judge_court_position SKILL = stewardship }
+    tca_court_select_linked_officer_effect = { POSITION = tca_household_registrar_court_position SKILL = stewardship }
+}
+
+# 主君作用域；POSITION静态ID、SKILL为能力底线。共用sync已提供主君scope。
+# 原生回调和选席调用同一正式人物资格，显式传入雇主，不遮蔽原生scope；输出由sync消费。
+tca_court_select_linked_officer_effect = {
+    if = { limit = { NOT = { exists = scope:tca_military_selected_marshal } employs_court_position = $POSITION$ }
+        court_position:$POSITION$ = {
+            if = { limit = {
+                tca_court_person_assignment_validity_trigger = { OWNER = scope:tca_military_council_liege POSITION = $POSITION$ SKILL = $SKILL$ ROUTE = tca_court_civil_route_trigger }
+                trigger_if = { limit = { exists = scope:tca_military_departing_officer } this != scope:tca_military_departing_officer }
+            } save_scope_as = tca_military_selected_marshal }
+        }
+    }
+}
+
+tca_civil_player_fallback_chancellor_effect = {
+    tca_court_player_fallback_council_effect = { COUNCIL = councillor_chancellor HAS_POSITION = tca_court_has_chancellor_commission_trigger ELIGIBILITY = can_be_chancellor_trigger SKILL = diplomacy RESTORE = tca_civil_restore_chancellor_task_effect }
+}
+tca_civil_player_fallback_steward_effect = {
+    tca_court_player_fallback_council_effect = { COUNCIL = councillor_steward HAS_POSITION = tca_court_has_steward_commission_trigger ELIGIBILITY = can_be_steward_trigger SKILL = stewardship RESTORE = tca_civil_restore_steward_task_effect }
+}
+
+# 主君作用域；用于改制与死亡后的实际雇主重绑。撤职共用旧军事的安全免费撤职接口。
+tca_civil_validate_council_positions_effect = {
+    tca_military_revoke_invalid_office_position_effect = { POSITION = tca_civil_adjutant_court_position VALIDITY = tca_civil_office_valid_trigger CHARACTER_VALIDITY = tca_civil_adjutant_validity_trigger }
+    tca_military_revoke_invalid_office_position_effect = { POSITION = tca_army_judge_court_position VALIDITY = tca_army_civil_office_valid_trigger CHARACTER_VALIDITY = tca_army_judge_validity_trigger }
+    tca_military_revoke_invalid_office_position_effect = { POSITION = tca_household_registrar_court_position VALIDITY = tca_civil_office_valid_trigger CHARACTER_VALIDITY = tca_household_registrar_validity_trigger }
+    if = { limit = { tca_is_landed_celestial_governor_trigger = no }
+        remove_variable = tca_court_councillor_chancellor_task remove_variable = tca_court_councillor_chancellor_target
+        remove_variable = tca_court_councillor_steward_task remove_variable = tca_court_councillor_steward_target
+    }
+}

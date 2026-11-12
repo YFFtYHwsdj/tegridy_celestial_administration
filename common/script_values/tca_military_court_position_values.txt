@@ -2,57 +2,19 @@
 #
 # 本文件维护朝廷铨选待阙武官时的资历计算。
 # 全天下待阙武官统一使用同一种资历评价标准：
-# 1. 资历基石：在籍官品等级（merit_level * 6.0，九品 6 分，一品 54 分，宋代以阶定除资历先拔）
+# 1. 资历基石：在籍官品等级（merit_level * 10.0，九品10分，一品90分，宋代以阶定除资历先拔）
 # 2. 资历波动项：微量军事能力（每点 0.2 封顶 5）、勇武（每点 0.1 封顶 3）与指挥官实战特质（+2），使同品武官资历产生自然分化
 # 3. 官德品行微调：勤勉/勇敢各+2，怠惰/怯懦各-2；各项相加，合计范围-4至+4。
 
 # 全国武官通用资历评分
-tca_military_officer_seniority_value = {
-	# 资历基石：朝廷品阶（每品 6 分）
-	value = merit_level
-	multiply = 6.0
-
-	# 资历波动：军事、勇武与实战特质（0 ～ 10 分微调，使资历产生自然分化波动）
-	add = {
-		value = martial
-		multiply = 0.2
-		max = 5
-	}
-	add = {
-		value = prowess
-		multiply = 0.1
-		max = 3
-	}
-	if = {
-		limit = { has_trait_with_flag = commander_trait_flag }
-		add = 2
-	}
-
-	# 官德品行逐项累加，不取最大项。
-	if = {
-		limit = { has_trait = diligent }
-		add = 2
-	}
-	if = {
-		limit = { has_trait = brave }
-		add = 2
-	}
-	if = {
-		limit = { has_trait = lazy }
-		add = -2
-	}
-	if = {
-		limit = { has_trait = craven }
-		add = -2
-	}
-}
+tca_military_officer_seniority_value = { value = merit_level multiply = 10 add = tca_court_military_supplement }
 
 # -------------------------------------------------------------------
 # 官署军事差遣重要度综合评分
 #
 # 重要度专门用于控制武官晋升与跨官署调任的“单向阀门（One-Way Valve）”：
 # 仅允许武官从低重要度官署向更高重要度官署流转（Target Importance > Current Importance）。
-# 绝对保证：监押最大重要度 (182) < 都监最低重要度 (200) < 都虞候最低重要度 (300)。
+# 绝对保证：监押最高182 < 都监最低300 < 都虞候最低400。
 # -------------------------------------------------------------------
 
 # 官署战略动态权重（Office Strategic Dynamic Weight）
@@ -143,33 +105,7 @@ tca_military_office_strategic_weight = {
 # -------------------------------------------------------------------
 # 官员当前任职重要度读取（Character Current Office Importance）
 # 作用域：角色（Character）
-# 若待阙无差遣则返回 0；若在任则读取对应职位的阶梯基础分（100/200/300）与雇主官署实际战略权重。
+# 若待阙无差遣则返回 0；若在任则读取对应职位的阶梯基础分（100/300/400）与雇主官署实际战略权重。
 # -------------------------------------------------------------------
-tca_military_character_current_office_importance = {
-	value = 0
-	if = {
-		limit = {
-			has_court_position = tca_corps_inspector_court_position
-			exists = liege
-		}
-		value = 300
-		add = liege.tca_military_office_strategic_weight
-	}
-	else_if = {
-		limit = {
-			has_court_position = tca_military_inspector_court_position
-			exists = liege
-		}
-		value = 200
-		add = liege.tca_military_office_strategic_weight
-	}
-	else_if = {
-		limit = {
-			has_court_position = tca_military_supervisor_court_position
-			exists = liege
-		}
-		value = 100
-		add = liege.tca_military_office_strategic_weight
-	}
-}
+tca_military_character_current_office_importance = { value = tca_court_current_importance }
 

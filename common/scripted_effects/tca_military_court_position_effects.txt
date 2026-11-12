@@ -1,11 +1,12 @@
 ﻿# 天朝军事差遣的季度铨选、迁转及地方军事内阁生命周期。
 # 季度入口只扫描本政权的天朝官署与宫廷；按预先收集的出缺名单分配，不将本轮腾退旧职重新入队。
-# 候选按称职度与资历选取至多三人后掣签；无候选时保留空缺，不生成人物。
+# 铨选与迁转委派文武共用入口；无候选时保留空缺，不生成人物。
 # 地方内阁选席、模块保护及离任清理集中于本文件，玩家任务交接由独立任务效果文件维护。
 # 各入口的作用域、参数及临时状态见相邻说明。
 
 # 地方军事内阁联动；原生回调提供employee与liege，所有任命汇入同一个选席入口。
 tca_military_court_position_on_received_effect = {
+    tca_court_on_received_effect = yes
     scope:liege = { tca_military_sync_local_marshal_effect = yes }
 }
 
@@ -14,50 +15,14 @@ tca_military_court_position_on_received_effect = {
 # 可选输入scope:tca_military_departing_officer由离任回调建立并清理，用于排除正在离任的旧官。
 # 只有实际兼任者获得模块锁，既有原生保护不改写；无法合法替换外部受保护司马时不强制执行。
 tca_military_sync_local_marshal_effect = {
-    if = {
-        limit = { is_alive = yes tca_is_landed_celestial_governor_trigger = yes }
-        save_scope_as = tca_military_council_liege
-        clear_saved_scope = tca_military_selected_marshal
-        tca_military_select_marshal_from_position_effect = { POSITION = tca_corps_inspector_court_position }
-        tca_military_select_marshal_from_position_effect = { POSITION = tca_military_inspector_court_position }
-        tca_military_select_marshal_from_position_effect = { POSITION = tca_military_supervisor_court_position }
-        # 低职不得保留旧锁；移除模块保护后，原生任免规则仍可独立阻止替换。
-        every_court_position_holder = {
-            limit = {
-                has_variable = tca_military_council_lock_owner
-                trigger_if = { limit = { exists = scope:tca_military_selected_marshal } NOT = { this = scope:tca_military_selected_marshal } }
-            }
-            tca_military_release_council_lock_effect = { OWNER = scope:tca_military_council_liege }
-        }
-        if = {
-            limit = { exists = scope:tca_military_selected_marshal }
-            if = {
-                limit = {
-                    NOT = { scope:tca_military_selected_marshal = { is_councillor_of = scope:tca_military_council_liege has_council_position = councillor_marshal } }
-                    OR = {
-                        NOT = { exists = cp:councillor_marshal }
-                        cp:councillor_marshal ?= { can_be_fired_from_council_trigger = { COURT_OWNER = scope:tca_military_council_liege } }
-                    }
-                }
-                tca_military_capture_marshal_task_effect = yes
-                assign_councillor_type = { type = councillor_marshal target = scope:tca_military_selected_marshal fire_on_actions = yes remove_existing_councillor = yes }
-            }
-            if = {
-                limit = { exists = cp:councillor_marshal cp:councillor_marshal = scope:tca_military_selected_marshal }
-                tca_military_restore_marshal_task_effect = yes
-                scope:tca_military_selected_marshal = {
-                    if = {
-                        limit = { NOT = { has_variable = block_fire_councillor } }
-                        set_variable = { name = block_fire_councillor value = scope:tca_military_council_liege }
-                        set_variable = { name = tca_military_council_lock_owner value = scope:tca_military_council_liege }
-                    }
-                }
-            }
-        }
-        else = { tca_military_player_fallback_marshal_effect = yes }
-        clear_saved_scope = tca_military_selected_marshal
-        clear_saved_scope = tca_military_council_liege
-    }
+    tca_court_sync_linked_council_effect = { COUNCIL = councillor_marshal SELECT = tca_military_select_local_marshal_effect CAPTURE = tca_military_capture_marshal_task_effect RESTORE = tca_military_restore_marshal_task_effect FALLBACK = tca_military_player_fallback_marshal_effect }
+}
+
+# 主君作用域；选席顺序不变，输出由共用同步入口消费。
+tca_military_select_local_marshal_effect = {
+    tca_military_select_marshal_from_position_effect = { POSITION = tca_corps_inspector_court_position }
+    tca_military_select_marshal_from_position_effect = { POSITION = tca_military_inspector_court_position }
+    tca_military_select_marshal_from_position_effect = { POSITION = tca_military_supervisor_court_position }
 }
 
 # 主君作用域；参数POSITION为静态职位ID，必需scope:tca_military_council_liege由选席入口提供。
@@ -86,42 +51,7 @@ tca_military_select_marshal_from_position_effect = {
 # 成功任命后消费主君的任务快照；本入口创建的候选与主君scope在本调用内清理。
 # tca_test_force_player_governor只启用测试分支，不改变原生AI身份或证明真人界面通过。
 tca_military_player_fallback_marshal_effect = {
-    if = {
-        limit = {
-            is_alive = yes
-            OR = { is_ai = no has_character_flag = tca_test_force_player_governor }
-            tca_is_landed_celestial_governor_trigger = yes
-            NOT = { exists = cp:councillor_marshal }
-            NOT = { employs_court_position = tca_military_supervisor_court_position }
-            NOT = { employs_court_position = tca_military_inspector_court_position }
-            NOT = { employs_court_position = tca_corps_inspector_court_position }
-        }
-        save_scope_as = tca_player_fallback_liege
-        clear_saved_scope = tca_temporary_acting_marshal
-        ordered_courtier = {
-            limit = {
-                can_be_marshal_trigger = { COURT_OWNER = scope:tca_player_fallback_liege }
-                is_councillor = no
-                trigger_if = {
-                    limit = { exists = scope:tca_military_departing_officer }
-                    NOT = { this = scope:tca_military_departing_officer }
-                }
-            }
-            order_by = martial
-            max = 1
-            save_scope_as = tca_temporary_acting_marshal
-        }
-        if = {
-            limit = { exists = scope:tca_temporary_acting_marshal }
-            assign_councillor_type = { type = councillor_marshal target = scope:tca_temporary_acting_marshal fire_on_actions = yes }
-            if = {
-                limit = { cp:councillor_marshal = scope:tca_temporary_acting_marshal }
-                tca_military_restore_marshal_task_effect = yes
-            }
-        }
-        clear_saved_scope = tca_temporary_acting_marshal
-        clear_saved_scope = tca_player_fallback_liege
-    }
+    tca_court_player_fallback_council_effect = { COUNCIL = councillor_marshal HAS_POSITION = tca_court_has_marshal_commission_trigger ELIGIBILITY = can_be_marshal_trigger SKILL = martial RESTORE = tca_military_restore_marshal_task_effect }
 }
 
 # 回调作用域；只有模块标记与当前原生锁都指向同一主君时才删除锁。
@@ -129,20 +59,7 @@ tca_military_player_fallback_marshal_effect = {
 # 建立并清理离任者排除scope；只有仍属原主君且原生规则允许时才解雇，再统一选择剩余差遣或补位。
 # 死亡人物不再访问变量；自然离廷/死亡由vacated覆盖，不能只依赖invalidated。
 tca_military_court_position_on_departure_effect = {
-    scope:employee = {
-        save_scope_as = tca_military_departing_officer
-        if = {
-            limit = { is_alive = yes }
-            remove_character_flag = tca_military_appointment_cooldown
-            tca_military_release_council_lock_effect = { OWNER = scope:liege }
-            if = {
-                limit = { liege_or_court_owner = scope:liege is_councillor_of = scope:liege has_council_position = councillor_marshal can_be_fired_from_council_trigger = { COURT_OWNER = scope:liege } }
-                scope:liege = { tca_military_capture_marshal_task_effect = yes fire_councillor = scope:employee }
-            }
-        }
-    }
-    scope:liege = { tca_military_sync_local_marshal_effect = yes }
-    clear_saved_scope = tca_military_departing_officer
+    tca_court_linked_council_departure_effect = { COUNCIL = councillor_marshal CAPTURE = tca_military_capture_marshal_task_effect SYNC = tca_military_sync_local_marshal_effect }
 }
 
 # 保留生命周期入口供三种职位复用；清理规则只有一个维护位置。
@@ -150,499 +67,24 @@ tca_military_court_position_on_revoked_effect = { tca_military_court_position_on
 tca_military_court_position_on_invalidated_effect = { tca_military_court_position_on_departure_effect = yes }
 tca_military_court_position_on_vacated_effect = { tca_military_court_position_on_departure_effect = yes }
 
-# 单个官署的出缺归类；作用域为待检查的天朝领主，实际准入由各职位trigger决定。
-# 输出到本次季度调用共享的五类出缺列表，列表由季度入口在本轮末尾清理。
-tca_military_sort_vacant_lord_effect = {
-	# 1. 都虞候出缺：枢密使或合格的王国级以上军路，排除独立皇帝。
-	if = {
-		limit = {
-			tca_corps_inspector_office_valid_trigger = yes
-			NOT = { employs_court_position = tca_corps_inspector_court_position }
-		}
-		add_to_list = tca_vacant_corps_inspectors
-	}
-
-	# 2. 兵马都监出缺：公爵级以上有地地方官署，按军制省标记分配队列。
-	if = {
-		limit = {
-			tca_military_inspector_office_valid_trigger = yes
-			vassal_contract_has_flag = celestial_province_military
-			NOT = { employs_court_position = tca_military_inspector_court_position }
-		}
-		add_to_list = tca_vacant_march_inspectors
-	}
-	else_if = {
-		limit = {
-			tca_military_inspector_office_valid_trigger = yes
-			NOT = { vassal_contract_has_flag = celestial_province_military }
-			NOT = { employs_court_position = tca_military_inspector_court_position }
-		}
-		add_to_list = tca_vacant_civil_inspectors
-	}
-
-	# 3. 兵马监押出缺（州县级实土官署）
-	if = {
-		limit = {
-			tca_military_supervisor_office_valid_trigger = yes
-			vassal_contract_has_flag = celestial_province_military
-			NOT = { employs_court_position = tca_military_supervisor_court_position }
-		}
-		add_to_list = tca_vacant_march_supervisors
-	}
-	else_if = {
-		limit = {
-			tca_military_supervisor_office_valid_trigger = yes
-			NOT = { vassal_contract_has_flag = celestial_province_military }
-			NOT = { employs_court_position = tca_military_supervisor_court_position }
-		}
-		add_to_list = tca_vacant_civil_supervisors
-	}
-}
-
-# 单个职位补选与除授子逻辑
-# 参数：POSITION为职位ID；KEEP_CURRENT为当前军事内阁是否高于拟补职位的只读trigger。
-# 当前作用域与scope:target_liege须为同一出缺官署领主。
-# 读取调用者提供的tca_military_candidate_pool，掣签名单在本调用清理，选中者从本轮各人员池移除。
-# 输出scope:tca_chosen_officer；每次筛选前清空，防止目标资格过滤耗尽时误用上次人选。
-# 副作用包括撤销旧差遣、跨宫廷迁入、临时授权除授、设置磨勘冷却及玩家到离任通知。
+# 旧军事单职调用适配；正常季度直接使用共用目录。
+# 参数POSITION、KEEP_CURRENT保留原调用契约；旧名单只在适配期间并入共用候选。
+# 当前雇主与scope:target_liege须一致，输出scope:tca_chosen_officer来自共用最高分流程。
 tca_military_fill_single_position_effect = {
-	# 仅在仍然出缺且候选池有合格人选时执行
-	if = {
-		limit = {
-			NOT = { employs_court_position = $POSITION$ }
-            tca_military_linked_council_available_trigger = { KEEP_CURRENT = $KEEP_CURRENT$ }
-			any_in_list = { list = tca_military_candidate_pool count >= 1 }
-		}
-
-        # 目标宫廷的原生内阁条件可能排除全部候选；不得沿用上一官署留下的scope。
-        clear_saved_scope = tca_chosen_officer
-		# 1. 按原生aptitude读数乘20与资历值排序，选取至多三名候选；接口与界面档位关系待专门核对。
-		ordered_in_list = {
-			list = tca_military_candidate_pool
-            # 前三名意为至多三人；池不足三人时按原生方式截断，避免范围警告。
-            check_range_bounds = no
-            limit = {
-                trigger_if = {
-                    limit = { scope:target_liege = { tca_is_landed_celestial_governor_trigger = yes } }
-                    can_be_marshal_trigger = { COURT_OWNER = scope:target_liege }
-                }
-            }
-			order_by = {
-				value = aptitude:$POSITION$
-				multiply = 20.0
-				add = tca_military_officer_seniority_value
-			}
-			max = 3
-			add_to_list = tca_military_top_candidates
-		}
-
-		# 2. 以1加候选总分为权重，掣签录取一人。
-		random_in_list = {
-			list = tca_military_top_candidates
-			weight = {
-				base = 1
-				modifier = {
-					add = {
-						value = aptitude:$POSITION$
-						multiply = 20.0
-						add = tca_military_officer_seniority_value
-					}
-				}
-			}
-			save_scope_as = tca_chosen_officer
-		}
-
-		# 清理临时掣签名单
-		every_in_list = {
-			list = tca_military_top_candidates
-			remove_from_list = tca_military_top_candidates
-		}
-
-		# 3. 除授并就任；先腾退旧差遣，再迁廷及授新职，旧官署不在本轮重新补缺。
-		if = {
-			limit = {
-				exists = scope:tca_chosen_officer
-			}
-
-			# 从全部可能池中移除此人，防止本轮同人重选
-			scope:tca_chosen_officer = {
-				remove_from_list = tca_military_candidate_pool
-				remove_from_list = tca_military_unassigned_pool
-				remove_from_list = tca_military_serving_supervisors
-				remove_from_list = tca_military_serving_inspectors
-			}
-
-			# 3.1 跨官署拔擢旧差遣安全腾退
-			if = {
-				limit = {
-					OR = {
-						scope:tca_chosen_officer = { has_court_position = tca_military_supervisor_court_position }
-						scope:tca_chosen_officer = { has_court_position = tca_military_inspector_court_position }
-						scope:tca_chosen_officer = { has_court_position = tca_corps_inspector_court_position }
-					}
-				}
-				# 记录原雇主领主（优先通过宫廷职位雇主链精准定位出资官署）
-				if = {
-					limit = {
-						scope:tca_chosen_officer = {
-							any_court_position_employer = { always = yes }
-						}
-					}
-					scope:tca_chosen_officer = {
-						random_court_position_employer = { save_scope_as = tca_previous_liege }
-					}
-				}
-				else = {
-					scope:tca_chosen_officer = {
-						liege = { save_scope_as = tca_previous_liege }
-					}
-				}
-				# 妥善撤除原官署差遣（系统脚本强制腾退，绕过威望惩罚）
-				if = {
-					limit = {
-						scope:tca_chosen_officer = { has_court_position = tca_military_supervisor_court_position }
-					}
-					scope:tca_previous_liege = {
-						add_character_flag = free_revoke_cost
-						revoke_court_position = {
-							recipient = scope:tca_chosen_officer
-							court_position = tca_military_supervisor_court_position
-						}
-						remove_character_flag = free_revoke_cost
-					}
-				}
-				else_if = {
-					limit = {
-						scope:tca_chosen_officer = { has_court_position = tca_military_inspector_court_position }
-					}
-					scope:tca_previous_liege = {
-						add_character_flag = free_revoke_cost
-						revoke_court_position = {
-							recipient = scope:tca_chosen_officer
-							court_position = tca_military_inspector_court_position
-						}
-						remove_character_flag = free_revoke_cost
-					}
-				}
-				else_if = {
-					limit = {
-						scope:tca_chosen_officer = { has_court_position = tca_corps_inspector_court_position }
-					}
-					scope:tca_previous_liege = {
-						add_character_flag = free_revoke_cost
-						revoke_court_position = {
-							recipient = scope:tca_chosen_officer
-							court_position = tca_corps_inspector_court_position
-						}
-						remove_character_flag = free_revoke_cost
-					}
-				}
-
-				# 若原雇主是玩家领主且非新任领主本人，发送“下属拔擢调离”公文通知
-				if = {
-					limit = {
-						exists = scope:tca_previous_liege
-						scope:tca_previous_liege = { is_ai = no }
-						NOT = { scope:tca_previous_liege = scope:target_liege }
-					}
-					scope:tca_previous_liege = {
-						send_interface_message = {
-							type = msg_court_position_removed
-							title = tca_military_promotion_departure_message_title
-							desc = tca_military_promotion_departure_message_desc
-							left_icon = scope:tca_chosen_officer
-							right_icon = scope:target_liege
-						}
-					}
-				}
-			}
-
-			# 3.2 若不在该领主宫廷，将其迁入
-			if = {
-				limit = {
-					NOT = { scope:tca_chosen_officer = { is_courtier_of = scope:target_liege } }
-				}
-				scope:target_liege = {
-					add_courtier = scope:tca_chosen_officer
-				}
-			}
-
-			# 3.3 临时授权并除授差遣
-			scope:tca_chosen_officer = {
-				add_character_flag = {
-					flag = tca_military_appointment_allowed
-					days = 1
-				}
-			}
-
-			scope:target_liege = {
-				appoint_court_position = {
-					recipient = scope:tca_chosen_officer
-					court_position = $POSITION$
-				}
-			}
-
-			scope:tca_chosen_officer = {
-				remove_character_flag = tca_military_appointment_allowed
-				# 设立 2 年（730 天）任期磨勘冷却期，安心供职不参与频繁调动
-				add_character_flag = {
-					flag = tca_military_appointment_cooldown
-					days = 730
-				}
-			}
-
-			# 3.4 玩家右侧公文通知（新任官署领主）
-			if = {
-				limit = {
-					scope:target_liege = { is_ai = no }
-				}
-				scope:target_liege = {
-					send_interface_message = {
-						type = msg_court_position_gained
-						title = tca_military_appointment_message_title
-						desc = tca_military_appointment_message_desc
-						left_icon = scope:tca_chosen_officer
-					}
-				}
-			}
-		}
-	}
-}
-
-# 人物作用域；按当前硬资格、任职与磨勘状态收集本轮候选。
-# 无输入scope；只追加到待阙／在职都监／在职监押临时名单，不任免或修改人物。
-# 调用者逐人调用一次并在轮末清理名单；皇帝宫廷与封臣宫廷共用此入口。
-tca_military_collect_officer_effect = {
-    if = {
-        limit = { tca_military_officer_base_eligibility_trigger = yes }
-
-        if = {
-            limit = {
-                tca_does_not_hold_any_military_court_position_trigger = yes
-                court_position_does_not_already_have_a_job_trigger = yes
-            }
-            add_to_list = tca_military_unassigned_pool
-        }
-        else_if = {
-            limit = {
-                has_court_position = tca_military_inspector_court_position
-                NOT = { has_character_flag = tca_military_appointment_cooldown }
-            }
-            add_to_list = tca_military_serving_inspectors
-        }
-        else_if = {
-            limit = {
-                has_court_position = tca_military_supervisor_court_position
-                NOT = { has_character_flag = tca_military_appointment_cooldown }
-            }
-            add_to_list = tca_military_serving_supervisors
-        }
+    if = { limit = { tca_military_linked_council_available_trigger = { KEEP_CURRENT = $KEEP_CURRENT$ } }
+    every_in_list = { list = tca_military_candidate_pool add_to_list = tca_court_candidates }
+    set_variable = { name = tca_court_legacy_position value = flag:$POSITION$ }
+    tca_court_visit_positions_effect = { VISITOR = tca_court_legacy_fill_effect }
+    remove_variable = tca_court_legacy_position
+    every_in_list = { list = tca_court_candidates remove_from_list = tca_court_candidates }
     }
 }
 
-# 独立天朝最高领主作用域；由开局与季度回调调用，调用者负责政体与独立条件。
-# 同链建立五类出缺队列与待阙/在任候选列表，按都虞候、都监、监押顺序分配，轮末清空列表。
-# 选中人物及原雇主等saved scopes服务同轮调任与通知；单职入口在每次抽选前重新清空候选输出。
-tca_military_quarterly_fill_vacancies_effect = {
-	# -------------------------------------------------------------
-	# 步骤一：单次扫描帝国内部天朝地方官署，归类出缺官署（避免重复全局遍历）
-	# 独立天朝皇帝全面排除地方差遣，遍历其境内所有天朝各级封臣
-	# -------------------------------------------------------------
-	every_vassal_or_below = {
-		limit = {
-			government_has_flag = government_is_celestial
-		}
-		tca_military_sort_vacant_lord_effect = yes
-	}
+# 人物作用域兼容入口；委派共用候选收集，不再按原职类拆分池。
+tca_military_collect_officer_effect = { tca_court_collect_officer_effect = yes }
 
-	# -------------------------------------------------------------
-	# 步骤二：零出缺守门阻断（若全朝廷无任何军职出缺，直接退出，跳过候选人扫描）
-	# -------------------------------------------------------------
-	if = {
-		limit = {
-			OR = {
-				any_in_list = { list = tca_vacant_corps_inspectors count >= 1 }
-				any_in_list = { list = tca_vacant_march_inspectors count >= 1 }
-				any_in_list = { list = tca_vacant_civil_inspectors count >= 1 }
-				any_in_list = { list = tca_vacant_march_supervisors count >= 1 }
-				any_in_list = { list = tca_vacant_civil_supervisors count >= 1 }
-			}
-		}
-
-		# -------------------------------------------------------------
-		# 步骤三：定向收集天朝武官（纯待阙池 + 满任期可晋升官员池）
-		# 采用单一基础资格守门（tca_military_officer_base_eligibility_trigger），消除重复全量扫描
-		# -------------------------------------------------------------
-		# 3.1 收集皇帝宫廷廷臣；这里不遍历宾客。
-		every_courtier = { tca_military_collect_officer_effect = yes }
-
-		# 3.2 收集各级封臣宫廷武官
-		every_vassal_or_below = {
-			limit = {
-				government_has_flag = government_is_celestial
-			}
-			every_courtier = { tca_military_collect_officer_effect = yes }
-		}
-
-		# -------------------------------------------------------------
-		# 步骤四：依战略优先级与重要度梯队除授（战略重镇优先配给，待阙池耗尽瞬间熔断）
-		# -------------------------------------------------------------
-
-		# 4.1 第一优先级——公王级帅府【都虞候】
-		# 候选范围：纯待阙池 + 满任期都监 + 满任期监押
-		every_in_list = {
-			list = tca_military_unassigned_pool
-			add_to_list = tca_military_candidate_pool
-		}
-		every_in_list = {
-			list = tca_military_serving_inspectors
-			add_to_list = tca_military_candidate_pool
-		}
-		every_in_list = {
-			list = tca_military_serving_supervisors
-			add_to_list = tca_military_candidate_pool
-		}
-
-		if = {
-			limit = { any_in_list = { list = tca_military_candidate_pool count >= 1 } }
-			ordered_in_list = {
-				list = tca_vacant_corps_inspectors
-				order_by = tca_military_office_strategic_weight
-				limit = { any_in_list = { list = tca_military_candidate_pool count >= 1 } }
-				save_scope_as = target_liege
-				tca_military_fill_single_position_effect = {
-					POSITION = tca_corps_inspector_court_position
-					KEEP_CURRENT = tca_military_marshal_higher_than_corps_trigger
-				}
-			}
-		}
-		# 清空都虞候本轮候选名单
-		every_in_list = {
-			list = tca_military_candidate_pool
-			remove_from_list = tca_military_candidate_pool
-		}
-
-		# 4.2 第二优先级——路分帅司【兵马都监】（沿边军管优先，普通路分紧随）
-		# 候选范围：纯待阙池 + 满任期监押（严禁都监同级平调）
-		every_in_list = {
-			list = tca_military_unassigned_pool
-			add_to_list = tca_military_candidate_pool
-		}
-		every_in_list = {
-			list = tca_military_serving_supervisors
-			add_to_list = tca_military_candidate_pool
-		}
-
-		if = {
-			limit = { any_in_list = { list = tca_military_candidate_pool count >= 1 } }
-			# 4.2.1 沿边军管帅司都监（按战略权重排序配给）
-			ordered_in_list = {
-				list = tca_vacant_march_inspectors
-				order_by = tca_military_office_strategic_weight
-				limit = { any_in_list = { list = tca_military_candidate_pool count >= 1 } }
-				save_scope_as = target_liege
-				tca_military_fill_single_position_effect = {
-					POSITION = tca_military_inspector_court_position
-					KEEP_CURRENT = tca_military_marshal_higher_than_inspector_trigger
-				}
-			}
-			# 4.2.2 普通路分都监（按战略权重排序配给）
-			ordered_in_list = {
-				list = tca_vacant_civil_inspectors
-				order_by = tca_military_office_strategic_weight
-				limit = { any_in_list = { list = tca_military_candidate_pool count >= 1 } }
-				save_scope_as = target_liege
-				tca_military_fill_single_position_effect = {
-					POSITION = tca_military_inspector_court_position
-					KEEP_CURRENT = tca_military_marshal_higher_than_inspector_trigger
-				}
-			}
-		}
-		# 清空都监本轮候选名单
-		every_in_list = {
-			list = tca_military_candidate_pool
-			remove_from_list = tca_military_candidate_pool
-		}
-
-		# 4.3 第三优先级——府州军【兵马监押】（基层差遣，仅供待阙新人出仕，严禁平调）
-		# 候选范围：仅纯待阙池
-		every_in_list = {
-			list = tca_military_unassigned_pool
-			add_to_list = tca_military_candidate_pool
-		}
-
-		if = {
-			limit = { any_in_list = { list = tca_military_candidate_pool count >= 1 } }
-			# 4.3.1 沿边要塞军州监押（按战略权重排序配给）
-			ordered_in_list = {
-				list = tca_vacant_march_supervisors
-				order_by = tca_military_office_strategic_weight
-				limit = { any_in_list = { list = tca_military_candidate_pool count >= 1 } }
-				save_scope_as = target_liege
-				tca_military_fill_single_position_effect = {
-					POSITION = tca_military_supervisor_court_position
-					KEEP_CURRENT = tca_military_marshal_higher_than_supervisor_trigger
-				}
-			}
-			# 4.3.2 普通州县监押（按战略权重排序配给）
-			ordered_in_list = {
-				list = tca_vacant_civil_supervisors
-				order_by = tca_military_office_strategic_weight
-				limit = { any_in_list = { list = tca_military_candidate_pool count >= 1 } }
-				save_scope_as = target_liege
-				tca_military_fill_single_position_effect = {
-					POSITION = tca_military_supervisor_court_position
-					KEEP_CURRENT = tca_military_marshal_higher_than_supervisor_trigger
-				}
-			}
-		}
-		# 清空监押本轮候选名单
-		every_in_list = {
-			list = tca_military_candidate_pool
-			remove_from_list = tca_military_candidate_pool
-		}
-	}
-
-	# -------------------------------------------------------------
-	# 步骤五：清理所有人员池与出缺队列列表
-	# -------------------------------------------------------------
-	every_in_list = {
-		list = tca_military_candidate_pool
-		remove_from_list = tca_military_candidate_pool
-	}
-	every_in_list = {
-		list = tca_military_unassigned_pool
-		remove_from_list = tca_military_unassigned_pool
-	}
-	every_in_list = {
-		list = tca_military_serving_supervisors
-		remove_from_list = tca_military_serving_supervisors
-	}
-	every_in_list = {
-		list = tca_military_serving_inspectors
-		remove_from_list = tca_military_serving_inspectors
-	}
-	every_in_list = {
-		list = tca_vacant_corps_inspectors
-		remove_from_list = tca_vacant_corps_inspectors
-	}
-	every_in_list = {
-		list = tca_vacant_march_inspectors
-		remove_from_list = tca_vacant_march_inspectors
-	}
-	every_in_list = {
-		list = tca_vacant_civil_inspectors
-		remove_from_list = tca_vacant_civil_inspectors
-	}
-	every_in_list = {
-		list = tca_vacant_march_supervisors
-		remove_from_list = tca_vacant_march_supervisors
-	}
-	every_in_list = {
-		list = tca_vacant_civil_supervisors
-		remove_from_list = tca_vacant_civil_supervisors
-	}
-}
+# 独立天朝最高领主作用域；保留原on_action调用名，所有铨选在共用框架执行。
+tca_military_quarterly_fill_vacancies_effect = { tca_court_quarterly_fill_effect = yes }
 
 # 官署领主作用域；供改制和主君死亡后的真实雇主重绑调用，只检查自己的三种差遣。
 # 改制回归曾在两日观察窗口内见到原生未清理，因此此入口显式验证官署与人物资格。

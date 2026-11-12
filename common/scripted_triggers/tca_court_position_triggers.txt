@@ -1,0 +1,70 @@
+﻿# 共用人物与官署资格；目标参数来自职位目录，任职与铨选使用相同硬资格。
+# 人物作用域，文武路线采用原生当前候选身份；冲突或未知不按最后路线猜测。
+tca_court_civil_route_trigger = { is_civilian_candidate_trigger = yes is_military_candidate_trigger = no }
+tca_court_military_route_trigger = { is_military_candidate_trigger = yes is_civilian_candidate_trigger = no }
+tca_court_holds_position_trigger = { OR = {
+    has_court_position = tca_corps_inspector_court_position
+    has_court_position = tca_military_inspector_court_position
+    has_court_position = tca_civil_adjutant_court_position
+    has_court_position = tca_army_judge_court_position
+    has_court_position = tca_household_registrar_court_position
+    has_court_position = tca_judicial_advisor_court_position
+    has_court_position = tca_military_supervisor_court_position
+} }
+tca_court_no_council_precedence_trigger = { always = no }
+# 伯爵级民政与军制按雇主当前最高头衔及原生契约判定，排除中央无地与独立君主。
+tca_civil_office_valid_trigger = {
+    tca_is_landed_celestial_governor_trigger = yes highest_held_title_tier = tier_county
+    OR = { vassal_contract_has_flag = celestial_province_standard vassal_contract_has_flag = celestial_province_metropolitan vassal_contract_has_flag = celestial_province_industrial }
+}
+tca_army_civil_office_valid_trigger = {
+    tca_is_landed_celestial_governor_trigger = yes highest_held_title_tier = tier_county
+    vassal_contract_has_flag = celestial_province_military
+}
+tca_court_person_eligible_trigger = {
+    is_alive = yes is_adult = yes is_ruler = no merit_level >= 1
+    government_has_flag = government_is_celestial
+    is_imprisoned = no NOT = { has_trait = incapable }
+    tca_retirement_excludes_appointment_trigger = no
+    OR = { tca_court_civil_route_trigger = yes tca_court_military_route_trigger = yes }
+    tca_military_has_no_other_full_time_job_trigger = yes
+    OR = {
+        is_councillor = no
+        tca_court_matches_linked_council_trigger = yes
+    }
+}
+# 人物作用域；不要求已在目标宫廷，可用于迁廷前候选复验。
+# 必需scope:target_liege。不将重要度、冷却混入持续任职资格。
+tca_court_target_person_trigger = {
+    tca_court_person_eligible_trigger = yes
+    $SKILL$ >= 6
+    trigger_if = { limit = { scope:tca_court_admission = 1 } tca_court_civil_route_trigger = yes }
+    trigger_if = { limit = { scope:tca_court_admission = 2 } tca_court_military_route_trigger = yes }
+    trigger_if = {
+        limit = { scope:tca_court_bias = 2 scope:target_liege = { tca_is_landed_celestial_governor_trigger = yes } }
+        can_be_marshal_trigger = { COURT_OWNER = scope:target_liege }
+        trigger_if = { limit = { has_variable = block_fire_councillor }
+            OR = {
+                var:block_fire_councillor = scope:target_liege
+                # 只有本模块拥有且仍指向真实来源雇主的锁，才可在撤旧时安全释放。
+                AND = { exists = liege_or_court_owner var:tca_military_council_lock_owner ?= liege_or_court_owner var:block_fire_councillor = liege_or_court_owner }
+            }
+        }
+    }
+}
+# 实际职位valid_character使用；人物作用域，scope:liege为原生雇主。
+# 通过原生授权或已任本职，禁止玩家绕过集中选官；同人不得兼任本体系其他差遣。
+tca_court_actual_validity_trigger = {
+    tca_court_person_assignment_validity_trigger = { OWNER = scope:liege POSITION = $POSITION$ SKILL = $SKILL$ ROUTE = $ROUTE$ }
+}
+# 人物作用域；OWNER显式传入雇主，原生回调和内部选席共用，不创建liege／employee别名。
+# 避免原生已提供永久scope时再次建立同名临时scope；无状态输出。
+tca_court_person_assignment_validity_trigger = {
+    tca_court_person_eligible_trigger = yes $SKILL$ >= 6
+    $ROUTE$ = yes
+    is_courtier_of = $OWNER$
+    $POSITION$_council_person_trigger = { OWNER = $OWNER$ }
+    trigger_if = { limit = { has_variable = block_fire_councillor } var:block_fire_councillor = $OWNER$ }
+    OR = { has_court_position = $POSITION$ NOT = { tca_court_holds_position_trigger = yes } }
+    custom_tooltip = { text = tca_court_system_appointment_required OR = { has_court_position = $POSITION$ has_character_flag = tca_military_appointment_allowed } }
+}

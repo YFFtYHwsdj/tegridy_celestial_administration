@@ -1,0 +1,54 @@
+﻿# 文武差遣与内阁对应关系；人物trigger与官署trigger分开维护，均无永久写入。
+tca_court_has_marshal_commission_trigger = { OR = { employs_court_position = tca_corps_inspector_court_position employs_court_position = tca_military_inspector_court_position employs_court_position = tca_military_supervisor_court_position } }
+tca_court_has_chancellor_commission_trigger = { employs_court_position = tca_civil_adjutant_court_position }
+tca_court_has_steward_commission_trigger = { OR = { employs_court_position = tca_army_judge_court_position employs_court_position = tca_household_registrar_court_position } }
+tca_court_person_has_council_commission_trigger = { OR = {
+    tca_does_not_hold_any_military_court_position_trigger = no
+    has_court_position = tca_civil_adjutant_court_position
+    has_court_position = tca_household_registrar_court_position
+    has_court_position = tca_army_judge_court_position
+} }
+# 人物作用域；只有真实本署对应席位允许兼任，不放宽其他全职岗位。
+tca_court_matches_linked_council_trigger = {
+    is_councillor_of = liege_or_court_owner
+    OR = {
+        AND = { tca_does_not_hold_any_military_court_position_trigger = no has_council_position = councillor_marshal }
+        AND = { has_court_position = tca_civil_adjutant_court_position has_council_position = councillor_chancellor }
+        AND = { OR = { has_court_position = tca_household_registrar_court_position has_court_position = tca_army_judge_court_position } has_council_position = councillor_steward }
+    }
+}
+
+# 人物作用域；OWNER为目标／实际雇主，只复用原生内阁条件，不复制原生性别、健康等规则。
+tca_court_linked_person_eligible_trigger = {
+    trigger_if = { limit = { $OWNER$ = { tca_is_landed_celestial_governor_trigger = yes } }
+        $ELIGIBILITY$ = { COURT_OWNER = $OWNER$ }
+    }
+}
+tca_civil_adjutant_court_position_council_person_trigger = { tca_court_linked_person_eligible_trigger = { OWNER = $OWNER$ ELIGIBILITY = can_be_chancellor_trigger } }
+tca_army_judge_court_position_council_person_trigger = { tca_court_linked_person_eligible_trigger = { OWNER = $OWNER$ ELIGIBILITY = can_be_steward_trigger } }
+tca_household_registrar_court_position_council_person_trigger = { tca_court_linked_person_eligible_trigger = { OWNER = $OWNER$ ELIGIBILITY = can_be_steward_trigger } }
+tca_judicial_advisor_court_position_council_person_trigger = { $OWNER$ = { always = yes } }
+tca_military_supervisor_court_position_council_person_trigger = { tca_court_linked_person_eligible_trigger = { OWNER = $OWNER$ ELIGIBILITY = can_be_marshal_trigger } }
+tca_military_inspector_court_position_council_person_trigger = { tca_court_linked_person_eligible_trigger = { OWNER = $OWNER$ ELIGIBILITY = can_be_marshal_trigger } }
+tca_corps_inspector_court_position_council_person_trigger = { tca_court_linked_person_eligible_trigger = { OWNER = $OWNER$ ELIGIBILITY = can_be_marshal_trigger } }
+
+# 官署作用域；只决定补缺是否会被既有受保护内阁阻挡，不并入职位持续官署资格。
+# KEEP_CURRENT对应本席更高差遣；源模块锁兼容保留，但外部保护不释放。
+tca_court_linked_seat_available_trigger = {
+    save_temporary_scope_as = tca_court_availability_liege
+    OR = {
+        NOT = { exists = cp:$COUNCIL$ }
+        cp:$COUNCIL$ ?= { OR = {
+            $KEEP_CURRENT$ = yes
+            can_be_fired_from_council_trigger = { COURT_OWNER = scope:tca_court_availability_liege }
+            AND = { has_variable = tca_military_council_lock_owner var:tca_military_council_lock_owner ?= scope:tca_court_availability_liege }
+        } }
+    }
+}
+tca_civil_adjutant_court_position_council_available_trigger = { tca_court_linked_seat_available_trigger = { COUNCIL = councillor_chancellor KEEP_CURRENT = tca_court_no_council_precedence_trigger } }
+tca_army_judge_court_position_council_available_trigger = { tca_court_linked_seat_available_trigger = { COUNCIL = councillor_steward KEEP_CURRENT = tca_court_no_council_precedence_trigger } }
+tca_household_registrar_court_position_council_available_trigger = { tca_court_linked_seat_available_trigger = { COUNCIL = councillor_steward KEEP_CURRENT = tca_court_no_council_precedence_trigger } }
+tca_judicial_advisor_court_position_council_available_trigger = { always = yes }
+tca_military_supervisor_court_position_council_available_trigger = { tca_military_linked_council_available_trigger = { KEEP_CURRENT = tca_military_marshal_higher_than_supervisor_trigger } }
+tca_military_inspector_court_position_council_available_trigger = { tca_military_linked_council_available_trigger = { KEEP_CURRENT = tca_military_marshal_higher_than_inspector_trigger } }
+tca_corps_inspector_court_position_council_available_trigger = { tca_military_linked_council_available_trigger = { KEEP_CURRENT = tca_military_marshal_higher_than_corps_trigger } }
