@@ -9,13 +9,15 @@
 ```sh
 # 查看可选择的正式用例，不启动游戏
 python3 tools/run_game_tests.py --list
-# 执行完整同局回归；全量通常需要20至30分钟，必须给足超时
-python3 tools/run_game_tests.py --timeout 1800
+# 日常先选受影响模块，优先并行
+python3 tools/run_game_tests.py --suite exam --parallel 4 --timeout 600
+# 仅影响面需要时运行一次完整同局回归，给足超时
+python3 tools/run_game_tests.py --parallel 4 --timeout 1800
 ```
 
 使用工具输出的本次任务目录，核对 `terminal.json`、`verification.json`、`result.txt` 和同次日志。通过必须同时满足所选范围完整执行、观察者确认、终局汇总、快照与日志核对通过；只看到PASS、只准备未执行或超时退出都不能算通过。详细文件及退出码见[运行隔离与结果](#运行隔离与结果)。
 
-全量回归默认（`--parallel 1`）在同一个世界内串行推进多个游戏年，包含一次业务原生保存重载；若所选范围包含真实玩家会话末项，再保存检查点并以新进程建立人类席位，最多启动三个进程，近年用例和等待增加后明显变长；以 `terminal.json` 的 `seconds` 和实际日志为准，不要用固定数字承诺。超时预算不足时第二局不会执行，整次运行按超时失败，并且仍会进行收尾与验收核对。
+工具省略`--parallel`时仍使用K=1；日常应显式传`--parallel 4`。全量回归在同一个世界内推进多个游戏年，包含一次业务原生保存重载；若所选范围包含真实玩家会话末项，再保存检查点并以新进程建立人类席位，最多启动三个进程，近年用例和等待增加后明显变长；以 `terminal.json` 的 `seconds` 和实际日志为准，不要用固定数字承诺。超时预算不足时第二局不会执行，整次运行按超时失败，并且仍会进行收尾与验收核对。
 
 Windows使用 `python`，先按[Windows步骤](#windows)设置UTF-8。需要保留产物时显式指定[持久输出目录](../development/README.md#测试证据如何保存)；不会自动上传共享。
 
@@ -41,40 +43,41 @@ Windows使用 `python`，先按[Windows步骤](#windows)设置UTF-8。需要保�
 
 ```sh
 # 即时／延迟入口均可单独运行，--case可重复
-python3 tools/run_game_tests.py --case tca_exam_test.1 --timeout 600
+python3 tools/run_game_tests.py --case tca_exam_test.1 --parallel 4 --timeout 600
 # 合并模块，仍然只启动一次；支持judicial、confucian等前缀
-python3 tools/run_game_tests.py --suite exam --suite confucian --timeout 600
+python3 tools/run_game_tests.py --suite exam --suite confucian --parallel 4 --timeout 600
 # 显式按叶模块拆局；每个子局仍执行原生正式用例
-python3 tools/run_game_tests.py --suite exam --suite confucian_statistics --isolate suite --timeout 600
+python3 tools/run_game_tests.py --suite exam --suite confucian_statistics --isolate suite --parallel 4 --timeout 600
 ```
 
 `--suite`与`--case`取并集并去重，按原生登记顺序执行。无选择才代表全组；未知模块、未知入口、仅续接事件直接报错。每轮`selection.json`列出实际入口、模块、日志名称、即时／延迟和断言数；验收按冻结计划检查遗漏、重复和额外执行。部分运行不能代表完整验收；隔离全组也不能冒充同局完整回归。
 
 当前目录：`events/tests/`保存原生事件，`common/scripted_effects/tests/framework/`保存框架效果，`modules/`保存登记，`fixtures/`保存场景准备。Python内部实现位于`tools/testing/`，回归位于`tools/tests/`；发现和封存都支持递归目录。
 
-主模组直接维护原生测试及模块登记，工具不生成测试或模拟业务。CLI只在适配副本中设置选择变量，普通游戏不加载适配。框架先从登记计算预期数量，统一派发；延迟用例按模块lane调度，默认一次一个，用例结束时调用正式lane结束效果续接，不再维护全局阶段编号。
+验证范围按[工作约定](../../AGENTS.md#测试与验证)选择最小充分集合：优先复用有效证据、扩展已有用例、批量修复后合并定向运行，不把整模块或全量当作每次收口的固定步骤。
+
+主模组直接维护原生测试及模块登记，工具不生成测试或模拟业务。CLI只在适配副本中设置选择变量，普通游戏不加载适配。框架先从登记计算预期数量，统一派发；延迟用例按模块lane调度，工具缺省一次一个，推荐显式K=4，用例结束时调用正式lane结束效果续接，不再维护全局阶段编号。
 
 ## 并行运行
 
-同一进程、同一世界的延迟用例可按模块lane并发，缩短全量回归的墙钟。默认`--parallel 1`，调度顺序与既有全组串行逐项等价；`--parallel K`（1至32）最多同时运行K个不同GROUP的延迟用例，同一GROUP内仍逐个执行，保存重载、玩家会话、开局快照等独占用例在途时整体串行。lane、GROUP、EXCLUSIVE与结束效果的契约见[框架契约](framework.md#并发-lane-与用例隔离)。全量串行仍是权威口径，K>1只用于加速和对照。
+同一进程、同一世界的延迟用例按模块lane并发，日常开发与验收优先显式使用`--parallel 4`。工具缺省值仍为1；`--parallel K`（1至32）最多同时运行K个不同GROUP的延迟用例，同一GROUP内仍逐个执行，保存重载、玩家会话、开局快照等独占用例在途时整体串行。lane、GROUP、EXCLUSIVE与结束效果的契约见[框架契约](framework.md#并发-lane-与用例隔离)。K>1完整通过可直接作为所选范围的验收依据，不要求例行补跑同范围K=1。
 
 ```sh
-# 同一选择范围分别按串行和并发运行；计划、断言和等待相同
+# 通常只运行一次所需范围
+python3 tools/run_game_tests.py --suite judicial_law --suite custody_review --parallel 4 --timeout 900
+# 仅疑似并发冲突或调度语义变化时，追加最小相关范围K=1诊断
 python3 tools/run_game_tests.py --suite judicial_law --suite custody_review --parallel 1 --timeout 900
-python3 tools/run_game_tests.py --suite judicial_law --suite custody_review --parallel 3 --timeout 900
-# 逐用例核对状态与断言计数；输出差异表与JSON，非0退出表示不一致
+# 已有两次可比运行时，逐用例核对；不是日常双跑要求
 python3 tools/compare_test_runs.py "<串行任务目录>" "<并行任务目录>"
-# 全量串行仍是权威口径；并发全量只作加速和对照
-python3 tools/run_game_tests.py --timeout 1800
 ```
 
 并行运行不改变选择计划、用例集合、等待天数或断言，`selection.json`与`verification.json`的结构不变；`execution.json`、`task.json`额外记录`parallel`。并发只减少同局内等待的叠加，墙钟仍受最慢lane和独占用例限制，不能用固定倍率承诺耗时。并发时调试日志按实际发生顺序交错，验收仍按冻结计划和逐用例断言核对，不以日志相邻行判断用例归属。
 
-**验证边界**：并行运行的逐用例结果不能替代同范围串行同局结果作为验收依据，全量串行仍是权威口径。K>1必须用`tools/compare_test_runs.py`与同范围K=1逐项核对一致，并核对两次的冻结计划、终局结果、`TCA_TEST`日志和同次`error.log`；工具按`verification.json`比较逐用例状态和断言计数，缺失用例显示`<missing>`，可用`--ignore case1,case2`（可重复）排除已知项；`--ignore`只排除逐用例状态，聚合断言计数差异仍会列出并须单独解释，也可用`--json`另行输出结果。对比一致只说明本轮并发未改变已覆盖的断言，不覆盖保存重载、真实玩家路径和界面等另行验收项。K>1新出现的逐用例差异应先按并发冲突排查（同一共享状态应只由同一GROUP的延迟非独占用例写入，否则合并GROUP或保持独占），不能直接当作flaky忽略。已知WIP flaky项（如`tca_test_retirement_player_session`等）可在对比时用`--ignore`排除并单独记录原因，但不得用排除掩盖新增失败、缺失结果或引擎错误。
+**验证边界**：接受K>1通过后无需另跑K=1的工程判断，但报告只写实际执行的K值和范围，不将未运行的K=1称为实测通过。并行验收同样要求冻结计划完整执行、终局、`TCA_TEST`及同次`error.log`核对通过。只有疑似并发冲突、调度器修改或明确串行语义要求时，才对最小相关范围补串行诊断或对照；不为取得串行结果额外跑全量。`tools/compare_test_runs.py`按`verification.json`比较逐用例状态与断言计数，缺失显示`<missing>`，支持`--json`；`--ignore`仅用于已明确说明的既有问题对比，不得掩盖新增失败、缺失结果或引擎错误，也不改变原始验收失败。发现新差异先检查共享状态与GROUP归属，不能直接归为偶发波动。
 
 新增或修改用例后先运行`python3 tools/check_test_parallel.py`：它检查注册的GROUP／EXCLUSIVE元数据、裸全局标识、lane flag与lane结束调用一致性、跨GROUP报告者状态冲突、共享状态跨GROUP写冲突（延迟非独占用例）、失败flag的写入／读取配对及触发链内失败归属；检查不通过不得提交，检查通过也不证明引擎行为。
 
-**当前放行状态**：登记以`python3 tools/check_test_parallel.py`输出为准（当前54个GROUP、26例EXCLUSIVE、5个跨命名空间合并组）。全量`--parallel 4`（固定种子424242）已在本机同一时段做过基线/放宽A/B：基线配置（62 GROUP／38 EXCLUSIVE）约496s、235 PASS，放宽后配置（54 GROUP／26 EXCLUSIVE）连续两轮约445s与458s、239与242 PASS；相对同机基线约1.08至1.12倍，相对全量K=1（715.7s）约1.56至1.61倍，可作为加速与回归对比模式。两轮均245/245用例执行、无重复BEGIN、无新增mod引擎错误。固定种子下失败集仍逐轮漂移（基线单轮也出现约10例非通过），已知WIP flaky、K>1夹具世界状态漂移与调度敏感项（retirement系列、tongpan_lifecycle、arrest家族、`tca_test_merit_startup_central_boundaries`等）不写入本文清单；同一用例跨轮PASS／FAIL／PRECONDITION_FAIL交替应视为漂移而非确定性回归，新差异须用`tools/compare_test_runs.py`逐项核对并记录。放宽轨迹：拘捕组10例曾试解除独占，两轮共同出现确定性失败且墙钟无收益，已回退；司法六个模块合并为`tca_judicial_realm`（timing三例与`tca_test_review_send_resolution`保留独占，否则续接断言在并发下缺失）；功绩年度组四模块合并为`tca_merit_annual_worker`（`tca_test_merit_maintenance_idempotence`与`tca_test_merit_multicountry`保留独占，避免任意日期世界级年度结算互污；pulse／draw／natural／legacy解除独占）。`tca_test_retirement_eligibility`的原生等级缓存时序对调度敏感，仅在EXCLUSIVE下稳定通过，其独占登记不得移除。保存重载探针偶发引擎级中断（console save→reload转换，同配置多数轮次未复现），遇到`process_exit`或`NOT VERIFIED`按整轮重跑处理，不记为用例失败；若复现，可在`gui/tca_merit_saveload_probe.gui`保存后加`OnPause`并延长等待，或由运行器在检测到保存成功后门控注入破坏步骤。全量K=1串行仍是权威验收口径。
+**既有并发观察与限制**：以下旧运行只保留独占取舍和已知失败背景，不代表当前源码验收通过。登记以`python3 tools/check_test_parallel.py`输出为准（当前54个GROUP、26例EXCLUSIVE、5个跨命名空间合并组）。全量`--parallel 4`（固定种子424242）已在本机同一时段做过基线/放宽A/B：基线配置（62 GROUP／38 EXCLUSIVE）约496s、235 PASS，放宽后配置（54 GROUP／26 EXCLUSIVE）连续两轮约445s与458s、239与242 PASS；相对同机基线约1.08至1.12倍，相对全量K=1（715.7s）约1.56至1.61倍，提供并行运行耗时的参考，不承诺当前版本相同收益。两轮均245/245用例执行、无重复BEGIN、无新增mod引擎错误。固定种子下失败集仍逐轮漂移（基线单轮也出现约10例非通过），已知WIP flaky、K>1夹具世界状态漂移与调度敏感项（retirement系列、tongpan_lifecycle、arrest家族、`tca_test_merit_startup_central_boundaries`等）不写入本文清单；同一用例跨轮PASS／FAIL／PRECONDITION_FAIL交替应视为漂移而非确定性回归，新差异先做定向诊断，已有可比运行时用`tools/compare_test_runs.py`逐项核对。放宽轨迹：拘捕组10例曾试解除独占，两轮共同出现确定性失败且墙钟无收益，已回退；司法六个模块合并为`tca_judicial_realm`（timing三例与`tca_test_review_send_resolution`保留独占，否则续接断言在并发下缺失）；功绩年度组四模块合并为`tca_merit_annual_worker`（`tca_test_merit_maintenance_idempotence`与`tca_test_merit_multicountry`保留独占，避免任意日期世界级年度结算互污；pulse／draw／natural／legacy解除独占）。`tca_test_retirement_eligibility`的原生等级缓存时序对调度敏感，仅在EXCLUSIVE下稳定通过，其独占登记不得移除。保存重载探针偶发引擎级中断（console save→reload转换，同配置多数轮次未复现），遇到`process_exit`或`NOT VERIFIED`按整轮重跑处理，不记为用例失败；若复现，可在`gui/tca_merit_saveload_probe.gui`保存后加`OnPause`并延长等待，或由运行器在检测到保存成功后门控注入破坏步骤。日常验收按上述并行优先策略执行，不例行追加K=1。
 
 ## Windows
 
@@ -85,7 +88,7 @@ python3 tools/run_game_tests.py --timeout 1800
 ```powershell
 $env:PYTHONUTF8 = "1"
 # 全量回归预留20至30分钟；单项或小范围可用较短超时
-python tools/run_game_tests.py --timeout 1800
+python tools/run_game_tests.py --parallel 4 --timeout 1800
 ```
 
 队列锁按平台选择原生后端：Windows使用`msvcrt.locking`的首字节非阻塞锁，macOS使用`fcntl.flock`；只在竞争时等待，其他系统错误直接报告。元数据更新保留锁定字节，运行结束或异常退出后释放锁。`platform_paths.py`与内部运行模块都包含在冻结工具副本中。
@@ -153,7 +156,7 @@ python tools/run_game_tests.py --timeout 1800
 
 以 `--list` 和该次冻结 `selection.json` 获取实际范围，不手填全组总数。超时、中断、未确认观察者、缺少结果或日志核对失败均为 `NOT VERIFIED`。没有执行不能算通过；单项、选择运行和分局隔离分别报告，不能替代同局完整回归。
 
-并行运行是加速与对照模式，不单独构成验收：`--parallel K`（K>1）须与同范围K=1逐项一致，逐项核对使用`tools/compare_test_runs.py`，全量串行仍是权威口径。并发安全依靠lane分组与静态检查，没有运行时共享状态守卫，跨模块共享状态仍须按[框架契约](framework.md#并发-lane-与用例隔离)人工判断。
+并行完整通过可作为实际所选范围的验收依据，无需例行串行复跑；串并行诊断的适用条件见[并行运行](#并行运行)。并发安全依靠lane分组与静态检查，没有运行时共享状态守卫，跨模块共享状态仍须按[框架契约](framework.md#并发-lane-与用例隔离)人工判断。
 
 [通判生命周期](../tongpan/implementation.md#未解决的生命周期一致性)及[经费请求](../office_funding/interactions.md#待复核的请求状态)存在尚未归因的跨执行范围差异。实际失败场景、源码入口和复核方法由所属模块维护；测试运行文档不保留另一份历史成绩表。已知WIP flaky项的对比处理见[并行运行](#并行运行)。真实 Windows 引擎、测试窗口显示、保存重载与长期 AI 仍需专门验收。
 
@@ -163,7 +166,7 @@ python tools/run_game_tests.py --timeout 1800
 
 ```sh
 python3 tools/build_startup_officials.py --check
-python3 tools/run_game_tests.py --start-date both --suite startup_officials --suite tongpan --timeout 600
+python3 tools/run_game_tests.py --start-date both --suite startup_officials --suite tongpan --parallel 4 --timeout 600
 ```
 
-双开局不共用世界；每局继续遵循K=1权威验收。原始开局快照在其它夹具前读取；家族测试使用正式策略和授职入口，季度等待不等于存档重载。现有用例仍保留各自前置，未执行不能算1178通过；当前差异见[开局官员验证](../appointment/startup_officials_verification.md)。
+双开局不共用世界；每局均按并行优先策略验收，不额外补跑K=1。原始开局快照在其它夹具前读取；家族测试使用正式策略和授职入口，季度等待不等于存档重载。现有用例仍保留各自前置，未执行不能算1178通过；当前差异见[开局官员验证](../appointment/startup_officials_verification.md)。
