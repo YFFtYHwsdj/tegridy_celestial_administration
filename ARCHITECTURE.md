@@ -8,6 +8,7 @@
 - [官职任命](docs/appointment/README.md)：原版地方／中央文官任命依据、通判与提刑选官设计的共同规则，以及[行政整饬](docs/appointment/admin_rectification.md)（归正辖属与裁撤兼领）；各职专业评分由所属模块维护。
 - [地方司法](docs/judicial/README.md)：提刑机构、路法理辖区、位望、分层拘捕、公职囚犯与详覆。拥有统一司法辖区和身份分档接口。
 - [通判](docs/tongpan/README.md)：州级独立无地官职、绑定与原生任命、常设分权、治理加成和行动附费。复用官署生命周期思路，保持自己的资格、绑定与法律。
+- [私征苛敛](docs/exaction/README.md)：地方官个人征敛、地方经济代价与事件网的机制设计；复用通判身份与天平、官员俸禄及原生秘密和司法接口。
 - [官署经费](docs/office_funding/README.md)：复用司法路和通判州的登记表，按辖区绑定付款、按官署保存待遇；[契约](docs/office_funding/contracts.md)拥有身份／功绩／俸禄边界，[调整互动](docs/office_funding/interactions.md)拥有授权与冷却。
 - [地方驻军与军事差遣](docs/military/README.md)：伯爵级军制头衔兵士基准规模与中央军费份额；军事宫廷差遣（兵马监押、兵马都监、都虞候）与待阙官员铨选流转系统。
 - [科举](docs/examination/README.md)：知贡举宫廷职位与玩家皇帝代办事件链，复用原版考生来源、评分和及第状态；AI保留原版活动。
