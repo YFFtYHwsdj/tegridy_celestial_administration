@@ -1,0 +1,68 @@
+﻿# 提刑候选池跨事件继承回归；自建低功绩廷臣，只读外国政权，不授予或销毁官署。
+namespace = tca_judicial_pool_test
+
+tca_judicial_pool_test.1 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_judicial_pool_test.1 tca_test_judicial_inherited_pool"
+        remove_character_flag = tca_test_tca_judicial_pool_test_case_failed
+        if = { limit = { debug_only = yes title:h_china.holder = root exists = title:c_middlesex.holder NOT = { title:c_middlesex.holder.top_liege = root } }
+            create_character = { age = 35 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_test_jp_courtier }
+            save_scope_as = tca_appointment_liege
+            save_scope_as = tca_judicial_pool_sovereign
+            save_scope_as = tca_judicial_candidate_batch
+            save_scope_value_as = { name = tca_judicial_pool_ready value = 1 }
+            title:c_middlesex.holder.top_liege = { save_scope_as = tca_appointment_candidate add_to_list = tca_initial_judicial_candidates }
+            # 下一事件继承同君主、已就绪、旧batch与不合格candidate，不能靠clear后exists识别本轮输出。
+            trigger_event = { id = tca_judicial_pool_test.2 days = 1 }
+        }
+        else = {
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_judicial_inherited_pool"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+            tca_test_lane_end_effect = { GROUP = tca_judicial_pool_test }
+        }
+    }
+}
+
+tca_judicial_pool_test.2 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            tca_clear_judicial_candidate_pool_effect = yes
+            if = { limit = { scope:tca_judicial_pool_ready = 0 NOT = { any_in_list = { list = tca_initial_judicial_candidates always = yes } } } debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_inherited_pool 1" }
+            else = { add_character_flag = tca_test_tca_judicial_pool_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_inherited_pool 1" }
+            tca_prepare_judicial_candidate_pool_effect = yes
+            if = { limit = { scope:tca_judicial_pool_ready = 1 scope:tca_test_jp_courtier = { is_in_list = tca_initial_judicial_candidates } } debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_inherited_pool 2" }
+            else = { add_character_flag = tca_test_tca_judicial_pool_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_inherited_pool 2" }
+            # 只保留根本不符合无官条件的君主；正式抽选器必须显式输出本轮空抽哨兵。
+            every_in_list = { list = tca_initial_judicial_candidates remove_from_list = tca_initial_judicial_candidates }
+            add_to_list = tca_initial_judicial_candidates
+            title:c_middlesex = { tca_select_judicial_candidate_effect = yes }
+            if = { limit = { scope:tca_appointment_candidate = root } debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_inherited_pool 3" }
+            else = { add_character_flag = tca_test_tca_judicial_pool_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_inherited_pool 3" }
+            # 换政权仍必须重建，不把中国廷臣带入外国池。
+            title:c_middlesex.holder.top_liege = { save_scope_as = tca_appointment_liege }
+            tca_prepare_judicial_candidate_pool_effect = yes
+            if = { limit = { scope:tca_judicial_pool_ready = 1 scope:tca_test_jp_courtier = { NOT = { is_in_list = tca_initial_judicial_candidates } } scope:tca_appointment_liege = { is_in_list = tca_initial_judicial_candidates } } debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_inherited_pool 4" }
+            else = { add_character_flag = tca_test_tca_judicial_pool_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_inherited_pool 4" }
+            # 批次之后公开单次入口必须自带清池边界，继承旧batch不会阻止清理。
+            title:c_middlesex = { tca_fill_initial_judicial_holder_effect = yes }
+            if = { limit = { scope:tca_judicial_pool_ready = 0 NOT = { any_in_list = { list = tca_initial_judicial_candidates always = yes } } } debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_inherited_pool 5" }
+            else = { add_character_flag = tca_test_tca_judicial_pool_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_inherited_pool 5" }
+            save_scope_as = tca_appointment_liege
+            tca_prepare_judicial_candidate_pool_effect = yes
+            if = { limit = { scope:tca_judicial_pool_ready = 1 scope:tca_test_jp_courtier = { is_in_list = tca_initial_judicial_candidates } } debug_log = "TCA_TEST CHECK_PASS tca_test_judicial_inherited_pool 6" }
+            else = { add_character_flag = tca_test_tca_judicial_pool_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_judicial_inherited_pool 6" }
+            tca_clear_judicial_candidate_pool_effect = yes
+            scope:tca_test_jp_courtier = { death = { death_reason = death_natural_causes } }
+            if = { limit = { has_character_flag = tca_test_tca_judicial_pool_test_case_failed }
+                debug_log = "TCA_TEST FAIL tca_test_judicial_inherited_pool"
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+            }
+            else = { debug_log = "TCA_TEST PASS tca_test_judicial_inherited_pool" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            remove_character_flag = tca_test_tca_judicial_pool_test_case_failed
+            tca_test_lane_end_effect = { GROUP = tca_judicial_pool_test }
+        }
+    }
+}

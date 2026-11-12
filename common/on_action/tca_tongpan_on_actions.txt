@@ -9,8 +9,8 @@ on_title_destroyed = { on_actions = { tca_tongpan_destroyed } }
 on_fired_from_council = { on_actions = { tca_tongpan_changed } }
 on_councillor_left = { on_actions = { tca_tongpan_council_left } }
 on_councillors_swapped = { on_actions = { tca_tongpan_council_swapped } }
-# 年度全局入口；分别向独立领主排队，实际维护自行判断政权资格并清理旧绑定。
-tca_tongpan_setup = { effect = { every_independent_ruler = { tca_request_tongpan_maintenance_effect = yes } } }
+# 年度全局入口；同步清理注册表一次，再为符合条件的政权排队次日维护。
+tca_tongpan_setup = { effect = { tca_request_tongpan_annual_maintenance_effect = yes } }
 # 变动角色作用域；排队维护自身政权，若 scope:title 为通判官职，再通知被辅佐县当前政权。
 tca_tongpan_changed = {
     trigger = { OR = { government_has_flag = government_is_celestial any_held_title = { has_variable = tca_tongpan_title } any_held_title = { has_variable = tca_tongpan_office } } }
@@ -33,6 +33,8 @@ tca_tongpan_destroyed = {
             if = {
                 limit = { has_variable = tca_tongpan_title }
                 tca_stop_tongpan_diarchy_effect = yes
+                # 原生无继任销毁也需摘除空官署；正式销毁路径已先处理，此处幂等补漏。
+                tca_detach_tongpan_title_de_jure_effect = yes
                 # 离任官员此时可能已成为独立家主。
                 # 通过被辅佐县当前所在政权排队修复。
                 var:tca_tongpan_county.holder ?= { tca_request_tongpan_maintenance_effect = yes }

@@ -1,17 +1,54 @@
-﻿# 角色作用域；把该统治者及其宫廷加入局部候选池。
+﻿# 角色作用域；粗筛统治者及宫廷，不使用某个官署的拟任直属上级条件。
 tca_collect_judicial_candidates_effect = {
+    if = { limit = { is_alive = yes } add_to_list = tca_initial_judicial_candidates }
+    every_courtier = { limit = { is_alive = yes } add_to_list = tca_initial_judicial_candidates }
+}
+# 任意作用域；清空本事件链临时候选池及政权归属，不写跨日持久状态。
+tca_clear_judicial_candidate_pool_effect = {
+    every_in_list = { list = tca_initial_judicial_candidates remove_from_list = tca_initial_judicial_candidates }
+    clear_saved_scope = tca_judicial_pool_sovereign
+    # 显式零值遮住继承事件的旧ready，不能clear后再以同君主引用判断池有效。
+    save_scope_value_as = { name = tca_judicial_pool_ready value = 0 }
+}
+# 调用者提供当前 tca_appointment_liege；同政权同批只收集一次。
+# 换政权必须重建；每职抽选仍使用实时硬资格和本职原生评分。
+tca_prepare_judicial_candidate_pool_effect = {
     if = {
-        limit = { tca_is_initial_judicial_candidate_trigger = yes }
-        add_to_list = tca_initial_judicial_candidates
+        limit = {
+            NOT = {
+                # NOT中的并列条件逐个否定；必须把“已就绪且同政权”显式合取后再取反。
+                AND = {
+                    exists = scope:tca_judicial_pool_ready
+                    scope:tca_judicial_pool_ready ?= 1
+                    scope:tca_judicial_pool_sovereign ?= scope:tca_appointment_liege.top_liege
+                }
+            }
+        }
+        tca_clear_judicial_candidate_pool_effect = yes
+        scope:tca_appointment_liege.top_liege = {
+            save_scope_as = tca_judicial_pool_sovereign
+            tca_collect_judicial_candidates_effect = yes
+            every_vassal_or_below = { tca_collect_judicial_candidates_effect = yes }
+        }
+        save_scope_value_as = { name = tca_judicial_pool_ready value = 1 }
     }
-    every_courtier = {
+}
+
+# 路头衔作用域；输入appointment_liege/title，输出candidate显式为本次命中者，
+# 零合格候选时输出不可能通过无官资格的最高君主。不得用clear/exists读继承旧人。
+tca_select_judicial_candidate_effect = {
+    scope:tca_appointment_liege.top_liege = { save_scope_as = tca_appointment_candidate }
+    tca_prepare_judicial_candidate_pool_effect = yes
+    random_in_list = {
+        list = tca_initial_judicial_candidates
         limit = { tca_is_initial_judicial_candidate_trigger = yes }
-        add_to_list = tca_initial_judicial_candidates
+        weight = { base = 0 modifier = { add = tca_judicial_candidate_weight_value } }
+        save_scope_as = tca_appointment_candidate
     }
 }
 
 # 路头衔作用域；保留合格在任者，修复空缺和无效持有人。
-tca_fill_initial_judicial_holder_effect = {
+tca_fill_initial_judicial_holder_in_batch_effect = {
     if = {
         limit = {
             tca_is_judicial_circuit_trigger = yes
@@ -29,29 +66,15 @@ tca_fill_initial_judicial_holder_effect = {
         tca_resolve_judicial_office_liege_effect = yes
         scope:tca_expected_judicial_liege = { save_scope_as = tca_appointment_liege }
         var:song_judicial_title = { save_scope_as = tca_appointment_title }
-        clear_saved_scope = tca_appointment_candidate
         # 引擎不允许为空缺官职读取候选分；临时挂靠上级持有，安装本职法后再抽取。
         create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_judicial_caretaker_change }
         scope:tca_appointment_title = { change_title_holder = { holder = scope:tca_appointment_liege change = scope:tca_judicial_caretaker_change } }
         resolve_title_and_vassal_change = scope:tca_judicial_caretaker_change
         scope:tca_appointment_title = { tca_ensure_official_title_succession_effect = yes }
-        every_in_list = {
-            list = tca_initial_judicial_candidates
-            remove_from_list = tca_initial_judicial_candidates
-        }
-        scope:tca_appointment_liege.top_liege = {
-            tca_collect_judicial_candidates_effect = yes
-            every_vassal_or_below = { tca_collect_judicial_candidates_effect = yes }
-        }
-        random_in_list = {
-            list = tca_initial_judicial_candidates
-            limit = { tca_is_initial_judicial_candidate_trigger = yes }
-            weight = { base = 0 modifier = { add = tca_judicial_candidate_weight_value } }
-            save_scope_as = tca_appointment_candidate
-        }
+        tca_select_judicial_candidate_effect = yes
         # 仅当现有候选均不合格时，生成原生学者。
         if = {
-            limit = { NOT = { exists = scope:tca_appointment_candidate } }
+            limit = { scope:tca_appointment_candidate = scope:tca_appointment_liege.top_liege }
             scope:tca_appointment_liege = {
                 create_character = {
                     template = tgp_minister_scholar_template
@@ -76,12 +99,12 @@ tca_fill_initial_judicial_holder_effect = {
                     save_scope_as = tca_appointment_candidate
                 }
             }
-            scope:tca_appointment_candidate = {
-                tca_initialize_new_judicial_scholar_effect = yes
+            if = { limit = { NOT = { scope:tca_appointment_candidate = scope:tca_appointment_liege.top_liege } }
+                scope:tca_appointment_candidate = { tca_initialize_new_judicial_scholar_effect = yes }
             }
         }
         if = {
-            limit = { exists = scope:tca_appointment_candidate }
+            limit = { NOT = { scope:tca_appointment_candidate = scope:tca_appointment_liege.top_liege } }
             scope:tca_appointment_candidate = {
                 # 非统治者补齐家族，并仅在首次选择命中10%时建立世族。
                 if = {
@@ -93,6 +116,8 @@ tca_fill_initial_judicial_holder_effect = {
                     tca_prepare_official_family_effect = { GOVERNMENT_GIVER = scope:tca_appointment_liege }
                 }
                 tca_grant_official_title_effect = { TITLE = scope:tca_appointment_title LIEGE = scope:tca_appointment_liege }
+                # 仅成功授职后消费候选；失败且仍无官者留待后续官署重新校验。
+                if = { limit = { any_held_title = { is_noble_family_title = no } } remove_from_list = tca_initial_judicial_candidates }
             }
             scope:tca_appointment_title = {
                 tca_sync_judicial_holder_liege_effect = yes
@@ -107,11 +132,7 @@ tca_fill_initial_judicial_holder_effect = {
                 tca_restore_judicial_title_identity_effect = yes
             }
         }
-        every_in_list = {
-            list = tca_initial_judicial_candidates
-            remove_from_list = tca_initial_judicial_candidates
-        }
-        clear_saved_scope = tca_appointment_candidate
+        scope:tca_appointment_liege.top_liege = { save_scope_as = tca_appointment_candidate }
     }
 }
 
@@ -214,7 +235,7 @@ tca_refresh_imperial_judicial_lieges_effect = {
 }
 
 # 头衔作用域；在引擎完成头衔／封臣事务后执行。
-tca_refresh_judicial_position_effect = {
+tca_refresh_judicial_position_in_batch_effect = {
     if = {
         limit = {
             has_variable = tca_judicial_title
@@ -226,7 +247,7 @@ tca_refresh_judicial_position_effect = {
         }
         var:song_judicial_circuit = {
             save_scope_as = tca_circuit
-            tca_fill_initial_judicial_holder_effect = yes
+            tca_fill_initial_judicial_holder_in_batch_effect = yes
         }
         holder ?= {
             primary_title = { set_variable = { name = tca_official_family_policy_office value = yes } }
@@ -245,10 +266,10 @@ tca_refresh_judicial_position_effect = {
 }
 
 # 角色作用域；用于延迟受封／改制回调及季度维护。
-tca_refresh_held_judicial_positions_effect = {
+tca_refresh_held_judicial_positions_in_batch_effect = {
     every_held_title = {
         limit = { has_variable = tca_judicial_title }
-        tca_refresh_judicial_position_effect = yes
+        tca_refresh_judicial_position_in_batch_effect = yes
     }
 }
 
@@ -264,4 +285,25 @@ tca_ensure_native_judicial_realm_succession_effect = {
         }
         add_realm_law_skip_effects = celestial_appointment_succession_law
     }
+}
+
+# 公开独立入口；显式封闭候选池，继承的batch scope不代表本次同步批次。
+tca_fill_initial_judicial_holder_effect = {
+    tca_clear_judicial_candidate_pool_effect = yes
+    tca_fill_initial_judicial_holder_in_batch_effect = yes
+    tca_clear_judicial_candidate_pool_effect = yes
+}
+
+# 公开独立入口；显式封闭候选池，继承的batch scope不代表本次同步批次。
+tca_refresh_judicial_position_effect = {
+    tca_clear_judicial_candidate_pool_effect = yes
+    tca_refresh_judicial_position_in_batch_effect = yes
+    tca_clear_judicial_candidate_pool_effect = yes
+}
+
+# 公开独立入口；显式封闭候选池，继承的batch scope不代表本次同步批次。
+tca_refresh_held_judicial_positions_effect = {
+    tca_clear_judicial_candidate_pool_effect = yes
+    tca_refresh_held_judicial_positions_in_batch_effect = yes
+    tca_clear_judicial_candidate_pool_effect = yes
 }

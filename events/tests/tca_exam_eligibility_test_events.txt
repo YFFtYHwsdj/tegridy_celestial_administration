@@ -72,8 +72,57 @@ tca_exam_eligibility_test.1 = {
                 scope:tca_test_exam_region_host = { destroy_title = scope:tca_test_exam_region_title tca_test_restore_character_effect = yes death = { death_reason = death_natural_causes } }
                 if = { limit = { scope:host = { is_alive = no } scope:tca_test_exam_officer = { tca_exam_local_guest_region_trigger = no } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_eligibility 12" }
                 else = { add_character_flag = tca_test_tca_exam_eligibility_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_eligibility 12" }
+                # 活动随行权重必须比较当前位置；候选或主持人无有效地点时安全拒绝。
+                save_scope_as = owner
+                create_character = { age = 30 random_traits = no gender_female_chance = 0 dynasty = none location = root.location culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_test_exam_near }
+                create_character = { age = 30 random_traits = no gender_female_chance = 0 dynasty = none location = root.location culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_test_exam_far }
+                # 原版b_paris对应province2333；合法创建后仅移动自备人物，异地断言也核对真实地点。
+                scope:tca_test_exam_far = { set_location = province:2333 }
+                if = { limit = { scope:tca_test_exam_near = { tca_exam_entourage_same_location_trigger = { OWNER = scope:owner } } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_eligibility 13" }
+                else = { add_character_flag = tca_test_tca_exam_eligibility_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_eligibility 13" }
+                if = { limit = { scope:tca_test_exam_far = { is_alive = yes exists = location NOT = { location = root.location } NOT = { tca_exam_entourage_same_location_trigger = { OWNER = scope:owner } } } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_eligibility 14" }
+                else = { add_character_flag = tca_test_tca_exam_eligibility_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_eligibility 14" }
+                # owner可能是事件原生别名，清saved scope不能证明它缺失；用私有作用域自备真正缺参数。
+                save_scope_as = tca_test_exam_missing_owner
+                clear_saved_scope = tca_test_exam_missing_owner
+                if = { limit = { NOT = { exists = scope:tca_test_exam_missing_owner } scope:tca_test_exam_near = { NOT = { tca_exam_entourage_same_location_trigger = { OWNER = scope:tca_test_exam_missing_owner } } } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_eligibility 15" }
+                else = { add_character_flag = tca_test_tca_exam_eligibility_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_eligibility 15" }
+                # 复用已死主持人测试缺地点边界，不生成人为无地点的活人物。
+                scope:tca_test_exam_region_host = { save_scope_as = owner }
+                if = { limit = { scope:tca_test_exam_near = { NOT = { tca_exam_entourage_same_location_trigger = { OWNER = scope:owner } } } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_eligibility 16" }
+                else = { add_character_flag = tca_test_tca_exam_eligibility_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_eligibility 16" }
+                save_scope_as = owner
+                scope:tca_test_exam_near = { death = { death_reason = death_natural_causes } }
+                if = { limit = { scope:tca_test_exam_near = { NOT = { tca_exam_entourage_same_location_trigger = { OWNER = scope:owner } } } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_eligibility 17" }
+                else = { add_character_flag = tca_test_tca_exam_eligibility_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_eligibility 17" }
+                scope:tca_test_exam_far = { death = { death_reason = death_natural_causes } }
+                clear_saved_scope = owner
                 # 不把死去的临时主持人留在共享host；后续测试仍由原报告者拥有该作用域。
                 save_scope_as = host
+                # 候选死亡后不可继续解引用其默认地点；正常同域活人仍由第7/10条覆盖。
+                if = { limit = { scope:tca_test_exam_near = { is_alive = no tca_exam_local_guest_region_trigger = no } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_eligibility 18" }
+                else = { add_character_flag = tca_test_tca_exam_eligibility_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_eligibility 18" }
+                # 不伪造activity或子集；本例新生人物没有参加活动，失效成员查询必须安全返回no。
+                if = { limit = { scope:tca_test_exam_officer = { is_alive = yes NOT = { exists = involved_activity } NOT = { tca_exam_member_in_activity_subset_trigger = { NAME = entrants } } } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_eligibility 19" }
+                else = { add_character_flag = tca_test_tca_exam_eligibility_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_eligibility 19" }
+                if = { limit = { scope:tca_test_exam_near = { is_alive = no NOT = { exists = involved_activity } NOT = { tca_exam_member_in_activity_subset_trigger = { NAME = scoreboard } } } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_eligibility 20" }
+                else = { add_character_flag = tca_test_tca_exam_eligibility_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_eligibility 20" }
+                # 正式主持奖励入口在无活动时不应解引用无效对象；本例人物不是host，
+                # 原版虔诚helper首项不满足，不伪造活动或有资格的虔诚支付。真实host支付仍待活动正例。
+                scope:tca_test_exam_officer = {
+                    save_scope_value_as = { name = tca_test_exam_reward_piety value = piety }
+                    save_scope_value_as = { name = tca_test_exam_reward_prestige value = prestige }
+                    save_scope_value_as = { name = tca_test_exam_reward_merit value = merit }
+                    save_scope_value_as = { name = tca_test_exam_reward_influence value = influence }
+                    local_examination_disburse_activity_host_rewards = yes
+                }
+                if = { limit = { scope:tca_test_exam_officer = { NOT = { this = scope:host } NOT = { exists = involved_activity } piety = scope:tca_test_exam_reward_piety prestige = scope:tca_test_exam_reward_prestige merit = scope:tca_test_exam_reward_merit influence = scope:tca_test_exam_reward_influence } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_eligibility 21" }
+                else = { add_character_flag = tca_test_tca_exam_eligibility_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_eligibility 21" }
+                # 阶段收集器的共用成员门槛与子集无关：无活动／死成员都不应进入原生查询。
+                if = { limit = { scope:tca_test_exam_officer = { is_alive = yes NOT = { exists = involved_activity } tca_exam_is_current_activity_member_trigger = no } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_eligibility 22" }
+                else = { add_character_flag = tca_test_tca_exam_eligibility_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_eligibility 22" }
+                if = { limit = { scope:tca_test_exam_near = { is_alive = no tca_exam_is_current_activity_member_trigger = no } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_eligibility 23" }
+                else = { add_character_flag = tca_test_tca_exam_eligibility_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_eligibility 23" }
                 if = { limit = { has_character_flag = tca_test_tca_exam_eligibility_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_exam_eligibility" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
                 else = { debug_log = "TCA_TEST PASS tca_test_exam_eligibility" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
             }

@@ -1,10 +1,28 @@
 ﻿# 独立退休卸职技术探针；仅在可丢弃 debug 局由皇帝报告者调用。
-# 前置：tca_ro_office 为有效官署，tca_ro_original 为真实原任。
-# 输出：tca_ro_actor、tca_ro_family、tca_ro_liege；只暂借该官署，不触碰辖区头衔。
+# 前置：tca_ro_office 为有效官署，tca_ro_original 为已持家门头衔的真实原任。
+# 输出：借出前后真实150年冷却都成立才写tca_ro_borrow_ready=1，并输出actor/family/liege；
+# 未就绪调用者须走abort前置未执行。只暂借官署，不触碰辖区头衔或给原任创造家门。
 # 原任和原领主受临时死亡保护；临时人物由已有夹具建立合法家门与天朝附庸关系。
 tca_test_prepare_retirement_office_actor_effect = {
+    save_scope_value_as = { name = tca_ro_borrow_ready value = 0 }
+    save_scope_value_as = { name = tca_ro_borrow_started value = 0 }
+    save_scope_value_as = { name = tca_ro_lock_before_transfer value = 0 }
+    save_scope_value_as = { name = tca_ro_supervisor_borrowed value = 0 }
+    save_scope_value_as = { name = tca_ro_supervisor_ready value = 1 }
+
     scope:tca_ro_original = {
         tca_test_protect_character_effect = yes
+        # 原生天朝州郡任命使用cooldown；暂离官署的真实原任也须封闭该入口，
+        # 否则等待正式退休补位时可能另任实州，原官署已不能合法归还。
+        # 保留原冷却及经过日数，归还后只恢复自然剩余日数，不永久封闭真实人物。
+        debug_log = "TCA_RETIREMENT_BORROW ORIGINAL id=[THIS.Char.GetID] timeout=[THIS.Char.MakeScope.ScriptValue('tca_retirement_probe_timeout_value')]"
+        set_variable = { name = tca_ro_original_timeout value = appointment_timeout_days }
+        set_variable = { name = tca_ro_borrowed_date value = current_date }
+        set_appointment_timeout = { years = 150 desc = appointment_timeout_desc_refusing }
+        debug_log = "TCA_RETIREMENT_BORROW BEFORE_TRANSFER id=[THIS.Char.GetID] timeout=[THIS.Char.MakeScope.ScriptValue('tca_retirement_probe_timeout_value')]"
+        if = { limit = { appointment_timeout_days > 36500 any_held_title = { is_noble_family_title = yes } }
+            save_scope_value_as = { name = tca_ro_lock_before_transfer value = 1 }
+        }
         # 原任暂离实职的70日内不能被首次补位选作第二官署，归还资格由夹具负责保留。
         # 两职初始池明确读取此旗标；只撤销本例添加的部分，不改真实历史人物标记。
         if = { limit = { NOT = { has_character_flag = tca_history_defined_character } }
@@ -12,29 +30,70 @@ tca_test_prepare_retirement_office_actor_effect = {
             add_character_flag = tca_history_defined_character
         }
     }
-    scope:tca_ro_office.holder.liege = {
-        save_scope_as = tca_ro_liege
-        # 借出与归还相隔105日；原领主死亡后不得再向其执行效忠事务。
-        # 使用独立所有权，避免撤掉框架或其他夹具已持有的保护。
-        if = { limit = { NOT = { has_trait = tca_test_death_protection } }
-            add_character_flag = tca_ro_liege_protection_owned
-            add_trait = tca_test_death_protection
+    # 借出前的真实原生状态不成立时不开始头衔事务，调用者按前置未执行收尾。
+    if = { limit = { scope:tca_ro_lock_before_transfer = 1 }
+        # 县主在等待期间自然升任公爵会使通判退出适用范围；只临时封闭其原生任命。
+        # 不改其头衔/官品/评分，既有冷却按实际经过日数恢复；不为原任制造新家门。
+        if = { limit = { scope:tca_ro_office = { has_variable = tca_tongpan_title } }
+            save_scope_value_as = { name = tca_ro_supervisor_borrowed value = 1 }
+            save_scope_value_as = { name = tca_ro_supervisor_ready value = 0 }
+            scope:tca_ro_jurisdiction.holder = {
+                save_scope_as = tca_ro_supervisor
+                set_variable = { name = tca_ro_supervisor_prior_timeout value = appointment_timeout_days }
+                set_variable = { name = tca_ro_supervisor_borrowed_date value = current_date }
+                if = { limit = { NOT = { has_trait = tca_test_death_protection } }
+                    add_character_flag = tca_ro_supervisor_protection_owned
+                    add_trait = tca_test_death_protection
+                }
+                set_appointment_timeout = { years = 150 desc = appointment_timeout_desc_refusing }
+                if = { limit = { appointment_timeout_days > 36500 }
+                    save_scope_value_as = { name = tca_ro_supervisor_ready value = 1 }
+                }
+                debug_log = "TCA_RETIREMENT_BORROW SUPERVISOR_LOCK id=[THIS.Char.GetID] timeout=[THIS.Char.MakeScope.ScriptValue('tca_retirement_probe_timeout_value')]"
+            }
+            # 沿已验证原生重算入口消费受影响的高阶current_heir缓存，不指定替代人选。
+            scope:tca_ro_supervisor.top_liege = {
+                tca_test_recalc_retirement_supervisor_heirs_effect = yes
+                every_vassal_or_below = { tca_test_recalc_retirement_supervisor_heirs_effect = yes }
+            }
         }
-    }
-    tca_test_create_merit_interface_character_effect = { CHARACTER = tca_ro_actor GOVERNMENT = celestial_government }
-    scope:tca_ro_actor = {
-        tca_test_add_native_merit_probe_exams_effect = yes
-        add_trait = education_stewardship_1
-        change_merit = 24000
-        scope:tca_merit_probe_new_family = { save_scope_as = tca_ro_family }
-        create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_ro_change }
-        scope:tca_ro_office = { change_title_holder = { holder = scope:tca_ro_actor change = scope:tca_ro_change } }
-        resolve_title_and_vassal_change = scope:tca_ro_change
-        create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_ro_fealty }
-        change_liege = { liege = scope:tca_ro_liege change = scope:tca_ro_fealty }
-        resolve_title_and_vassal_change = scope:tca_ro_fealty
-        change_government = celestial_government
-        tca_ensure_official_contract_effect = yes
+        if = { limit = { scope:tca_ro_supervisor_ready = 1 }
+            save_scope_value_as = { name = tca_ro_borrow_started value = 1 }
+            scope:tca_ro_office.holder.liege = {
+                save_scope_as = tca_ro_liege
+                # 借出与归还相隔105日；原领主死亡后不得再向其执行效忠事务。
+                # 使用独立所有权，避免撤掉框架或其他夹具已持有的保护。
+                if = { limit = { NOT = { has_trait = tca_test_death_protection } }
+                    add_character_flag = tca_ro_liege_protection_owned
+                    add_trait = tca_test_death_protection
+                }
+            }
+            tca_test_create_merit_interface_character_effect = { CHARACTER = tca_ro_actor GOVERNMENT = celestial_government }
+            scope:tca_ro_actor = {
+                tca_test_add_native_merit_probe_exams_effect = yes
+                add_trait = education_stewardship_1
+                change_merit = 24000
+                scope:tca_merit_probe_new_family = { save_scope_as = tca_ro_family }
+                create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_ro_change }
+                scope:tca_ro_office = { change_title_holder = { holder = scope:tca_ro_actor change = scope:tca_ro_change } }
+                resolve_title_and_vassal_change = scope:tca_ro_change
+                create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_ro_fealty }
+                change_liege = { liege = scope:tca_ro_liege change = scope:tca_ro_fealty }
+                resolve_title_and_vassal_change = scope:tca_ro_fealty
+                change_government = celestial_government
+                tca_ensure_official_contract_effect = yes
+            }
+            scope:tca_ro_original = {
+                debug_log = "TCA_RETIREMENT_BORROW AFTER_TRANSFER id=[THIS.Char.GetID] timeout=[THIS.Char.MakeScope.ScriptValue('tca_retirement_probe_timeout_value')]"
+                # 借出事务可能重写原生任期；人物失职稳定后才建立整个借用期间的保护，不覆盖原快照。
+                set_appointment_timeout = { years = 150 desc = appointment_timeout_desc_refusing }
+                debug_log = "TCA_RETIREMENT_BORROW LOCKED_AFTER_TRANSFER id=[THIS.Char.GetID] timeout=[THIS.Char.MakeScope.ScriptValue('tca_retirement_probe_timeout_value')]"
+                if = { limit = { appointment_timeout_days > 36500 any_held_title = { is_noble_family_title = yes } }
+                    save_scope_value_as = { name = tca_ro_borrow_ready value = 1 }
+                }
+            }
+        }
+
     }
 }
 
@@ -42,23 +101,55 @@ tca_test_prepare_retirement_office_actor_effect = {
 # 输出：原任重新持有 tca_ro_office；原生头衔回调负责分权与契约，调用者须真实等候。
 # 若卸职接口没有交出官署，仍执行相同归还，不把失败留给后续用例。
 tca_test_restore_retirement_office_effect = {
-    if = { limit = { scope:tca_ro_original = { is_alive = yes } scope:tca_ro_liege = { is_alive = yes } }
+    save_scope_value_as = { name = tca_ro_supervisor_was_protected value = 0 }
+    if = { limit = { scope:tca_ro_supervisor_borrowed = 1 }
+        if = { limit = {
+            scope:tca_ro_jurisdiction.holder = scope:tca_ro_supervisor
+            scope:tca_ro_supervisor = { appointment_timeout_days > 36500 highest_held_title_tier = tier_county }
+        }
+            save_scope_value_as = { name = tca_ro_supervisor_was_protected value = 1 }
+        }
+        else = { debug_log = "TCA_RETIREMENT_BORROW SUPERVISOR_LOCK_LOST" }
+        scope:tca_ro_supervisor = { debug_log = "TCA_RETIREMENT_BORROW SUPERVISOR_BEFORE_RETURN id=[THIS.Char.GetID] timeout=[THIS.Char.MakeScope.ScriptValue('tca_retirement_probe_timeout_value')]" }
+    }
+
+    save_scope_value_as = { name = tca_ro_protection_before_return value = 0 }
+    scope:tca_ro_original = {
+        debug_log = "TCA_RETIREMENT_BORROW BEFORE_RETURN id=[THIS.Char.GetID] timeout=[THIS.Char.MakeScope.ScriptValue('tca_retirement_probe_timeout_value')]"
+        if = { limit = { appointment_timeout_days > 36500 NOT = { any_held_title = { is_noble_family_title = no this != scope:tca_ro_office } } }
+            save_scope_value_as = { name = tca_ro_protection_before_return value = 1 }
+            debug_log = "TCA_RETIREMENT_BORROW PRE_RETURN_LOCK_VALID"
+        }
+        else = { debug_log = "TCA_RETIREMENT_BORROW PRE_RETURN_LOCK_INVALID" }
+    }
+    if = { limit = {
         scope:tca_ro_original = {
-            if = { limit = { has_character_flag = tca_ro_history_owned }
-                remove_character_flag = tca_history_defined_character
-                remove_character_flag = tca_ro_history_owned
-            }
+            is_alive = yes
+            NOT = { any_held_title = { is_noble_family_title = no this != scope:tca_ro_office } }
+        }
+        scope:tca_ro_liege = { is_alive = yes }
+    }
+        scope:tca_ro_original = {
             create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_ro_restore }
             scope:tca_ro_office = { change_title_holder = { holder = scope:tca_ro_original change = scope:tca_ro_restore } }
             resolve_title_and_vassal_change = scope:tca_ro_restore
             create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_ro_restore_fealty }
             change_liege = { liege = scope:tca_ro_liege change = scope:tca_ro_restore_fealty }
             resolve_title_and_vassal_change = scope:tca_ro_restore_fealty
+            debug_log = "TCA_RETIREMENT_BORROW AFTER_RETURN id=[THIS.Char.GetID] timeout=[THIS.Char.MakeScope.ScriptValue('tca_retirement_probe_timeout_value')]"
         }
     }
     else = {
         add_character_flag = tca_test_$GROUP$_case_failed
-        debug_log = "TCA_RETIREMENT_OFFICE RESTORE_DEAD_PARTICIPANT"
+        # 不把已经自然另任真实领地的人物强行兼授官署，保留现场并如实失败。
+        debug_log = "TCA_RETIREMENT_OFFICE RESTORE_UNAVAILABLE_PARTICIPANT"
+        scope:tca_ro_original = { debug_log = "TCA_RETIREMENT_OFFICE ORIGINAL_UNAVAILABLE id=[THIS.Char.GetID] primary=[THIS.Char.GetPrimaryTitle.GetNameNoTier]" }
+    }
+    scope:tca_ro_original = {
+        if = { limit = { has_character_flag = tca_ro_history_owned }
+            remove_character_flag = tca_history_defined_character
+            remove_character_flag = tca_ro_history_owned
+        }
     }
     scope:tca_ro_liege = {
         if = { limit = { is_alive = yes has_character_flag = tca_ro_liege_protection_owned }
@@ -67,6 +158,36 @@ tca_test_restore_retirement_office_effect = {
         }
     }
     scope:tca_ro_actor = { tca_test_cleanup_retirement_exit_actor_effect = yes }
+}
+
+# 原任人物作用域；在归还后真实等待官署回调，最后恢复借用前冷却的自然剩余。
+# 无快照时不写状态，中央职位等未借用该夹具的路径可安全调用。
+tca_test_finish_retirement_office_borrow_effect = {
+    if = { limit = { is_alive = yes has_variable = tca_ro_original_timeout }
+        clear_appointment_timeout = yes
+        if = { limit = { tca_retirement_office_probe_remaining_timeout_days > 0 }
+            set_appointment_timeout = { days = tca_retirement_office_probe_remaining_timeout_days }
+        }
+        debug_log = "TCA_RETIREMENT_BORROW FINISH_RESTORED id=[THIS.Char.GetID] timeout=[THIS.Char.MakeScope.ScriptValue('tca_retirement_probe_timeout_value')]"
+        remove_variable = tca_ro_original_timeout
+        remove_variable = tca_ro_borrowed_date
+    }
+    if = { limit = { scope:tca_ro_supervisor_borrowed = 1 }
+        scope:tca_ro_supervisor = {
+            save_scope_value_as = { name = tca_ro_supervisor_expected_timeout value = tca_retirement_supervisor_remaining_timeout_days }
+            clear_appointment_timeout = yes
+            if = { limit = { scope:tca_ro_supervisor_expected_timeout > 0 }
+                set_appointment_timeout = { days = tca_retirement_supervisor_remaining_timeout_days }
+            }
+            remove_variable = tca_ro_supervisor_prior_timeout
+            remove_variable = tca_ro_supervisor_borrowed_date
+            if = { limit = { has_character_flag = tca_ro_supervisor_protection_owned }
+                remove_trait = tca_test_death_protection
+                remove_character_flag = tca_ro_supervisor_protection_owned
+            }
+        }
+    }
+    save_scope_value_as = { name = tca_ro_supervisor_borrowed value = 0 }
 }
 
 # 候选技术事务，尚非正式退休实现。人物作用域，必须为实际在任者。
@@ -121,4 +242,158 @@ tca_retirement_candidate_step_down_offices_effect = {
             debug_log = "TCA_RETIREMENT_OFFICE CANDIDATE_RETURN_TO_LIEGE"
         }
     }
+}
+
+# 角色作用域；只读记录空缺预算在进入身份、解雇和销毁三阶段的真实读数，不补钱或改结果。
+tca_test_diag_retirement_vacancy_stage_effect = {
+    debug_log = "TCA_RETIREMENT_VACANCY_ACTOR id=[THIS.Char.GetID] treasury=[THIS.Char.MakeScope.ScriptValue('tca_retirement_probe_treasury_value')]"
+    scope:councillor_liege ?= { debug_log = "TCA_RETIREMENT_VACANCY_COUNCIL_LIEGE id=[THIS.Char.GetID] treasury=[THIS.Char.MakeScope.ScriptValue('tca_retirement_probe_treasury_value')]" }
+}
+
+# 报告者作用域；准备未能建立真实原生冷却时终止本项，不继续延迟业务断言。
+# GROUP/CASE为调用用例登记；只恢复已开始的借用事务与本例添加的临时保护。
+tca_test_abort_retirement_office_borrow_effect = {
+    debug_log = "TCA_TEST PRECONDITION_FAIL $CASE$"
+    debug_log = "TCA_RETIREMENT_BORROW PREPARATION_LOCK_FAILED"
+    if = { limit = { scope:tca_ro_borrow_started = 1 }
+        tca_test_restore_retirement_office_effect = { GROUP = $GROUP$ }
+    }
+    scope:tca_ro_original = {
+        tca_test_finish_retirement_office_borrow_effect = yes
+        if = { limit = { has_character_flag = tca_ro_history_owned }
+            remove_character_flag = tca_history_defined_character
+            remove_character_flag = tca_ro_history_owned
+        }
+        tca_test_restore_character_effect = yes
+    }
+    if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+    tca_test_lane_end_effect = { GROUP = $GROUP$ }
+}
+
+# 本朝实际持有人作用域；仅重算当前把临时封任县主列为较高阶继任者的持有人。
+# 原生接口自行重建其名单；不替换current_heir，不复制任何候选资格或评分。
+tca_test_recalc_retirement_supervisor_heirs_effect = {
+    if = { limit = { any_held_title = { tier > tier_county exists = current_heir current_heir = scope:tca_ro_supervisor } }
+        scriptedtests_recalculate_succession = yes
+    }
+}
+
+# 原任人物作用域；只读原生valid/able失败分项，不制造活动、旅行或incapable状态。
+# 活动范围分项逐字对应原生is_diarch_able中的属地条件，业务断言仍直接调用原生trigger。
+tca_test_diag_retirement_tongpan_native_state_effect = {
+    save_temporary_scope_as = tca_ro_diag_returning
+    debug_log = "TCA_RETIREMENT_TP_RESTORE NATIVE_RESTRICTED id=[THIS.Char.GetID]"
+    if = { limit = { is_diarch_valid_trigger = no } debug_log = "TCA_RETIREMENT_TP_RESTORE NATIVE_VALID_FALSE" }
+    if = { limit = { is_diarch_able_trigger = no } debug_log = "TCA_RETIREMENT_TP_RESTORE NATIVE_ABLE_FALSE" }
+    if = { limit = { is_imprisoned = yes } debug_log = "TCA_RETIREMENT_TP_RESTORE NATIVE_BLOCK_PRISON" }
+    if = { limit = { regency_for_personal_reasons_trigger = yes } debug_log = "TCA_RETIREMENT_TP_RESTORE NATIVE_BLOCK_PERSONAL_REGEN" }
+    if = { limit = { is_ai = yes has_character_flag = cannot_be_diarch } debug_log = "TCA_RETIREMENT_TP_RESTORE NATIVE_BLOCK_EVENT" }
+    if = { limit = { exists = liege }
+        if = { limit = { is_at_war_with = liege } debug_log = "TCA_RETIREMENT_TP_RESTORE NATIVE_BLOCK_WAR" }
+        if = { limit = { exists = involved_activity }
+            if = { limit = { involved_activity.activity_location.county.holder = { target_is_same_character_or_above = scope:tca_ro_diag_returning.liege } } }
+            else = { debug_log = "TCA_RETIREMENT_TP_RESTORE NATIVE_BLOCK_ACTIVITY_OUTSIDE_LIEGE" }
+        }
+        if = { limit = { is_travelling = yes exists = current_travel_plan travel_would_cause_regency_trigger = { REALM_HOLDER = liege } }
+            debug_log = "TCA_RETIREMENT_TP_RESTORE NATIVE_BLOCK_TRAVEL_OUTSIDE_LIEGE"
+        }
+    }
+    if = { limit = { tgp_is_ceremonial_liege_trigger = yes } debug_log = "TCA_RETIREMENT_TP_RESTORE NATIVE_BLOCK_CEREMONIAL" }
+}
+
+# 家门金币收入阴性探针的只读现场；人物作用域，三阶段对actor与control都调用。
+# 技能是原生GetSkill有效值；庄园资源与完整明细直接使用原版GUI接口，避免自算收入公式。
+# 未确认独立基础技能getter，不把有效值或反算结果冒充base；原始skill以同次存档作补充。
+tca_test_diag_retirement_salary_household_effect = {
+    debug_log = "TCA_RET_SALARY_HOUSEHOLD id=[THIS.Char.GetID] income=[THIS.Char.MakeScope.ScriptValue('tca_retirement_probe_monthly_gold_value')|5] treasury=[THIS.Char.MakeScope.ScriptValue('tca_retirement_probe_treasury_value')|5] gold=[THIS.Char.MakeScope.ScriptValue('tca_retirement_probe_gold_value')|5]"
+    debug_log = "TCA_RET_SALARY_EFFECTIVE_SKILLS id=[THIS.Char.GetID] diplomacy=[THIS.Char.GetSkill('diplomacy')] martial=[THIS.Char.GetSkill('martial')] stewardship=[THIS.Char.GetSkill('stewardship')] intrigue=[THIS.Char.GetSkill('intrigue')] learning=[THIS.Char.GetSkill('learning')]"
+    if = { limit = { exists = primary_spouse }
+        primary_spouse = { debug_log = "TCA_RET_SALARY_PRIMARY_SPOUSE id=[THIS.Char.GetID] stewardship=[THIS.Char.GetSkill('stewardship')]" }
+    }
+    else = { debug_log = "TCA_RET_SALARY_NO_PRIMARY_SPOUSE" }
+    if = { limit = { exists = cp:councillor_spouse }
+        cp:councillor_spouse = {
+            debug_log = "TCA_RET_SALARY_COUNCIL_SPOUSE id=[THIS.Char.GetID] stewardship=[THIS.Char.GetSkill('stewardship')]"
+            if = { limit = { is_performing_council_task = task_spouse_default } debug_log = "TCA_RET_SALARY_SPOUSE_TASK DEFAULT" }
+            if = { limit = { is_performing_council_task = task_manage_domain } debug_log = "TCA_RET_SALARY_SPOUSE_TASK MANAGE_DOMAIN" }
+            if = { limit = { is_performing_council_task = task_court_politics } debug_log = "TCA_RET_SALARY_SPOUSE_TASK COURT_POLITICS" }
+            if = { limit = { is_performing_council_task = task_chivalry } debug_log = "TCA_RET_SALARY_SPOUSE_TASK CHIVALRY" }
+            if = { limit = { is_performing_council_task = task_court_intrigue } debug_log = "TCA_RET_SALARY_SPOUSE_TASK COURT_INTRIGUE" }
+            if = { limit = { is_performing_council_task = task_patronage } debug_log = "TCA_RET_SALARY_SPOUSE_TASK PATRONAGE" }
+        }
+    }
+    else = { debug_log = "TCA_RET_SALARY_NO_COUNCIL_SPOUSE" }
+    if = { limit = { exists = domicile }
+        debug_log = "TCA_RET_SALARY_ESTATE_RESOURCE [THIS.Char.GetDomicile.GetGoldResource|5]"
+        debug_log = "TCA_RET_SALARY_ESTATE_BREAKDOWN [THIS.Char.GetDomicile.GetGoldResourceTooltip]"
+    }
+    else = { debug_log = "TCA_RET_SALARY_NO_ESTATE" }
+}
+
+# 仅本例新建阴性人物作用域；保留家门与庄园对象，消除不在被测范围内的普通庄园金币基数。
+# 使用原版原生清楼入口，不能改trait薪酬通道；金币只在准备时归零一次，后续不钳制收入或余额。
+# 每个35日节点另验建筑始终为空及实际金币／国库收入为零，重建或意外发薪仍保留失败。
+tca_test_isolate_retirement_salary_estate_effect = {
+    tgp_wipe_domicile_effect = yes
+    # 当前引擎拒绝负值add_gold；沿原版roman_restoration_events的扣尽写法，不写负收入。
+    if = { limit = { gold > 0 } remove_short_term_gold = gold }
+}
+
+# 报告者作用域；只读tca_ro_office及其真实绑定。由调用点先写明确阶段日志。
+# 数值冻结到本次scope_value；人物/路的缺失使用显式found与哨兵，绝不clear后读继承旧值。
+# 不结算、不刷新财政、不写官署日期/资格；用于区分短月30日防重与真实付款资格失败。
+tca_test_log_retirement_judicial_funding_effect = {
+    save_scope_value_as = { name = tca_ro_funding_diag_date value = current_date }
+    save_scope_value_as = { name = tca_ro_funding_diag_paid value = -1 }
+    save_scope_value_as = { name = tca_ro_funding_diag_amount value = -1 }
+    save_scope_value_as = { name = tca_ro_funding_diag_merit value = -1 }
+    save_scope_as = tca_ro_funding_diag_holder
+    save_scope_as = tca_ro_funding_diag_recipient
+    title:h_china = { save_scope_as = tca_ro_funding_diag_circuit }
+    save_scope_value_as = { name = tca_ro_funding_diag_holder_found value = 0 }
+    save_scope_value_as = { name = tca_ro_funding_diag_holder_alive value = 0 }
+    save_scope_value_as = { name = tca_ro_funding_diag_holder_celestial value = 0 }
+    save_scope_value_as = { name = tca_ro_funding_diag_holder_treasury value = 0 }
+    save_scope_value_as = { name = tca_ro_funding_diag_valid_holder value = 0 }
+    save_scope_value_as = { name = tca_ro_funding_diag_can_receive value = 0 }
+    save_scope_value_as = { name = tca_ro_funding_diag_receipt_found value = 0 }
+    save_scope_value_as = { name = tca_ro_funding_diag_receipt_current value = 0 }
+    save_scope_value_as = { name = tca_ro_funding_diag_receipt_old_actor value = 0 }
+    save_scope_value_as = { name = tca_ro_funding_diag_judicial_marker value = 0 }
+    save_scope_value_as = { name = tca_ro_funding_diag_circuit_found value = 0 }
+    save_scope_value_as = { name = tca_ro_funding_diag_circuit_valid value = 0 }
+    save_scope_value_as = { name = tca_ro_funding_diag_circuit_enabled value = 0 }
+    save_scope_value_as = { name = tca_ro_funding_diag_circuit_binding value = 0 }
+    save_scope_value_as = { name = tca_ro_funding_diag_payer_treasury value = 0 }
+    save_scope_value_as = { name = tca_ro_funding_diag_payer_distinct value = 0 }
+    save_scope_value_as = { name = tca_ro_funding_diag_same_top_liege value = 0 }
+    save_scope_value_as = { name = tca_ro_funding_diag_paid_found value = 0 }
+    scope:tca_ro_office = {
+        save_scope_value_as = { name = tca_ro_funding_diag_age value = tca_office_funding_age_value }
+        if = { limit = { has_variable = tca_office_funding_paid } save_scope_value_as = { name = tca_ro_funding_diag_paid value = var:tca_office_funding_paid } }
+        if = { limit = { has_variable = tca_office_funding_last_amount } save_scope_value_as = { name = tca_ro_funding_diag_amount value = var:tca_office_funding_last_amount } }
+        if = { limit = { has_variable = tca_office_funding_last_merit } save_scope_value_as = { name = tca_ro_funding_diag_merit value = var:tca_office_funding_last_merit } }
+        holder ?= { save_scope_as = tca_ro_funding_diag_holder }
+        var:tca_office_funding_last_merit_recipient ?= { save_scope_as = tca_ro_funding_diag_recipient }
+        var:song_judicial_circuit ?= { save_scope_as = tca_ro_funding_diag_circuit }
+        if = { limit = { exists = holder } save_scope_value_as = { name = tca_ro_funding_diag_holder_found value = 1 } }
+        if = { limit = { holder = { is_alive = yes } } save_scope_value_as = { name = tca_ro_funding_diag_holder_alive value = 1 } }
+        if = { limit = { holder = { government_has_flag = government_is_celestial } } save_scope_value_as = { name = tca_ro_funding_diag_holder_celestial value = 1 } }
+        if = { limit = { holder = { has_treasury = yes } } save_scope_value_as = { name = tca_ro_funding_diag_holder_treasury value = 1 } }
+        if = { limit = { tca_is_valid_judicial_holder_trigger = yes } save_scope_value_as = { name = tca_ro_funding_diag_valid_holder value = 1 } }
+        if = { limit = { tca_office_can_receive_funding_trigger = yes } save_scope_value_as = { name = tca_ro_funding_diag_can_receive value = 1 } }
+        if = { limit = { has_variable = tca_office_funding_last_merit_recipient } save_scope_value_as = { name = tca_ro_funding_diag_receipt_found value = 1 } }
+        if = { limit = { has_variable = tca_office_funding_last_merit_recipient exists = holder var:tca_office_funding_last_merit_recipient = holder } save_scope_value_as = { name = tca_ro_funding_diag_receipt_current value = 1 } }
+        if = { limit = { has_variable = tca_office_funding_last_merit_recipient var:tca_office_funding_last_merit_recipient = scope:tca_ro_actor } save_scope_value_as = { name = tca_ro_funding_diag_receipt_old_actor value = 1 } }
+        if = { limit = { has_variable = tca_judicial_title } save_scope_value_as = { name = tca_ro_funding_diag_judicial_marker value = 1 } }
+        if = { limit = { exists = var:song_judicial_circuit } save_scope_value_as = { name = tca_ro_funding_diag_circuit_found value = 1 } }
+        if = { limit = { var:song_judicial_circuit = { tca_is_judicial_circuit_trigger = yes } } save_scope_value_as = { name = tca_ro_funding_diag_circuit_valid value = 1 } }
+        if = { limit = { var:song_judicial_circuit = { NOT = { has_variable = tca_judicial_disabled } } } save_scope_value_as = { name = tca_ro_funding_diag_circuit_enabled value = 1 } }
+        if = { limit = { exists = var:song_judicial_circuit.var:song_judicial_title var:song_judicial_circuit.var:song_judicial_title = scope:tca_ro_office } save_scope_value_as = { name = tca_ro_funding_diag_circuit_binding value = 1 } }
+        if = { limit = { var:song_judicial_circuit.holder = { has_treasury = yes } } save_scope_value_as = { name = tca_ro_funding_diag_payer_treasury value = 1 } }
+        if = { limit = { exists = holder exists = var:song_judicial_circuit.holder NOT = { var:song_judicial_circuit.holder = holder } } save_scope_value_as = { name = tca_ro_funding_diag_payer_distinct value = 1 } }
+        if = { limit = { exists = holder.top_liege exists = var:song_judicial_circuit.holder.top_liege var:song_judicial_circuit.holder.top_liege = holder.top_liege } save_scope_value_as = { name = tca_ro_funding_diag_same_top_liege value = 1 } }
+        if = { limit = { has_variable = tca_office_funding_paid } save_scope_value_as = { name = tca_ro_funding_diag_paid_found value = 1 } }
+    }
+    debug_log_scopes = yes
 }

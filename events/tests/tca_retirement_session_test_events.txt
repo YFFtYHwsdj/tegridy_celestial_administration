@@ -4,28 +4,40 @@ namespace = tca_retirement_session
 tca_retirement_session.1 = {
     type = character_event hidden = yes
     immediate = {
-        debug_log = "TCA_TEST BEGIN tca_retirement_session.1 tca_test_retirement_player_session"
-        remove_character_flag = tca_test_tca_retirement_session_case_failed
-        # 本用例只接受独立人类会话适配器写入的标记；观察者/CLI局不运行真实玩家交接。
-        # 先在最外层事件声明默认值，满足引擎“变量必须由可执行脚本设置”的契约；
-        # 人类适配器先写1，这里的默认分支不会覆盖已存在的值。
-        title:h_china = { if = { limit = { NOT = { has_variable = tca_retirement_human_run } } set_variable = { name = tca_retirement_human_run value = 0 } } }
-        if = { limit = { debug_only = yes title:h_china.holder = root title:h_china = { var:tca_retirement_human_run ?= 1 } }
-            tca_test_create_merit_interface_character_with_age_effect = { CHARACTER = tca_rsess_actor GOVERNMENT = celestial_government AGE = 65 }
-            scope:tca_rsess_actor = {
-                tca_test_add_native_merit_probe_exams_effect = yes add_trait = education_stewardship_1 set_merit_level = 4
-                primary_title = { save_scope_as = tca_rsess_family }
-                domicile = { save_scope_as = tca_rsess_estate }
-                clear_appointment_timeout = yes
-                create_character = { age = 30 gender_female_chance = 0 random_traits = no dynasty = this.dynasty father = this employer = this culture = this.culture faith = this.faith rite = this.rite save_scope_as = tca_rsess_child }
-                add_trait = incapable
-                add_character_flag = tca_retirement_candidate_application_probe
+        if = {
+            limit = {
+                debug_only = yes is_ai = yes title:h_china.holder = root
+                title:h_china = { var:tca_cli_ready ?= 1 NOT = { var:tca_retirement_human_run ?= 1 } }
             }
-            scope:tca_rsess_child = { set_house = scope:tca_rsess_actor.house tca_test_protect_character_effect = yes add_character_flag = ai_will_not_convert add_character_flag = tca_merit_interface_probe set_appointment_timeout = { years = 150 desc = appointment_timeout_desc_refusing } }
-            title:h_china = { set_variable = { name = tca_retirement_session_actor value = scope:tca_rsess_actor } set_variable = { name = tca_retirement_session_phase value = 0 } set_variable = { name = tca_retirement_session_family value = scope:tca_rsess_family } set_variable = { name = tca_retirement_session_estate value = scope:tca_rsess_estate } set_variable = { name = tca_retirement_session_child value = scope:tca_rsess_child } }
-            trigger_event = { id = tca_retirement_session.1001 days = 2 }
+            # CLI在末项独占lane保存本局，原生新进程-play建立人类席位后才真正BEGIN。
+            # 不释放lane、不改变计数、不设human_run；此阶段不能冒充真人业务已执行。
+            title:h_china = { set_variable = { name = tca_cli_human_phase value = 1 } }
+            debug_log = "TCA_CLI HUMAN_SESSION_REQUESTED"
         }
-        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_retirement_player_session" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_lane_end_effect = { GROUP = tca_retirement_session } }
+        else = {
+            debug_log = "TCA_TEST BEGIN tca_retirement_session.1 tca_test_retirement_player_session"
+            remove_character_flag = tca_test_tca_retirement_session_case_failed
+            # 本用例接受经原生is_ai确认的人类适配器标记；CLI先保存再用新进程建立真实席位。
+            # 原生事件声明默认值，满足引擎“变量必须由可执行脚本设置”的契约；
+            # 人类适配器先写1，这里的默认分支不会覆盖已存在的值。
+            title:h_china = { if = { limit = { NOT = { has_variable = tca_retirement_human_run } } set_variable = { name = tca_retirement_human_run value = 0 } } }
+            if = { limit = { debug_only = yes is_ai = no title:h_china.holder = root title:h_china = { var:tca_retirement_human_run ?= 1 } }
+                tca_test_create_merit_interface_character_with_age_effect = { CHARACTER = tca_rsess_actor GOVERNMENT = celestial_government AGE = 65 }
+                scope:tca_rsess_actor = {
+                    tca_test_add_native_merit_probe_exams_effect = yes add_trait = education_stewardship_1 set_merit_level = 4
+                    primary_title = { save_scope_as = tca_rsess_family }
+                    domicile = { save_scope_as = tca_rsess_estate }
+                    clear_appointment_timeout = yes
+                    create_character = { age = 30 gender_female_chance = 0 random_traits = no dynasty = this.dynasty father = this employer = this culture = this.culture faith = this.faith rite = this.rite save_scope_as = tca_rsess_child }
+                    add_trait = incapable
+                    add_character_flag = tca_retirement_candidate_application_probe
+                }
+                scope:tca_rsess_child = { set_house = scope:tca_rsess_actor.house tca_test_protect_character_effect = yes add_character_flag = ai_will_not_convert add_character_flag = tca_merit_interface_probe set_appointment_timeout = { years = 150 desc = appointment_timeout_desc_refusing } }
+                title:h_china = { set_variable = { name = tca_retirement_session_actor value = scope:tca_rsess_actor } set_variable = { name = tca_retirement_session_phase value = 0 } set_variable = { name = tca_retirement_session_transfer_request value = 0 } set_variable = { name = tca_retirement_session_transfer_queued value = 0 } set_variable = { name = tca_retirement_session_family value = scope:tca_rsess_family } set_variable = { name = tca_retirement_session_estate value = scope:tca_rsess_estate } set_variable = { name = tca_retirement_session_child value = scope:tca_rsess_child } }
+                trigger_event = { id = tca_retirement_session.1001 days = 2 }
+            }
+            else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_retirement_player_session" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_lane_end_effect = { GROUP = tca_retirement_session } }
+        }
     }
 }
 tca_retirement_session.1001 = {
@@ -38,15 +50,52 @@ tca_retirement_session.1001 = {
             else = { add_character_flag = tca_test_tca_retirement_session_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_player_session 1" }
             scope:tca_rsess_actor = { set_variable = { name = tca_rsess_rank_before value = merit_level } }
             title:h_china = { set_variable = { name = tca_retirement_session_phase value = 1 } set_variable = { name = tca_retirement_session_heir value = scope:tca_rsess_heir } }
+            # 原报告者原生排队等待GUI请求，避免GUI控制台的延迟event被接受后未实际投递。
+            debug_log = "TCA_RETIREMENT_SESSION WAIT_GUI_REQUEST"
+            trigger_event = { id = tca_retirement_session.1010 days = 1 }
         }
     }
 }
-# GUI接管后真实调用；原角色的执行资格与效果从同一正式候选决议读取。
+# 原报告者原生轮询；GUI只写请求，消费后仍保留原两日等待，再进入真实身份/效果断言。
+# queued先写后派，重复GUI请求不能重复排1002；不改任何框架计数或玩家身份。
+# 独立人类适配器不运行suite；CLI若有suite标记则必须仍拥有原session lane。
+tca_retirement_session.1010 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = {
+                limit = {
+                    OR = { has_character_flag = tca_test_lane_tca_retirement_session_active NOT = { has_character_flag = tca_test_suite_running } }
+                    title:h_china = { var:tca_retirement_session_phase ?= 1 }
+                }
+                if = {
+                    limit = { title:h_china = { var:tca_retirement_session_transfer_request ?= 1 NOT = { var:tca_retirement_session_transfer_queued ?= 1 } } }
+                    title:h_china = {
+                        set_variable = { name = tca_retirement_session_transfer_request value = 0 }
+                        set_variable = { name = tca_retirement_session_transfer_queued value = 1 }
+                    }
+                    debug_log = "TCA_RETIREMENT_SESSION TRANSFER_REQUEST_CONSUMED"
+                    trigger_event = { id = tca_retirement_session.1002 days = 2 }
+                }
+                else_if = {
+                    limit = { title:h_china = { NOT = { var:tca_retirement_session_transfer_queued ?= 1 } } }
+                    trigger_event = { id = tca_retirement_session.1010 days = 1 }
+                }
+            }
+        }
+    }
+}
+
+# GUI接管后由原生watcher真实调用；原角色的执行资格与效果从同一正式候选决议读取。
 tca_retirement_session.1002 = {
     type = character_event hidden = yes
     immediate = {
         tca_test_validate_environment_effect = yes
         if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+        # 所有延迟续接先执行框架环境验证；业务入口及请求消费分别留证。
+        debug_log = "TCA_RETIREMENT_SESSION TRANSFER_EVENT_ENTERED"
         title:h_china.var:tca_retirement_session_actor = { save_scope_as = tca_rsess_actor }
         title:h_china.var:tca_retirement_session_family = { save_scope_as = tca_rsess_family }
         title:h_china.var:tca_retirement_session_estate = { save_scope_as = tca_rsess_estate }
@@ -102,6 +151,7 @@ tca_retirement_session.1004 = {
             if = { limit = { scope:tca_rsess_actor = { is_ai = yes } scope:tca_rsess_heir = { is_ai = yes } title:h_china = { var:tca_retirement_session_phase = 3 } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_player_session 5" }
             else = { add_character_flag = tca_test_tca_retirement_session_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_player_session 5" }
             remove_character_flag = tca_rsess_was_player
+            title:h_china = { remove_variable = tca_retirement_session_transfer_request remove_variable = tca_retirement_session_transfer_queued }
             scope:tca_rsess_actor = { remove_character_flag = tca_retirement_candidate_application_probe remove_trait = incapable tca_test_cleanup_retirement_exit_actor_effect = yes }
             scope:tca_rsess_child = { tca_test_cleanup_merit_probe_character_effect = yes }
             title:h_china = { remove_variable = tca_retirement_session_actor remove_variable = tca_retirement_session_family remove_variable = tca_retirement_session_estate remove_variable = tca_retirement_session_child remove_variable = tca_retirement_session_heir set_variable = { name = tca_retirement_session_phase value = 5 } }

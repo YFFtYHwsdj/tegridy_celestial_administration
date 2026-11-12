@@ -162,6 +162,26 @@ tca_merit_central_probe.1001 = {
             scope:tca_merit_central_original = {
                 save_scope_value_as = { name = tca_merit_central_original_timeout value = appointment_timeout_days }
             }
+            # 本例对照人物已经完成无任命首位快照；只在实际低／高任命期间封闭其他部司自然继任。
+            # 原生celestial_minister启用cooldown；不改任何真实部首或候选评分。
+            scope:tca_merit_central_control = { tca_test_lock_merit_central_control_effect = yes }
+            if = { limit = { scope:tca_mc_control_lock_ready = 1 scope:tca_merit_central_control = {
+                appointment_timeout_days > 36500
+                has_variable = tca_mc_control_prior_timeout
+                has_variable = tca_mc_control_locked_date
+                var:tca_mc_control_lock_owned = 1
+            } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_central_appointment 15" }
+            else = { add_character_flag = tca_test_tca_merit_central_probe_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_central_appointment 15" }
+            # 只重算实际将本例控制人列作其他部司首位的持有人，清除锁定前缓存，不指定替代人。
+            every_vassal_or_below = {
+                limit = { any_held_title = {
+                    tgp_is_minister_title = yes
+                    this != title:e_minister_of_justice
+                    exists = current_heir
+                    current_heir = scope:tca_merit_central_control
+                } }
+                scriptedtests_recalculate_succession = yes
+            }
             assign_councillor_type = { type = minister_justice target = scope:tca_merit_central_low fire_on_actions = yes remove_existing_councillor = yes }
             if = { limit = { cp:minister_justice = scope:tca_merit_central_low title:e_minister_of_justice.holder = scope:tca_merit_central_low scope:tca_merit_central_low = { merit = 100 var:tca_merit_central_probe_gains = 1 var:tca_merit_central_probe_seen_merit = 100 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_central_appointment 2" }
             else = { add_character_flag = tca_test_tca_merit_central_probe_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_central_appointment 2" }
@@ -279,6 +299,15 @@ tca_merit_central_probe.1003 = {
             }
             # 恢复后先按最终议会/头衔重算继承，再等两日让原生继承刷新完成；
             # 检查 9 的比较已移到 .1004，避免在原生刷新完成前读取 current_heir。
+            # 恢复真实原任后，先精确解除owned控制人物的临时锁，再沿原入口重算并等原两日。
+            scope:tca_merit_central_control = { tca_test_unlock_merit_central_control_effect = yes }
+            if = { limit = { scope:tca_mc_control_unlock_ready = 1 scope:tca_merit_central_control = {
+                appointment_timeout_days = scope:tca_mc_control_expected_timeout
+                NOT = { has_variable = tca_mc_control_lock_owned }
+                NOT = { has_variable = tca_mc_control_prior_timeout }
+                NOT = { has_variable = tca_mc_control_locked_date }
+            } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_central_appointment 16" }
+            else = { add_character_flag = tca_test_tca_merit_central_probe_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_central_appointment 16" }
             scope:tca_merit_central_original = { scriptedtests_recalculate_succession = yes }
             # 原生重新授职会刷新五年任命冷却；这是探针副作用，不能带入后续用例。
             # 在正式回调完成后恢复事前剩余日数；不改获任资格、候选分或局势催化剂。
@@ -328,9 +357,9 @@ tca_merit_central_probe.1004 = {
             # 保留“议会/头衔恢复 + 原首位一致”的完整语义，heir 不同仍判失败。
             remove_character_flag = tca_mc9_bad
             if = { limit = { cp:minister_justice = scope:tca_merit_central_original title:e_minister_of_justice.holder = scope:tca_merit_central_original }
-                # 读档续接后旧首位作用域可能丢失；此时只核对议会与头衔已恢复，并明确记录作用域缺失。
+                # 旧首位是exact恢复比较的必要输入；缺失须记录并失败，不能只凭议会/头衔已恢复算通过。
                 if = { limit = { exists = scope:tca_merit_central_heir title:e_minister_of_justice.current_heir = scope:tca_merit_central_heir } }
-                else_if = { limit = { NOT = { exists = scope:tca_merit_central_heir } } debug_log = "TCA_MERIT_CENTRAL HEIR_SCOPE_LOST" }
+                else_if = { limit = { NOT = { exists = scope:tca_merit_central_heir } } add_character_flag = tca_mc9_bad debug_log = "TCA_MERIT_CENTRAL HEIR_SCOPE_LOST" }
                 else = { add_character_flag = tca_mc9_bad }
             }
             else = { add_character_flag = tca_mc9_bad }
@@ -354,7 +383,8 @@ tca_merit_central_probe.1004 = {
             } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_central_appointment 13" }
             else = { add_character_flag = tca_test_tca_merit_central_probe_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_central_appointment 13" }
             # 继任对照人物只在本项暂时开放候选；恢复长冷却与保护，不留给后续用例。
-            scope:tca_merit_central_control = { tca_test_cleanup_merit_probe_character_effect = yes }
+            # 无论本项断言是否失败，收尾先解本例锁，再走既有长冷却回收。
+            scope:tca_merit_central_control = { tca_test_unlock_merit_central_control_effect = yes tca_test_cleanup_merit_probe_character_effect = yes }
             if = { limit = { scope:tca_merit_central_control = { appointment_timeout_days > 36500 tca_merit_interface_probe_trigger = yes tca_merit_population_trigger = no NOT = { has_character_flag = tca_merit_active } NOT = { has_variable = tca_merit_grant_phase } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_central_appointment 14" }
             else = { add_character_flag = tca_test_tca_merit_central_probe_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_central_appointment 14" }
             situation:dynastic_cycle.situation_top_sub_region = { remove_variable = tca_merit_central_before remove_variable = tca_merit_central_expected remove_variable = tca_merit_central_before_high remove_variable = tca_merit_central_worker_before remove_variable = tca_merit_central_restore_expected }

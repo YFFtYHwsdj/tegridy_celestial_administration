@@ -2,6 +2,10 @@
 
 仅用于[闲退接口验证](../../docs/appointment/retirement_verification.md)的实际玩家控制权检查。复用主模组 `tca_retirement_session.1` 及其5条原生断言，不复制玩法规则，不修改观察者框架的统计、运行标记或验收器。
 
+## 优先使用统一CLI
+
+统一CLI已集成末项人类阶段：`python3 tools/run_game_tests.py --case tca_retirement_session.1 --timeout 600`；默认全量同样执行。观察者先保存本局检查点，新进程使用 `-loadsave` 与 `-play=h_china` 建立真实人类席位，原生确认后续接唯一用例，最后由GUI回观察者。证据契约见[测试运行说明](../../docs/testing/README.md#真实玩家会话末阶段)。下文保留独立适配器的人工复现方式，不与统一CLI同时加载。此入口的实现接线与静态协议测试不等于引擎已验收。
+
 ## 加载与隔离
 
 使用全新的可丢弃用户目录，仅加载主模组和本目录对应的工具适配器。**不同时加载CLI观察者适配器**；观察者中的 `play` 可能只切换观察视角，GUI的 `GetPlayer` 匹配不能证明人物由人类控制。

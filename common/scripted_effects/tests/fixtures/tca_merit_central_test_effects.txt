@@ -47,3 +47,46 @@ tca_test_restore_central_office_effect = {
     }
     $CHARACTER$ = { tca_test_restore_central_timeout_effect = { TIMEOUT = $TIMEOUT$ ELAPSED = $ELAPSED$ } }
 }
+
+# 本例自建阳性对照人物作用域；无任命对照完成后，临时封闭实际任命四日中的其他部司继任。
+# 每轮显式覆盖ready=0，保存原生冷却及日期；不改官品、余额、评分或原first快照。
+tca_test_lock_merit_central_control_effect = {
+    save_scope_value_as = { name = tca_mc_control_lock_ready value = 0 }
+    save_scope_value_as = { name = tca_mc_control_unlock_ready value = 0 }
+    set_variable = { name = tca_mc_control_prior_timeout value = appointment_timeout_days }
+    set_variable = { name = tca_mc_control_locked_date value = current_date }
+    set_variable = { name = tca_mc_control_lock_owned value = 1 }
+    set_appointment_timeout = { years = 150 desc = appointment_timeout_desc_refusing }
+    if = { limit = { appointment_timeout_days > 36500 }
+        save_scope_value_as = { name = tca_mc_control_lock_ready value = 1 }
+    }
+}
+
+# 本例自建对照人物作用域；根据实际经过日数精确解除本轮临时锁，调用后删除全部私有变量。
+# 返回expected及ready只用于立即读取原生值验证；缺本轮所有权不消费继承的旧scope输出。
+# 断言失败也必须调用；最终人物通用回收前重复调用是无写入的幂等清理。
+tca_test_unlock_merit_central_control_effect = {
+    save_scope_value_as = { name = tca_mc_control_unlock_ready value = 0 }
+    if = { limit = {
+        has_variable = tca_mc_control_lock_owned
+        var:tca_mc_control_lock_owned = 1
+        has_variable = tca_mc_control_prior_timeout
+        has_variable = tca_mc_control_locked_date
+    }
+        save_scope_value_as = { name = tca_mc_control_expected_timeout value = tca_merit_central_control_remaining_timeout_days }
+        clear_appointment_timeout = yes
+        if = { limit = { scope:tca_mc_control_expected_timeout > 0 }
+            set_appointment_timeout = { days = tca_merit_central_control_remaining_timeout_days }
+        }
+        remove_variable = tca_mc_control_prior_timeout
+        remove_variable = tca_mc_control_locked_date
+        remove_variable = tca_mc_control_lock_owned
+        if = { limit = { appointment_timeout_days = scope:tca_mc_control_expected_timeout }
+            save_scope_value_as = { name = tca_mc_control_unlock_ready value = 1 }
+        }
+    }
+    # 私有快照若不完整，不能伪造成功恢复；仍清除残留字段，由ready=0保留断言失败。
+    remove_variable = tca_mc_control_prior_timeout
+    remove_variable = tca_mc_control_locked_date
+    remove_variable = tca_mc_control_lock_owned
+}

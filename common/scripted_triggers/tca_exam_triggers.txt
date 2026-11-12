@@ -25,25 +25,44 @@ tca_exam_can_take_exam_trigger = {
 }
 
 # 人物作用域；乡试受邀者的正式地域判定，scope:host为本次活动主持人。
-# 无输出或副作用。空主持人、已死主持人或缺首府一律拒绝，不能跳过地域限制。
-# 两层分支分别保护host和capital_county；有效主持人沿用原版同帝国／邻接王国规则。
+# 无输出或副作用。主持人缺失/死亡/无首府，或候选死亡/无默认地点及完整法理链均拒绝。
+# 逐层exists后才读下游链接；有效地点仍沿用原版同帝国／邻接王国规则。
 tca_exam_local_guest_region_trigger = {
-    trigger_if = {
-        limit = { exists = scope:host }
+    custom_tooltip = {
+        text = tca_exam_local_guest_region_tt
         trigger_if = {
-            limit = { scope:host = { is_alive = yes exists = capital_county } }
-            default_location.county.empire = {
-                OR = {
-                    this = scope:host.capital_county.empire
-                    any_title_to_title_neighboring_kingdom = {
-                        this = scope:host.capital_county.kingdom
+            limit = { exists = scope:host }
+            trigger_if = {
+                limit = { scope:host = { is_alive = yes exists = capital_county } }
+                trigger_if = {
+                    limit = { is_alive = yes exists = default_location }
+                    trigger_if = {
+                        limit = { default_location = { exists = county } }
+                        trigger_if = {
+                            limit = {
+                                default_location.county = { exists = empire }
+                                scope:host.capital_county = { exists = empire exists = kingdom }
+                            }
+                            default_location.county.empire = {
+                                OR = {
+                                    this = scope:host.capital_county.empire
+                                    any_title_to_title_neighboring_kingdom = {
+                                        this = scope:host.capital_county.kingdom
+                                    }
+                                }
+                            }
+                        }
+                        trigger_else = { always = no }
                     }
+                    trigger_else = { always = no }
                 }
+                trigger_else = { always = no }
             }
+            trigger_else = { always = no }
         }
         trigger_else = { always = no }
+
     }
-    trigger_else = { always = no }
 }
 
 # 人物作用域；考生硬条件。scope:host 必须是本次会试的皇帝。
@@ -100,4 +119,57 @@ tca_exam_event_trigger = {
     NOT = { is_activity_type_on_cooldown = activity_imperial_examination }
     NOT = { title:h_china = { has_variable = tca_exam_cooldown } }
     NOT = { is_in_activity = yes }
+}
+
+# 随行候选人物作用域；OWNER为显式主持人参数，正式活动传scope:owner。
+# 只读，保留原版当前位置相同的要求；主持人缺失、双方死亡或无地点时返回no。
+# 分层守门后才比较location，避免死亡/清理期间的空链接在AI权重中报错。
+tca_exam_entourage_same_location_trigger = {
+    trigger_if = {
+        limit = { exists = $OWNER$ }
+        trigger_if = {
+            limit = { is_alive = yes $OWNER$ = { is_alive = yes } }
+            trigger_if = {
+                limit = { exists = location $OWNER$ = { exists = location } }
+                location = $OWNER$.location
+            }
+            trigger_else = { always = no }
+        }
+        trigger_else = { always = no }
+    }
+    trigger_else = { always = no }
+}
+
+# 活动成员人物作用域；NAME为原版guest subset名（guests/entrants/failees/scoreboard/imperial_examiners）。
+# 输入scope:activity为当前阶段活动；只读，无输出或副作用，返回是否仍绑定同一活动且属于该子集。
+# 必须先分别确认活动与成员绑定存在，再比较身份；无活动或转到其它活动均为no。
+# 只用于乡试正向子集查询，不翻转NOT或包住其它结算；正常同一活动仍直接读取原生membership。
+tca_exam_member_in_activity_subset_trigger = {
+    trigger_if = {
+        limit = { exists = scope:activity }
+        trigger_if = {
+            limit = { exists = involved_activity }
+            trigger_if = {
+                limit = { involved_activity = scope:activity }
+                is_in_guest_subset = { name = $NAME$ }
+            }
+            trigger_else = { always = no }
+        }
+        trigger_else = { always = no }
+    }
+    trigger_else = { always = no }
+}
+
+# 活动成员人物作用域；输入scope:activity，返回当前人物是否仍关联同一有效活动。
+# 只读、不查询子集；供阶段迭代器先过滤失联人物，再原样执行原生条件和动作。
+tca_exam_is_current_activity_member_trigger = {
+    trigger_if = {
+        limit = { exists = scope:activity }
+        trigger_if = {
+            limit = { exists = involved_activity }
+            involved_activity = scope:activity
+        }
+        trigger_else = { always = no }
+    }
+    trigger_else = { always = no }
 }

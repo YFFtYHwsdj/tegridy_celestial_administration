@@ -263,6 +263,86 @@ class RunEvidenceTests(unittest.TestCase):
         issues, _ = inspect_run(self.run_log(), error, {'tca_test_example': 1})
         self.assertEqual(issues, [])
 
+    def test_native_runtime_character_fields_do_not_hide_script_identifiers(self):
+        from check_test_run import ROOT
+        self_body = 'reverse_add_opinion effect [ tca_name_tca_gen_1066_c_tca_tongpan_hanzhou Wang of c_tca_tongpan_fengxiang (Internal ID: 31884 - Historical ID tca_gen_1066_c_tca_tongpan_hanzhou) is trying to add an opinion of themself ]'
+        scheme_body = "change_opportunities effect [ Invalid scheme 'celestial_movement_power_promote' with owner tca_name_tca_gen_1066_c_tca_tongpan_hengzhou_1 Liu of c_tca_tongpan_shaozhou_1 (Internal ID: 32562 - Historical ID tca_gen_1066_c_tca_tongpan_hengzhou_1) and target \u0015ONCLICK:CHARACTER,29289 \u0015TOOLTIP:CHARACTER,29289 \u0015L Retired Official of Rank 8 Zhào Yunchū of the Retirement Honor\u0015!\u0015!\u0015! ]"
+        def error(body, scheme=False):
+            frame = ('events/scheme_events/scheme_critical_moments_events.txt line: 214 (scheme_critical_moments_0001_execute_scheme_default_flow_effect[args#1734234035])' if scheme else 'events/scheme_events/agent_events.txt line: 577 (agent_events.0011:option)')
+            return '[14:53:51][E]: Script system error!\n Error: ' + body + '\n Script location: file: ' + frame + '\n'
+        for body, scheme in ((self_body, False), (scheme_body, True)):
+            raw = error(body, scheme)
+            visible = []
+            self.assertEqual(inspect_engine_errors(raw, source_root=ROOT, diagnostics=visible), [])
+            self.assertEqual(visible[0]['classification'], 'native-runtime-character')
+            self.assertEqual(visible[0]['raw'], raw)
+            self.assertTrue(inspect_engine_errors(raw))
+            self.assertTrue(inspect_engine_errors(raw, source_root=ROOT/'absent-source'))
+            self.assertTrue(inspect_engine_errors(raw + ' file: common/on_action/tca_actual.txt line: 8 (tca_actual_child)\n', source_root=ROOT))
+            self.assertTrue(inspect_engine_errors(raw.replace('Internal ID:', 'Invalid ID:'), source_root=ROOT))
+        for body in (self_body[:-2] + ' modifier=tca_modifier ]', scheme_body.replace('celestial_movement_power_promote', 'tca_scheme'), scheme_body.replace('and target ', 'and target tca_real_target '), 'Unknown effect tca_bad '+self_body, "Undefined event target 'tca_real' "+scheme_body):
+            self.assertTrue(inspect_engine_errors(error(body), source_root=ROOT))
+        import tempfile
+        with tempfile.TemporaryDirectory() as temp:
+            self.assertTrue(inspect_engine_errors(error(self_body), source_root=Path(temp)))
+
+    def test_historical_runtime_title_variants_remain_visible_and_do_not_hide_mod_frames(self):
+        from check_test_run import ROOT
+        body = "is_in_guest_subset trigger [ Character 'Song_980C Sū of d_tca_judicial_fujian (Internal ID: 32057 - Historical ID han_7424)' is not involved in any activity. ]"
+        error = '[14:54:15][E]: Script system error!\n Error: ' + body + '\n Script location: file: common/activities/pulse_actions/imperial_examination_actions.txt line: 6 (apa_boasting_calligraphy:is_valid)\n'
+        for text in (error, error.replace('Internal ID:', 'Internal ID'), error.replace(' - Historical ID han_7424', '')):
+            visible = []
+            self.assertEqual(inspect_engine_errors(text, source_root=ROOT, diagnostics=visible), [])
+            self.assertEqual(visible[0]['classification'], 'native-runtime-title')
+            self.assertEqual(visible[0]['raw'], text)
+            actual = text + ' file: common/activities/activity_types/zz_tca_local_examination.txt line: 1146 (activity_local_examination:on_weekly_pulse)\n'
+            self.assertTrue(inspect_engine_errors(actual, source_root=ROOT))
+        self.assertTrue(inspect_engine_errors(error))
+        self.assertTrue(inspect_engine_errors(error.replace(body, 'Unknown effect c_tca_bad'), source_root=ROOT))
+        self.assertTrue(inspect_engine_errors(error.replace(body, body + ' Unknown variable tca_real'), source_root=ROOT))
+        self.assertTrue(inspect_engine_errors(error.replace('han_7424', 'tca_real_identifier'), source_root=ROOT))
+
+    def test_registration_proof_is_exact_and_fail_closed(self):
+        import tempfile
+        import json
+        from pathlib import Path
+        error = ('[10:00:00][E]: Script system error!\n Error: native missing scope\n'
+                 ' Script location: file: common/scripted_effects/native.txt line: 6 (native_effect)\n'
+                 ' file: common/on_action/tca_parent.txt line: 1 (on_death)\n')
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root/'common/on_action').mkdir(parents=True)
+            (root/'tools').mkdir()
+            script = root/'common/on_action/tca_parent.txt'
+            registry = root/'tools/upstream_overrides.json'
+            entry = {'key': 'on_death', 'mod': 'common/on_action/tca_parent.txt', 'vanilla': 'common/on_action/death.txt'}
+            registry.write_text(json.dumps({'known_extensions': [entry]}))
+            script.write_text('on_death = { on_actions = { tca_child } }\n')
+            diagnostics = []
+            self.assertEqual(inspect_engine_errors(error, source_root=root, diagnostics=diagnostics), [])
+            self.assertEqual(diagnostics[0]['classification'], 'native_error_with_mod_registration')
+            self.assertEqual(diagnostics[0]['raw'], error)
+            runtime = error.replace('native missing scope', 'add_opinion effect [ Name of c_tca_county (Internal ID: 42) is trying to add an opinion of themself ]')
+            visible = []
+            self.assertEqual(inspect_engine_errors(runtime, source_root=root, diagnostics=visible), [])
+            self.assertEqual(visible[0]['raw'], runtime)
+            self.assertTrue(inspect_engine_errors(error.replace('native missing scope', 'Unknown effect c_tca_bad'), source_root=root))
+            child = error + ' file: common/on_action/tca_parent.txt line: 2 (tca_child)\n'
+            self.assertTrue(inspect_engine_errors(child, source_root=root))
+            mixed = error + '[10:00:01][E]: Script system error!\n Error: tca_real broken\n Script location: file: common/scripted_effects/tca_real.txt line: 2 (tca_real)\n'
+            diagnostics = []
+            self.assertEqual(len(inspect_engine_errors(mixed, source_root=root, diagnostics=diagnostics)), 1)
+            self.assertEqual(len(diagnostics), 1)
+            self.assertTrue(inspect_engine_errors(error))
+            self.assertTrue(inspect_engine_errors(error.replace('line: 1', 'line: 2'), source_root=root))
+            script.write_text('on_death = { effect = { tca_child = yes } }\n')
+            self.assertTrue(inspect_engine_errors(error, source_root=root))
+            script.write_text('on_death = { on_actions = { tca_child } }\n')
+            registry.write_text('{}')
+            self.assertTrue(inspect_engine_errors(error, source_root=root))
+            script.unlink()
+            self.assertTrue(inspect_engine_errors(error, source_root=root))
+
     def test_native_on_action_error_with_mod_composition_frame_is_not_attributed(self):
         # 模组只向 on_death 追加 on_actions 时，原版 death.txt 自身的 on_death
         # 错误也会带上模组文件帧；同名 on_action 组合帧不是调用来源。
@@ -273,7 +353,9 @@ class RunEvidenceTests(unittest.TestCase):
             '    file: common/on_action/tca_retirement_title_on_actions.txt line: 2 (on_death)\n'
         )
         issues, _ = inspect_run(self.run_log(), error, {'tca_test_example': 1})
-        self.assertEqual(issues, [])
+        self.assertTrue(issues)  # 无指定源码不能仅因同名父帧放行。
+        from check_test_run import ROOT
+        self.assertEqual(inspect_engine_errors(error, source_root=ROOT), [])
 
     def test_mod_on_action_effect_error_is_still_attributed(self):
         # 模组 on_action 内实际 effect 报错（函数名与 on_action 不同）仍应归属。

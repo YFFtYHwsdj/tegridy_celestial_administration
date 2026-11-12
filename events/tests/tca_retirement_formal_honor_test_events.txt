@@ -29,6 +29,20 @@ tca_retirement_formal_honor.2000 = {
             scope:tca_rh_high = { tca_merit_initialize_character_effect = yes tca_retirement_enter_effect = { KIND = 2 } tca_retirement_step_down_effect = yes tca_retirement_honor_effect = { APPROVE = yes } }
             scope:tca_rh_no = { tca_merit_initialize_character_effect = yes tca_retirement_enter_effect = { KIND = 2 } tca_retirement_step_down_effect = yes tca_retirement_honor_effect = { APPROVE = no } tca_retirement_honor_effect = { APPROVE = yes } }
             scope:tca_rh_top = { tca_merit_initialize_character_effect = yes tca_retirement_enter_effect = { KIND = 2 } tca_retirement_step_down_effect = yes tca_retirement_honor_effect = { APPROVE = yes } }
+            tca_test_create_merit_interface_character_effect = { CHARACTER = tca_rh_missing GOVERNMENT = celestial_government }
+            scope:tca_rh_missing = {
+                set_merit_level = 3
+                tca_merit_initialize_character_effect = yes
+                tca_retirement_enter_effect = { KIND = 2 }
+                tca_retirement_step_down_effect = yes
+                tca_retirement_honor_effect = { APPROVE = yes }
+                # 模拟正式迁出清理移除核定值：审计不能凭target虚构已成功授品。
+                tca_merit_leave_celestial_effect = yes
+                tca_retirement_audit_honor_effect = yes
+            }
+            if = { limit = { scope:tca_rh_missing = { NOT = { has_variable = tca_merit_approved_level } has_variable = tca_retirement_honor_target NOT = { has_character_flag = tca_retirement_honor_processed } var:tca_retirement_honor_attempts >= 1 } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_formal_honor 7" }
+            else = { add_character_flag = tca_test_tca_retirement_formal_honor_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_formal_honor 7" }
+            scope:tca_rh_missing = { tca_test_cleanup_retirement_formal_effect = yes }
             scope:tca_rh_zero = { tca_retirement_enter_effect = { KIND = 2 } tca_retirement_step_down_effect = yes tca_retirement_honor_effect = { APPROVE = yes } }
             scope:tca_rh_low = { trigger_event = tca_retirement_probe.92 }
             trigger_event = { id = tca_retirement_formal_honor.2001 days = 3 }

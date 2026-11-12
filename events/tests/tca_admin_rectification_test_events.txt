@@ -836,113 +836,172 @@ tca_admin_rectification_test.5 = {
     immediate = {
         debug_log = "TCA_TEST BEGIN tca_admin_rectification_test.5 tca_test_retract_concurrent_natural_pipeline"
         remove_character_flag = tca_test_tca_admin_rectification_test_case_failed
+        # 先把明确不合格的皇帝保存为旧输出，再跨事件继承；正式选拔必须覆写旧scope。
+        # clear_saved_scope不能作为本次实际选中的凭据，原五项断言仍验自然候选与真实交接。
+        root = { save_scope_as = tca_admin_rectification_selected_successor save_scope_as = tca_ar_drawn_candidate }
+        debug_log = "TCA_TEST WAIT tca_test_retract_concurrent_natural_pipeline 1 day inherited selection"
+        trigger_event = { id = tca_admin_rectification_test.1005 days = 1 }
+    }
+}
+tca_admin_rectification_test.1005 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
         if = {
-            limit = {
-                debug_only = yes
-                is_alive = yes
-                root = { has_title = title:h_china }
-            }
-            clear_saved_scope = tca_art_nat_gov
-            clear_saved_scope = tca_art_nat_duchy
-            clear_saved_scope = tca_art_nat_duchy_orig_holder
-            clear_saved_scope = tca_art_nat_vassal_count
-            random_vassal = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = {
                 limit = {
-                    tca_is_admin_rectification_target_official_trigger = yes
-                    primary_title.tier = tier_kingdom
-                    exists = capital_county
-                    any_vassal = {
-                        tca_is_admin_rectification_target_official_trigger = yes
-                        primary_title.tier = tier_duchy
-                        primary_title != prev.capital_county.duchy
-                        any_vassal = {
-                            tca_is_admin_rectification_target_official_trigger = yes
-                            primary_title.tier = tier_county
-                            primary_title.de_jure_liege ?= prev.primary_title
-                        }
-                    }
+                    debug_only = yes
+                    is_alive = yes
+                    root = { has_title = title:h_china }
                 }
-                save_scope_as = tca_art_nat_gov
+                clear_saved_scope = tca_art_nat_gov
+                clear_saved_scope = tca_art_nat_duchy
+                clear_saved_scope = tca_art_nat_duchy_orig_holder
+                clear_saved_scope = tca_art_nat_vassal_count
+                clear_saved_scope = tca_art_nat_primary
+                clear_saved_scope = tca_art_nat_capital
                 random_vassal = {
                     limit = {
                         tca_is_admin_rectification_target_official_trigger = yes
-                        primary_title.tier = tier_duchy
-                        primary_title != prev.capital_county.duchy
+                        primary_title.tier = tier_kingdom
+                        exists = capital_county
                         any_vassal = {
                             tca_is_admin_rectification_target_official_trigger = yes
-                            primary_title.tier = tier_county
-                            primary_title.de_jure_liege ?= prev.primary_title
-                        }
-                    }
-                    save_scope_as = tca_art_nat_duchy_orig_holder
-                    primary_title = { save_scope_as = tca_art_nat_duchy }
-                    random_vassal = {
-                        limit = {
-                            tca_is_admin_rectification_target_official_trigger = yes
-                            primary_title.tier = tier_county
-                            primary_title.de_jure_liege ?= prev.primary_title
-                        }
-                        save_scope_as = tca_art_nat_vassal_count
-                    }
-                }
-            }
-            if = {
-                limit = {
-                    exists = scope:tca_art_nat_gov
-                    exists = scope:tca_art_nat_duchy
-                    exists = scope:tca_art_nat_duchy_orig_holder
-                    exists = scope:tca_art_nat_vassal_count
-                }
-                # 1) 将非首府公国临时授予路主 nat_gov，制造兼领；同时将下属伯爵 nat_vassal_count 直属上级改为路主。
-                scope:tca_art_nat_duchy_orig_holder = {
-                    create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_art_grant_nat_duchy }
-                    scope:tca_art_nat_duchy = { change_title_holder = { holder = scope:tca_art_nat_gov change = scope:tca_art_grant_nat_duchy } }
-                    resolve_title_and_vassal_change = scope:tca_art_grant_nat_duchy
-                }
-                scope:tca_art_nat_vassal_count = {
-                    create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_art_nat_fealty_gov }
-                    change_liege = { liege = scope:tca_art_nat_gov change = scope:tca_art_nat_fealty_gov }
-                    resolve_title_and_vassal_change = scope:tca_art_nat_fealty_gov
-                }
-                # 2) 发起裁撤兼领书信，完全由正式流程自然抽取或生成继任者。
-                root = { save_scope_as = actor }
-                scope:tca_art_nat_gov = { save_scope_as = recipient }
-                scope:tca_art_nat_duchy = { save_scope_as = target }
-                tca_send_retract_concurrent_letter_effect = { APPROVED = no }
-
-                # 断言 1：系统自然选定或生成了合格的在途继任者，且挂载了预约标记与在途变量。
-                if = {
-                    limit = {
-                        scope:tca_art_nat_gov = {
-                            has_variable = tca_retract_pending_successor
-                            has_variable = tca_retract_pending_actor
-                            has_variable = tca_retract_pending_title
-                            var:tca_retract_pending_successor = {
-                                is_alive = yes
-                                this != scope:tca_art_nat_gov
-                                tca_circuit_has_title_level_requirement_trigger = { TITLE = scope:tca_art_nat_duchy }
+                            primary_title.tier = tier_duchy
+                            primary_title != prev.capital_county.duchy
+                            any_vassal = {
+                                tca_is_admin_rectification_target_official_trigger = yes
+                                primary_title.tier = tier_county
+                                primary_title.de_jure_liege ?= prev.primary_title
                             }
                         }
                     }
-                    debug_log = "TCA_TEST CHECK_PASS tca_test_retract_concurrent_natural_pipeline 1"
+                    save_scope_as = tca_art_nat_gov
+                    primary_title = { save_scope_as = tca_art_nat_primary }
+                    capital_county = { save_scope_as = tca_art_nat_capital }
+                    random_vassal = {
+                        limit = {
+                            tca_is_admin_rectification_target_official_trigger = yes
+                            primary_title.tier = tier_duchy
+                            primary_title != prev.capital_county.duchy
+                            any_vassal = {
+                                tca_is_admin_rectification_target_official_trigger = yes
+                                primary_title.tier = tier_county
+                                primary_title.de_jure_liege ?= prev.primary_title
+                            }
+                        }
+                        save_scope_as = tca_art_nat_duchy_orig_holder
+                        primary_title = { save_scope_as = tca_art_nat_duchy }
+                        random_vassal = {
+                            limit = {
+                                tca_is_admin_rectification_target_official_trigger = yes
+                                primary_title.tier = tier_county
+                                primary_title.de_jure_liege ?= prev.primary_title
+                            }
+                            save_scope_as = tca_art_nat_vassal_count
+                        }
+                    }
+                }
+                if = {
+                    limit = {
+                        exists = scope:tca_art_nat_gov
+                        exists = scope:tca_art_nat_duchy
+                        exists = scope:tca_art_nat_duchy_orig_holder
+                        exists = scope:tca_art_nat_vassal_count
+                    }
+                    # 1) 将非首府公国临时授予路主 nat_gov，制造兼领；同时将下属伯爵 nat_vassal_count 直属上级改为路主。
+                    scope:tca_art_nat_duchy_orig_holder = {
+                        create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_art_grant_nat_duchy }
+                        scope:tca_art_nat_duchy = { change_title_holder = { holder = scope:tca_art_nat_gov change = scope:tca_art_grant_nat_duchy } }
+                        resolve_title_and_vassal_change = scope:tca_art_grant_nat_duchy
+                    }
+                    scope:tca_art_nat_vassal_count = {
+                        create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_art_nat_fealty_gov }
+                        change_liege = { liege = scope:tca_art_nat_gov change = scope:tca_art_nat_fealty_gov }
+                        resolve_title_and_vassal_change = scope:tca_art_nat_fealty_gov
+                    }
+                    # 兼领夹具须保持原路主主头衔和首府，不能依赖授职事务不改变派生选择。
+                    # 仅恢复仍由本人持有的原头衔／首府；不授回已失头衔、不改正式豁免规则。
+                    scope:tca_art_nat_gov = {
+                        if = {
+                            limit = { is_alive = yes has_title = scope:tca_art_nat_primary NOT = { primary_title = scope:tca_art_nat_primary } }
+                            set_primary_title_to = scope:tca_art_nat_primary
+                        }
+                        if = {
+                            limit = { is_alive = yes has_title = scope:tca_art_nat_capital NOT = { capital_county = scope:tca_art_nat_capital } }
+                            set_realm_capital = scope:tca_art_nat_capital
+                        }
+                    }
+                    # 2) 发起裁撤兼领书信，完全由正式流程自然抽取或生成继任者。
+                    root = { save_scope_as = actor }
+                    scope:tca_art_nat_gov = { save_scope_as = recipient }
+                    scope:tca_art_nat_duchy = { save_scope_as = target }
+                    # 派信前保留全部真实守门检查；夹具失效必须留下现场，不能靠注入继任者补成成功。
+                    if = { limit = { NOT = { scope:recipient = { tca_retract_concurrent_still_valid_trigger = { ACTOR = scope:actor TITLE = scope:target } } } } debug_log = "TCA_RECTIFY_NAT PREPARED_SEND_GUARD_REJECTED" debug_log_scopes = yes }
+                    tca_send_retract_concurrent_letter_effect = { APPROVED = no }
+
+                    # 断言 1：系统自然选定或生成了合格的在途继任者，且挂载了预约标记与在途变量。
+                    if = {
+                        limit = {
+                            scope:tca_art_nat_gov = {
+                                primary_title = scope:tca_art_nat_primary
+                                capital_county = scope:tca_art_nat_capital
+                                has_variable = tca_retract_pending_successor
+                                has_variable = tca_retract_pending_actor
+                                has_variable = tca_retract_pending_title
+                                var:tca_retract_pending_successor = {
+                                    is_alive = yes
+                                    this != scope:tca_art_nat_gov
+                                    tca_circuit_has_title_level_requirement_trigger = { TITLE = scope:tca_art_nat_duchy }
+                                }
+                            }
+                        }
+                        debug_log = "TCA_TEST CHECK_PASS tca_test_retract_concurrent_natural_pipeline 1"
+                    }
+                    else = {
+                        add_character_flag = tca_test_tca_admin_rectification_test_case_failed
+                        debug_log = "TCA_TEST CHECK_FAIL tca_test_retract_concurrent_natural_pipeline 1"
+                        # 只读记录正式派信守门与在途继任者，区分制造兼领后资格变化和同日官品派生延迟。
+                        # 不能以指定继任者或降低门槛修补自然流水线。
+                        if = { limit = { scope:actor = { NOT = { tca_is_admin_rectification_actor_trigger = yes } } } debug_log = "TCA_RECTIFY_NAT ACTOR_INELIGIBLE" }
+                        scope:tca_art_nat_gov = {
+                            if = { limit = { NOT = { tca_is_admin_rectification_target_official_trigger = yes } } debug_log = "TCA_RECTIFY_NAT RECIPIENT_INELIGIBLE" }
+                            if = { limit = { NOT = { top_liege = scope:actor.top_liege } } debug_log = "TCA_RECTIFY_NAT REALM_CHANGED" }
+                            if = { limit = { NOT = { tca_retract_concurrent_still_valid_trigger = { ACTOR = scope:actor TITLE = scope:target } } } debug_log = "TCA_RECTIFY_NAT SEND_GUARD_REJECTED" }
+                            primary_title ?= { save_scope_as = tca_art_nat_diag_primary }
+                            capital_county ?= { save_scope_as = tca_art_nat_diag_capital duchy ?= { save_scope_as = tca_art_nat_diag_capital_duchy } }
+                            if = { limit = { NOT = { has_variable = tca_retract_pending_actor } } debug_log = "TCA_RECTIFY_NAT NO_PENDING_ACTOR" }
+                            if = { limit = { NOT = { has_variable = tca_retract_pending_successor } } debug_log = "TCA_RECTIFY_NAT NO_PENDING_SUCCESSOR" }
+                            var:tca_retract_pending_successor ?= {
+                                save_scope_as = tca_art_nat_diag_successor
+                                save_scope_value_as = { name = tca_art_nat_diag_successor_level value = merit_level }
+                                if = { limit = { has_variable = tca_merit_approved_level } save_scope_value_as = { name = tca_art_nat_diag_successor_approved value = var:tca_merit_approved_level } }
+                                if = { limit = { NOT = { tca_circuit_has_title_level_requirement_trigger = { TITLE = scope:tca_art_nat_duchy } } } debug_log = "TCA_RECTIFY_NAT SUCCESSOR_LEVEL_BELOW_REQUIREMENT" }
+                            }
+                        }
+                        scope:tca_art_nat_duchy = {
+                            holder ?= { save_scope_as = tca_art_nat_diag_holder }
+                            if = { limit = { NOT = { holder ?= scope:tca_art_nat_gov } } debug_log = "TCA_RECTIFY_NAT TITLE_HOLDER_CHANGED" }
+                            if = { limit = { NOT = { tca_is_retractable_concurrent_title_trigger = { HOLDER = scope:tca_art_nat_gov } } } debug_log = "TCA_RECTIFY_NAT TITLE_NOT_RETRACTABLE" }
+                        }
+                        debug_log_scopes = yes
+                    }
+                    debug_log = "TCA_TEST WAIT tca_test_retract_concurrent_natural_pipeline 2 days"
+                    trigger_event = { id = tca_admin_rectification_test.105 days = 2 }
                 }
                 else = {
-                    add_character_flag = tca_test_tca_admin_rectification_test_case_failed
-                    debug_log = "TCA_TEST CHECK_FAIL tca_test_retract_concurrent_natural_pipeline 1"
+                    debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_retract_concurrent_natural_pipeline"
+                    if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+                    tca_test_lane_end_effect = { GROUP = tca_admin_rectification_test }
                 }
-                debug_log = "TCA_TEST WAIT tca_test_retract_concurrent_natural_pipeline 2 days"
-                trigger_event = { id = tca_admin_rectification_test.105 days = 2 }
             }
             else = {
                 debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_retract_concurrent_natural_pipeline"
                 if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
                 tca_test_lane_end_effect = { GROUP = tca_admin_rectification_test }
             }
-        }
-        else = {
-            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_retract_concurrent_natural_pipeline"
-            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
-            tca_test_lane_end_effect = { GROUP = tca_admin_rectification_test }
         }
     }
 }
@@ -997,6 +1056,8 @@ tca_admin_rectification_test.105 = {
             if = {
                 limit = {
                     scope:tca_art_nat_gov = {
+                        primary_title = scope:tca_art_nat_primary
+                        capital_county = scope:tca_art_nat_capital
                         NOT = { has_variable = tca_retract_pending_actor }
                         NOT = { has_variable = tca_retract_pending_title }
                         NOT = { has_variable = tca_retract_pending_successor }
@@ -1033,6 +1094,22 @@ tca_admin_rectification_test.105 = {
                     resolve_title_and_vassal_change = scope:tca_art_restore_nat_vassal
                 }
             }
+            # 清理事务也可能重选首府；仅恢复本人仍持有的原状态，失去原头衔则由恢复断言明确失败。
+            scope:tca_art_nat_gov = {
+                if = {
+                    limit = { is_alive = yes has_title = scope:tca_art_nat_primary NOT = { primary_title = scope:tca_art_nat_primary } }
+                    set_primary_title_to = scope:tca_art_nat_primary
+                }
+                if = {
+                    limit = { is_alive = yes has_title = scope:tca_art_nat_capital NOT = { capital_county = scope:tca_art_nat_capital } }
+                    set_realm_capital = scope:tca_art_nat_capital
+                }
+            }
+            if = {
+                limit = { scope:tca_art_nat_gov = { is_alive = yes primary_title = scope:tca_art_nat_primary capital_county = scope:tca_art_nat_capital } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_retract_concurrent_natural_pipeline 5"
+            }
+            else = { add_character_flag = tca_test_tca_admin_rectification_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retract_concurrent_natural_pipeline 5" debug_log_scopes = yes }
             if = {
                 limit = { has_character_flag = tca_test_tca_admin_rectification_test_case_failed }
                 debug_log = "TCA_TEST FAIL tca_test_retract_concurrent_natural_pipeline"

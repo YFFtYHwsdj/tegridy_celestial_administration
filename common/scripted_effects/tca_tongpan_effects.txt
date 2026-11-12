@@ -32,49 +32,89 @@ tca_bind_tongpan_office_effect = {
 # 不以皇帝兜底；政事堂空缺时本委任也空缺。
 # 暂持上级必须同属天朝：官职头衔法只允许天朝政体，非天朝上级无法安装继承法。
 tca_resolve_tongpan_liege_effect = {
-    clear_saved_scope = tca_tp_liege
-    holder.top_liege = { save_scope_as = tca_tp_sovereign }
-    de_jure_liege ?= {
-        holder ?= {
-            if = {
-                limit = { is_alive = yes NOT = { this = scope:tca_tp_sovereign } top_liege = scope:tca_tp_sovereign highest_held_title_tier > tier_county government_has_flag = government_is_celestial }
-                save_scope_as = tca_tp_liege
+    # clear后继承层旧引用可能再现；只认本次成功位，君主仅作失败哨兵，绝不授职兜底。
+    save_scope_value_as = { name = tca_tp_liege_found value = 0 }
+    if = {
+        limit = { exists = holder.top_liege }
+        holder.top_liege = { save_scope_as = tca_tp_sovereign save_scope_as = tca_tp_liege }
+        de_jure_liege ?= {
+            holder ?= {
+                if = {
+                    limit = { is_alive = yes NOT = { this = scope:tca_tp_sovereign } top_liege = scope:tca_tp_sovereign highest_held_title_tier > tier_county government_has_flag = government_is_celestial }
+                    save_scope_as = tca_tp_liege
+                    save_scope_value_as = { name = tca_tp_liege_found value = 1 }
+                }
             }
-        }
-        if = {
-            limit = { NOT = { exists = scope:tca_tp_liege } }
-            de_jure_liege ?= {
-                holder ?= {
-                    if = {
-                        limit = { is_alive = yes NOT = { this = scope:tca_tp_sovereign } top_liege = scope:tca_tp_sovereign highest_held_title_tier > tier_county government_has_flag = government_is_celestial }
-                        save_scope_as = tca_tp_liege
+            if = {
+                limit = { scope:tca_tp_liege = scope:tca_tp_sovereign }
+                de_jure_liege ?= {
+                    holder ?= {
+                        if = {
+                            limit = { is_alive = yes NOT = { this = scope:tca_tp_sovereign } top_liege = scope:tca_tp_sovereign highest_held_title_tier > tier_county government_has_flag = government_is_celestial }
+                            save_scope_as = tca_tp_liege
+                            save_scope_value_as = { name = tca_tp_liege_found value = 1 }
+                        }
                     }
                 }
             }
         }
-    }
-    if = {
-        limit = { NOT = { exists = scope:tca_tp_liege } }
-        title:e_minister_chancellor.holder ?= {
-            if = {
-                limit = { is_alive = yes NOT = { this = scope:tca_tp_sovereign } top_liege = scope:tca_tp_sovereign highest_held_title_tier > tier_county government_has_flag = government_is_celestial }
-                save_scope_as = tca_tp_liege
+        if = {
+            limit = { scope:tca_tp_liege = scope:tca_tp_sovereign }
+            title:e_minister_chancellor.holder ?= {
+                if = {
+                    limit = { is_alive = yes NOT = { this = scope:tca_tp_sovereign } top_liege = scope:tca_tp_sovereign highest_held_title_tier > tier_county government_has_flag = government_is_celestial }
+                    save_scope_as = tca_tp_liege
+                    save_scope_value_as = { name = tca_tp_liege_found value = 1 }
+                }
             }
         }
     }
 }
 
-# 角色作用域；仅初始空缺或无效官职从此池选人。
+# 角色作用域；只做与拟任官署无关的粗筛。不同直属上级的硬资格与评分在抽选时重算。
 tca_collect_tongpan_candidates_effect = {
-    if = { limit = { tca_is_initial_tongpan_candidate_trigger = yes } add_to_list = tca_tp_candidates }
-    every_courtier = { limit = { tca_is_initial_tongpan_candidate_trigger = yes } add_to_list = tca_tp_candidates }
+    if = { limit = { is_alive = yes } add_to_list = tca_tp_candidates }
+    every_courtier = { limit = { is_alive = yes } add_to_list = tca_tp_candidates }
+}
+# 任意作用域；清理本事件链局部池及所属政权。无人物变量或跨日持久缓存。
+tca_clear_tongpan_candidate_pool_effect = {
+    every_in_list = { list = tca_tp_candidates remove_from_list = tca_tp_candidates }
+    clear_saved_scope = tca_tp_pool_sovereign
+    # clear_saved_scope 后可能再次读到延迟事件继承的旧引用；显式零值封闭本次池状态。
+    save_scope_value_as = { name = tca_tp_pool_ready value = 0 }
+}
+# 调用者须已解析 tca_tp_sovereign；同政权同批次只扫描一次，换政权先丢弃旧池。
+# 粗池包含当前不合资格者，以免首个官署的条件裁掉后续官署的候选。
+tca_prepare_tongpan_candidate_pool_effect = {
+    if = {
+        limit = { NOT = { AND = { exists = scope:tca_tp_pool_ready scope:tca_tp_pool_ready ?= 1 scope:tca_tp_pool_sovereign ?= scope:tca_tp_sovereign } } }
+        tca_clear_tongpan_candidate_pool_effect = yes
+        scope:tca_tp_sovereign = {
+            save_scope_as = tca_tp_pool_sovereign
+            tca_collect_tongpan_candidates_effect = yes
+            every_vassal_or_below = { tca_collect_tongpan_candidates_effect = yes }
+        }
+        save_scope_value_as = { name = tca_tp_pool_ready value = 1 }
+    }
+}
+
+# 官职作用域；调用前已有本轮池及拟任上下级。输出candidate为本次抽中者；零命中保留君主哨兵。
+# 君主不符合无地专职候选资格。显式覆盖避免clear后暴露继承事件的旧candidate。
+tca_draw_tongpan_candidate_effect = {
+    scope:tca_tp_sovereign = { save_scope_as = tca_tp_candidate }
+    random_in_list = {
+        list = tca_tp_candidates
+        limit = { tca_is_initial_tongpan_candidate_trigger = yes }
+        weight = { base = 0 modifier = { add = tca_tongpan_candidate_weight_value } }
+        save_scope_as = tca_tp_candidate
+    }
 }
 
 # 官职作用域；调用者建立县、上级和君主作用域。
 tca_fill_tongpan_office_effect = {
     if = {
         limit = { NOT = { tca_is_valid_tongpan_holder_trigger = yes } }
-        clear_saved_scope = tca_tp_candidate
+        scope:tca_tp_sovereign = { save_scope_as = tca_tp_candidate }
         # 引擎拒绝查询无持有人头衔的任命评分；仅在本次事务期间
         # 把空缺或无效官职暂交已解析的上级，
         # 随后由选中的专职官员替换。
@@ -82,22 +122,15 @@ tca_fill_tongpan_office_effect = {
         change_title_holder = { holder = scope:tca_tp_liege change = scope:tca_tp_caretaker_change }
         resolve_title_and_vassal_change = scope:tca_tp_caretaker_change
         tca_ensure_official_title_succession_effect = yes
+        # 有持有人后才进入真实法理树；评分仍读取原来正确的公国及本职继承法。
+        tca_attach_tongpan_title_de_jure_effect = yes
         # 头衔法安装失败时不能查询任命评分；保留暂持状态，交给次日维护重试。
         if = {
-            limit = { has_title_law = tca_tongpan_office_succession_law }
-            every_in_list = { list = tca_tp_candidates remove_from_list = tca_tp_candidates }
-            scope:tca_tp_sovereign = {
-                tca_collect_tongpan_candidates_effect = yes
-                every_vassal_or_below = { tca_collect_tongpan_candidates_effect = yes }
-            }
-            random_in_list = {
-                list = tca_tp_candidates
-                limit = { tca_is_initial_tongpan_candidate_trigger = yes }
-                weight = { base = 0 modifier = { add = tca_tongpan_candidate_weight_value } }
-                save_scope_as = tca_tp_candidate
-            }
+            limit = { exists = holder has_title_law = tca_tongpan_office_succession_law }
+            tca_prepare_tongpan_candidate_pool_effect = yes
+            tca_draw_tongpan_candidate_effect = yes
             if = {
-                limit = { NOT = { exists = scope:tca_tp_candidate } }
+                limit = { scope:tca_tp_candidate = scope:tca_tp_sovereign }
                 scope:tca_tp_liege = {
                     create_character = {
                         template = tgp_minister_scholar_template
@@ -109,9 +142,10 @@ tca_fill_tongpan_office_effect = {
                         save_scope_as = tca_tp_candidate
                     }
                 }
-                scope:tca_tp_candidate = { tca_initialize_new_tongpan_scholar_effect = yes }
+                if = { limit = { NOT = { scope:tca_tp_candidate = scope:tca_tp_sovereign } } scope:tca_tp_candidate = { tca_initialize_new_tongpan_scholar_effect = yes } }
             }
-            scope:tca_tp_candidate = {
+            if = { limit = { NOT = { scope:tca_tp_candidate = scope:tca_tp_sovereign } }
+              scope:tca_tp_candidate = {
                 if = {
                     limit = { is_ruler = no }
                     if = { limit = { is_lowborn = yes } create_dynasty = { spread_to_descendants = yes } }
@@ -119,8 +153,10 @@ tca_fill_tongpan_office_effect = {
                 }
                 # 已按评分选定；共用原生授职事务，不让任命缓存替换人选。
                 tca_grant_official_title_effect = { TITLE = scope:tca_tp_office LIEGE = scope:tca_tp_liege }
+                # 仅成功授职后消费候选；失败且仍无官者留待后续官署重新校验。
+                if = { limit = { any_held_title = { is_noble_family_title = no } } remove_from_list = tca_tp_candidates }
+              }
             }
-            every_in_list = { list = tca_tp_candidates remove_from_list = tca_tp_candidates }
             clear_saved_scope = tca_tp_candidate
         }
     }
@@ -144,10 +180,67 @@ tca_stop_tongpan_diarchy_effect = {
     }
     remove_variable = tca_tongpan_supervisor
 }
-# 通判官职头衔作用域；先结束旧辅佐关系再销毁现任官职。
+# 官署头衔作用域；仅有持有人时进入绑定州的真实法理树，供原生任命评分读取。
+tca_attach_tongpan_title_de_jure_effect = {
+    if = {
+        limit = { exists = holder exists = var:tca_tongpan_county.de_jure_liege OR = { NOT = { exists = de_jure_liege } NOT = { de_jure_liege = var:tca_tongpan_county.de_jure_liege } } }
+        set_de_jure_liege_title = var:tca_tongpan_county.de_jure_liege
+    }
+}
+
+# 官署头衔作用域；不删除绑定或固定对象。原生法理父级接口不接受空值，复用提刑已验证的
+# 临时父头衔办法，使空官署离开真实领土树；重复清理已退休父级时不再创建对象。
+# 否则原生统一战争遍历伯爵级法理对象时，会对无持有人的通判空壳查询holder。
+tca_detach_tongpan_title_de_jure_effect = {
+    if = {
+        limit = { exists = de_jure_liege NOT = { de_jure_liege = { has_variable = tca_tongpan_retirement_parent } } }
+        save_scope_as = tca_tp_detach_office
+        clear_saved_scope = tca_tp_detach_actor
+        # 本次命中标记独立于旧引用；没有找到角色时不得消费继承的旧actor。
+        save_scope_value_as = { name = tca_tp_detach_actor_found value = 0 }
+        var:tca_tongpan_county.holder.top_liege ?= {
+            if = { limit = { is_alive = yes highest_held_title_tier >= tier_kingdom exists = capital_county } save_scope_as = tca_tp_detach_actor save_scope_value_as = { name = tca_tp_detach_actor_found value = 1 } }
+        }
+        if = {
+            limit = { scope:tca_tp_detach_actor_found = 0 }
+            every_independent_ruler = {
+                limit = { is_alive = yes highest_held_title_tier >= tier_kingdom exists = capital_county scope:tca_tp_detach_actor_found = 0 }
+                save_scope_as = tca_tp_detach_actor
+                save_scope_value_as = { name = tca_tp_detach_actor_found value = 1 }
+            }
+        }
+        if = {
+            limit = { scope:tca_tp_detach_actor_found = 1 }
+            scope:tca_tp_detach_actor = { create_dynamic_title = { tier = duchy name = tca_tongpan_retirement_name } }
+            scope:new_title = {
+                save_scope_as = tca_tp_detach_parent
+                if = { limit = { exists = scope:tca_tp_detach_office.title_capital_county } set_capital_county = scope:tca_tp_detach_office.title_capital_county }
+                else = { set_capital_county = scope:tca_tp_detach_actor.capital_county }
+                set_landless_title = yes
+                set_variable = { name = tca_tongpan_retirement_parent value = yes }
+                set_delete_on_destroy = yes
+                set_no_automatic_claims = yes
+            }
+            scope:tca_tp_detach_actor = {
+                create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_tp_detach_change }
+                scope:tca_tp_detach_parent = { change_title_holder = { holder = scope:tca_tp_detach_actor change = scope:tca_tp_detach_change } }
+                resolve_title_and_vassal_change = scope:tca_tp_detach_change
+            }
+            set_de_jure_liege_title = scope:tca_tp_detach_parent
+            scope:tca_tp_detach_actor = { destroy_title = scope:tca_tp_detach_parent }
+        }
+        else = { debug_log = "TCA_TONGPAN_DETACH NO_VALID_ACTOR" }
+        clear_saved_scope = tca_tp_detach_actor
+        clear_saved_scope = tca_tp_detach_parent
+        clear_saved_scope = tca_tp_detach_office
+    }
+}
+
+# 通判官职头衔作用域；先结束辅佐、脱离实际法理树，再销毁现任官职。
 # 只 destroy，不 delete；保留县与官职双向绑定，使重新启用时复用同一对象。
 tca_destroy_tongpan_office_effect = {
     tca_stop_tongpan_diarchy_effect = yes
+    tca_detach_tongpan_title_de_jure_effect = yes
     if = {
         limit = { exists = holder }
         save_scope_as = tca_tp_retired_office
@@ -155,8 +248,15 @@ tca_destroy_tongpan_office_effect = {
     }
 }
 
-# 县作用域的日常维护；复用有效持有人、原生继承和对象 ID。
+# 县作用域公开入口；单次维护明确建池和释放，不读取继承上下文的batch存在状态。
 tca_refresh_tongpan_county_effect = {
+    tca_clear_tongpan_candidate_pool_effect = yes
+    tca_refresh_tongpan_county_in_batch_effect = yes
+    tca_clear_tongpan_candidate_pool_effect = yes
+}
+# 县作用域内部工作入口；只由上述单次包装或显式政权批次调用。
+# 复用有效持有人、原生继承和对象 ID；空官署在有暂持人前不得挂入真实县树。
+tca_refresh_tongpan_county_in_batch_effect = {
     if = {
         limit = { tca_is_tongpan_county_trigger = yes }
         tca_bind_tongpan_office_effect = yes
@@ -168,9 +268,10 @@ tca_refresh_tongpan_county_effect = {
                 save_scope_as = tca_tp_office
                 tca_repair_tongpan_name_effect = yes
                 if = {
-                    limit = { exists = scope:tca_tp_liege }
+                    limit = { scope:tca_tp_liege_found = 1 }
                     if = { limit = { NOT = { title_capital_county = scope:tca_tp_county } } set_capital_county = scope:tca_tp_county }
-                    if = { limit = { OR = { NOT = { exists = de_jure_liege } NOT = { de_jure_liege = scope:tca_tp_county.de_jure_liege } } } set_de_jure_liege_title = scope:tca_tp_county.de_jure_liege }
+                    if = { limit = { NOT = { exists = holder } } tca_detach_tongpan_title_de_jure_effect = yes }
+                    else = { tca_attach_tongpan_title_de_jure_effect = yes }
                     tca_fill_tongpan_office_effect = yes
                     if = {
                         limit = { NOT = { has_variable = tca_tongpan_identity_configured } }
@@ -215,8 +316,10 @@ tca_refresh_tongpan_county_effect = {
     }
 }
 
-# 君主作用域；注册表也处理离开政权及已销毁县头衔。
-tca_refresh_tongpan_realm_effect = {
+# 君主作用域；只刷新本政权。年度全局入口另统一清理注册表。
+# 整批局部池由本入口建立并销毁，逐官署仍校验其直属上级硬资格与原生权重。
+tca_refresh_tongpan_realm_offices_effect = {
+    tca_clear_tongpan_candidate_pool_effect = yes
     tca_initialize_tongpan_catalog_effect = yes
     tca_register_historical_characters_effect = yes
     if = {
@@ -228,13 +331,19 @@ tca_refresh_tongpan_realm_effect = {
         }
         every_vassal_or_below = {
             limit = { highest_held_title_tier = tier_county is_landed = yes }
-            primary_title = { tca_refresh_tongpan_county_effect = yes }
+            primary_title = { tca_refresh_tongpan_county_in_batch_effect = yes }
         }
     }
+    tca_clear_tongpan_candidate_pool_effect = yes
+}
+# 空／任意作用域；注册表退出清理不依赖当前仍存在适用政权，覆盖跨国和已销毁县。
+tca_cleanup_invalid_tongpan_offices_effect = {
     if = {
         limit = { has_global_variable_list = tca_tongpan_counties }
         every_in_global_list = {
             variable = tca_tongpan_counties
+            # 兼容旧局：合法州的官署也可能尚未补位，先摘除无holder的旧法理空壳。
+            var:tca_tongpan_office ?= { if = { limit = { NOT = { exists = holder } } tca_detach_tongpan_title_de_jure_effect = yes } }
             if = {
                 limit = { NOT = { tca_is_tongpan_county_trigger = yes } }
                 var:tca_tongpan_office = { tca_destroy_tongpan_office_effect = yes }
@@ -242,14 +351,40 @@ tca_refresh_tongpan_realm_effect = {
         }
     }
 }
+# 君主作用域；非年度生命周期保留全局退出补漏，不因新政权不适用而漏清旧绑定。
+tca_refresh_tongpan_realm_effect = {
+    tca_refresh_tongpan_realm_offices_effect = yes
+    tca_cleanup_invalid_tongpan_offices_effect = yes
+}
+# 全局／任意作用域；年度同步退出清理只做一次，即使已无适用政权也必须执行。
+# 一日标记只吸收同日重复年度入口，次日授职不依赖单一事件接收者。
+tca_request_tongpan_annual_maintenance_effect = {
+    if = {
+        limit = { NOT = { has_global_variable = tca_tongpan_annual_cleaned } }
+        tca_cleanup_invalid_tongpan_offices_effect = yes
+        set_global_variable = { name = tca_tongpan_annual_cleaned value = yes days = 1 }
+    }
+    every_independent_ruler = {
+        limit = { is_alive = yes government_has_flag = government_is_celestial highest_held_title_tier = tier_hegemony NOT = { has_variable = tca_tongpan_maintenance_pending } }
+        set_variable = { name = tca_tongpan_maintenance_pending value = yes days = 3 }
+        set_variable = { name = tca_tongpan_annual_only value = yes days = 3 }
+        trigger_event = { id = tca_tongpan.1 days = 1 }
+    }
+}
 # 角色作用域；把维护合并到实际最高领主，三天 pending 标记防重复排队，次日执行 tca_tongpan.1。
 # 执行期间保留标记以吸收事务回调，事件结束主动清除；事件未运行时标记到期允许重新排队。
 tca_request_tongpan_maintenance_effect = {
     top_liege ?= {
         if = {
-            limit = { is_alive = yes NOT = { has_variable = tca_tongpan_maintenance_pending } }
-            set_variable = { name = tca_tongpan_maintenance_pending value = yes days = 3 }
-            trigger_event = { id = tca_tongpan.1 days = 1 }
+            # 原生内阁离任可传来已消失的旧雇主；存活角色守门必须覆盖所有变量写入。
+            limit = { is_alive = yes }
+            # 已排年度任务若收到真实生命周期变化，升级为完整维护；不丢失跨国退出补漏。
+            remove_variable = tca_tongpan_annual_only
+            if = {
+                limit = { NOT = { has_variable = tca_tongpan_maintenance_pending } }
+                set_variable = { name = tca_tongpan_maintenance_pending value = yes days = 3 }
+                trigger_event = { id = tca_tongpan.1 days = 1 }
+            }
         }
     }
 }

@@ -80,21 +80,16 @@ tca_exam_clear_results_effect = {
     remove_variable = tca_exam_top_10
 }
 
-# 皇帝作用域；清空候选名单。名单只在本效果链内使用。
+# 皇帝作用域；单次遍历清空临时候选名单，不为清理消耗随机数。
+# 与原版 00_faction_effects 清空临时名单的写法一致，可在遍历中移除当前项。
 tca_exam_clear_candidate_lists_effect = {
-    while = {
-        limit = { list_size:tca_exam_candidates > 0 }
-        random_in_list = {
-            list = tca_exam_candidates
-            remove_from_list = tca_exam_candidates
-        }
+    every_in_list = {
+        list = tca_exam_candidates
+        remove_from_list = tca_exam_candidates
     }
-    while = {
-        limit = { list_size:tca_exam_sampled > 0 }
-        random_in_list = {
-            list = tca_exam_sampled
-            remove_from_list = tca_exam_sampled
-        }
+    every_in_list = {
+        list = tca_exam_sampled
+        remove_from_list = tca_exam_sampled
     }
 }
 
@@ -128,7 +123,8 @@ tca_exam_exclude_priority_candidates_effect = {
     }
 }
 
-# 皇帝作用域；按已收集名单计算显示人数。候选池上限只约束普通名额，近亲另加。
+# 皇帝作用域；按已收集名单计算请开科时的候选池显示人数。
+# 此时尚未选择规模：普通池按大开上限600截断，近亲另加；不是小比／常科的抽样人数。
 # 输入tca_exam_candidates；去掉池内优先近亲，输出tca_exam_expected_entrants。
 tca_exam_count_collected_candidates_effect = {
     tca_exam_exclude_priority_candidates_effect = yes
@@ -153,14 +149,13 @@ tca_exam_count_candidates_effect = {
 
 # 皇帝作用域；从输入tca_exam_candidates抽普通名额，再追加优先近亲。
 # 保存host；重建tca_exam_sampled，输出tca_exam_num_candidates；调用者保证池内人物已符合硬条件。
+# 普通抽样会消耗输入池，结束后其中只留未入选者；显示预估须在抽样前调用。
+# 每次等概率抽取剩余人物并立即移出，与原先过滤已选者等价，不作有放回抽样。
 tca_exam_sample_candidates_effect = {
     tca_exam_exclude_priority_candidates_effect = yes
-    while = {
-        limit = { list_size:tca_exam_sampled > 0 }
-        random_in_list = {
-            list = tca_exam_sampled
-            remove_from_list = tca_exam_sampled
-        }
+    every_in_list = {
+        list = tca_exam_sampled
+        remove_from_list = tca_exam_sampled
     }
     save_scope_value_as = {
         name = tca_exam_sample_size
@@ -173,27 +168,19 @@ tca_exam_sample_candidates_effect = {
         count = scope:tca_exam_sample_size
         random_in_list = {
             list = tca_exam_candidates
-            limit = { NOT = { is_in_list = tca_exam_sampled } }
             add_to_list = tca_exam_sampled
+            remove_from_list = tca_exam_candidates
         }
     }
     if = {
         limit = { has_character_flag = command_to_attend_flag }
         every_close_family_member = {
-            limit = {
-                tca_exam_close_kin_priority_trigger = yes
-                NOT = { is_in_list = tca_exam_sampled }
-            }
+            # 优先近亲已从普通池排除，近亲迭代器每人只访问一次，无需搜索已选名单。
+            limit = { tca_exam_close_kin_priority_trigger = yes }
             add_to_list = tca_exam_sampled
         }
     }
-    set_variable = { name = tca_exam_num_candidates value = 0 }
-    every_in_list = {
-        list = tca_exam_sampled
-        root = {
-            change_variable = { name = tca_exam_num_candidates add = 1 }
-        }
-    }
+    set_variable = { name = tca_exam_num_candidates value = list_size:tca_exam_sampled }
 }
 
 # 皇帝作用域；正式结算入口使用真实王朝周期收集，再调用共享抽样流程。
@@ -226,7 +213,8 @@ tca_exam_prepare_candidate_effect = {
     }
 }
 
-# 皇帝作用域；按录取标准标记末位落榜者，并标记前 10 名。
+# 皇帝作用域；按录取标准标记末位落榜者，单次排序标记殿试前十并保存名次。
+# 输出沿用 tca_exam_top_1..10；调用者先清理上届结果与考生临时标记。
 # 落榜比例与原生一致：宽取 10%、依例 15%、严取 30%、极严 50%。
 tca_exam_mark_results_effect = {
     set_variable = {
@@ -244,6 +232,9 @@ tca_exam_mark_results_effect = {
             set_variable = tca_exam_failed
         }
     }
+    # 名次与殿试标记复用同一次有序遍历；同分者使用这次原生排序的顺序。
+    # 游标只在本次同步调用存在，不留下跨届缓存。
+    set_variable = { name = tca_exam_rank_cursor value = 0 }
     ordered_in_list = {
         list = tca_exam_sampled
         limit = { NOT = { has_variable = tca_exam_failed } }
@@ -251,7 +242,52 @@ tca_exam_mark_results_effect = {
         max = tca_exam_palace_entrant_cap
         check_range_bounds = no
         set_variable = tca_exam_palace
+        save_temporary_scope_as = tca_exam_ranked
+        root = {
+            change_variable = { name = tca_exam_rank_cursor add = 1 }
+            if = {
+                limit = { var:tca_exam_rank_cursor = 1 }
+                set_variable = { name = tca_exam_top_1 value = scope:tca_exam_ranked }
+            }
+            else_if = {
+                limit = { var:tca_exam_rank_cursor = 2 }
+                set_variable = { name = tca_exam_top_2 value = scope:tca_exam_ranked }
+            }
+            else_if = {
+                limit = { var:tca_exam_rank_cursor = 3 }
+                set_variable = { name = tca_exam_top_3 value = scope:tca_exam_ranked }
+            }
+            else_if = {
+                limit = { var:tca_exam_rank_cursor = 4 }
+                set_variable = { name = tca_exam_top_4 value = scope:tca_exam_ranked }
+            }
+            else_if = {
+                limit = { var:tca_exam_rank_cursor = 5 }
+                set_variable = { name = tca_exam_top_5 value = scope:tca_exam_ranked }
+            }
+            else_if = {
+                limit = { var:tca_exam_rank_cursor = 6 }
+                set_variable = { name = tca_exam_top_6 value = scope:tca_exam_ranked }
+            }
+            else_if = {
+                limit = { var:tca_exam_rank_cursor = 7 }
+                set_variable = { name = tca_exam_top_7 value = scope:tca_exam_ranked }
+            }
+            else_if = {
+                limit = { var:tca_exam_rank_cursor = 8 }
+                set_variable = { name = tca_exam_top_8 value = scope:tca_exam_ranked }
+            }
+            else_if = {
+                limit = { var:tca_exam_rank_cursor = 9 }
+                set_variable = { name = tca_exam_top_9 value = scope:tca_exam_ranked }
+            }
+            else_if = {
+                limit = { var:tca_exam_rank_cursor = 10 }
+                set_variable = { name = tca_exam_top_10 value = scope:tca_exam_ranked }
+            }
+        }
     }
+    remove_variable = tca_exam_rank_cursor
     set_variable = {
         name = tca_exam_pass_count
         value = {
@@ -265,25 +301,6 @@ tca_exam_mark_results_effect = {
         value = {
             value = var:tca_exam_pass_count
             max = tca_exam_palace_entrant_cap
-        }
-    }
-}
-
-# 皇帝作用域；按名次保存前十名，供放榜和传胪事件显示。
-# RANK 为 1–10，POSITION 为 0–9；由 tca_exam_resolve_effect 在标记结果后调用。
-tca_exam_store_rank_effect = {
-    ordered_in_list = {
-        list = tca_exam_sampled
-        limit = { NOT = { has_variable = tca_exam_failed } }
-        order_by = imperial_examination_score_value
-        position = $POSITION$
-        check_range_bounds = no
-        save_temporary_scope_as = tca_exam_ranked
-        root = {
-            set_variable = {
-                name = tca_exam_top_$RANK$
-                value = scope:tca_exam_ranked
-            }
         }
     }
 }
@@ -445,16 +462,6 @@ tca_exam_resolve_effect = {
         tca_exam_prepare_candidate_effect = yes
     }
     tca_exam_mark_results_effect = yes
-    if = { limit = { var:tca_exam_pass_count >= 1 } tca_exam_store_rank_effect = { RANK = 1 POSITION = 0 } }
-    if = { limit = { var:tca_exam_pass_count >= 2 } tca_exam_store_rank_effect = { RANK = 2 POSITION = 1 } }
-    if = { limit = { var:tca_exam_pass_count >= 3 } tca_exam_store_rank_effect = { RANK = 3 POSITION = 2 } }
-    if = { limit = { var:tca_exam_pass_count >= 4 } tca_exam_store_rank_effect = { RANK = 4 POSITION = 3 } }
-    if = { limit = { var:tca_exam_pass_count >= 5 } tca_exam_store_rank_effect = { RANK = 5 POSITION = 4 } }
-    if = { limit = { var:tca_exam_pass_count >= 6 } tca_exam_store_rank_effect = { RANK = 6 POSITION = 5 } }
-    if = { limit = { var:tca_exam_pass_count >= 7 } tca_exam_store_rank_effect = { RANK = 7 POSITION = 6 } }
-    if = { limit = { var:tca_exam_pass_count >= 8 } tca_exam_store_rank_effect = { RANK = 8 POSITION = 7 } }
-    if = { limit = { var:tca_exam_pass_count >= 9 } tca_exam_store_rank_effect = { RANK = 9 POSITION = 8 } }
-    if = { limit = { var:tca_exam_pass_count >= 10 } tca_exam_store_rank_effect = { RANK = 10 POSITION = 9 } }
     every_in_list = {
         list = tca_exam_sampled
         tca_exam_award_candidate_effect = yes

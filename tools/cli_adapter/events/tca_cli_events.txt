@@ -11,3 +11,24 @@ tca_cli.1 = {
   else = { debug_log = "TCA_CLI NOT_OBSERVER" }
  }
 }
+
+# 此入口只续接已在观察者阶段认领的独占lane；不得重派整个suite。
+tca_cli.2 = {
+ type = character_event hidden = yes
+ # 由GUI控制台真实触发，无原生事件调用者；按原版events/_events.info的调试外部入口声明。
+ orphan = yes
+ immediate = {
+  if = {
+   limit = { debug_only = yes is_ai = no title:h_china.holder = root title:h_china = { var:tca_cli_human_phase ?= 2 } has_character_flag = tca_test_lane_tca_retirement_session_active }
+   debug_log = "TCA_RETIREMENT_HUMAN INITIAL_PLAYER_CONFIRMED"
+   title:h_china = { set_variable = { name = tca_cli_human_phase value = 3 } set_variable = { name = tca_retirement_human_run value = 1 } }
+   # 原版debug事件只各有一个空选项，显式建立两种真实窗口暂停；不直接改日期或业务结果。
+   # 先由GUI选择这些真实选项，原生日期才能推进到session的两日后续；原5断言不变。
+   trigger_event = debug.1004
+   trigger_event = debug.1005
+   debug_log = "TCA_CLI HUMAN_NATIVE_WINDOWS_QUEUED"
+   trigger_event = tca_retirement_session.1
+  }
+  else = { debug_log = "TCA_CLI HUMAN_ENTRY_REJECTED" }
+ }
+}

@@ -33,6 +33,7 @@ tca_judicial_arrest_test.1101 = {
         if = {
             limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
 
+        tca_test_diag_pending_arrest_effect = { STAGE = DAY_1 }
         if = { limit = { tca_test_native_arrest_waiting_trigger = yes } debug_log = "TCA_TEST CHECK_PASS tca_test_arrest_commissioner_family_veto 4" }
         else = { add_character_flag = tca_test_tca_judicial_arrest_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_arrest_commissioner_family_veto 4" }
         debug_log = "TCA_TEST WAIT tca_test_arrest_commissioner_family_veto 19 days"
@@ -49,6 +50,7 @@ tca_judicial_arrest_test.1201 = {
         if = {
             limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
 
+        tca_test_diag_pending_arrest_effect = { STAGE = DAY_20 }
         tca_test_log_native_arrest_final_effect = yes
         if = { limit = { tca_test_native_arrest_veto_result_trigger = yes } debug_log = "TCA_TEST CHECK_PASS tca_test_arrest_commissioner_family_veto 5" }
         else = { add_character_flag = tca_test_tca_judicial_arrest_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_arrest_commissioner_family_veto 5" }
@@ -74,7 +76,11 @@ tca_judicial_arrest_test.2 = {
             remove_character_flag = tca_test_tca_judicial_arrest_test_case_failed
             if = {
                 limit = { tca_test_native_arrest_realm_ready_trigger = yes }
+                # full39夔州授后同日销毁；只指定本例失败域，不绕过共享夹具的任何原资格。
+                set_variable = { name = tca_test_arrest_preferred_circuit value = title:k_kuizhou }
                 tca_test_prepare_native_arrest_effect = { FAMILY = yes COMMISSIONER = yes OFFICE = no CONTROL = tca_test_arrest_force_approval CASE = tca_test_arrest_case_2 IMPERIAL = no }
+                remove_variable = tca_test_arrest_preferred_circuit
+                if = { limit = { scope:tca_test_arrest_selected_found = 1 }
                 if = { limit = { tca_test_native_arrest_fixture_valid_trigger = { FAMILY = yes COMMISSIONER = yes OFFICE = no } scope:tca_test_arrest_target = { var:tca_test_arrest_case = flag:tca_test_arrest_case_2 } } debug_log = "TCA_TEST CHECK_PASS tca_test_arrest_commissioner_family_approval 1" }
                 else = { add_character_flag = tca_test_tca_judicial_arrest_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_arrest_commissioner_family_approval 1" }
                 if = { limit = { tca_test_native_arrest_send_valid_trigger = yes } debug_log = "TCA_TEST CHECK_PASS tca_test_arrest_commissioner_family_approval 2" tca_test_send_native_arrest_effect = yes }
@@ -83,6 +89,8 @@ tca_judicial_arrest_test.2 = {
                 else = { add_character_flag = tca_test_tca_judicial_arrest_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_arrest_commissioner_family_approval 3" }
                 debug_log = "TCA_TEST WAIT tca_test_arrest_commissioner_family_approval 1 day"
                 trigger_event = { id = tca_judicial_arrest_test.1102 days = 1 }
+                }
+                else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_arrest_commissioner_family_approval" debug_log = "TCA_ARREST_FIXTURE PREFERRED_CIRCUIT_UNAVAILABLE" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_lane_end_effect = { GROUP = tca_judicial_arrest_test } }
             }
             else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_arrest_commissioner_family_approval" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_lane_end_effect = { GROUP = tca_judicial_arrest_test } }
     }

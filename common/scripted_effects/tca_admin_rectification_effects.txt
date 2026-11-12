@@ -115,8 +115,9 @@ tca_admin_rectification_build_realm_candidate_pool_effect = {
 # 头衔作用域（待移交官署）；参数：$TOP_LIEGE$ 最高领主。
 # 生成一名符合 6.4 规则的新官员（火星人），并完成 Day 0 无地统治者准备（王朝、家门、领主、天朝政体），
 # 确保次日书信确认时可直接安全接收有地头衔。
-# 输出：scope:tca_admin_rectification_selected_successor。
+# 输出：scope:tca_ar_selection_succeeded = 1 时，scope:tca_admin_rectification_selected_successor 为本次人选。
 tca_admin_rectification_generate_official_effect = {
+    save_scope_value_as = { name = tca_ar_selection_succeeded value = 0 }
     save_scope_as = tca_ar_gen_title
     $TOP_LIEGE$ = { save_scope_as = tca_ar_gen_sovereign }
     clear_saved_scope = tca_ar_generated_char
@@ -239,6 +240,7 @@ tca_admin_rectification_generate_official_effect = {
             add_character_flag = tca_merit_active
             tca_merit_refresh_cap_effect = yes
             save_scope_as = tca_admin_rectification_selected_successor
+            save_scope_value_as = { name = tca_ar_selection_succeeded value = 1 }
         }
         debug_log = "TCA_ADMIN_RECTIFY GENERATED_OFFICIAL"
     }
@@ -249,10 +251,12 @@ tca_admin_rectification_generate_official_effect = {
 #   1. 首先检查待移交头衔的 current_heir，若满足全部任职条件，直接作为继任者；
 #   2. 若不存在或不合格，从现有候选池按任官评分加权最多重新抽取 3 次（每次重抽校验完整任职资格）；
 #   3. 三次重抽仍未获得合格人选，则直接生成新官员（火星人）。
-# 输出：scope:tca_admin_rectification_selected_successor。
+# 输出：scope:tca_ar_selection_succeeded = 1 时，scope:tca_admin_rectification_selected_successor 为本次人选。
 tca_admin_rectification_select_or_generate_successor_effect = {
     save_scope_as = tca_admin_rectification_scoring_title
     $TOP_LIEGE$ = { save_scope_as = tca_ar_select_top_liege }
+    # clear_saved_scope 可能露出上层事件继承的同名scope；本次是否选中必须由显式重置的数值scope确认，跨人物／头衔切换显式读取。
+    save_scope_value_as = { name = tca_ar_selection_succeeded value = 0 }
     clear_saved_scope = tca_admin_rectification_selected_successor
     # 步骤 1：优先检查待移交头衔的 current_heir。
     if = {
@@ -267,12 +271,13 @@ tca_admin_rectification_select_or_generate_successor_effect = {
         }
         current_heir = {
             save_scope_as = tca_admin_rectification_selected_successor
+            save_scope_value_as = { name = tca_ar_selection_succeeded value = 1 }
         }
         debug_log = "TCA_ADMIN_RECTIFY SELECTED_CURRENT_HEIR"
     }
     # 步骤 2：current_heir 不存在或不合格时，从现有候选池最多重抽 3 次。
     if = {
-        limit = { NOT = { exists = scope:tca_admin_rectification_selected_successor } }
+        limit = { scope:tca_ar_selection_succeeded = 0 }
         scope:tca_ar_select_top_liege = {
             tca_admin_rectification_build_realm_candidate_pool_effect = yes
         }
@@ -280,13 +285,14 @@ tca_admin_rectification_select_or_generate_successor_effect = {
         while = {
             limit = {
                 local_var:tca_ar_draw_count < 3
-                NOT = { exists = scope:tca_admin_rectification_selected_successor }
+                scope:tca_ar_selection_succeeded = 0
                 any_in_list = {
                     list = tca_admin_rectification_candidate_pool
                     is_alive = yes
                 }
             }
             change_local_variable = { name = tca_ar_draw_count add = 1 }
+            save_scope_value_as = { name = tca_ar_draw_succeeded value = 0 }
             clear_saved_scope = tca_ar_drawn_candidate
             random_in_list = {
                 list = tca_admin_rectification_candidate_pool
@@ -301,9 +307,11 @@ tca_admin_rectification_select_or_generate_successor_effect = {
                     modifier = { add = tca_admin_rectification_candidate_weight_value }
                 }
                 save_scope_as = tca_ar_drawn_candidate
+                save_scope_value_as = { name = tca_ar_draw_succeeded value = 1 }
             }
             if = {
                 limit = {
+                    scope:tca_ar_draw_succeeded = 1
                     exists = scope:tca_ar_drawn_candidate
                     scope:tca_ar_drawn_candidate = {
                         tca_admin_rectification_is_qualified_candidate_trigger = {
@@ -314,6 +322,7 @@ tca_admin_rectification_select_or_generate_successor_effect = {
                 }
                 scope:tca_ar_drawn_candidate = {
                     save_scope_as = tca_admin_rectification_selected_successor
+                    save_scope_value_as = { name = tca_ar_selection_succeeded value = 1 }
                 }
                 debug_log = "TCA_ADMIN_RECTIFY SELECTED_POOL_CANDIDATE"
             }
@@ -328,13 +337,13 @@ tca_admin_rectification_select_or_generate_successor_effect = {
     }
     # 步骤 3：三次重抽仍未获得合格人选，生成新官员（火星人）。
     if = {
-        limit = { NOT = { exists = scope:tca_admin_rectification_selected_successor } }
+        limit = { scope:tca_ar_selection_succeeded = 0 }
         tca_admin_rectification_generate_official_effect = {
             TOP_LIEGE = scope:tca_ar_select_top_liege
         }
     }
     if = {
-        limit = { exists = scope:tca_admin_rectification_selected_successor }
+        limit = { scope:tca_ar_selection_succeeded = 1 exists = scope:tca_admin_rectification_selected_successor }
         scope:tca_admin_rectification_selected_successor = {
             set_variable = {
                 name = tca_admin_rectification_reserved_successor
@@ -373,7 +382,7 @@ tca_send_retract_concurrent_letter_effect = {
             }
         }
         if = {
-            limit = { exists = scope:tca_admin_rectification_selected_successor }
+            limit = { scope:tca_ar_selection_succeeded = 1 exists = scope:tca_admin_rectification_selected_successor }
             scope:tca_admin_rectification_selected_successor = {
                 save_scope_as = tca_retract_successor
                 # 6.5 若继任者为现有低级有地官员，且持有位于新官署法理范围外的旧实职头衔，
@@ -394,7 +403,7 @@ tca_send_retract_concurrent_letter_effect = {
                                 TOP_LIEGE = scope:tca_ar_send_top_liege
                             }
                             if = {
-                                limit = { exists = scope:tca_admin_rectification_selected_successor }
+                                limit = { scope:tca_ar_selection_succeeded = 1 exists = scope:tca_admin_rectification_selected_successor }
                                 set_variable = {
                                     name = tca_ar_vacate_prepared_successor
                                     value = scope:tca_admin_rectification_selected_successor
@@ -456,6 +465,7 @@ tca_admin_rectification_vacate_promoted_old_title_effect = {
         }
         if = {
             limit = {
+                scope:tca_ar_selection_succeeded = 1
                 exists = scope:tca_admin_rectification_selected_successor
                 scope:tca_admin_rectification_selected_successor = {
                     OR = {
@@ -586,8 +596,9 @@ tca_execute_retract_concurrent_title_effect = {
                         TOP_LIEGE = scope:tca_retract_exec_sovereign
                     }
                 }
-                scope:tca_admin_rectification_selected_successor ?= {
-                    save_scope_as = tca_retract_exec_successor
+                if = {
+                    limit = { scope:tca_ar_selection_succeeded = 1 }
+                    scope:tca_admin_rectification_selected_successor ?= { save_scope_as = tca_retract_exec_successor }
                 }
             }
             if = {

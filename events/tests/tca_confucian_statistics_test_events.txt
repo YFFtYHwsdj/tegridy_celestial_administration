@@ -50,15 +50,17 @@ tca_confucian_statistics_test.1 = {
                 if = { limit = { scope:tca_test_stats_viewer = { var:tca_test_stats_mismatch = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_confucian_statistics 20" }
                 else = { add_character_flag = tca_test_tca_confucian_statistics_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_confucian_statistics 20" }
                 scope:tca_test_stats_other = { tca_clear_confucian_statistics_effect = yes }
-                # 只把本用例夹具送入正式收集器，以获得可精确断言的2:1分布。
+                # 只把本用例夹具送入正式去重访问入口，以获得可精确断言的2:1分布。
                 scope:tca_test_stats_viewer = { tca_clear_confucian_statistics_effect = yes save_scope_as = tca_stats_viewer }
                 top_liege = { save_scope_as = tca_stats_realm }
-                scope:tca_test_stats_a = { tca_collect_confucian_statistics_member_effect = yes }
-                scope:tca_test_stats_b = { tca_collect_confucian_statistics_member_effect = yes }
-                scope:tca_test_stats_c = { tca_collect_confucian_statistics_member_effect = yes }
-                scope:tca_test_stats_child = { tca_collect_confucian_statistics_member_effect = yes }
-                scope:tca_test_stats_other = { tca_collect_confucian_statistics_member_effect = yes }
-                scope:tca_test_stats_dead = { tca_collect_confucian_statistics_member_effect = yes }
+                scope:tca_test_stats_a = { tca_visit_confucian_statistics_member_effect = yes }
+                # 同一人物经廷臣／囚犯等路径重复访问，人数及贡献必须只计一次。
+                scope:tca_test_stats_a = { tca_visit_confucian_statistics_member_effect = yes }
+                scope:tca_test_stats_b = { tca_visit_confucian_statistics_member_effect = yes }
+                scope:tca_test_stats_c = { tca_visit_confucian_statistics_member_effect = yes }
+                scope:tca_test_stats_child = { tca_visit_confucian_statistics_member_effect = yes }
+                scope:tca_test_stats_other = { tca_visit_confucian_statistics_member_effect = yes }
+                scope:tca_test_stats_dead = { tca_visit_confucian_statistics_member_effect = yes }
                 scope:tca_test_stats_viewer = { tca_finalize_confucian_statistics_effect = yes }
                 if = { limit = { scope:tca_test_stats_viewer = { var:tca_stats_total = 3 any_in_list = { variable = tca_stats_rows count = 2 } } } debug_log = "TCA_TEST CHECK_PASS tca_test_confucian_statistics 2" }
                 else = { add_character_flag = tca_test_tca_confucian_statistics_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_confucian_statistics 2" }
@@ -74,9 +76,12 @@ tca_confucian_statistics_test.1 = {
                 else = { add_character_flag = tca_test_tca_confucian_statistics_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_confucian_statistics 14" }
                 scope:tca_test_stats_c = { add_trait = confucian_education add_trait_xp = { trait = confucian_education value = 100 } }
                 scope:tca_test_stats_viewer = { tca_clear_confucian_statistics_effect = yes }
-                scope:tca_test_stats_a = { tca_collect_confucian_statistics_member_effect = yes }
-                scope:tca_test_stats_b = { tca_collect_confucian_statistics_member_effect = yes }
-                scope:tca_test_stats_c = { tca_collect_confucian_statistics_member_effect = yes }
+                # 清理必须移除访问标记；新一轮仍能收集同一人物，且强贡献不能串入后续普通人物。
+                if = { limit = { scope:tca_test_stats_a = { NOT = { has_character_flag = tca_stats_visited } } scope:tca_test_stats_b = { NOT = { has_character_flag = tca_stats_visited } } scope:tca_test_stats_c = { NOT = { has_character_flag = tca_stats_visited } } } debug_log = "TCA_TEST CHECK_PASS tca_test_confucian_statistics 29" }
+                else = { add_character_flag = tca_test_tca_confucian_statistics_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_confucian_statistics 29" }
+                scope:tca_test_stats_c = { tca_visit_confucian_statistics_member_effect = yes }
+                scope:tca_test_stats_a = { tca_visit_confucian_statistics_member_effect = yes }
+                scope:tca_test_stats_b = { tca_visit_confucian_statistics_member_effect = yes }
                 scope:tca_test_stats_viewer = { tca_finalize_confucian_statistics_effect = yes }
                 if = { limit = { scope:tca_test_stats_viewer = { var:tca_stats_total = 3 var:tca_stats_strength = 33 var:tca_stats_education = 30 var:tca_stats_titles = 0 var:tca_stats_families = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_confucian_statistics 15" }
                 else = { add_character_flag = tca_test_tca_confucian_statistics_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_confucian_statistics 15" }
@@ -172,6 +177,35 @@ tca_confucian_statistics_test.1 = {
                 scope:tca_test_stats_viewer = { trigger_event = { on_action = tca_confucian_statistics_quarterly } }
                 if = { limit = { scope:tca_test_stats_viewer = { NOT = { has_variable = tca_stats_updated } } } debug_log = "TCA_TEST CHECK_PASS tca_test_confucian_statistics 28" }
                 else = { add_character_flag = tca_test_tca_confucian_statistics_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_confucian_statistics 28" }
+                # 正式刷新须清理所有已访问人物；紧接第二次刷新不得因残留标记漏人。
+                scope:tca_test_cache_owner = { tca_refresh_confucian_statistics_effect = yes }
+                if = { limit = { scope:tca_test_cache_owner = { var:tca_stats_strength = var:tca_test_cached_strength NOT = { has_variable_list = tca_stats_seen } NOT = { has_character_flag = tca_stats_visited } } scope:tca_test_stats_c = { NOT = { has_character_flag = tca_stats_visited } } } debug_log = "TCA_TEST CHECK_PASS tca_test_confucian_statistics 30" }
+                else = { add_character_flag = tca_test_tca_confucian_statistics_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_confucian_statistics 30" }
+                # 交替刷新两个实际政权的临时缓存；不得共享访问标记或覆盖另一政权已完成的快照。
+                random_independent_ruler = { limit = { top_liege != scope:tca_test_cache_owner } save_scope_as = tca_test_stats_foreign_realm }
+                if = {
+                    limit = { exists = scope:tca_test_stats_foreign_realm }
+                    create_character = { age = 40 gender_female_chance = 0 random_traits = no dynasty = none employer = scope:tca_test_stats_foreign_realm culture = root.culture faith = faith:mahayana_faith save_scope_as = tca_test_stats_foreign_viewer }
+                    scope:tca_test_stats_foreign_viewer = {
+                        tca_refresh_confucian_statistics_effect = yes
+                        set_variable = { name = tca_confucian_statistics_test_foreign_total value = var:tca_stats_total }
+                        set_variable = { name = tca_confucian_statistics_test_foreign_strength value = var:tca_stats_strength }
+                    }
+                    scope:tca_test_cache_owner = { tca_refresh_confucian_statistics_effect = yes }
+                    if = { limit = { scope:tca_test_cache_owner = { var:tca_stats_strength = var:tca_test_cached_strength var:tca_stats_realm = this } scope:tca_test_stats_foreign_viewer = { var:tca_stats_realm = scope:tca_test_stats_foreign_realm } } debug_log = "TCA_TEST CHECK_PASS tca_test_confucian_statistics 31" }
+                    else = { add_character_flag = tca_test_tca_confucian_statistics_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_confucian_statistics 31" }
+                    scope:tca_test_stats_foreign_viewer = { tca_refresh_confucian_statistics_effect = yes }
+                    if = { limit = { scope:tca_test_stats_foreign_viewer = { var:tca_stats_total = var:tca_confucian_statistics_test_foreign_total var:tca_stats_strength = var:tca_confucian_statistics_test_foreign_strength NOT = { has_variable_list = tca_stats_seen } } scope:tca_test_cache_owner = { var:tca_stats_strength = var:tca_test_cached_strength } } debug_log = "TCA_TEST CHECK_PASS tca_test_confucian_statistics 32" }
+                    else = { add_character_flag = tca_test_tca_confucian_statistics_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_confucian_statistics 32" }
+                    scope:tca_test_stats_foreign_viewer = { tca_clear_confucian_statistics_effect = yes death = { death_reason = death_natural_causes } }
+                }
+                else = { add_character_flag = tca_test_tca_confucian_statistics_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_confucian_statistics 31" debug_log = "TCA_TEST CHECK_FAIL tca_test_confucian_statistics 32" }
+                # 无雇主、无廷臣的异教人物作独立空人口夹具，正式刷新也必须清空旧行并避免零分母。
+                create_character = { age = 40 gender_female_chance = 0 random_traits = no dynasty = none location = root.location culture = root.culture faith = faith:mahayana_faith save_scope_as = tca_test_stats_empty_viewer }
+                scope:tca_test_stats_empty_viewer = { tca_refresh_confucian_statistics_effect = yes tca_refresh_confucian_statistics_effect = yes }
+                if = { limit = { scope:tca_test_stats_empty_viewer = { top_liege = this var:tca_stats_total = 0 var:tca_stats_strength = 0 var:tca_stats_rite_count = 0 NOT = { has_variable_list = tca_stats_rows } NOT = { has_variable_list = tca_stats_display_rows } NOT = { has_variable_list = tca_stats_seen } NOT = { has_character_flag = tca_stats_visited } } } debug_log = "TCA_TEST CHECK_PASS tca_test_confucian_statistics 33" }
+                else = { add_character_flag = tca_test_tca_confucian_statistics_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_confucian_statistics 33" }
+                scope:tca_test_stats_empty_viewer = { tca_clear_confucian_statistics_effect = yes death = { death_reason = death_natural_causes } }
                 scope:tca_test_cache_owner = { remove_variable = tca_test_cached_strength }
                 # 清理全部临时人物，避免改变后续任命候选或共享统计。
                 scope:tca_test_stats_viewer = { tca_clear_confucian_statistics_effect = yes death = { death_reason = death_natural_causes } }

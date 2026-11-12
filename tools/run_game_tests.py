@@ -446,11 +446,11 @@ class RunLogMonitor:
                 self._observer = True
             if any(marker in line for marker in SUMMARY_MARKERS):
                 self._summary = True
-            if 'TCA_TEST OBSERVER_ENTRY_REJECTED' in line:
+            if 'TCA_TEST OBSERVER_ENTRY_REJECTED' in line or 'TCA_CLI HUMAN_ENTRY_REJECTED' in line:
                 self._entry_rejected = True
             if 'TCA_CLI NOT_OBSERVER' in line:
                 self._not_observer = True
-            if 'TCA_CLI RELOAD_SAVE' in line or 'console_success: Game saved to ' in line:
+            if any(marker in line for marker in ('TCA_CLI RELOAD_SAVE', 'TCA_CLI HUMAN_SAVE', 'console_success: Game saved to ')):
                 self._reload_lines.append(line)
 
 
@@ -465,7 +465,7 @@ def progress(log, elapsed, running):
 def terminal_condition(log, process_code):
     if any(marker in log for marker in SUMMARY_MARKERS):
         return 'summary'
-    if 'TCA_TEST OBSERVER_ENTRY_REJECTED' in log:
+    if 'TCA_TEST OBSERVER_ENTRY_REJECTED' in log or 'TCA_CLI HUMAN_ENTRY_REJECTED' in log:
         return 'entry_rejected'
     if 'TCA_CLI NOT_OBSERVER' in log:
         return 'not_observer'
@@ -528,9 +528,18 @@ def game_command(args, run, save_name=None):
     return command
 
 
+def checkpoint_records(log):
+    """只读完整原生debug_log记录或裸协议行，忽略控制台回显中的内嵌脚本文本。
+
+    实际引擎输出在元数据后以“: TCA_CLI”起行内记录；命令回显里的debug_log字符串
+    没有这一记录边界。保留原始名称供后续严格校验，非法路径和真实重复不能被过滤掉。
+    """
+    return re.findall(r'(?:^|: )TCA_CLI (RELOAD_SAVE|HUMAN_SAVE) ([^\r\n]+)$', log, re.MULTILINE)
+
+
 def reload_request(log, run):
     """只接受原生保存成功后的一次本地检查点请求，不执行日志中的任意命令。"""
-    names = re.findall(r'TCA_CLI RELOAD_SAVE ([^\r\n]+)', log)
+    names = [name for marker, name in checkpoint_records(log) if marker == 'RELOAD_SAVE']
     if not names:
         return None
     if len(names) != 1 or not re.fullmatch(r'[A-Za-z0-9_]+', names[0]):
@@ -545,6 +554,43 @@ def reload_request(log, run):
         if not handle.read(3).startswith((b'SAV', b'PK')):
             raise ValueError('Checkpoint has no native save header')
     return name
+
+
+def checkpoint_request(log, run, used):
+    """两个独立用途各限一次；玩家阶段只能最后加载，不能借新token重开业务重载。"""
+    kinds = checkpoint_records(log)
+    if not kinds:
+        return None
+    if len(kinds) != 1:
+        raise ValueError('Invalid or repeated checkpoint request')
+    marker, name = kinds[0]
+    kind = 'human' if marker == 'HUMAN_SAVE' else 'reload'
+    if kind in used or 'human' in used:
+        raise ValueError('Each checkpoint purpose may only reload once; human session must be last')
+    if kind == 'human':
+        selection = json.loads((run / 'selection.json').read_text(encoding='utf-8'))
+        if name != 'tca_cli_human_session' or not any(
+                row.get('event') == 'tca_retirement_session.1' for row in selection['cases']):
+            raise ValueError('Human checkpoint not authorized by the frozen selection')
+    # 复用既有原生保存完成、路径、文件头和尺寸检查；不执行任意日志命令。
+    checked = reload_request(log.replace('TCA_CLI HUMAN_SAVE ', 'TCA_CLI RELOAD_SAVE '), run)
+    return kind, checked
+
+
+def human_phase_issues(log):
+    """人类阶段必须先有原生身份确认、真实传家，再回观察者；最终观察者不能覆盖开局误observe。"""
+    markers = ('TCA_RETIREMENT_HUMAN INITIAL_PLAYER_CONFIRMED',
+               'TCA_TEST BEGIN tca_retirement_session.1 tca_test_retirement_player_session',
+               'TCA_RETIREMENT_SESSION PLAYER_CONFIRMED',
+               'TCA_TEST CHECK_PASS tca_test_retirement_player_session 4',
+               'console_success: Going to observe mode',
+               'TCA_TEST CHECK_PASS tca_test_retirement_player_session 5')
+    positions = [log.find(marker) for marker in markers]
+    if any(pos < 0 for pos in positions) or positions != sorted(positions):
+        return ['Human phase missing native identity, transfer or final observer confirmation in order']
+    if log.count(markers[0]) != 1:
+        return ['Human phase initial native identity must be confirmed exactly once']
+    return []
 
 
 def archive_phase_logs(run, phase):
@@ -600,6 +646,8 @@ def run_game(args, run):
     start = time.monotonic()
     condition, last = None, None
     phase = 1
+    used_checkpoints = set()
+    phase_modes = ['observer']
     # 轮询只读取日志新增字节；跨 phase 的累计状态由监视器保存，不拼接旧阶段全文。
     monitor = RunLogMonitor(run / 'logs/debug.log')
     with (run / 'stdout.txt').open('w', encoding='utf-8') as stdout:
@@ -626,9 +674,8 @@ def run_game(args, run):
                 if condition:
                     break
                 try:
-                    save_name = reload_request(monitor.reload_log(), run)
-                    if save_name and phase != 1:
-                        raise ValueError('A checkpoint may only reload once per run')
+                    request = checkpoint_request(monitor.reload_log(), run, used_checkpoints)
+                    kind, save_name = request if request else (None, None)
                 except ValueError as error:
                     print(str(error), flush=True)
                     condition = 'invalid_reload_request'
@@ -648,6 +695,8 @@ def run_game(args, run):
                     archive_phase_logs(run, phase)
                     monitor.next_phase()
                     phase += 1
+                    used_checkpoints.add(kind)
+                    phase_modes.append('human' if kind == 'human' else 'observer')
                     command = game_command(args, run, save_name=save_name)
                     try:
                         process = subprocess.Popen(command, cwd=args.game_dir / 'binaries', env=env,
@@ -659,6 +708,7 @@ def run_game(args, run):
                         break
                     write_json(run / 'process.json', {'pid': process.pid, 'args': command, 'owned': True,
                                'environment': game_environment(args.game_dir), 'phase': phase,
+                               'checkpoint_kind': kind,
                                'checkpoint_sha256': hashlib.sha256((run / 'save games' / (save_name + '.ck3')).read_bytes()).hexdigest()})
                     print(f'Reloading native checkpoint in isolated CK3 PID {process.pid}', flush=True)
                 time.sleep(2)
@@ -694,6 +744,14 @@ def run_game(args, run):
     execution_file = run / 'execution.json'
     execution = json.loads(execution_file.read_text(encoding='utf-8')) if execution_file.is_file() else {}
     snapshot_issues += start_date_issues(execution, log)
+    human_phases = [index + 1 for index, mode in enumerate(phase_modes) if mode == 'human']
+    for index in human_phases:
+        phase_log = phase_logs[index - 1].read_text(encoding='utf-8', errors='replace') if phase_logs[index - 1].is_file() else ''
+        snapshot_issues += human_phase_issues(phase_log)
+    # 选择真实玩家用例必须实际经历新进程；纯观察者中伪造全部CHECK也不能通过。
+    selection = json.loads((run / 'selection.json').read_text(encoding='utf-8'))
+    if any(row['event'] == 'tca_retirement_session.1' for row in selection['cases']) and not human_phases:
+        snapshot_issues.append('Selected player-session case did not enter a native human process phase')
     code = outcome(condition, state['observer_confirmed'], checker.returncode)
     if not state['observer_confirmed']:
         with (run / 'result.txt').open('a') as result:
@@ -706,7 +764,7 @@ def run_game(args, run):
             result.write('NOT VERIFIED\n' + '\n'.join(snapshot_issues) + '\n')
     write_json(run / 'terminal.json', {**state, 'condition': condition,
                'process_exit': None if condition == 'reload_launch_failed' else process.returncode,
-               'phases': phase, 'parallel': getattr(args, 'parallel', 1),
+               'phases': phase, 'phase_modes': phase_modes, 'human_phases': human_phases, 'parallel': getattr(args, 'parallel', 1),
                'verification_exit': checker.returncode,
                'runner_exit': code, 'snapshot_issues': snapshot_issues,
                'source_sha256': json.loads((run / 'source_manifest.json').read_text(encoding='utf-8'))['sha256'],

@@ -47,8 +47,13 @@ tca_local_domain_native_test.3 = {
             if = { limit = { domain_limit = var:tca_domain_sovereign_baseline NOT = { has_realm_law = tca_local_domain_restricted_law } }
                 debug_log = "TCA_TEST CHECK_PASS tca_test_local_domain_native 3" }
             else = { add_character_flag = tca_test_tca_local_domain_native_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_local_domain_native 3" }
-            scope:tca_domain_civil = { vassal_contract_set_obligation_level = { type = celestial_provinces level = celestial_province_military } }
+            # 本例主动改变行政类型，须同步夹具借用路的类型真值；否则官署模块会正确地按旧军制补约。
+            # 不调用领地法同步，后台法仍须在原生检查周期自行响应契约变化。
+            scope:tca_domain_military.var:tca_domain_test_circuit = { set_variable = { name = tca_circuit_kind value = 1 } }
             scope:tca_domain_military = { vassal_contract_set_obligation_level = { type = celestial_provinces level = celestial_province_standard } }
+            # 先释放原军制名额，再把文官转为军制；两者互换不应临时超订原生名额。
+            scope:tca_domain_civil.var:tca_domain_test_circuit = { set_variable = { name = tca_circuit_kind value = 2 } }
+            scope:tca_domain_civil = { vassal_contract_set_obligation_level = { type = celestial_provinces level = celestial_province_military } }
             debug_log = "TCA_TEST WAIT tca_test_local_domain_native 35 days"
             trigger_event = { id = tca_local_domain_native_test.4 days = 35 }
         }
@@ -62,7 +67,22 @@ tca_local_domain_native_test.4 = {
         if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
             if = { limit = { scope:tca_domain_civil = { vassal_contract_has_flag = celestial_military_appointment domain_limit > 1 has_realm_law = tca_local_domain_unrestricted_law } scope:tca_domain_military = { vassal_contract_has_flag = celestial_civil_appointment domain_limit = 1 has_realm_law = tca_local_domain_restricted_law } }
                 debug_log = "TCA_TEST CHECK_PASS tca_test_local_domain_native 4" }
-            else = { add_character_flag = tca_test_tca_local_domain_native_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_local_domain_native 4" }
+            else = {
+                add_character_flag = tca_test_tca_local_domain_native_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_local_domain_native 4"
+                # 只读失败现场，区分契约互换失效与后台法／容量没有自然刷新，不修改预期或补刷。
+                scope:tca_domain_civil = {
+                    save_scope_value_as = { name = tca_domain_native_civil_limit value = domain_limit }
+                    if = { limit = { NOT = { vassal_contract_has_flag = celestial_military_appointment } } debug_log = "TCA_DOMAIN_NATIVE CIVIL_NOT_MILITARY" }
+                    if = { limit = { has_realm_law = tca_local_domain_restricted_law } debug_log = "TCA_DOMAIN_NATIVE CIVIL_STILL_RESTRICTED" }
+                }
+                scope:tca_domain_military = {
+                    save_scope_value_as = { name = tca_domain_native_military_limit value = domain_limit }
+                    if = { limit = { NOT = { vassal_contract_has_flag = celestial_civil_appointment } } debug_log = "TCA_DOMAIN_NATIVE MILITARY_NOT_CIVIL" }
+                    if = { limit = { has_realm_law = tca_local_domain_unrestricted_law } debug_log = "TCA_DOMAIN_NATIVE MILITARY_STILL_UNRESTRICTED" }
+                }
+                debug_log_scopes = yes
+            }
             add_realm_law_skip_effects = tca_local_domain_all_law
             debug_log = "TCA_TEST WAIT tca_test_local_domain_native 35 days"
             trigger_event = { id = tca_local_domain_native_test.5 days = 35 }
@@ -132,8 +152,25 @@ tca_local_domain_native_test.8 = {
             else = { add_character_flag = tca_test_tca_local_domain_native_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_local_domain_native 9" }
             add_realm_law_skip_effects = tca_local_domain_original_law
             tca_test_cleanup_local_domain_effect = yes
-            # 两位原长官都从帝直属路取得；独立场景清理后必须恢复实际领主关系。
-            if = { limit = { scope:tca_domain_civil.var:tca_domain_test_old_circuit_holder = { liege = root } scope:tca_domain_military.var:tca_domain_test_old_circuit_holder = { liege = root } }
+            # 两位原长官都从帝直属路取得；独立场景清理须同时恢复领属和借用前的路类型（含原缺省）。
+            if = { limit = {
+                scope:tca_domain_civil.var:tca_domain_test_old_circuit_holder = { liege = root }
+                scope:tca_domain_military.var:tca_domain_test_old_circuit_holder = { liege = root }
+                scope:tca_domain_civil = {
+                    trigger_if = {
+                        limit = { has_variable = tca_domain_test_old_kind }
+                        var:tca_domain_test_circuit = { var:tca_circuit_kind = scope:tca_domain_civil.var:tca_domain_test_old_kind }
+                    }
+                    trigger_else = { var:tca_domain_test_circuit = { NOT = { has_variable = tca_circuit_kind } } }
+                }
+                scope:tca_domain_military = {
+                    trigger_if = {
+                        limit = { has_variable = tca_domain_test_old_kind }
+                        var:tca_domain_test_circuit = { var:tca_circuit_kind = scope:tca_domain_military.var:tca_domain_test_old_kind }
+                    }
+                    trigger_else = { var:tca_domain_test_circuit = { NOT = { has_variable = tca_circuit_kind } } }
+                }
+            }
                 debug_log = "TCA_TEST CHECK_PASS tca_test_local_domain_native 10" }
             else = { add_character_flag = tca_test_tca_local_domain_native_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_local_domain_native 10" debug_log_scopes = yes }
             if = { limit = { has_character_flag = tca_test_tca_local_domain_native_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_local_domain_native" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }

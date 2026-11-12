@@ -1,0 +1,282 @@
+﻿# 官署维护批次回归；自建人物与非适用州绑定，不依赖前序用例。
+namespace = tca_office_batch_test
+tca_office_batch_test.1 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_office_batch_test.1 tca_test_office_candidate_batch"
+        remove_character_flag = tca_test_tca_office_batch_test_case_failed
+        if = {
+            limit = { debug_only = yes is_alive = yes is_independent_ruler = yes exists = title:c_middlesex.holder exists = title:c_middlesex.de_jure_liege exists = title:c_middlesex.de_jure_liege.de_jure_liege NOT = { title:c_middlesex.holder.top_liege = root } }
+            # 本机原版Middlesex位于d_bedford；测试读取真实父级，兼容地图／法理变化。
+            title:c_middlesex.de_jure_liege = { save_scope_as = tca_test_ob_foreign_parent de_jure_liege = { save_scope_as = tca_test_ob_foreign_ancestor } }
+            create_character = { age = 35 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_test_ob_candidate }
+            save_scope_as = tca_tp_liege
+            save_scope_as = tca_tp_sovereign
+            save_scope_as = tca_appointment_liege
+            tca_clear_tongpan_candidate_pool_effect = yes
+            tca_clear_judicial_candidate_pool_effect = yes
+            tca_prepare_tongpan_candidate_pool_effect = yes
+            tca_prepare_judicial_candidate_pool_effect = yes
+            # 粗池不得预先套用官署直属上级资格：低功绩人物仍在池内，抽选时再硬校验。
+            if = { limit = { scope:tca_test_ob_candidate = { is_in_list = tca_tp_candidates is_in_list = tca_initial_judicial_candidates } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_candidate_batch 1" }
+            else = {
+                add_character_flag = tca_test_tca_office_batch_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_office_candidate_batch 1"
+                if = { limit = { scope:tca_test_ob_candidate = { NOT = { is_in_list = tca_tp_candidates } } } debug_log = "TCA_OFFICE_BATCH CHECK1_TONGPAN_MISSING" }
+                if = { limit = { scope:tca_test_ob_candidate = { NOT = { is_in_list = tca_initial_judicial_candidates } } } debug_log = "TCA_OFFICE_BATCH CHECK1_JUDICIAL_MISSING" }
+                if = { limit = { NOT = { any_courtier = { this = scope:tca_test_ob_candidate } } } debug_log = "TCA_OFFICE_BATCH CHECK1_NOT_IN_REPORTER_COURT" }
+                scope:tca_test_ob_candidate = { liege_or_court_owner ?= { save_scope_as = tca_test_ob_diag_owner } top_liege ?= { save_scope_as = tca_test_ob_diag_realm } }
+                debug_log_scopes = yes
+            }
+            # 低功绩人物即使在粗池内，也不能通过两职正式硬资格。
+            if = { limit = { scope:tca_test_ob_candidate = { NOT = { tca_is_initial_tongpan_candidate_trigger = yes } NOT = { tca_is_initial_judicial_candidate_trigger = yes } } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_candidate_batch 2" }
+            else = { add_character_flag = tca_test_tca_office_batch_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_candidate_batch 2" }
+            # 同批复用不得重新把已消费的人物收回池内。
+            scope:tca_test_ob_candidate = { remove_from_list = tca_tp_candidates remove_from_list = tca_initial_judicial_candidates }
+            tca_prepare_tongpan_candidate_pool_effect = yes
+            tca_prepare_judicial_candidate_pool_effect = yes
+            if = { limit = { scope:tca_test_ob_candidate = { NOT = { is_in_list = tca_tp_candidates } NOT = { is_in_list = tca_initial_judicial_candidates } } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_candidate_batch 3" }
+            else = { add_character_flag = tca_test_tca_office_batch_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_candidate_batch 3" }
+            tca_clear_tongpan_candidate_pool_effect = yes
+            tca_clear_judicial_candidate_pool_effect = yes
+            # 继承引用可以仍可见，但ready必须显式失效且列表实际为空；不承诺clear移除上层scope。
+            if = { limit = { scope:tca_tp_pool_ready = 0 scope:tca_judicial_pool_ready = 0 NOT = { any_in_list = { list = tca_tp_candidates always = yes } } NOT = { any_in_list = { list = tca_initial_judicial_candidates always = yes } } scope:tca_test_ob_candidate = { NOT = { is_in_list = tca_tp_candidates } NOT = { is_in_list = tca_initial_judicial_candidates } } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_candidate_batch 4" }
+            else = { add_character_flag = tca_test_tca_office_batch_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_candidate_batch 4" }
+            # 新批次必须重新发现仍在宫廷的候选，不得沿用上批消费状态。
+            tca_prepare_tongpan_candidate_pool_effect = yes
+            tca_prepare_judicial_candidate_pool_effect = yes
+            if = { limit = { scope:tca_test_ob_candidate = { is_in_list = tca_tp_candidates is_in_list = tca_initial_judicial_candidates } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_candidate_batch 5" }
+            else = {
+                add_character_flag = tca_test_tca_office_batch_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_office_candidate_batch 5"
+                if = { limit = { scope:tca_test_ob_candidate = { NOT = { is_in_list = tca_tp_candidates } } } debug_log = "TCA_OFFICE_BATCH CHECK5_TONGPAN_MISSING" }
+                if = { limit = { scope:tca_test_ob_candidate = { NOT = { is_in_list = tca_initial_judicial_candidates } } } debug_log = "TCA_OFFICE_BATCH CHECK5_JUDICIAL_MISSING" }
+                if = { limit = { NOT = { any_courtier = { this = scope:tca_test_ob_candidate } } } debug_log = "TCA_OFFICE_BATCH CHECK5_NOT_IN_REPORTER_COURT" }
+                scope:tca_test_ob_candidate = { liege_or_court_owner ?= { save_scope_as = tca_test_ob_diag_owner } top_liege ?= { save_scope_as = tca_test_ob_diag_realm } }
+                debug_log_scopes = yes
+            }
+            # 同事件链换到外国批次，旧朝候选必须被丢弃，不能跨政权复用。
+            title:c_middlesex.holder.top_liege = { save_scope_as = tca_tp_sovereign save_scope_as = tca_appointment_liege }
+            tca_prepare_tongpan_candidate_pool_effect = yes
+            tca_prepare_judicial_candidate_pool_effect = yes
+            if = { limit = { scope:tca_test_ob_candidate = { NOT = { is_in_list = tca_tp_candidates } NOT = { is_in_list = tca_initial_judicial_candidates } } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_candidate_batch 6" }
+            else = { add_character_flag = tca_test_tca_office_batch_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_candidate_batch 6" }
+            tca_clear_tongpan_candidate_pool_effect = yes
+            tca_clear_judicial_candidate_pool_effect = yes
+            # 真实跨事件继承同君主旧pool/batch及不合格旧candidate，不能只在同一事件里clear后重设。
+            root = { save_scope_as = tca_tp_pool_sovereign save_scope_as = tca_judicial_pool_sovereign save_scope_as = tca_tp_candidate_batch save_scope_as = tca_judicial_candidate_batch }
+            scope:tca_test_ob_candidate = { save_scope_as = tca_tp_candidate save_scope_as = tca_appointment_candidate tca_test_protect_character_effect = yes }
+            save_scope_value_as = { name = tca_tp_pool_ready value = 1 }
+            save_scope_value_as = { name = tca_judicial_pool_ready value = 1 }
+            debug_log = "TCA_TEST WAIT tca_test_office_candidate_batch 1 day inherited pool"
+            # 旧上级死后仍可经延迟事件继承；正式resolver必须覆盖它，不能因exists旧alias跳过fallback。
+            create_character = { age = 35 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_test_ob_dead_liege }
+            scope:tca_test_ob_dead_liege = { save_scope_as = tca_tp_liege death = { death_reason = death_natural_causes } }
+            trigger_event = { id = tca_office_batch_test.1001 days = 1 }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_office_candidate_batch" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_lane_end_effect = { GROUP = tca_office_batch_test } }
+    }
+}
+
+# 续接：清理与重建必须无视继承层的旧same-sovereign／batch；空抽必须覆盖旧candidate。
+tca_office_batch_test.1001 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            # 外国州的本地上级非天朝，政事堂也不属该朝；明确应返回该朝君主哨兵与found=0。
+            title:c_middlesex = { tca_resolve_tongpan_liege_effect = yes }
+            if = { limit = { scope:tca_tp_liege_found = 0 scope:tca_tp_liege = title:c_middlesex.holder.top_liege NOT = { scope:tca_tp_liege = scope:tca_test_ob_dead_liege } scope:tca_test_ob_dead_liege = { is_alive = no } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_candidate_batch 14" }
+            else = { add_character_flag = tca_test_tca_office_batch_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_candidate_batch 14" debug_log_scopes = yes }
+            root = { save_scope_as = tca_tp_sovereign save_scope_as = tca_tp_liege save_scope_as = tca_appointment_liege }
+            tca_clear_tongpan_candidate_pool_effect = yes
+            tca_clear_judicial_candidate_pool_effect = yes
+            if = { limit = { scope:tca_tp_pool_ready = 0 scope:tca_judicial_pool_ready = 0 scope:tca_test_ob_candidate = { NOT = { is_in_list = tca_tp_candidates } NOT = { is_in_list = tca_initial_judicial_candidates } } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_candidate_batch 7" }
+            else = { add_character_flag = tca_test_tca_office_batch_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_candidate_batch 7" }
+            tca_prepare_tongpan_candidate_pool_effect = yes
+            tca_prepare_judicial_candidate_pool_effect = yes
+            if = { limit = { scope:tca_tp_pool_ready = 1 scope:tca_judicial_pool_ready = 1 scope:tca_test_ob_candidate = { is_in_list = tca_tp_candidates is_in_list = tca_initial_judicial_candidates } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_candidate_batch 8" }
+            else = {
+                add_character_flag = tca_test_tca_office_batch_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_office_candidate_batch 8"
+                if = { limit = { scope:tca_test_ob_candidate = { NOT = { is_in_list = tca_tp_candidates } } } debug_log = "TCA_OFFICE_BATCH CHECK8_TONGPAN_MISSING" }
+                if = { limit = { scope:tca_test_ob_candidate = { NOT = { is_in_list = tca_initial_judicial_candidates } } } debug_log = "TCA_OFFICE_BATCH CHECK8_JUDICIAL_MISSING" }
+                if = { limit = { NOT = { any_courtier = { this = scope:tca_test_ob_candidate } } } debug_log = "TCA_OFFICE_BATCH CHECK8_NOT_IN_REPORTER_COURT" }
+                scope:tca_test_ob_candidate = { liege_or_court_owner ?= { save_scope_as = tca_test_ob_diag_owner } top_liege ?= { save_scope_as = tca_test_ob_diag_realm } }
+                debug_log_scopes = yes
+            }
+            # 同一批再次prepare仍不得补回已消费者；原3在正常上下文的断言也保留。
+            scope:tca_test_ob_candidate = { remove_from_list = tca_tp_candidates remove_from_list = tca_initial_judicial_candidates }
+            tca_prepare_tongpan_candidate_pool_effect = yes
+            tca_prepare_judicial_candidate_pool_effect = yes
+            if = { limit = { scope:tca_test_ob_candidate = { NOT = { is_in_list = tca_tp_candidates } NOT = { is_in_list = tca_initial_judicial_candidates } } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_candidate_batch 9" }
+            else = { add_character_flag = tca_test_tca_office_batch_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_candidate_batch 9" }
+            # 非适用县不会授职，仍须由公开入口清理旧batch上下文带来的池；不调用内部批次worker。
+            title:c_middlesex = { tca_refresh_tongpan_county_effect = yes }
+            if = { limit = { scope:tca_tp_pool_ready = 0 NOT = { any_in_list = { list = tca_tp_candidates always = yes } } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_candidate_batch 10" }
+            else = { add_character_flag = tca_test_tca_office_batch_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_candidate_batch 10" }
+            # 池为空时正式只读draw须返回本次sentinel；不能沿用跨日继承的低功绩人物。
+            root = { save_scope_as = tca_tp_sovereign }
+            title:c_tca_tongpan_middlesex = { tca_draw_tongpan_candidate_effect = yes }
+            if = { limit = { scope:tca_tp_candidate = root NOT = { scope:tca_tp_candidate = scope:tca_test_ob_candidate } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_candidate_batch 11" }
+            else = { add_character_flag = tca_test_tca_office_batch_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_candidate_batch 11" }
+            # 提刑的同批空池也必须回传本次君主sentinel；ready=1表示合法已耗尽的同朝粗池。
+            tca_clear_judicial_candidate_pool_effect = yes
+            root = { save_scope_as = tca_appointment_liege save_scope_as = tca_judicial_pool_sovereign }
+            save_scope_value_as = { name = tca_judicial_pool_ready value = 1 }
+            # 池已显式清空，不会执行资格或原生评分；仍给共享入口提供明确头衔输入。
+            root.primary_title = { save_scope_as = tca_appointment_title }
+            scope:tca_test_ob_foreign_ancestor = { tca_select_judicial_candidate_effect = yes }
+            if = { limit = { scope:tca_appointment_candidate = root NOT = { scope:tca_appointment_candidate = scope:tca_test_ob_candidate } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_candidate_batch 12" }
+            else = { add_character_flag = tca_test_tca_office_batch_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_candidate_batch 12" }
+            scope:tca_test_ob_foreign_parent = { tca_fill_initial_judicial_holder_effect = yes }
+            if = { limit = { scope:tca_judicial_pool_ready = 0 NOT = { any_in_list = { list = tca_initial_judicial_candidates always = yes } } } debug_log = "TCA_TEST CHECK_PASS tca_test_office_candidate_batch 13" }
+            else = { add_character_flag = tca_test_tca_office_batch_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_office_candidate_batch 13" }
+            tca_clear_tongpan_candidate_pool_effect = yes
+            tca_clear_judicial_candidate_pool_effect = yes
+            scope:tca_test_ob_candidate = { death = { death_reason = death_natural_causes } }
+            if = { limit = { has_character_flag = tca_test_tca_office_batch_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_office_candidate_batch" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_office_candidate_batch" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            remove_character_flag = tca_test_tca_office_batch_test_case_failed
+            tca_test_lane_end_effect = { GROUP = tca_office_batch_test }
+        }
+    }
+}
+
+# 用非适用外国州建立真实无效绑定，验证清理无需依附适用政权；年度排队须真实等待。
+tca_office_batch_test.2 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_office_batch_test.2 tca_test_tongpan_annual_batch"
+        remove_character_flag = tca_test_tca_office_batch_test_case_failed
+        if = {
+            limit = { debug_only = yes title:h_china.holder = root exists = title:c_middlesex.holder exists = title:c_middlesex.de_jure_liege exists = title:c_middlesex.de_jure_liege.de_jure_liege title:c_middlesex = { NOT = { tca_is_tongpan_county_trigger = yes } } title:c_tca_tongpan_middlesex = { NOT = { exists = holder } } }
+            # 本机原版Middlesex位于d_bedford；测试读取真实父级，兼容地图／法理变化。
+            title:c_middlesex.de_jure_liege = { save_scope_as = tca_test_ob_foreign_parent de_jure_liege = { save_scope_as = tca_test_ob_foreign_ancestor } }
+            # 自备法律与正式维护状态；不依赖前序用例已经启法或世界已经存在活动通判。
+            remove_character_flag = tca_test_ob_restore_enabled
+            remove_character_flag = tca_test_ob_governor_was_protected
+            remove_character_flag = tca_test_ob_officer_was_protected
+            clear_saved_scope = tca_test_ob_repair_county
+            clear_saved_scope = tca_test_ob_governor
+            clear_saved_scope = tca_test_ob_repair_officer
+            if = { limit = { has_realm_law = tca_tongpan_enabled_law } add_character_flag = tca_test_ob_restore_enabled }
+            else = { add_realm_law_skip_effects = tca_tongpan_enabled_law }
+            tca_refresh_tongpan_realm_effect = yes
+            random_vassal_or_below = {
+                limit = { tca_has_active_tongpan_trigger = yes }
+                save_scope_as = tca_test_ob_governor
+                primary_title = { save_scope_as = tca_test_ob_repair_county }
+                diarch = { save_scope_as = tca_test_ob_repair_officer }
+            }
+            if = {
+                limit = { exists = scope:tca_test_ob_governor exists = scope:tca_test_ob_repair_officer scope:tca_test_ob_governor = { tca_has_active_tongpan_trigger = yes diarch = scope:tca_test_ob_repair_officer } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_annual_batch 6"
+            }
+            else = { add_character_flag = tca_test_tca_office_batch_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_annual_batch 6" }
+            if = { limit = { scope:tca_test_ob_governor ?= { has_trait = tca_test_death_protection } } add_character_flag = tca_test_ob_governor_was_protected }
+            if = { limit = { scope:tca_test_ob_repair_officer ?= { has_trait = tca_test_death_protection } } add_character_flag = tca_test_ob_officer_was_protected }
+            scope:tca_test_ob_governor ?= { tca_test_protect_character_effect = yes }
+            scope:tca_test_ob_repair_officer ?= { tca_test_protect_character_effect = yes }
+            title:c_middlesex = { tca_bind_tongpan_office_effect = yes }
+            title:c_tca_tongpan_middlesex = { set_de_jure_liege_title = scope:tca_test_ob_foreign_parent }
+            create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_test_ob_change }
+            title:c_tca_tongpan_middlesex = { change_title_holder = { holder = root change = scope:tca_test_ob_change } }
+            resolve_title_and_vassal_change = scope:tca_test_ob_change
+            # 调用作用域本身不适用，也必须处理注册表中的退出；绑定须永久保留。
+            title:c_middlesex.holder = { tca_cleanup_invalid_tongpan_offices_effect = yes }
+            if = { limit = { title:c_tca_tongpan_middlesex = { NOT = { exists = holder } var:tca_tongpan_county = title:c_middlesex } title:c_middlesex = { var:tca_tongpan_office = title:c_tca_tongpan_middlesex } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_annual_batch 1" }
+            else = { add_character_flag = tca_test_tca_office_batch_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_annual_batch 1" }
+            if = { limit = {
+                title:c_tca_tongpan_middlesex = { NOT = { de_jure_liege = scope:tca_test_ob_foreign_parent } }
+                scope:tca_test_ob_foreign_parent = { NOT = { any_in_de_jure_hierarchy = { this = title:c_tca_tongpan_middlesex } } }
+                scope:tca_test_ob_foreign_ancestor = { NOT = { any_in_de_jure_hierarchy = { this = title:c_tca_tongpan_middlesex } } }
+            } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_annual_batch 8" }
+            else = {
+                add_character_flag = tca_test_tca_office_batch_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_annual_batch 8"
+                title:c_tca_tongpan_middlesex = { de_jure_liege ?= { save_scope_as = tca_test_ob_diag_retired_parent } }
+                debug_log_scopes = yes
+            }
+            # 再次制造失效官职，直接验证年度入口同步清理，而非下一日普通回调代劳。
+            create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_test_ob_change }
+            title:c_tca_tongpan_middlesex = { change_title_holder = { holder = root change = scope:tca_test_ob_change } }
+            resolve_title_and_vassal_change = scope:tca_test_ob_change
+            remove_global_variable = tca_tongpan_annual_cleaned
+            remove_variable = tca_tongpan_maintenance_pending
+            remove_variable = tca_tongpan_annual_only
+            # 重复年度入口不恢复外国州官职；年度退出同步完成，授职仍次日执行。
+            tca_request_tongpan_annual_maintenance_effect = yes
+            tca_request_tongpan_annual_maintenance_effect = yes
+            # 旧batch／君主引用不再代表缓存有效；正式入口以ready=0与真实空列表完成释放。
+            if = { limit = { title:c_tca_tongpan_middlesex = { NOT = { exists = holder } } scope:tca_tp_pool_ready = 0 NOT = { any_in_list = { list = tca_tp_candidates always = yes } } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_annual_batch 2" }
+            else = { add_character_flag = tca_test_tca_office_batch_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_annual_batch 2" }
+            tca_request_tongpan_annual_maintenance_effect = yes
+            tca_request_tongpan_annual_maintenance_effect = yes
+            if = { limit = { has_variable = tca_tongpan_maintenance_pending has_global_variable = tca_tongpan_annual_cleaned } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_annual_batch 3" }
+            else = { add_character_flag = tca_test_tca_office_batch_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_annual_batch 3" }
+            # 在已排队后主动破坏一个有效州的分权连接；当日必须保持破坏，次日worker才修复。
+            scope:tca_test_ob_governor ?= { end_diarchy = yes }
+            if = { limit = { exists = scope:tca_test_ob_governor scope:tca_test_ob_governor = { NOT = { has_diarchy_type = tca_tongpan } } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_annual_batch 5" }
+            else = { add_character_flag = tca_test_tca_office_batch_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_annual_batch 5" }
+            # 同步销毁的原生回调可先建立完整任务，此时不要求 annual_only。
+            trigger_event = { id = tca_office_batch_test.1002 days = 2 }
+        }
+        else = {
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_tongpan_annual_batch"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+            tca_test_lane_end_effect = { GROUP = tca_office_batch_test }
+        }
+    }
+}
+tca_office_batch_test.1002 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            # 验证正式次日维护恢复真实分权，不用可被后续生命周期再次排队的pending代表完成。
+            if = { limit = { scope:tca_test_ob_repair_county.holder = { tca_has_active_tongpan_trigger = yes diarch = scope:tca_test_ob_repair_officer } title:c_tca_tongpan_middlesex = { NOT = { exists = holder } } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_annual_batch 4" }
+            else = { add_character_flag = tca_test_tca_office_batch_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_annual_batch 4" }
+            # 只恢复本项更改的法律与保护；不转让人物、真实县或官署。
+            if = {
+                limit = { NOT = { has_character_flag = tca_test_ob_restore_enabled } NOT = { has_realm_law = tca_tongpan_disabled_law } }
+                add_realm_law_skip_effects = tca_tongpan_disabled_law
+            }
+            if = { limit = { NOT = { has_character_flag = tca_test_ob_governor_was_protected } } scope:tca_test_ob_governor ?= { tca_test_restore_character_effect = yes } }
+            if = { limit = { NOT = { has_character_flag = tca_test_ob_officer_was_protected } } scope:tca_test_ob_repair_officer ?= { tca_test_restore_character_effect = yes } }
+            tca_refresh_tongpan_realm_effect = yes
+            if = {
+                limit = {
+                    exists = scope:tca_test_ob_governor exists = scope:tca_test_ob_repair_officer
+                    OR = {
+                        AND = { has_character_flag = tca_test_ob_restore_enabled has_realm_law = tca_tongpan_enabled_law scope:tca_test_ob_governor = { tca_has_active_tongpan_trigger = yes } }
+                        AND = { NOT = { has_character_flag = tca_test_ob_restore_enabled } has_realm_law = tca_tongpan_disabled_law scope:tca_test_ob_governor = { NOT = { has_diarchy_type = tca_tongpan } } }
+                    }
+                    OR = {
+                        AND = { has_character_flag = tca_test_ob_governor_was_protected scope:tca_test_ob_governor = { has_trait = tca_test_death_protection } }
+                        AND = { NOT = { has_character_flag = tca_test_ob_governor_was_protected } scope:tca_test_ob_governor = { NOT = { has_trait = tca_test_death_protection } } }
+                    }
+                    OR = {
+                        AND = { has_character_flag = tca_test_ob_officer_was_protected scope:tca_test_ob_repair_officer = { has_trait = tca_test_death_protection } }
+                        AND = { NOT = { has_character_flag = tca_test_ob_officer_was_protected } scope:tca_test_ob_repair_officer = { NOT = { has_trait = tca_test_death_protection } } }
+                    }
+                }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_annual_batch 7"
+            }
+            else = { add_character_flag = tca_test_tca_office_batch_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_annual_batch 7" }
+            remove_character_flag = tca_test_ob_governor_was_protected
+            remove_character_flag = tca_test_ob_officer_was_protected
+            remove_character_flag = tca_test_ob_restore_enabled
+            if = { limit = { has_character_flag = tca_test_tca_office_batch_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_tongpan_annual_batch" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_tongpan_annual_batch" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            remove_character_flag = tca_test_tca_office_batch_test_case_failed
+            tca_test_lane_end_effect = { GROUP = tca_office_batch_test }
+        }
+    }
+}

@@ -10,9 +10,16 @@ tca_retirement_probe.1 = {
         if = {
             limit = { debug_only = yes is_alive = yes title:h_china.holder = root }
             tca_test_create_merit_interface_character_with_age_effect = { CHARACTER = tca_rp_actor GOVERNMENT = celestial_government AGE = 65 }
-            # 同配置对照人物：只用于把“加探针特质前后收入不变”与同局原生收入漂移分开。
-            # 与受测人物同一创建入口（含零品隔离、任命超时与月度收入隔离），不加任何探针特质。
+            # 同入口对照人物不加探针特质；两者仅在创建后一次清空普通庄园收入建筑。
+            # 保留家门／庄园与原始收入断言，以相同零基数隔离技能、婚姻和生活方式造成的无关倍率变化。
             tca_test_create_merit_interface_character_with_age_effect = { CHARACTER = tca_rp_control GOVERNMENT = celestial_government AGE = 65 }
+            scope:tca_rp_actor = { tca_test_isolate_retirement_salary_estate_effect = yes }
+            scope:tca_rp_control = { tca_test_isolate_retirement_salary_estate_effect = yes }
+            if = { limit = {
+                scope:tca_rp_actor = { is_ruler = yes exists = domicile domicile = { num_domicile_buildings = 0 } gold = 0 }
+                scope:tca_rp_control = { is_ruler = yes exists = domicile domicile = { num_domicile_buildings = 0 } gold = 0 }
+            } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_salary 4" }
+            else = { add_character_flag = tca_test_tca_retirement_probe_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_salary 4" }
             scope:tca_rp_actor = {
                 primary_title = { save_scope_as = tca_rp_family }
                 domicile = { save_scope_as = tca_rp_estate }
@@ -35,15 +42,19 @@ tca_retirement_probe.1001 = {
         if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
             if = { limit = { scope:tca_rp_actor = { primary_title = scope:tca_rp_family government_has_flag = government_is_celestial merit_level = 0 domicile = scope:tca_rp_estate } scope:tca_rp_child.father = scope:tca_rp_actor } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_salary 1" }
             else = { add_character_flag = tca_test_tca_retirement_probe_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_salary 1" }
+            # 第35／70／105日读实际状态；普通收入隔离失效或trait独自触发原生发薪均判失败。
+            if = { limit = { scope:tca_rp_actor = { exists = domicile domicile = { num_domicile_buildings = 0 } monthly_character_income = 0 monthly_character_treasury_income = 0 }
+                scope:tca_rp_control = { exists = domicile domicile = { num_domicile_buildings = 0 } monthly_character_income = 0 monthly_character_treasury_income = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_salary 5" }
+            else = { add_character_flag = tca_test_tca_retirement_probe_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_salary 5" }
             debug_log = "TCA_RETIREMENT STAGE baseline"
             scope:tca_rp_actor = {
                 trigger_event = tca_retirement_probe.90
+                tca_test_diag_retirement_salary_household_effect = yes
                 set_variable = { name = tca_rp_baseline value = monthly_character_income }
                 add_trait = tca_retirement_probe_fengci
             }
-            # 对照人物在同一时点记录自身基线；断言比较两人的收入变化量，
-            # 抵消世界预算/月结等对所有人物同向作用造成的绝对收入漂移。
-            scope:tca_rp_control = { set_variable = { name = tca_rp_control_baseline value = monthly_character_income } }
+            # 对照人物保留相同的零普通收入基数；不宣称比较了未参与断言的收入差值。
+            scope:tca_rp_control = { tca_test_diag_retirement_salary_household_effect = yes }
             trigger_event = { id = tca_retirement_probe.1002 days = 35 }
         }
     }
@@ -54,14 +65,18 @@ tca_retirement_probe.1002 = {
     immediate = {
         tca_test_validate_environment_effect = yes
         if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            # 第35／70／105日读实际状态；普通收入隔离失效或trait独自触发原生发薪均判失败。
+            if = { limit = { scope:tca_rp_actor = { exists = domicile domicile = { num_domicile_buildings = 0 } monthly_character_income = 0 monthly_character_treasury_income = 0 }
+                scope:tca_rp_control = { exists = domicile domicile = { num_domicile_buildings = 0 } monthly_character_income = 0 monthly_character_treasury_income = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_salary 6" }
+            else = { add_character_flag = tca_test_tca_retirement_probe_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_salary 6" }
             debug_log = "TCA_RETIREMENT STAGE trait_only_fengci"
-            scope:tca_rp_actor = { trigger_event = tca_retirement_probe.90 }
+            scope:tca_rp_actor = { trigger_event = tca_retirement_probe.90 tca_test_diag_retirement_salary_household_effect = yes }
+            scope:tca_rp_control = { tca_test_diag_retirement_salary_household_effect = yes }
             # 现行待遇由退休头衔与独立契约承担；仅加特质不得自行建立契约或发薪。
             if = { limit = { scope:tca_rp_actor = {
                 has_trait = tca_retirement_probe_fengci
-                # 只加特质不得产生额外收入：收入应与加特质前基线一致，或与同配置
-                # 无特质对照人物同一时点读数一致（±0.0002）；原生收入会随世界预算
-                # 整体漂移，两种参照任一成立即排除特质单独发薪。
+                # 只加特质不得产生额外收入：保留与原基线或无特质对照人物的原比较（±0.0002）。
+                # 普通庄园基数已在准备时清零，另验各节点建筑／金币及国库收入实际仍为零。
                 OR = {
                     monthly_character_income = var:tca_rp_baseline
                     AND = {
@@ -94,13 +109,17 @@ tca_retirement_probe.1003 = {
     immediate = {
         tca_test_validate_environment_effect = yes
         if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            # 第35／70／105日读实际状态；普通收入隔离失效或trait独自触发原生发薪均判失败。
+            if = { limit = { scope:tca_rp_actor = { exists = domicile domicile = { num_domicile_buildings = 0 } monthly_character_income = 0 monthly_character_treasury_income = 0 }
+                scope:tca_rp_control = { exists = domicile domicile = { num_domicile_buildings = 0 } monthly_character_income = 0 monthly_character_treasury_income = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_salary 7" }
+            else = { add_character_flag = tca_test_tca_retirement_probe_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_salary 7" }
             debug_log = "TCA_RETIREMENT STAGE trait_only_retired"
-            scope:tca_rp_actor = { trigger_event = tca_retirement_probe.90 }
+            scope:tca_rp_actor = { trigger_event = tca_retirement_probe.90 tca_test_diag_retirement_salary_household_effect = yes }
+            scope:tca_rp_control = { tca_test_diag_retirement_salary_household_effect = yes }
             if = { limit = { scope:tca_rp_actor = {
                 has_trait = tca_retirement_probe_retired
-                # 只加特质不得产生额外收入：收入应与加特质前基线一致，或与同配置
-                # 无特质对照人物同一时点读数一致（±0.0002）；原生收入会随世界预算
-                # 整体漂移，两种参照任一成立即排除特质单独发薪。
+                # 只加特质不得产生额外收入：保留与原基线或无特质对照人物的原比较（±0.0002）。
+                # 普通庄园基数已在准备时清零，另验各节点建筑／金币及国库收入实际仍为零。
                 OR = {
                     monthly_character_income = var:tca_rp_baseline
                     AND = {
@@ -121,9 +140,9 @@ tca_retirement_probe.1003 = {
                 if = { limit = { scope:tca_rp_actor = { vassal_contract_has_flag = tca_zhishi_salary_active } } debug_log = "TCA_RET_PROBE DIAG3 ZHISHI_SALARY_FLAG" }
                 if = { limit = { scope:tca_rp_actor = { vassal_contract_has_flag = tca_retirement_merit_half } } debug_log = "TCA_RET_PROBE DIAG3 MERIT_HALF_FLAG" }
             }
-            scope:tca_rp_actor = { remove_trait = tca_retirement_probe_retired tca_test_cleanup_merit_probe_character_effect = yes }
+            scope:tca_rp_actor = { remove_trait = tca_retirement_probe_retired remove_variable = tca_rp_baseline tca_test_cleanup_merit_probe_character_effect = yes }
             scope:tca_rp_child = { tca_test_cleanup_merit_probe_character_effect = yes }
-            scope:tca_rp_control = { remove_variable = tca_rp_control_baseline tca_test_cleanup_merit_probe_character_effect = yes }
+            scope:tca_rp_control = { tca_test_cleanup_merit_probe_character_effect = yes }
             if = { limit = { has_character_flag = tca_test_tca_retirement_probe_case_failed } debug_log = "TCA_TEST FAIL tca_test_retirement_salary" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
             else = { debug_log = "TCA_TEST PASS tca_test_retirement_salary" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
             remove_character_flag = tca_test_tca_retirement_probe_case_failed

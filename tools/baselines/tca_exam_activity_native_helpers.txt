@@ -1,0 +1,76 @@
+imperial_examination_gather_guests_effect = {
+	scope:activity = {
+		every_attending_character = {
+			limit = {
+				# You should get as many shots at the Palace Exam as you want.
+				has_character_flag = passed_palace_exam
+				NOR = {
+					this = scope:host
+					is_in_guest_subset = { name = imperial_examiners }
+					is_in_guest_subset = { name = entrants }
+				}
+			}
+			save_temporary_scope_as = temp_character
+			scope:activity = {
+				add_to_guest_subset = {
+					name = guests
+					target = scope:temp_character
+				}
+			}
+		}
+	}
+}
+
+metropolitan_examination_scoreboard_setup_effect = {
+	#Do we actually have 10 entrants for the scoreboard?
+	set_variable = { 
+		name = scoreboard_size
+		value = 0
+	}
+	if = {
+		limit = {
+			any_guest_subset = {
+				name = entrants
+				count >= 10
+			} 
+		}
+		change_variable = {
+			name = scoreboard_size
+			add = 10
+		}
+	}
+	#Otherwise set the scoreboard size to the amount of entrants
+	else = {
+		every_guest_subset = {
+			name = entrants
+			scope:activity = {
+				change_variable = {
+					name = scoreboard_size
+					add = 1
+				}
+			}
+		}
+	}
+	#Add the fresh entrants to the scoreboard
+	every_attending_character = {
+		limit = {
+			is_in_guest_subset = { name = entrants }
+			NOR = {
+				is_in_guest_subset = { name = scoreboard }
+				scope:activity = {
+					any_guest_subset = {
+						name = scoreboard
+						count = scope:activity.var:scoreboard_size
+					}
+				}
+			}
+		}
+		save_temporary_scope_as = temp_character
+		scope:activity = {
+			add_to_guest_subset = {
+				name = scoreboard
+				target = scope:temp_character
+			}
+		}
+	}
+}

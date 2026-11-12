@@ -56,7 +56,7 @@
 - [`tca_local_domain_native_test.1`](../../events/tests/tca_local_domain_native_test_events.txt)：三档政策、文武契约变化及独立后解除限制，真实等待原生检查，不手动补刷。
 - [`tca_merit_saveload_probe_test.1`](../../events/tests/tca_merit_saveload_probe_test_events.txt)：与功绩共用唯一CLI检查点，另建人物验证国家政策、改革冷却和后台法律随存档恢复。保存后现场改回量才兼领并清除冷却，续局依赖原排队事件检查，不重新初始化或同步来修复结果。
 
-各项通过[独立夹具](../../common/scripted_effects/tests/fixtures/tca_local_domain_test_effects.txt)新建官员，取样限于帝直属州制文官路，清理时恢复原政策、持有人、行政类型和实际领属。独立场景只归还头衔不足以恢复帝直属关系，必须另做真实归附事务，并保留恢复断言，防止污染后续司法用例。
+各项通过[独立夹具](../../common/scripted_effects/tests/fixtures/tca_local_domain_test_effects.txt)新建官员，文官与武官分别借用帝直属州制、军制原路，清理时恢复原政策、持有人、行政类型和实际领属。军制夹具复用已占用的同类名额，文武契约互换先释放后取得，避免满额世界中把准备失败误作领地法恢复失败。主动换约时同时设置夹具路的临时行政类型，避免官署维护按旧军制类型补约；不调用领地法同步，仍等待原生法律检查。交还头衔前恢复原行政类型记录，含原先缺少记录的情况。独立场景只归还头衔不足以恢复帝直属关系，必须另做真实归附事务，并保留恢复断言，防止污染后续司法用例。
 
 ```sh
 python3 tools/run_game_tests.py --suite local_domain --suite court --case tca_merit_saveload_probe_test.1 --timeout 600

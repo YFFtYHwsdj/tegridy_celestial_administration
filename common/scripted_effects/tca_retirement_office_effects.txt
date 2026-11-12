@@ -1,5 +1,5 @@
 ﻿# 正式卸职；人物作用域，必须先设置退休身份。
-# 官署保留辖区绑定／经费，真实继任者无效时交回实际上级等待原维护补位。
+# 通判／提刑官署保留辖区绑定与经费，无合格人选时交上级；中央官署无有效原生人选时沿原版留缺。
 tca_retirement_step_down_effect = {
     # 首次退休与误授纠正都覆盖完整卸职阶段，阻止中途回调切回退休主头衔。
     add_character_flag = tca_retirement_exit_pending
@@ -9,14 +9,20 @@ tca_retirement_step_down_effect = {
     every_held_title = {
         limit = { OR = { has_variable = tca_tongpan_title has_variable = tca_judicial_title } }
         save_scope_as = tca_retirement_office_title
+        # 别名会随延迟事件继承；本轮found与退出者哨兵显式覆盖，不能clear后以exists消费旧人。
+        save_scope_value_as = { name = tca_retirement_office_liege_found value = 0 }
+        save_scope_value_as = { name = tca_retirement_office_heir_found value = 0 }
+        scope:tca_retirement_office_retiring = { save_scope_as = tca_retirement_office_liege save_scope_as = tca_retirement_office_heir }
         if = {
-            limit = { exists = holder.liege }
+            limit = { exists = holder.liege holder.liege = { is_alive = yes this != scope:tca_retirement_office_retiring } }
             holder.liege = { save_scope_as = tca_retirement_office_liege }
+            save_scope_value_as = { name = tca_retirement_office_liege_found value = 1 }
         }
-        else = {
+        else_if = {
+            limit = { title:h_china = { exists = holder holder = { is_alive = yes this != scope:tca_retirement_office_retiring } } }
             title:h_china.holder = { save_scope_as = tca_retirement_office_liege }
+            save_scope_value_as = { name = tca_retirement_office_liege_found value = 1 }
         }
-        clear_saved_scope = tca_retirement_office_heir
         current_heir ?= {
             if = {
                 limit = {
@@ -27,18 +33,25 @@ tca_retirement_step_down_effect = {
                     NOT = { any_held_title = { is_noble_family_title = no } }
                 }
                 save_scope_as = tca_retirement_office_heir
+                save_scope_value_as = { name = tca_retirement_office_heir_found value = 1 }
             }
         }
         if = { limit = { has_variable = tca_tongpan_title } tca_stop_tongpan_diarchy_effect = yes }
         if = {
-            limit = { exists = scope:tca_retirement_office_heir }
+            limit = {
+                scope:tca_retirement_office_heir_found = 1
+                scope:tca_retirement_office_liege_found = 1
+                scope:tca_retirement_office_liege = { is_alive = yes this != scope:tca_retirement_office_retiring }
+                scope:tca_retirement_office_heir = { is_alive = yes this != scope:tca_retirement_office_retiring }
+            }
             scope:tca_retirement_office_liege = {
                 create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_retirement_office_change }
                 scope:tca_retirement_office_title = { change_title_holder = { holder = scope:tca_retirement_office_heir change = scope:tca_retirement_office_change } }
                 resolve_title_and_vassal_change = scope:tca_retirement_office_change
             }
         }
-        else = {
+        else_if = {
+            limit = { scope:tca_retirement_office_liege_found = 1 scope:tca_retirement_office_liege = { is_alive = yes this != scope:tca_retirement_office_retiring } }
             scope:tca_retirement_office_liege = {
                 create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_retirement_office_change }
                 scope:tca_retirement_office_title = { change_title_holder = { holder = scope:tca_retirement_office_liege change = scope:tca_retirement_office_change } }
@@ -46,37 +59,139 @@ tca_retirement_step_down_effect = {
             }
         }
     }
-    # 中央大臣职位优先交接并清理，确保主头衔与领主作用域完整。
-    if = { limit = { tgp_is_any_minister = yes }
-        liege = { save_scope_as = councillor_liege }
-        # 直接授职纠正可能仍携带原任命上下文，不能让原生换席守卫跳过退休移交。
-        clear_saved_scope = new_councillor
-        clear_saved_scope = swapped_position
+    # 实际议席与主头衔可能不同步；按真实持有的每个中央官署卸职，不从议席或primary反推另一个。
+    tca_retirement_step_down_ministries_effect = yes
+    # 普通行政头衔与封地使用已验证原生接口；家门和庄园保留。
+    if = { limit = { is_ruler = yes } force_step_down_landed_titles = yes }
+    if = {
+        limit = { NOT = { any_held_title = { tgp_is_minister_title = yes } } }
+        remove_character_flag = tca_retirement_exit_pending
+        tca_retirement_sync_income_effect = yes
+    }
+    else = {
+        # 授职未完成不能造较低阶退休公国并虚报卸职；保留屏障，由原清理事件重试。
+        debug_log = "TCA_RETIREMENT CENTRAL_EXIT_PENDING"
+        if = { limit = { NOT = { has_character_flag = tca_retirement_office_cleanup_pending } }
+            add_character_flag = { flag = tca_retirement_office_cleanup_pending days = 3 }
+            trigger_event = { id = tca_retirement.90 days = 1 }
+        }
+    }
+}
+
+# 人物作用域；外层已设置退出身份与exit_pending。保留外层原生换席上下文，结束时原样恢复。
+# 原生 fired 按primary推导官署；先保留旧议席与预算完成真实title交接，最后解雇残留旧席。
+# 不改候选分、官品、继承法或法理；title_gain仍负责新任的原生议席、官署与收支同步。
+tca_retirement_step_down_ministries_effect = {
+    clear_saved_scope = tca_rt_saved_new_councillor
+    clear_saved_scope = tca_rt_saved_swapped_position
+    clear_saved_scope = tca_rt_saved_councillor_liege
+    save_scope_value_as = { name = tca_rt_had_new_councillor value = 0 }
+    scope:new_councillor ?= { save_scope_as = tca_rt_saved_new_councillor save_scope_value_as = { name = tca_rt_had_new_councillor value = 1 } }
+    save_scope_value_as = { name = tca_rt_had_swapped_position value = 0 }
+    scope:swapped_position ?= { save_scope_as = tca_rt_saved_swapped_position save_scope_value_as = { name = tca_rt_had_swapped_position value = 1 } }
+    save_scope_value_as = { name = tca_rt_had_councillor_liege value = 0 }
+    scope:councillor_liege ?= { save_scope_as = tca_rt_saved_councillor_liege save_scope_value_as = { name = tca_rt_had_councillor_liege value = 1 } }
+    clear_saved_scope = new_councillor
+    clear_saved_scope = swapped_position
+    top_liege = { save_scope_as = tca_rt_ministry_sovereign save_scope_as = councillor_liege }
+    save_scope_value_as = { name = tca_rt_had_ministry value = 0 }
+    if = { limit = { any_held_title = { tgp_is_minister_title = yes } } save_scope_value_as = { name = tca_rt_had_ministry value = 1 } }
+    # 交接期间保留真实旧议席与其预算；原生空缺入口必须先交预算再destroy/fire。
+    # 换席守卫贯穿此阶段，避免on_fired又按旧primary启动另一条移交链。
+    save_scope_as = new_councillor
+    every_held_title = {
+        limit = { tgp_is_minister_title = yes }
+        save_scope_as = tca_rt_ministry_title
+        tca_retirement_pick_ministry_heir_effect = yes
         if = {
-            limit = { exists = primary_title.current_heir primary_title.current_heir = { is_alive = yes NOT = { tca_retirement_excludes_appointment_trigger = yes } this != scope:tca_retirement_office_retiring } }
-            if = { limit = { debug_only = yes } debug_log = "TCA_RETIREMENT_CENTRAL NATIVE_HEIR" }
-            # 从真实解雇入口派发原生职位回调，让新旧议会作用域由引擎建立。
-            scope:councillor_liege = { always_fire_councillor = scope:tca_retirement_office_retiring }
+            limit = { scope:tca_rt_ministry_heir_found = 1 }
+            # appointment事务会再读缓存并可能授回已退休旧任；granted精确授给刚从原生名单校验的人。
+            scope:tca_rt_ministry_sovereign = {
+                create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_rt_ministry_change }
+                scope:tca_rt_ministry_title = { change_title_holder = { holder = scope:tca_rt_ministry_heir change = scope:tca_rt_ministry_change } }
+                resolve_title_and_vassal_change = scope:tca_rt_ministry_change
+            }
+            if = { limit = { holder ?= scope:tca_rt_ministry_heir } holder = { tca_set_official_appointment_cooldown_effect = yes } }
         }
         else = {
-            if = { limit = { debug_only = yes } debug_log = "TCA_RETIREMENT_CENTRAL VACANCY" }
-            # 与原生无继任者分支相同；不能把已退出的current_heir重新授回原职。
-            switch = {
-                trigger = primary_title
-                title:e_minister_chancellor = { destroy_and_fire_minister_effect = { MINISTER = e_minister_chancellor } }
-                title:e_minister_censor = { destroy_and_fire_minister_effect = { MINISTER = e_minister_censor } }
-                title:e_minister_grand_marshal = { destroy_and_fire_minister_effect = { MINISTER = e_minister_grand_marshal } }
-                title:e_minister_of_personnel = { destroy_and_fire_minister_effect = { MINISTER = e_minister_of_personnel } }
-                title:e_minister_of_revenue = { destroy_and_fire_minister_effect = { MINISTER = e_minister_of_revenue } }
-                title:e_minister_of_rites = { destroy_and_fire_minister_effect = { MINISTER = e_minister_of_rites } }
-                title:e_minister_of_war = { destroy_and_fire_minister_effect = { MINISTER = e_minister_of_war } }
-                title:e_minister_of_justice = { destroy_and_fire_minister_effect = { MINISTER = e_minister_of_justice } }
-                title:e_minister_of_works = { destroy_and_fire_minister_effect = { MINISTER = e_minister_of_works } }
+            # 无有效原生候选时沿用原版空缺：国库余额交天子并销毁该官署，不把退出者留在职上。
+            scope:tca_rt_ministry_sovereign = { save_scope_as = councillor_liege }
+            scope:tca_retirement_office_retiring = {
+                tca_retirement_vacate_ministry_title_effect = { TITLE = scope:tca_rt_ministry_title }
             }
         }
     }
-    # 普通行政头衔与封地使用已验证原生接口；家门和庄园保留。
-    if = { limit = { is_ruler = yes } force_step_down_landed_titles = yes }
-    remove_character_flag = tca_retirement_exit_pending
-    tca_retirement_sync_income_effect = yes
+    if = {
+        limit = { is_councillor_of = scope:tca_rt_ministry_sovereign scope:tca_rt_had_ministry = 1 }
+        # 原生换席守卫只抑制fired_minister_position的primary移交，generic离任回调照常运行。
+        save_scope_as = new_councillor
+        scope:tca_rt_ministry_sovereign = { always_fire_councillor = scope:tca_retirement_office_retiring }
+        clear_saved_scope = new_councillor
+    }
+    if = { limit = { NOT = { any_held_title = { tgp_is_minister_title = yes } } } remove_character_modifier = minister_scheme_slots_modifier }
+    clear_saved_scope = new_councillor
+    clear_saved_scope = swapped_position
+    clear_saved_scope = councillor_liege
+    if = { limit = { scope:tca_rt_had_new_councillor = 1 }
+        scope:tca_rt_saved_new_councillor = { save_scope_as = new_councillor }
+    }
+    if = { limit = { scope:tca_rt_had_swapped_position = 1 }
+        scope:tca_rt_saved_swapped_position = { save_scope_as = swapped_position }
+    }
+    if = { limit = { scope:tca_rt_had_councillor_liege = 1 }
+        scope:tca_rt_saved_councillor_liege = { save_scope_as = councillor_liege }
+    }
+    clear_saved_scope = tca_rt_saved_new_councillor
+    clear_saved_scope = tca_rt_saved_swapped_position
+    clear_saved_scope = tca_rt_saved_councillor_liege
+    save_scope_value_as = { name = tca_rt_ministry_heir_found value = 0 }
+    scope:tca_retirement_office_retiring = { save_scope_as = tca_rt_ministry_heir }
+    clear_saved_scope = tca_rt_ministry_title
+    clear_saved_scope = tca_rt_ministry_sovereign
+}
+
+# 旧任人物作用域；TITLE为实际持有的中央官署，councillor_liege为该朝君主。
+# 无有效原生继任者的空缺工作入口：复用原版国库转交、销毁及仍在席时解雇，不生成替代人选。
+tca_retirement_vacate_ministry_title_effect = {
+    switch = {
+        trigger = $TITLE$
+        title:e_minister_chancellor = { destroy_and_fire_minister_effect = { MINISTER = e_minister_chancellor } }
+        title:e_minister_censor = { destroy_and_fire_minister_effect = { MINISTER = e_minister_censor } }
+        title:e_minister_grand_marshal = { destroy_and_fire_minister_effect = { MINISTER = e_minister_grand_marshal } }
+        title:e_minister_of_personnel = { destroy_and_fire_minister_effect = { MINISTER = e_minister_of_personnel } }
+        title:e_minister_of_revenue = { destroy_and_fire_minister_effect = { MINISTER = e_minister_of_revenue } }
+        title:e_minister_of_rites = { destroy_and_fire_minister_effect = { MINISTER = e_minister_of_rites } }
+        title:e_minister_of_war = { destroy_and_fire_minister_effect = { MINISTER = e_minister_of_war } }
+        title:e_minister_of_justice = { destroy_and_fire_minister_effect = { MINISTER = e_minister_of_justice } }
+        title:e_minister_of_works = { destroy_and_fire_minister_effect = { MINISTER = e_minister_of_works } }
+    }
+}
+
+# 中央官署头衔作用域；调用者提供tca_retirement_office_retiring与tca_rt_ministry_sovereign。
+# 只读选择本职原生名单首名有效人；found=1时输出本次heir，否则heir显式为退出者哨兵。
+# 不授职、不改预算或候选排序；消费者必须先认本次found，不能读取clear后的继承旧人。
+tca_retirement_pick_ministry_heir_effect = {
+    save_scope_as = tca_rt_ministry_title
+    save_scope_value_as = { name = tca_rt_ministry_heir_found value = 0 }
+    scope:tca_retirement_office_retiring = { save_scope_as = tca_rt_ministry_heir }
+    # 从此头衔原生名单挑有效人，保留本职原生议席资格，并额外排除已持另一中央职者。
+    # 原生got按各旧职current_heir转授；为避免再引入一条中央换席链，退出纠错保守排除现职。
+    # 尚无证据保证旧职缓存指向谁，不把“必然回授退休者”当成已验证事实。
+    # 不将这个退出专用附加条件宣称为原生候选资格完全不变。
+    every_title_heir = {
+        limit = {
+            scope:tca_rt_ministry_heir_found = 0
+            is_alive = yes is_adult = yes
+            this != scope:tca_retirement_office_retiring
+            NOT = { tca_retirement_excludes_appointment_trigger = yes }
+            NOT = { any_held_title = { tgp_is_minister_title = yes } }
+            trigger_if = {
+                limit = { scope:tca_rt_ministry_title = title:e_minister_grand_marshal }
+                tgp_can_be_grand_marshal_trigger = { COURT_OWNER = scope:tca_rt_ministry_sovereign }
+            }
+            trigger_else = { tgp_can_be_a_minister_trigger = { COURT_OWNER = scope:tca_rt_ministry_sovereign } }
+        }
+        save_scope_as = tca_rt_ministry_heir
+        save_scope_value_as = { name = tca_rt_ministry_heir_found value = 1 }
+    }
 }

@@ -1,0 +1,167 @@
+﻿# 通判生命周期借还夹具；只操作本例create分支登记的人物及明确借用的三个真实头衔。
+# 人物作用域，必须紧接本例create_character；不从可能继承的saved scope取得清理所有权。
+tca_test_tp2_register_owned_character_effect = {
+    add_character_flag = tca_test_tp2_owned
+    save_scope_as = tca_test_tp2_registering_owned
+    root = { add_to_variable_list = { name = tca_test_tp2_owned_people target = scope:tca_test_tp2_registering_owned } }
+}
+
+# 真实头衔作用域；调用时尚未转授。原任预先确认天朝政府及文官任命法，去重保存与保护。
+tca_test_tp2_snapshot_borrowed_title_effect = {
+    save_scope_as = tca_test_tp2_snapshot_title
+    root = { add_to_variable_list = { name = tca_test_tp2_borrowed_titles target = scope:tca_test_tp2_snapshot_title } }
+    if = { limit = { exists = holder }
+        set_variable = { name = tca_test_tp2_original_holder value = holder }
+        holder = {
+            if = { limit = { NOT = { has_variable = tca_test_tp2_original_timeout } }
+                set_variable = { name = tca_test_tp2_original_timeout value = appointment_timeout_days }
+                primary_title ?= { prev = { set_variable = { name = tca_test_tp2_original_primary value = prev } } }
+                capital_county ?= { prev = { set_variable = { name = tca_test_tp2_original_capital value = prev } } }
+                liege ?= { prev = { set_variable = { name = tca_test_tp2_original_liege value = prev } } }
+                if = { limit = { is_independent_ruler = yes } set_variable = { name = tca_test_tp2_original_independent value = yes } }
+                if = { limit = { NOT = { has_trait = tca_test_death_protection } }
+                    add_trait = tca_test_death_protection
+                    set_variable = { name = tca_test_tp2_original_protection_added value = yes }
+                }
+                save_scope_as = tca_test_tp2_snapshot_holder
+                root = { add_to_variable_list = { name = tca_test_tp2_original_people target = scope:tca_test_tp2_snapshot_holder } }
+            }
+        }
+    }
+    if = { limit = { exists = de_jure_liege } set_variable = { name = tca_test_tp2_original_parent value = de_jure_liege } }
+    if = { limit = { has_variable = tca_circuit_kind } set_variable = { name = tca_test_tp2_original_kind value = var:tca_circuit_kind } }
+}
+
+# 报告者作用域；原任在借用期全程保护，不会先自然另任再被强行兼授。先归还、后销毁owned NF。
+tca_test_tp2_cleanup_owned_and_restore_effect = {
+    save_scope_value_as = { name = tca_test_tp2_elapsed value = { value = current_date subtract = var:tca_test_tp2_borrowed_date } }
+    # 分权及所有owned人物可能自然获得的本模组官署先正式注销；不销毁真实地理头衔。
+    every_in_list = { variable = tca_test_tp2_owned_people
+        if = { limit = { is_alive = yes has_character_flag = tca_test_tp2_owned }
+            if = { limit = { has_diarchy_type = tca_tongpan } end_diarchy = yes }
+            every_held_title = { limit = { has_variable = tca_tongpan_title } tca_destroy_tongpan_office_effect = yes }
+        }
+    }
+    create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_test_tp2_return_change }
+    every_in_list = { variable = tca_test_tp2_borrowed_titles
+        if = { limit = { exists = var:tca_test_tp2_original_holder var:tca_test_tp2_original_holder = { is_alive = yes } }
+            change_title_holder = { holder = var:tca_test_tp2_original_holder change = scope:tca_test_tp2_return_change }
+        }
+    }
+    resolve_title_and_vassal_change = scope:tca_test_tp2_return_change
+    every_in_list = { variable = tca_test_tp2_borrowed_titles
+        # 原本无主者恢复无主；不让旧saved alias冒充原任。
+        if = { limit = { NOT = { exists = var:tca_test_tp2_original_holder } exists = holder holder = { has_character_flag = tca_test_tp2_owned } }
+            save_scope_as = tca_test_tp2_originally_unheld
+            holder = { destroy_title = scope:tca_test_tp2_originally_unheld }
+        }
+        if = { limit = { has_variable = tca_test_tp2_original_parent NOT = { de_jure_liege = var:tca_test_tp2_original_parent } }
+            set_de_jure_liege_title = var:tca_test_tp2_original_parent
+        }
+        if = { limit = { has_variable = tca_test_tp2_original_kind } set_variable = { name = tca_circuit_kind value = var:tca_test_tp2_original_kind } }
+        else = { remove_variable = tca_circuit_kind }
+    }
+    every_in_list = { variable = tca_test_tp2_original_people
+        if = { limit = { is_alive = yes }
+            if = { limit = { has_variable = tca_test_tp2_original_independent NOT = { is_independent_ruler = yes } }
+                create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_test_tp2_return_liege }
+                becomes_independent = { change = scope:tca_test_tp2_return_liege }
+                resolve_title_and_vassal_change = scope:tca_test_tp2_return_liege
+            }
+            else_if = { limit = { exists = var:tca_test_tp2_original_liege NOT = { var:tca_test_tp2_original_liege = this } NOT = { liege = var:tca_test_tp2_original_liege } }
+                create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_test_tp2_return_liege }
+                change_liege = { liege = var:tca_test_tp2_original_liege change = scope:tca_test_tp2_return_liege }
+                resolve_title_and_vassal_change = scope:tca_test_tp2_return_liege
+            }
+            if = { limit = { NOT = { government_has_flag = government_is_celestial } } change_government = celestial_government }
+            if = { limit = { NOT = { has_realm_law = celestial_appointment_succession_law } } add_realm_law_skip_effects = celestial_appointment_succession_law }
+            if = { limit = { exists = var:tca_test_tp2_original_primary has_title = var:tca_test_tp2_original_primary NOT = { primary_title = var:tca_test_tp2_original_primary } } set_primary_title_to = var:tca_test_tp2_original_primary }
+            if = { limit = { exists = var:tca_test_tp2_original_capital has_title = var:tca_test_tp2_original_capital NOT = { capital_county = var:tca_test_tp2_original_capital } } set_realm_capital = var:tca_test_tp2_original_capital }
+            tca_test_restore_central_timeout_only_effect = { TIMEOUT = var:tca_test_tp2_original_timeout ELAPSED = scope:tca_test_tp2_elapsed }
+            if = { limit = { has_variable = tca_test_tp2_original_protection_added } remove_trait = tca_test_death_protection }
+        }
+    }
+    every_in_list = { variable = tca_test_tp2_owned_people
+        if = { limit = { is_alive = yes has_character_flag = tca_test_tp2_owned }
+            tca_test_cleanup_merit_probe_character_effect = yes
+            # 与既有司法owned夹具相同：只销毁本例人物实际持有的自建家门；真实头衔必须先归还。
+            every_held_title = { limit = { is_noble_family_title = yes } save_scope_as = tca_test_tp2_cleaning_family set_delete_on_destroy = yes holder = { destroy_title = scope:tca_test_tp2_cleaning_family } }
+            if = { limit = { NOT = { is_ruler = yes } }
+                tca_merit_leave_celestial_effect = yes
+                remove_variable = block_hire_councillor
+                remove_variable = tca_test_tp2_execution_seen
+                remove_variable = tca_test_tp2_execution_prestige_paid
+                remove_character_flag = tca_test_tp2_owned
+                death = { death_reason = death_natural_causes }
+            }
+        }
+    }
+}
+
+# 报告者作用域；原62项之外独立验证清理与借还，不把清理未执行计为通过。
+tca_test_tp2_check_cleanup_effect = {
+    if = { limit = { any_in_list = { variable = tca_test_tp2_owned_people count = 16 always = yes } NOT = { any_in_list = { variable = tca_test_tp2_owned_people OR = { is_alive = yes is_ruler = yes any_held_title = { always = yes } has_trait = tca_test_death_protection } } } }
+        debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 63"
+    }
+    else = { add_character_flag = tca_test_tca_tongpan_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 63" }
+    if = { limit = {
+        any_in_list = { variable = tca_test_tp2_borrowed_titles count = 3 always = yes }
+        NOT = { any_in_list = { variable = tca_test_tp2_borrowed_titles OR = {
+            AND = { exists = var:tca_test_tp2_original_holder NOT = { holder = var:tca_test_tp2_original_holder } }
+            AND = { NOT = { exists = var:tca_test_tp2_original_holder } exists = holder }
+            AND = { has_variable = tca_test_tp2_original_parent NOT = { de_jure_liege = var:tca_test_tp2_original_parent } }
+            AND = { has_variable = tca_test_tp2_original_kind NOT = { var:tca_circuit_kind = var:tca_test_tp2_original_kind } }
+            AND = { NOT = { has_variable = tca_test_tp2_original_kind } has_variable = tca_circuit_kind }
+        } } }
+        NOT = { any_in_list = { variable = tca_test_tp2_original_people OR = {
+            is_alive = no
+            NOT = { AND = { government_has_flag = government_is_celestial has_realm_law = celestial_appointment_succession_law } }
+            AND = { exists = var:tca_test_tp2_original_primary NOT = { primary_title = var:tca_test_tp2_original_primary } }
+            AND = { exists = var:tca_test_tp2_original_capital NOT = { capital_county = var:tca_test_tp2_original_capital } }
+            AND = { has_variable = tca_test_tp2_original_independent NOT = { is_independent_ruler = yes } }
+            AND = { NOT = { has_variable = tca_test_tp2_original_independent } exists = var:tca_test_tp2_original_liege NOT = { liege = var:tca_test_tp2_original_liege } }
+            AND = { has_variable = tca_test_tp2_original_protection_added has_trait = tca_test_death_protection }
+            AND = { NOT = { has_variable = tca_test_tp2_original_protection_added } NOT = { has_trait = tca_test_death_protection } }
+            NOT = { appointment_timeout_days = { value = var:tca_test_tp2_original_timeout subtract = scope:tca_test_tp2_elapsed min = 0 } }
+        } } }
+    } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 64" }
+    else = { add_character_flag = tca_test_tca_tongpan_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 64" debug_log_scopes = yes }
+    # 26b的三个真实失败县逐项调用正式resolver；清理后的已死owned公爵不可作为上级输出。
+    save_scope_value_as = { name = tca_test_tp2_resolver_valid_count value = 0 }
+    title:c_tca_tongpan_shanzhou.var:tca_tongpan_county = { tca_test_tp2_check_resolver_effect = yes }
+    title:c_tca_tongpan_yingzhou.var:tca_tongpan_county = { tca_test_tp2_check_resolver_effect = yes }
+    title:c_tca_tongpan_bozhou.var:tca_tongpan_county = { tca_test_tp2_check_resolver_effect = yes }
+    if = { limit = { scope:tca_test_tp2_resolver_valid_count = 3 } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 65" }
+    else = { add_character_flag = tca_test_tca_tongpan_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 65" debug_log_scopes = yes }
+    every_in_list = { variable = tca_test_tp2_original_people if = { limit = { is_alive = yes }
+        remove_variable = tca_test_tp2_original_timeout
+        remove_variable = tca_test_tp2_original_primary
+        remove_variable = tca_test_tp2_original_capital
+        remove_variable = tca_test_tp2_original_liege
+        remove_variable = tca_test_tp2_original_independent
+        remove_variable = tca_test_tp2_original_protection_added
+    } }
+    every_in_list = { variable = tca_test_tp2_borrowed_titles
+        remove_variable = tca_test_tp2_original_holder
+        remove_variable = tca_test_tp2_original_parent
+        remove_variable = tca_test_tp2_original_kind
+    }
+    clear_variable_list = tca_test_tp2_original_people
+    clear_variable_list = tca_test_tp2_borrowed_titles
+    clear_variable_list = tca_test_tp2_owned_people
+    remove_variable = tca_test_tp2_borrowed_date
+}
+
+# 真实县作用域；只读解析，不转授、不修改领属。found=0必须是本次君主哨兵，found=1必须仍满足原资格。
+tca_test_tp2_check_resolver_effect = {
+    tca_resolve_tongpan_liege_effect = yes
+    if = { limit = {
+        NOT = { scope:tca_tp_liege = scope:tca_test_tp2_duke }
+        OR = {
+            AND = { scope:tca_tp_liege_found = 0 scope:tca_tp_liege = holder.top_liege }
+            AND = { scope:tca_tp_liege_found = 1 scope:tca_tp_liege = { is_alive = yes NOT = { this = scope:tca_tp_sovereign } top_liege = scope:tca_tp_sovereign highest_held_title_tier > tier_county government_has_flag = government_is_celestial } }
+        }
+    }
+        save_scope_value_as = { name = tca_test_tp2_resolver_valid_count value = { value = scope:tca_test_tp2_resolver_valid_count add = 1 } }
+    }
+}

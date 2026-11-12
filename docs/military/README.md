@@ -71,7 +71,7 @@
 
 职位、铨选、内阁联动及任务交接均已实现；综合验收仍有未执行项目，不能将实现完成等同于全部验收完成。
 
-原生用例统一维护于 [军事测试事件](../../events/tests/tca_military_court_positions_test_events.txt)，由 `military_court_positions` 和 `military_council` 两个模块登记。前者覆盖资格、评分、任免与补位，后者覆盖任务、同署优先级及独占延迟生命周期。用 `--list` 读取实际范围，不在文档维护断言总数或逐轮成绩。
+原生用例统一维护于 [军事测试事件](../../events/tests/tca_military_court_positions_test_events.txt)，由 `military_court_positions` 和 `military_council` 两个模块登记。前者覆盖资格、评分、任免与补位，后者覆盖任务、同署优先级及独占延迟生命周期。冷却／空池用例自备地方官署和真实监押，直接调用季度流程共用的人物收集入口，分别检查磨勘期拒绝、解除冷却后接纳、重新冷却后拒绝，以及有效官署在候选池为空时保持出缺；任务显示资格另测雇主正例和普通廷臣反例。用 `--list` 读取实际范围，不在文档维护断言总数或逐轮成绩。
 
 定向回归入口、验证边界及尚未执行的玩家界面、自然 AI、完整跨署升迁、旧存档与保存重载验收，统一见[联动验收](military_council_integration.md#回归与验收)。全模组回归按[测试运行说明](../testing/README.md)执行，军事定向结果不能替代全量结论。
 

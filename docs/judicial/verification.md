@@ -16,6 +16,8 @@
 
 无世族对照仅要求**发送时**没有世族头衔；若原生授职自动生成世族，仅销毁该测试人物的世族头衔。后续自然提刑维护可能补回世族，不把“永久没有世族”作为前提。每项会替换测试世界的路长官或提刑，不能在正常存档运行。
 
+司法审批失效用例 `tca_judicial_law_test.41/.42` 的原六条断言之后，会精确归还替换前仍存活的原提刑及实际官署，复用正式辖属、继承法与契约维护，恢复原剩余任期。仅清理本例创建的替任者及其新家门，不让其作为在任AI继续进入后续多年测试；新增断言分项检查官署持有人、原任主要头衔、实际领属和剩余任期恢复，并检查新人物没有遗留任职；任期通过命名script value恢复，临时数值变量随即清除。该收尾不取消世界计谋，也不修改原版宗教计谋事件。新增恢复断言仍需引擎定向复测，静态检查不能替代实际头衔事务验收。
+
 ## 原生发送与控制
 
 `common/scripted_effects/tests/fixtures/tca_judicial_arrest_test_effects.txt`通过正式`tca_request_imprison_interaction`的run_interaction发送，设置send_threshold=decline，**不设置execute_threshold**。禁止用execute_threshold=accept：该路径会直接执行OnAccept，不能测试审批队列。

@@ -213,26 +213,38 @@ tca_merit_annual_draw_pool_effect = {
         limit = { var:tca_ma_source = 1 }
         tca_merit_annual_draw_nine_to_eight_effect = { ROUTE = $ROUTE$ SOURCE = $SOURCE$ TARGET = $TARGET$ }
     }
-    else = {
+    else_if = {
+        # 额度已满（含零额度）时不建立剩余池、不读取权重，也不抽随机数。
+        limit = { var:tca_ma_success_$ROUTE$_$SOURCE$ < var:tca_ma_quota_$ROUTE$_$SOURCE$ }
         set_variable = { name = tca_ma_half_gap value = tca_merit_annual_half_gap_value }
         every_in_list = {
             list = tca_ma_candidates
             limit = { var:tca_ma_frozen_anchor = scope:tca_ma_anchor var:tca_ma_frozen_route = $ROUTE$ var:tca_ma_frozen_level = $SOURCE$ }
             add_to_list = tca_ma_remaining
         }
-        set_variable = { name = tca_ma_attempt_limit value = tca_merit_annual_remaining_count_value }
+        set_variable = { name = tca_ma_attempt_limit value = list_size:tca_ma_remaining }
         set_variable = { name = tca_ma_attempts value = 0 }
+        # 冻结余额在本轮不可变；只有移出池顶人物才需重算最大值。
+        # 仍按剩余池归一化，保留差值截断与定点精度，不能固定使用初始池顶。
+        set_variable = { name = tca_ma_max_dirty value = yes }
         while = {
             limit = {
                 var:tca_ma_attempts < var:tca_ma_attempt_limit
                 var:tca_ma_success_$ROUTE$_$SOURCE$ < var:tca_ma_quota_$ROUTE$_$SOURCE$
-                tca_merit_annual_remaining_count_value > 0
             }
-            set_variable = { name = tca_ma_max value = tca_merit_annual_max_value }
+            if = {
+                limit = { has_variable = tca_ma_max_dirty }
+                set_variable = { name = tca_ma_max value = tca_merit_annual_max_value }
+                remove_variable = tca_ma_max_dirty
+            }
             random_in_list = {
                 list = tca_ma_remaining
                 weight = { base = 0 modifier = { add = tca_merit_annual_weight_value } }
                 remove_from_list = tca_ma_remaining
+                if = {
+                    limit = { var:tca_ma_frozen_merit >= scope:tca_ma_anchor.var:tca_ma_max }
+                    scope:tca_ma_anchor = { set_variable = { name = tca_ma_max_dirty value = yes } }
+                }
                 scope:tca_ma_anchor = { change_variable = { name = tca_ma_attempts add = 1 } }
                 # 本次被抽中即留下“已尝试”标记；结算后只有未被抽中者才是正常落选。
                 # 仅为真实人类保存，AI不建立展示账；尝试成功/失效都在年度反馈末尾清理。
@@ -257,6 +269,7 @@ tca_merit_annual_draw_pool_effect = {
             }
         }
         every_in_list = { list = tca_ma_remaining remove_from_list = tca_ma_remaining }
+        remove_variable = tca_ma_max_dirty
     }
 }
 # 国家title作用域；第一关（九→八品）专用：冻结名单内该国家/路线/来源的全部候选逐个确定性尝试一次。

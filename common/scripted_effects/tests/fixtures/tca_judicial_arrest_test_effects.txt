@@ -47,6 +47,16 @@ tca_test_prepare_native_arrest_effect = {
     clear_saved_scope = tca_test_law_circuit
     clear_saved_scope = tca_test_law_position
     clear_saved_scope = tca_test_law_commissioner
+    # 一次性指定输入仅用于复现已观察到的授路销毁；仍沿当前快照与全部原资格筛选。
+    # 用本次0/1读取；私有输入由设置它的调用者在同链返回后立即删除，避免跨GROUP写状态。
+    save_scope_value_as = { name = tca_test_arrest_preferred_requested value = 0 }
+    save_scope_value_as = { name = tca_test_arrest_selected_found value = 0 }
+    title:h_china = { save_scope_as = tca_test_arrest_preferred_circuit }
+    if = { limit = { has_variable = tca_test_arrest_preferred_circuit }
+        var:tca_test_arrest_preferred_circuit = { save_scope_as = tca_test_arrest_preferred_circuit }
+        save_scope_value_as = { name = tca_test_arrest_preferred_requested value = 1 }
+    }
+    title:h_china = { save_scope_as = tca_test_law_circuit }
     scope:tca_test_law_sovereign = {
         every_in_list = {
             variable = tca_test_law_circuits
@@ -54,12 +64,16 @@ tca_test_prepare_native_arrest_effect = {
                 NOT = { has_variable = tca_test_arrest_fixture_used }
                 tca_is_judicial_circuit_trigger = yes
                 holder.primary_title = this
+                OR = { scope:tca_test_arrest_preferred_requested = 0 this = scope:tca_test_arrest_preferred_circuit }
             }
             # 每个合格条目均无条件覆盖继承而来的别名。
             # 最后一个合格条目生效，绝不以别名是否存在控制选择。
             save_scope_as = tca_test_law_circuit
+            save_scope_value_as = { name = tca_test_arrest_selected_found value = 1 }
         }
     }
+    # 没有满足原资格的指定路就不执行授职；调用者必须将其记为前置未执行。
+    if = { limit = { scope:tca_test_arrest_selected_found = 1 }
     # 遍历完成后，仅标记选中的路。
     scope:tca_test_law_circuit = { set_variable = { name = tca_test_arrest_fixture_used value = yes } }
     scope:tca_test_law_circuit = { save_scope_as = tca_test_arrest_estate_circuit }
@@ -189,6 +203,7 @@ tca_test_prepare_native_arrest_effect = {
     tca_setup_judicial_arrest_roles_effect = yes
     tca_setup_judicial_approval_effect = yes
     scope:intermediary ?= { save_scope_as = tca_test_arrest_approver }
+    }
 }
 
 tca_test_send_native_arrest_effect = {
@@ -259,16 +274,69 @@ tca_test_log_native_arrest_final_effect = {
 tca_test_log_native_arrest_fixture_effect = {
     if = {
         limit = { debug_only = yes }
-        debug_log = "TCA_ARREST_FIXTURE_$STAGE$"
-        clear_saved_scope = tca_test_arrest_fixture_circuit_holder
-        clear_saved_scope = tca_test_arrest_fixture_circuit_liege
-        scope:tca_test_law_circuit ?= {
-            holder ?= { save_scope_as = tca_test_arrest_fixture_circuit_holder }
-            de_facto_liege ?= { save_scope_as = tca_test_arrest_fixture_circuit_liege }
-        }
-        scope:tca_test_arrest_actor ?= {
+        debug_log = "TCA_ARREST_FIXTURE $STAGE$"
+        # 诊断也要显式mask继承别名；未找到holder时保留actor哨兵并写found=0。
+        save_scope_value_as = { name = tca_test_arrest_fixture_holder_found value = 0 }
+        save_scope_value_as = { name = tca_test_arrest_fixture_liege_found value = 0 }
+        save_scope_value_as = { name = tca_test_arrest_fixture_actor_counties value = 0 }
+        save_scope_value_as = { name = tca_test_arrest_fixture_holder_counties value = 0 }
+        save_scope_value_as = { name = tca_test_arrest_fixture_kind value = -1 }
+        save_scope_value_as = { name = tca_test_arrest_fixture_capital_found value = 0 }
+        save_scope_value_as = { name = tca_test_arrest_fixture_actor_capital_found value = 0 }
+        scope:tca_test_arrest_actor = {
+            save_scope_as = tca_test_arrest_fixture_circuit_holder
+            save_scope_as = tca_test_arrest_fixture_circuit_liege
+            save_scope_as = tca_test_arrest_fixture_capital_holder
+            save_scope_as = tca_test_arrest_fixture_actor_capital_holder
+            every_held_title = {
+                limit = { tier = tier_county is_noble_family_title = no is_landless_type_title = no }
+                save_scope_value_as = { name = tca_test_arrest_fixture_actor_counties value = { value = scope:tca_test_arrest_fixture_actor_counties add = 1 } }
+            }
+            capital_county.holder ?= {
+                save_scope_value_as = { name = tca_test_arrest_fixture_actor_capital_found value = 1 }
+                save_scope_as = tca_test_arrest_fixture_actor_capital_holder
+            }
+            if = { limit = { government_has_flag = government_is_celestial } debug_log = "TCA_ARREST_FIXTURE ACTOR_CELESTIAL" }
+            else = { debug_log = "TCA_ARREST_FIXTURE ACTOR_NOT_CELESTIAL" }
+            if = { limit = { vassal_contract_has_flag = celestial_province_military } debug_log = "TCA_ARREST_FIXTURE ACTOR_MILITARY_CONTRACT" }
+            if = { limit = { vassal_contract_has_flag = celestial_province_protectorate } debug_log = "TCA_ARREST_FIXTURE ACTOR_PROTECTORATE_CONTRACT" }
             if = { limit = { has_title = scope:tca_test_law_circuit } debug_log = "TCA_ARREST_FIXTURE REQUESTER_HAS_CIRCUIT" }
             else = { debug_log = "TCA_ARREST_FIXTURE REQUESTER_MISSING_CIRCUIT" }
+        }
+        if = { limit = { scope:tca_test_law_circuit = scope:tca_test_arrest_estate_circuit } debug_log = "TCA_ARREST_FIXTURE CIRCUIT_ID_UNCHANGED" }
+        else = { debug_log = "TCA_ARREST_FIXTURE CIRCUIT_ID_CHANGED" }
+        scope:tca_test_law_circuit ?= {
+            if = { limit = { has_variable = tca_circuit_kind } save_scope_value_as = { name = tca_test_arrest_fixture_kind value = var:tca_circuit_kind } }
+            if = { limit = { is_landless_type_title = yes } debug_log = "TCA_ARREST_FIXTURE CIRCUIT_LANDLESS" }
+            if = { limit = { tca_is_judicial_circuit_trigger = yes } debug_log = "TCA_ARREST_FIXTURE CIRCUIT_VALID" }
+            else = { debug_log = "TCA_ARREST_FIXTURE CIRCUIT_INVALID" }
+            # 原生任命继承法属于现任人物的realm，不能在路头衔作用域查询。
+            holder ?= {
+                if = { limit = { has_realm_law = celestial_appointment_succession_law } debug_log = "TCA_ARREST_FIXTURE CIRCUIT_CIVIL_APPOINTMENT" }
+                if = { limit = { has_realm_law = celestial_military_appointment_succession_law } debug_log = "TCA_ARREST_FIXTURE CIRCUIT_MILITARY_APPOINTMENT" }
+            }
+            title_capital_county.holder ?= {
+                save_scope_value_as = { name = tca_test_arrest_fixture_capital_found value = 1 }
+                save_scope_as = tca_test_arrest_fixture_capital_holder
+            }
+            holder ?= {
+                save_scope_as = tca_test_arrest_fixture_circuit_holder
+                save_scope_value_as = { name = tca_test_arrest_fixture_holder_found value = 1 }
+                every_held_title = {
+                    limit = { tier = tier_county is_noble_family_title = no is_landless_type_title = no }
+                    save_scope_value_as = { name = tca_test_arrest_fixture_holder_counties value = { value = scope:tca_test_arrest_fixture_holder_counties add = 1 } }
+                }
+                if = { limit = { government_has_flag = government_is_celestial } debug_log = "TCA_ARREST_FIXTURE HOLDER_CELESTIAL" }
+                else = { debug_log = "TCA_ARREST_FIXTURE HOLDER_NOT_CELESTIAL" }
+                if = { limit = { vassal_contract_has_flag = celestial_province_military } debug_log = "TCA_ARREST_FIXTURE HOLDER_MILITARY_CONTRACT" }
+                if = { limit = { vassal_contract_has_flag = celestial_province_protectorate } debug_log = "TCA_ARREST_FIXTURE HOLDER_PROTECTORATE_CONTRACT" }
+            }
+            de_facto_liege ?= {
+                holder ?= {
+                    save_scope_as = tca_test_arrest_fixture_circuit_liege
+                    save_scope_value_as = { name = tca_test_arrest_fixture_liege_found value = 1 }
+                }
+            }
         }
         debug_log_scopes = yes
     }
@@ -284,5 +352,39 @@ tca_test_record_direct_arrest_context_effect = {
         scope:actor = { set_variable = { name = tca_test_direct_arrest_backer value = scope:tca_governor } }
         debug_log = "TCA_EM DIRECT_NATIVE_CONTEXT"
         debug_log_scopes = yes
+    }
+}
+
+# 调试观察等待中原生请求的实时上下文；不重新发送或回复，不更换保存的审批者。
+# 报告者作用域；STAGE 为日志标签，参与者取本例固定 saved scopes。
+tca_test_diag_pending_arrest_effect = {
+    if = {
+        limit = { debug_only = yes }
+        scope:tca_test_arrest_actor = { save_scope_as = actor save_scope_as = puppet_or_actor }
+        scope:tca_test_arrest_target = { save_scope_as = recipient }
+        scope:tca_test_arrest_approver ?= { save_scope_as = intermediary }
+        debug_log = "TCA_ARREST_PENDING $STAGE$"
+        scope:tca_test_arrest_actor = {
+            debug_log = "TCA_ARREST_PENDING ACTOR id=[THIS.Char.GetID]"
+            primary_title ?= { debug_log = "TCA_ARREST_PENDING ACTOR_TITLE [THIS.Title.GetKey]" }
+            if = { limit = { tca_is_judicial_governor_trigger = yes } debug_log = "TCA_ARREST_PENDING ACTOR_GOVERNOR" }
+        }
+        scope:tca_test_arrest_target = {
+            debug_log = "TCA_ARREST_PENDING TARGET id=[THIS.Char.GetID]"
+            primary_title ?= { debug_log = "TCA_ARREST_PENDING TARGET_TITLE [THIS.Title.GetKey]" }
+            if = { limit = { tca_is_judicial_commissioner_trigger = yes } debug_log = "TCA_ARREST_PENDING TARGET_COMMISSIONER" }
+            if = { limit = { is_imprisoned = yes } debug_log = "TCA_ARREST_PENDING TARGET_IMPRISONED" }
+        }
+        scope:tca_test_arrest_approver ?= {
+            debug_log = "TCA_ARREST_PENDING APPROVER id=[THIS.Char.GetID]"
+            if = { limit = { is_alive = yes } debug_log = "TCA_ARREST_PENDING APPROVER_ALIVE" }
+            if = { limit = { is_imprisoned = yes } debug_log = "TCA_ARREST_PENDING APPROVER_IMPRISONED" }
+            if = { limit = { has_council_position = minister_justice } debug_log = "TCA_ARREST_PENDING APPROVER_JUSTICE" }
+            if = { limit = { tca_is_current_central_approver_trigger = { COURT = scope:tca_test_arrest_actor.top_liege } } debug_log = "TCA_ARREST_PENDING APPROVER_CURRENT" }
+        }
+        if = { limit = { tca_judicial_arrest_context_valid_trigger = yes } debug_log = "TCA_ARREST_PENDING CONTEXT_VALID" }
+        else = { debug_log = "TCA_ARREST_PENDING CONTEXT_INVALID" }
+        if = { limit = { tca_judicial_arrest_still_valid_trigger = yes } debug_log = "TCA_ARREST_PENDING STILL_VALID" }
+        else = { debug_log = "TCA_ARREST_PENDING NO_LONGER_VALID" }
     }
 }

@@ -77,6 +77,172 @@ class GameRunnerTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 reload_request('TCA_CLI RELOAD_SAVE ../outside', run)
 
+    def test_checkpoint_tokens_are_independently_single_use_and_human_is_last(self):
+        from run_game_tests import checkpoint_request
+        with tempfile.TemporaryDirectory() as temp:
+            run = Path(temp)
+            (run/'save games').mkdir()
+            for name in ('probe', 'tca_cli_human_session'):
+                (run/'save games'/f'{name}.ck3').write_bytes(b'SAV' + b'x'*100)
+            (run/'selection.json').write_text(json.dumps({'cases': [{'event': 'tca_retirement_session.1'}]}))
+            regular = 'console_success: Game saved to probe\nTCA_CLI RELOAD_SAVE probe'
+            human = 'console_success: Game saved to tca_cli_human_session\nTCA_CLI HUMAN_SAVE tca_cli_human_session'
+            self.assertEqual(checkpoint_request(regular, run, set()), ('reload', 'probe'))
+            self.assertEqual(checkpoint_request(human, run, {'reload'}), ('human', 'tca_cli_human_session'))
+            self.assertEqual(checkpoint_request(human, run, set()), ('human', 'tca_cli_human_session'))
+            for log, used in ((regular, {'reload'}), (human, {'human'}),
+                              (regular, {'human'}), (regular+'\n'+human, set())):
+                with self.subTest(log=log, used=used), self.assertRaises(ValueError):
+                    checkpoint_request(log, run, used)
+            with self.assertRaises(ValueError):
+                checkpoint_request(human.replace('tca_cli_human_session', 'wrong'), run, set())
+            (run/'selection.json').write_text(json.dumps({'cases': []}))
+            with self.assertRaises(ValueError):
+                checkpoint_request(human, run, set())
+
+    def test_checkpoint_parser_counts_native_output_without_console_command_echo(self):
+        from run_game_tests import checkpoint_request
+        with tempfile.TemporaryDirectory() as temp:
+            run = Path(temp)
+            (run/'save games').mkdir()
+            (run/'save games/tca_cli_human_session.ck3').write_bytes(b'SAV' + b'x'*100)
+            (run/'selection.json').write_text(json.dumps({'cases': [{'event': 'tca_retirement_session.1'}]}))
+            saved = '[08:55:39][D][console.cpp:1193]: console_success: Game saved to tca_cli_human_session'
+            # 实际run-esbkntx5的命令回显与debug_log输出是两条不同日志；回显本身不是请求。
+            echo = '[08:55:44][D][console.cpp:1164]: Running console command: effect title:h_china = { debug_log = "TCA_CLI HUMAN_SAVE tca_cli_human_session" }'
+            native = '[08:55:44][D][jomini_effect_impl.cpp:450]: file: effect console command line: 1: TCA_CLI HUMAN_SAVE tca_cli_human_session'
+            self.assertIsNone(checkpoint_request(saved+'\n'+echo, run, set()))
+            self.assertEqual(checkpoint_request('\n'.join((saved, echo, native)), run, set()),
+                             ('human', 'tca_cli_human_session'))
+            with self.assertRaises(ValueError):
+                checkpoint_request('\n'.join((saved, echo, native, native)), run, set())
+            # 原生输出中的非法路径仍须报错，不能被锚定规则静默忽略。
+            with self.assertRaises(ValueError):
+                reload_request('[D][jomini_effect_impl.cpp:450]: TCA_CLI RELOAD_SAVE ../outside', run)
+
+    def test_human_phase_requires_native_identity_then_transfer_then_observer(self):
+        from run_game_tests import human_phase_issues
+        log = '\n'.join(['TCA_RETIREMENT_HUMAN INITIAL_PLAYER_CONFIRMED',
+            'TCA_TEST BEGIN tca_retirement_session.1 tca_test_retirement_player_session',
+            'TCA_RETIREMENT_SESSION PLAYER_CONFIRMED',
+            'TCA_TEST CHECK_PASS tca_test_retirement_player_session 4',
+            'console_success: Going to observe mode',
+            'TCA_TEST CHECK_PASS tca_test_retirement_player_session 5'])
+        self.assertEqual(human_phase_issues(log), [])
+        self.assertTrue(human_phase_issues(log.replace('INITIAL_PLAYER_CONFIRMED', 'NOT_HUMAN')))
+        self.assertTrue(human_phase_issues(log.replace('TCA_RETIREMENT_SESSION PLAYER_CONFIRMED', '')))
+        self.assertTrue(human_phase_issues('console_success: Going to observe mode\n'+log))
+        self.assertTrue(human_phase_issues(log.replace('console_success: Going to observe mode', '')))
+
+    def test_cli_human_stage_is_wired_without_an_early_observe_or_suite_redispatch(self):
+        # 冻结适配器只在原生确认人类身份后续接被认领的同一个用例。
+        events = definitions((ROOT/'tools/cli_adapter/events/tca_cli_events.txt').read_text(encoding='utf-8-sig'))
+        boot = ' '.join(events['tca_cli.2'])
+        self.assertIn('orphan = yes', boot)
+        self.assertIn('is_ai = no', boot)
+        self.assertIn('INITIAL_PLAYER_CONFIRMED', boot)
+        self.assertIn('trigger_event = tca_retirement_session.1', boot)
+        self.assertNotIn('tca_run_observer_tests_effect', boot)
+        gui = (ROOT/'tools/cli_adapter/gui/tca_cli_widgets.gui').read_text(encoding='utf-8-sig')
+        self.assertIn("Var('tca_cli_human_phase')", gui)
+        native = definitions((ROOT/'events/tests/tca_retirement_session_test_events.txt').read_text(encoding='utf-8-sig'))
+        session = ' '.join(native['tca_retirement_session.1'])
+        self.assertIn('tca_cli_human_phase', session)
+        self.assertIn('debug_only = yes is_ai = no title:h_china.holder = root', session)
+        self.assertIn('TCA_TEST BEGIN tca_retirement_session.1', session)
+
+    def test_human_event_handlers_live_in_native_windows_and_preserve_original_bytes(self):
+        # 顶层自动widget没有EventWindow实例；适配器只在两个真实窗口内添加同一控件。
+        import hashlib
+        expected = {
+            'letter_event': 'eb141a50868cd0f32cb9327630a895024edaa9e7580ab4520be88032bfc4ee8c',
+            'character_event': 'b0c3efdd81d08e4682c6bdfa9c4fff76351083359b642e9420b8b9d389c6f2e9',
+        }
+        for name, digest in expected.items():
+            raw = (ROOT / f'tools/cli_adapter/gui/event_windows/{name}.gui').read_bytes()
+            start = raw.index(b'\t# TCA_CLI_NATIVE_EVENT_BEGIN')
+            end = raw.index(b'\t# TCA_CLI_NATIVE_EVENT_END', start)
+            end = raw.index(b'\n', end) + 1
+            block = raw[start:end].decode('utf-8')
+            self.assertIn('EventWindow.IsOnTop', block)
+            self.assertIn('EventOption.IsValid', block)
+            self.assertIn("'(CFixedPoint)3'", block)
+            self.assertIn('EventOption.Select', block)
+            self.assertIn('PdxGuiWidget.GetIndexInDataModel', block)
+            commands = [line.strip() for line in block.splitlines() if 'ExecuteConsoleCommand' in line]
+            self.assertEqual(len(commands), 1)
+            self.assertIn(f'TCA_CLI HUMAN_NATIVE_OPTION {name}', commands[0])
+            self.assertIn('effect debug_log =', commands[0])
+            self.assertNotIn('trigger_event', block)
+            self.assertNotIn('OnPause', block)
+            self.assertEqual(hashlib.sha256(raw[:start] + raw[end:]).hexdigest(), digest)
+        registration = (ROOT / 'tools/cli_adapter/gui/scripted_widgets/tca_cli_widgets.txt').read_text(encoding='utf-8-sig')
+        self.assertNotIn('= tca_cli_human_event_continue', registration)
+
+    def test_human_entry_explicitly_exercises_native_letter_and_character_windows(self):
+        # 两个原版debug事件均只有无副作用的真实选项；必须在is_ai确认后才触发。
+        native = ' '.join(definitions((ROOT/'tools/cli_adapter/events/tca_cli_events.txt').read_text(encoding='utf-8-sig'))['tca_cli.2'])
+        for event in ('debug.1004', 'debug.1005'):
+            call = f'trigger_event = {event}'
+            self.assertIn(call, native)
+            self.assertLess(native.index('is_ai = no'), native.index(call))
+            self.assertLess(native.index('name = tca_cli_human_phase value = 3'), native.index(call))
+            self.assertLess(native.index(call), native.index('trigger_event = tca_retirement_session.1'))
+
+    def test_human_checkpoint_widget_survives_prepare_and_cannot_restart_after_load(self):
+        # 此处检查GUI生命周期接线；原生保存与实际续局仍必须由引擎验收。
+        gui = (ROOT/'tools/cli_adapter/gui/tca_cli_human_checkpoint.gui').read_text(encoding='utf-8-sig')
+        widget = gui.split('name = "tca_cli_human_checkpoint"', 1)[1].split('# 关闭CLI自动恢复暂停后才停靠', 1)[0]
+        visible = next(line for line in widget.splitlines() if line.strip().startswith('visible ='))
+        self.assertIn("Or(EqualTo_CFixedPoint(Title.MakeScope.Var('tca_cli_human_phase').GetValue, '(CFixedPoint)1'), And(EqualTo_CFixedPoint(Title.MakeScope.Var('tca_cli_human_phase').GetValue, '(CFixedPoint)2'), GetVariableSystem.HasValue('tca_cli_human_started', 'yes')))", visible)
+        show = widget.split('name = _show', 1)[1].split('next = tca_cli_human_prepare', 1)[0]
+        self.assertIn("GetVariableSystem.Set('tca_cli_human_started', 'yes')", show)
+        request = widget.split('name = tca_cli_human_request', 1)[1]
+        self.assertIn("Not(GetVariableSystem.HasValue('tca_cli_human_requested', 'yes'))", request)
+        self.assertIn("GetVariableSystem.Set('tca_cli_human_requested', 'yes')", request)
+        self.assertIn('TCA_CLI HUMAN_SAVE tca_cli_human_session', request)
+
+    def test_native_load_human_boot_uses_fresh_gui_and_confirms_before_phase_three(self):
+        # -loadsave不依赖退出新开局大厅的回调；新进程UI不带首进程started标记。
+        gui = (ROOT/'tools/cli_adapter/gui/tca_cli_human_checkpoint.gui').read_text(encoding='utf-8-sig')
+        boot = gui.split('name = "tca_cli_human_load_boot"', 1)[1]
+        self.assertIn("EqualTo_CFixedPoint(Title.MakeScope.Var('tca_cli_human_phase').GetValue, '(CFixedPoint)2')", boot)
+        self.assertIn("Not(GetVariableSystem.HasValue('tca_cli_human_started', 'yes'))", boot)
+        self.assertIn("Not(GetVariableSystem.HasValue('tca_cli_human_booted', 'yes'))", boot)
+        self.assertIn('trigger_event = tca_cli.2', boot)
+        self.assertNotIn('tca_retirement_human_run', boot)
+        self.assertNotIn('name = tca_cli_human_phase value = 3', boot)
+        events = definitions((ROOT/'tools/cli_adapter/events/tca_cli_events.txt').read_text(encoding='utf-8-sig'))
+        native = ' '.join(events['tca_cli.2'])
+        self.assertIn('var:tca_cli_human_phase ?= 2', native)
+        self.assertIn('is_ai = no', native)
+        self.assertIn('has_character_flag = tca_test_lane_tca_retirement_session_active', native)
+        self.assertLess(native.index('is_ai = no'), native.index('name = tca_cli_human_phase value = 3'))
+        action = (ROOT/'tools/cli_adapter/common/on_action/tca_cli_on_actions.txt').read_text(encoding='utf-8-sig')
+        self.assertNotIn('name = tca_cli_human_phase value = 3', action)
+
+    def test_player_transfer_request_is_consumed_by_original_native_reporter_once(self):
+        # GUI只提交请求，原生链负责保持原报告者、消费防重及真实两日等待。
+        effects = definitions((ROOT/'common/scripted_effects/tests/fixtures/tca_retirement_session_probe_effects.txt').read_text(encoding='utf-8-sig'))
+        gui = ' '.join(effects['tca_retirement_session_gui_transfer_effect'])
+        self.assertNotIn('trigger_event', gui)
+        self.assertIn('name = tca_retirement_session_transfer_request value = 1', gui)
+        self.assertIn('tca_retirement_session_transfer_queued', gui)
+        events = definitions((ROOT/'events/tests/tca_retirement_session_test_events.txt').read_text(encoding='utf-8-sig'))
+        prepare = ' '.join(events['tca_retirement_session.1001'])
+        self.assertIn('id = tca_retirement_session.1010 days = 1', prepare)
+        watcher = ' '.join(events['tca_retirement_session.1010'])
+        self.assertIn('tca_test_validate_environment_effect = yes', watcher)
+        self.assertIn('has_character_flag = tca_test_lane_tca_retirement_session_active', watcher)
+        self.assertIn('name = tca_retirement_session_transfer_request value = 0', watcher)
+        self.assertIn('name = tca_retirement_session_transfer_queued value = 1', watcher)
+        self.assertIn('id = tca_retirement_session.1002 days = 2', watcher)
+        transfer = ' '.join(events['tca_retirement_session.1002'])
+        # 延迟入口先通过共同环境守门，再记录业务入口；不能为诊断绕过统一中止契约。
+        self.assertLess(transfer.index('tca_test_validate_environment_effect'), transfer.index('TRANSFER_EVENT_ENTERED'))
+        self.assertLess(transfer.index('TRANSFER_EVENT_ENTERED'), transfer.index('name = tca_retirement_session_phase value = 2'))
+        self.assertIn('is_ai = no', transfer)
+
     def test_phase_archive_and_merge_preserve_every_raw_error_and_assertion(self):
         from run_game_tests import archive_phase_logs, merge_phase_logs
         with tempfile.TemporaryDirectory() as temp:
@@ -110,11 +276,14 @@ class GameRunnerTests(unittest.TestCase):
             (root/'binaries').mkdir()
             emitter = root/'emit.py'
             emitter.write_text('''from pathlib import Path
-import sys, time
+import json, sys, time
 run = Path(sys.argv[1])
 resume = sys.argv[2] == 'resume'
 (run/'logs').mkdir(exist_ok=True)
 name = 'tca_test_exam_contract'
+# 日志夹具按冻结计划分成两段，科举扩充断言不会使控制器测试读到旧总数。
+checks = json.loads((run/'selection.json').read_text())['cases'][0]['checks']
+split = checks // 2 + 1
 lines = []
 if not resume:
     (run/'save games').mkdir()
@@ -123,7 +292,7 @@ if not resume:
               'TCA_TEST BEGIN tca_exam_test.1 ' + name]
 if not resume or sys.argv[3] == 'yes':
     lines += ['console_success: Going to observe mode']
-lines += [f'TCA_TEST CHECK_PASS {name} {i}' for i in (range(20,39) if resume else range(1,20))]
+lines += [f'TCA_TEST CHECK_PASS {name} {i}' for i in (range(split, checks + 1) if resume else range(1, split))]
 lines += ([f'TCA_TEST PASS {name}', 'TCA_TEST SUITE_ALL_PASSED'] if resume else
           ['console_success: Game saved to probe', 'TCA_CLI RELOAD_SAVE probe'])
 (run/'logs/debug.log').write_text('\\n'.join(lines) + '\\n')
@@ -141,10 +310,69 @@ time.sleep(20)
             log = (run/'logs/debug.log').read_text()
             self.assertEqual(log.count('TCA_TEST SUITE_DISPATCH'), 1)
             self.assertEqual(log.count('TCA_TEST BEGIN'), 1)
-            self.assertEqual(log.count('TCA_TEST CHECK_PASS'), 38)
+            self.assertEqual(log.count('TCA_TEST CHECK_PASS'),
+                             json.loads((run/'selection.json').read_text())['cases'][0]['checks'])
             self.assertEqual(json.loads((run/'terminal.json').read_text())['phases'], 2)
             evidence = json.loads((run/'reload_evidence.json').read_text())
             self.assertEqual(len(evidence['raw_logs']), 4)
+
+    def test_three_processes_keep_both_checkpoint_tokens_and_native_human_evidence(self):
+        self._check_human_process_protocol(False)
+
+    def test_human_process_early_observe_cannot_be_hidden_by_final_observe(self):
+        self._check_human_process_protocol(True)
+
+    def _check_human_process_protocol(self, early_observe):
+        """只用日志协议夹具验证进程、封存与验收控制器；不模拟玩家或退休业务。"""
+        from run_game_tests import run_game
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root/'binaries').mkdir()
+            emitter = root/'emit.py'
+            emitter.write_text('''from pathlib import Path
+import sys, time
+run = Path(sys.argv[1])
+phase = sys.argv[2]
+(run/'logs').mkdir(exist_ok=True)
+(run/'save games').mkdir(exist_ok=True)
+name = 'tca_test_retirement_player_session'
+if phase == 'start':
+    (run/'save games/probe.ck3').write_bytes(b'SAV' + b'x'*100)
+    lines = ['TCA_TEST SUITE_DISPATCH', 'console_success: Going to observe mode',
+             'console_success: Game saved to probe', 'TCA_CLI RELOAD_SAVE probe']
+elif phase == 'probe':
+    (run/'save games/tca_cli_human_session.ck3').write_bytes(b'SAV' + b'x'*100)
+    lines = ['console_success: Going to observe mode',
+             'console_success: Game saved to tca_cli_human_session',
+             'TCA_CLI HUMAN_SAVE tca_cli_human_session']
+else:
+    lines = ['console_success: Going to observe mode'] if sys.argv[3] == 'early' else []
+    lines += ['TCA_RETIREMENT_HUMAN INITIAL_PLAYER_CONFIRMED',
+              'TCA_TEST BEGIN tca_retirement_session.1 ' + name,
+              'TCA_RETIREMENT_SESSION PLAYER_CONFIRMED']
+    lines += [f'TCA_TEST CHECK_PASS {name} {i}' for i in range(1, 5)]
+    lines += ['console_success: Going to observe mode',
+              f'TCA_TEST CHECK_PASS {name} 5', f'TCA_TEST PASS {name}', 'TCA_TEST SUITE_ALL_PASSED']
+(run/'logs/debug.log').write_text('\\n'.join(lines) + '\\n')
+(run/'logs/error.log').write_text('')
+time.sleep(20)
+''', encoding='utf-8')
+            run = prepare_run(ROOT, root/'runs', root/'absent', 'tca_retirement_session.1')
+            args = SimpleNamespace(game_dir=root, seed=None, timeout=30, strict_title_heir=False)
+            def command(_args, target, save_name=None):
+                return [sys.executable, str(emitter), str(target), save_name or 'start',
+                        'early' if early_observe else 'normal']
+            with patch('run_game_tests.game_command', side_effect=command):
+                self.assertEqual(run_game(args, run), 2 if early_observe else 0)
+            terminal = json.loads((run/'terminal.json').read_text())
+            self.assertEqual(terminal['phases'], 3)
+            self.assertEqual(terminal['phase_modes'], ['observer', 'observer', 'human'])
+            self.assertEqual(terminal['human_phases'], [3])
+            self.assertEqual(terminal['snapshot_issues'] == [], not early_observe)
+            log = (run/'logs/debug.log').read_text()
+            self.assertEqual(log.count('TCA_TEST BEGIN '), 1)
+            self.assertEqual(log.count('TCA_TEST CHECK_PASS '), 5)
+            self.assertEqual(len(json.loads((run/'reload_evidence.json').read_text())['raw_logs']), 6)
 
     def test_frozen_checker_imports_nested_helpers_without_source_checkout(self):
         # 在源码目录之外执行封存验收器，防止导入意外回退到工作目录。
@@ -154,7 +382,8 @@ time.sleep(20)
             logs.mkdir()
             name = 'tca_test_exam_contract'
             lines = ['TCA_TEST SUITE_DISPATCH', f'TCA_TEST BEGIN tca_exam_test.1 {name}']
-            lines += [f'TCA_TEST CHECK_PASS {name} {i}' for i in range(1, 39)]
+            checks = json.loads((run/'selection.json').read_text())['cases'][0]['checks']
+            lines += [f'TCA_TEST CHECK_PASS {name} {i}' for i in range(1, checks + 1)]
             lines += [f'TCA_TEST PASS {name}', 'TCA_TEST SUITE_ALL_PASSED']
             (logs/'debug.log').write_text('\n'.join(lines))
             (logs/'error.log').write_text('')

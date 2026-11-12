@@ -92,47 +92,131 @@ def _frame_function(line):
     return match.group(1).strip() if match else ''
 
 
-def _script_stack_related(entry, owned_paths):
-    """判断脚本错误栈是否落在本模组脚本。
+def _registration_frame(frame, source_root):
+    """只认可给定源码及其登记中的纯on_actions父块；缺证据一律保守拒绝。"""
+    if source_root is None:
+        return None
+    match = re.fullmatch(r'(?:Script location: )?file: (common/on_action/[\w./-]+) line: (\d+) \((\w+)\)', frame)
+    if not match:
+        return None
+    path, line, parent = match.groups()
+    if '..' in Path(path).parts:
+        return None
+    source = Path(source_root)
+    registry_path = source / 'tools/upstream_overrides.json'
+    if not registry_path.is_file() and source.name == 'tca_main' and source.parent.name == 'mod':
+        # 运行器冻结业务源码与工具分目录存放，必须是同一个run的工具快照。
+        registry_path = source.parent.parent / 'tools/upstream_overrides.json'
+    try:
+        registry = json.loads(registry_path.read_text(encoding='utf-8'))
+        entries = [item for item in registry.get('known_extensions', [])
+                   if item.get('key') == parent and item.get('mod') == path
+                   and item.get('vanilla', '').startswith('common/on_action/')]
+        if len(entries) != 1:
+            return None
+        raw = (source / path).read_text(encoding='utf-8-sig')
+        clean = re.sub(r'#[^\n]*', '', raw)
+        heads = list(re.finditer(r'(?m)^[ \t]*' + re.escape(parent) + r'\s*=\s*', clean))
+        if len(heads) != 1:
+            return None
+        head = heads[0]
+        body = re.match(r'\{\s*on_actions\s*=\s*\{\s*(?:[A-Za-z_]\w*\s*)+\}\s*\}', clean[head.end():])
+        if not body:
+            return None
+        # 纯块必须是解析器所见的完整父定义，不能只匹配带effect的块之前缀。
+        from check_upstream_overrides import tokens
+        if definitions(raw).get(parent) != tokens(body[0]):
+            return None
+        first_line = clean.count('\n', 0, head.start()) + 1
+        last_line = clean.count('\n', 0, head.end() + body.end()) + 1
+        if not first_line <= int(line) <= last_line:
+            return None
+        return {'classification': 'native-registration-frame', 'path': path,
+                'parent': parent, 'line': int(line)}
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        return None
 
-    Script system error 的正文会内嵌角色名、头衔名等运行时文本；模组头衔键
-    （如 c_tca_tongpan_junzhou）随原生脚本错误被打印时，不能仅凭正文里的
-    `tca_` 认定为模组错误。这里只看 `Script location:` 之后的 file: 栈帧。
 
-    原版 on_action 允许各文件追加同名定义，引擎栈会把同一 on_action 的
-    其他定义也列出来（例如本模组只追加 `on_death = { on_actions = {...} }`
-    时，原版 death.txt:1561 的 on_death 自身错误也会带上本模组文件名）。
-    这类“同名 on_action 组合帧”不是调用来源，不据此归属模组；真正的
-    模组 effect／trigger 帧函数名不同，仍会命中。首个脚本位置本身就是
-    模组文件时，无论函数名如何都视为模组相关。
-    """
-    frames = []
-    for line in entry.splitlines():
-        stripped = line.strip()
-        if not (stripped.startswith('file:') or stripped.startswith('Script location:')):
+def _runtime_character_field(detail, frames, source_root):
+    """仅识别两种原生错误的人物字段；源码登记与完整脚本栈缺失时不应用。"""
+    if source_root is None or not Path(source_root).is_dir() or not frames:
+        return None
+    source = Path(source_root)
+    registry_path = source / 'tools/upstream_overrides.json'
+    if not registry_path.is_file() and source.name == 'tca_main' and source.parent.name == 'mod':
+        registry_path = source.parent.parent / 'tools/upstream_overrides.json'
+    try:
+        registry = json.loads(registry_path.read_text(encoding='utf-8'))
+        if not isinstance(registry.get('known_extensions'), list):
+            return None
+    except (OSError, ValueError, AttributeError):
+        return None
+    if any(not re.fullmatch(r'(?:Script location: )?file: (?:common|events)/[\w./-]+ line: [1-9]\d* \(.+\)', frame) for frame in frames):
+        return None
+    # 人物格式不依赖tca前缀；以数字ID和完整固定错误语法界定字段，不做全局字符串替换。
+    character = (r'(?P<character>[^()\[\]\r\n]+ of [^()\[\]\r\n]+ '
+                 r'\(Internal ID:? (?P<id>[1-9]\d*)(?: - Historical ID (?P<history>[\w.-]+))?\))')
+    patterns = (
+        r'reverse_add_opinion effect \[ ' + character + r' is trying to add an opinion of themself \]',
+        r"change_opportunities effect \[ Invalid scheme '[A-Za-z_]\w*' with owner " + character + r' and target [^\r\n]+ \]',
+    )
+    for pattern in patterns:
+        match = re.fullmatch(pattern, detail)
+        if match:
+            start, end = match.span('character')
+            return (detail[:start] + '<runtime-character>' + detail[end:],
+                    {'character_id': int(match['id']), 'historical_id': match['history'],
+                     'display': match['character']})
+    return None
+
+
+def _script_stack_related(entry, owned_paths, source_root=None, diagnostics=None):
+    """纯注册父帧只表示结构来源；任何实际模组执行帧或错误正文仍阻断。"""
+    frames = [line.strip() for line in entry.splitlines()
+              if line.strip().startswith(('file:', 'Script location:'))]
+    proofs = []
+    detail = re.search(r'Error: ([^\n]+)', entry)
+    runtime_titles = []
+    runtime_character = None
+    if detail:
+        # 仅扩展同一种带引擎Internal ID的人物头衔展示；不删除姓名、历史ID或其它正文。
+        pattern = r'\bof [bcdkeh]_tca_\w+ (?=\(Internal ID:? \d+(?: - Historical ID [\w.-]+)?\))'
+        runtime_titles = re.findall(pattern, detail[1])
+        text = re.sub(pattern, 'of <runtime-title> ', detail[1])
+        character_field = _runtime_character_field(detail[1], frames, source_root)
+        if character_field:
+            text, runtime_character = character_field
+            runtime_titles = []
+        old_text = re.sub(r'\bof [bcdkeh]_tca_\w+ (?=\(Internal ID: \d+\))', 'of <runtime-title> ', detail[1])
+        if not runtime_character and text != old_text and (source_root is None or not Path(source_root).is_dir() or not frames):
+            return True  # 新格式缺少指定源码／有效栈时，不能单凭展示格式放行。
+        if 'tca_' in text or '提点刑狱司' in text:
+            return True
+    for index, frame in enumerate(frames):
+        frame_path = re.search(r'file: ([^ ]+) line:', frame)
+        in_source = bool(source_root is not None and frame_path and '..' not in Path(frame_path[1]).parts
+                         and (Path(source_root) / frame_path[1]).is_file())
+        if not (in_source or 'tca_' in frame or '提点刑狱司' in frame or any(path in frame for path in owned_paths)):
             continue
-        frames.append(stripped)
-    if not frames:
-        return False
-    first_function = _frame_function(frames[0])
-    first_is_mod = 'tca_' in frames[0] or '提点刑狱司' in frames[0] or any(
-        path in frames[0] for path in owned_paths)
-    if first_is_mod:
-        return True
-    for frame in frames[1:]:
-        is_mod = 'tca_' in frame or '提点刑狱司' in frame or any(
-            path in frame for path in owned_paths)
-        if not is_mod:
-            continue
-        # 仅追加同类 on_action 定义时，组合帧与首个位置同名，不构成调用来源。
-        if (frame.startswith('file: common/on_action/')
-                and _frame_function(frame) == first_function):
-            continue
-        return True
+        proof = _registration_frame(frame, source_root) if index else None
+        if proof is None:
+            return True
+        proofs.append(proof)
+    if runtime_character and proofs:
+        return True  # 此窄分类只接纳全原生执行栈，不复用纯注册帧分类来扩大边界。
+    if runtime_character and diagnostics is not None:
+        diagnostics.append({'classification': 'native-runtime-character',
+                            'character': runtime_character, 'raw': entry})
+    if proofs and diagnostics is not None:
+        diagnostics.append({'classification': 'native_error_with_mod_registration',
+                            'frames': proofs, 'raw': entry})
+    if runtime_titles and diagnostics is not None:
+        diagnostics.append({'classification': 'native-runtime-title',
+                            'runtime_titles': runtime_titles, 'raw': entry})
     return False
 
 
-def _inspect_engine_entries(entries):
+def _inspect_engine_entries(entries, source_root=None, diagnostics=None):
     """逐条分类启动期引擎错误，返回顺序与原文逐条扫描一致。"""
     registry = json.loads((ROOT / 'tools/upstream_overrides.json').read_text(encoding='utf-8'))
     owned_paths = {entry['mod'] for section in ('overrides', 'file_overrides')
@@ -148,7 +232,7 @@ def _inspect_engine_entries(entries):
         loc_error = re.search(r"Data error in loc string '([^']+)'", entry)
         if 'Script system error' in entry:
             # 脚本错误只看调用栈；正文中的头衔／角色名可能是原生运行时文本。
-            related = _script_stack_related(entry, owned_paths)
+            related = _script_stack_related(entry, owned_paths, source_root, diagnostics)
         else:
             related = ('tca_' in entry or '提点刑狱司' in entry or
                        any(path in entry for path in owned_paths) or
@@ -204,9 +288,9 @@ def _inspect_engine_entries(entries):
     return [f'Engine error ({count}): {label}' for label, count in findings.items()]
 
 
-def inspect_engine_errors(errors):
+def inspect_engine_errors(errors, source_root=None, diagnostics=None):
     """纳入已审阅的整文件 GUI 覆盖，即使错误中没有 tca_ 标识。"""
-    return _inspect_engine_entries(_engine_entries(errors))
+    return _inspect_engine_entries(_engine_entries(errors), source_root, diagnostics)
 
 
 def _debug_error_entries(debug, logged_errors):
@@ -313,7 +397,7 @@ def _scan_latest(debug, strict_title_heir=False):
     return scan
 
 
-def _inspect_scan(scan, debug, errors, expected):
+def _inspect_scan(scan, debug, errors, expected, source_root=None, diagnostics=None):
     """由单遍解析结果生成问题列表与结果汇总；文本、顺序与计数保持原样。"""
     if not scan.dispatched:
         return ['No suite dispatch found'], Counter()
@@ -351,17 +435,17 @@ def _inspect_scan(scan, debug, errors, expected):
     error_entries = list(_engine_entries(errors))
     logged_errors = set(error_entries)
     issues.extend(_inspect_engine_entries(
-        chain(error_entries, _debug_error_entries(debug, logged_errors))))
+        chain(error_entries, _debug_error_entries(debug, logged_errors)), source_root, diagnostics))
     summary = Counter({kind: sum(count for (k, _), count in scan.results.items() if k == kind)
                        for kind in ['BEGIN', 'PASS', 'FAIL', 'PRECONDITION_FAIL']})
     summary.update(scan.checks)
     return issues, summary
 
 
-def inspect_run(debug, errors, expected, strict_title_heir=False):
+def inspect_run(debug, errors, expected, strict_title_heir=False, source_root=None, diagnostics=None):
     """核对一次运行：单遍解析最新派发，再逐条检查引擎错误。"""
     scan = _scan_latest(debug, strict_title_heir)
-    return _inspect_scan(scan, debug, errors, expected)
+    return _inspect_scan(scan, debug, errors, expected, source_root, diagnostics)
 
 
 def selected_case_expectations(entry, root=ROOT):
@@ -405,11 +489,13 @@ def case_outcomes(debug, expected):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--logs', type=Path, default=ROOT.parent.parent / 'logs')
+    parser.add_argument('--output', type=Path, help='write verification to a separate path without modifying frozen results')
     parser.add_argument('--case', help='verify only this maintained native case')
     parser.add_argument('--strict-title-heir', action='store_true', help='fail when native appointment differs from preview head')
     parser.add_argument('--source-root', type=Path, help='exact frozen mod source used by this run')
     args = parser.parse_args()
     source = args.source_root or (args.logs.parent / 'mod/tca_main')
+    proof_source = source if source.is_dir() else None
     if not source.is_dir():
         source = ROOT
         print('WARNING: no source snapshot; checking current case counts only')
@@ -432,7 +518,8 @@ def main():
     debug = (args.logs / 'debug.log').read_text(encoding='utf-8', errors='replace') if (args.logs / 'debug.log').is_file() else ''
     errors = (args.logs / 'error.log').read_text(encoding='utf-8', errors='replace') if (args.logs / 'error.log').is_file() else ''
     scan = _scan_latest(debug, args.strict_title_heir)
-    issues, counts = _inspect_scan(scan, debug, errors, expected)
+    diagnostics = []
+    issues, counts = _inspect_scan(scan, debug, errors, expected, source_root=proof_source, diagnostics=diagnostics)
     if (args.logs.parent / 'source_manifest.json').is_file():
         from run_game_tests import verify_snapshot
         issues.extend(verify_snapshot(args.logs.parent))
@@ -445,8 +532,13 @@ def main():
         print(f'... {len(issues) - 30} further issues')
     scope = plan.get('scope', 'legacy selection') if plan else 'selected case' if args.case else 'all current cases'
     cases = _case_states(scan, expected)
-    (args.logs.parent / 'verification.json').write_text(json.dumps(
+    for item in diagnostics:
+        print('Native background error (' + item['classification'] + '): ' + item['raw'].strip())
+    (args.output or args.logs.parent / 'verification.json').write_text(json.dumps(
         {'scope': scope, 'cases': cases, 'counts': dict(counts), 'issues': issues,
+         'native_registration_diagnostics': [item for item in diagnostics if item['classification'] == 'native_error_with_mod_registration'],
+         'native_runtime_title_diagnostics': [item for item in diagnostics if item['classification'] == 'native-runtime-title'],
+         'native_runtime_character_diagnostics': [item for item in diagnostics if item['classification'] == 'native-runtime-character'],
          'verification_exit': int(bool(issues))}, ensure_ascii=False, indent=2) + '\n')
     print('NOT VERIFIED' if issues else f'OK: {scope} passed; no detected mod-related engine errors')
     return int(bool(issues))

@@ -1,0 +1,147 @@
+﻿# 报告者作用域；只重建本例owned父亲的旧法输入，不测其跨月can_keep资格。
+# 借用的真实路不写title law；当前持有人必须仍是owned父亲，已有realm法不重写。
+tca_test_prepare_circuit_heir_family_law_effect = {
+    if = {
+        limit = {
+            var:tca_cs13_holder ?= { is_alive = yes has_character_flag = tca_cs13_owned_parent }
+            var:tca_cs13_road ?= { has_variable = tca_cs13_borrowed_road holder = root.var:tca_cs13_holder }
+        }
+        var:tca_cs13_holder = {
+            if = { limit = { NOT = { has_realm_law = single_heir_succession_law } } add_realm_law_skip_effects = single_heir_succession_law }
+            scriptedtests_recalculate_succession = yes
+        }
+    }
+}
+
+# 原参与者人物作用域；只记录本例新加的保护，去重后跨日保存在报告者列表。
+tca_test_protect_circuit_heir_original_effect = {
+    if = { limit = { is_alive = yes NOT = { has_trait = tca_test_death_protection } }
+        save_scope_as = tca_cs13_protecting_original
+        root = { add_to_variable_list = { name = tca_cs13_protected_people target = scope:tca_cs13_protecting_original } }
+        add_trait = tca_test_death_protection
+    }
+}
+
+# 报告者作用域；保留保护到归还后的三日核对，只移除本例所有的保护。
+tca_test_release_circuit_heir_original_protection_effect = {
+    every_in_list = { variable = tca_cs13_protected_people if = { limit = { is_alive = yes } remove_trait = tca_test_death_protection } }
+    clear_variable_list = tca_cs13_protected_people
+}
+
+# 报告者作用域；先按已验证local_domain事务结构精确归还真实县／路，再清自建家门与父子。
+# 真实人物从不set_merit_level或写Merit；冷却只恢复借用前日数扣除实际经过天数。
+tca_test_cleanup_circuit_heir_fixture_effect = {
+    if = {
+        limit = { has_variable = tca_cs13_borrowed var:tca_cs13_original_holder ?= { is_alive = yes } var:tca_cs13_county_holder ?= { is_alive = yes } }
+        var:tca_cs13_road = {
+            set_variable = { name = tca_circuit_kind value = root.var:tca_cs13_original_kind }
+            if = { limit = { NOT = { de_jure_liege = root.var:tca_cs13_parent } } set_de_jure_liege_title = root.var:tca_cs13_parent }
+            remove_variable = tca_cs13_borrowed_road
+        }
+        var:tca_cs13_original_capital = {
+            if = { limit = { NOT = { de_jure_liege = root.var:tca_cs13_county_parent } } set_de_jure_liege_title = root.var:tca_cs13_county_parent }
+        }
+        create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_cs13_restore }
+        var:tca_cs13_original_capital = { change_title_holder = { holder = root.var:tca_cs13_county_holder change = scope:tca_cs13_restore } }
+        var:tca_cs13_road = { change_title_holder = { holder = root.var:tca_cs13_original_holder change = scope:tca_cs13_restore } }
+        resolve_title_and_vassal_change = scope:tca_cs13_restore
+        var:tca_cs13_original_holder = {
+            if = { limit = { NOT = { liege = root.var:tca_cs13_original_liege } }
+                create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_cs13_restore_fealty }
+                change_liege = { liege = root.var:tca_cs13_original_liege change = scope:tca_cs13_restore_fealty }
+                resolve_title_and_vassal_change = scope:tca_cs13_restore_fealty
+            }
+            if = { limit = { NOT = { government_has_flag = government_is_celestial } } change_government = celestial_government }
+            # 借出最后实职后原生可自动换继承法；两位原任在选择时均确认原有此法，仅还原缺失项。
+            if = { limit = { NOT = { has_realm_law = celestial_appointment_succession_law } } add_realm_law_skip_effects = celestial_appointment_succession_law }
+            if = { limit = { NOT = { vassal_contract_has_flag = celestial_province_standard } } vassal_contract_set_obligation_level = { type = celestial_provinces level = celestial_province_standard } }
+            if = { limit = { has_title = root.var:tca_cs13_original_primary NOT = { primary_title = root.var:tca_cs13_original_primary } } set_primary_title_to = root.var:tca_cs13_original_primary }
+            if = { limit = { has_title = root.var:tca_cs13_original_capital NOT = { capital_county = root.var:tca_cs13_original_capital } } set_realm_capital = root.var:tca_cs13_original_capital }
+        }
+        # 县／路同一原任时，primary/capital/liege/law/冷却只按同一快照恢复一次。
+        if = {
+            limit = { NOT = { var:tca_cs13_county_holder = var:tca_cs13_original_holder } }
+            var:tca_cs13_county_holder = {
+                if = { limit = { NOT = { liege = root.var:tca_cs13_county_liege } }
+                    create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_cs13_restore_county_fealty }
+                    change_liege = { liege = root.var:tca_cs13_county_liege change = scope:tca_cs13_restore_county_fealty }
+                    resolve_title_and_vassal_change = scope:tca_cs13_restore_county_fealty
+                }
+                if = { limit = { NOT = { government_has_flag = government_is_celestial } } change_government = celestial_government }
+                # 借出最后实职后原生可自动换继承法；两位原任在选择时均确认原有此法，仅还原缺失项。
+                if = { limit = { NOT = { has_realm_law = celestial_appointment_succession_law } } add_realm_law_skip_effects = celestial_appointment_succession_law }
+                if = { limit = { has_title = root.var:tca_cs13_county_primary NOT = { primary_title = root.var:tca_cs13_county_primary } } set_primary_title_to = root.var:tca_cs13_county_primary }
+                if = { limit = { has_title = root.var:tca_cs13_county_capital NOT = { capital_county = root.var:tca_cs13_county_capital } } set_realm_capital = root.var:tca_cs13_county_capital }
+            }
+        }
+        # 回调可能重建登记；只还原借用前的成员状态，不对真实路调用unregister清业务字段。
+        var:tca_cs13_road = {
+            if = { limit = { root.var:tca_cs13_original_registered = 1 } tca_circuit_register_title_effect = yes }
+            else_if = { limit = { is_target_in_global_variable_list = { name = tca_circuit_titles target = this } } remove_list_global_variable = { name = tca_circuit_titles target = this } }
+        }
+        save_scope_value_as = { name = tca_cs13_elapsed value = { value = current_date subtract = var:tca_cs13_borrowed_date } }
+        var:tca_cs13_original_holder = { tca_test_restore_central_timeout_only_effect = { TIMEOUT = root.var:tca_cs13_original_timeout ELAPSED = scope:tca_cs13_elapsed } }
+        if = { limit = { NOT = { var:tca_cs13_county_holder = var:tca_cs13_original_holder } }
+            var:tca_cs13_county_holder = { tca_test_restore_central_timeout_only_effect = { TIMEOUT = root.var:tca_cs13_county_timeout ELAPSED = scope:tca_cs13_elapsed } }
+        }
+        remove_variable = tca_cs13_borrowed
+    }
+    var:tca_cs13_family ?= {
+        if = { limit = { is_noble_family_title = yes holder ?= { has_character_flag = tca_cs13_owned_parent } }
+            save_scope_as = tca_cs13_cleaning_family
+            set_delete_on_destroy = yes
+            holder = { destroy_title = scope:tca_cs13_cleaning_family }
+        }
+    }
+    var:tca_cs13_heir ?= {
+        if = { limit = { is_alive = yes has_character_flag = tca_cs13_owned }
+            tca_merit_leave_celestial_effect = yes
+            remove_variable = tca_cs13_expected
+            remove_variable = block_hire_councillor
+            remove_character_modifier = tca_merit_probe_stasis_modifier
+            death = { death_reason = death_natural_causes }
+        }
+    }
+    var:tca_cs13_holder ?= {
+        if = { limit = { is_alive = yes has_character_flag = tca_cs13_owned_parent }
+            # 创建途中失败可能尚未保存NF输出；仍只枚举owned父亲自有家门，不消费旧saved scope。
+            every_held_title = {
+                limit = { is_noble_family_title = yes }
+                save_scope_as = tca_cs13_cleaning_extra_family
+                set_delete_on_destroy = yes
+                root.var:tca_cs13_holder = { destroy_title = scope:tca_cs13_cleaning_extra_family }
+            }
+            tca_merit_leave_celestial_effect = yes
+            remove_variable = block_hire_councillor
+            remove_character_modifier = tca_merit_probe_stasis_modifier
+            death = { death_reason = death_natural_causes }
+        }
+    }
+}
+
+# 仅释放本例报告者字段；须在清理及恢复断言之后调用。
+tca_test_clear_circuit_heir_fixture_fields_effect = {
+    remove_variable = tca_cs13_road
+    remove_variable = tca_cs13_holder
+    remove_variable = tca_cs13_heir
+    remove_variable = tca_cs13_family
+    remove_variable = tca_cs13_parent
+    remove_variable = tca_cs13_county_parent
+    remove_variable = tca_cs13_county_holder
+    remove_variable = tca_cs13_county_primary
+    remove_variable = tca_cs13_county_capital
+    remove_variable = tca_cs13_county_liege
+    remove_variable = tca_cs13_county_timeout
+    remove_variable = tca_cs13_county_protected
+    remove_variable = tca_cs13_original_holder
+    remove_variable = tca_cs13_original_primary
+    remove_variable = tca_cs13_original_capital
+    remove_variable = tca_cs13_original_liege
+    remove_variable = tca_cs13_original_kind
+    remove_variable = tca_cs13_original_timeout
+    remove_variable = tca_cs13_original_title_she
+    remove_variable = tca_cs13_original_registered
+    remove_variable = tca_cs13_original_protected
+    remove_variable = tca_cs13_borrowed_date
+    remove_variable = tca_cs13_borrowed
+}

@@ -39,6 +39,17 @@ class ExamContractTests(unittest.TestCase):
                     region_call = 'tca_exam_local_guest_region_trigger = yes'
                     self.assertEqual(patched.count(region_call), 1)
                     patched = patched.replace(region_call, 'default_location.county.empire = { OR = { this = scope:host.capital_county.empire any_title_to_title_neighboring_kingdom = { this = scope:host.capital_county.kingdom } } }')
+                    # 同地规则本身保持原版，只为死亡/缺地点提供安全拒绝；原生用例验证正反分支。
+                    location_call = 'tca_exam_entourage_same_location_trigger = { OWNER = scope:owner }'
+                    self.assertEqual(patched.count(location_call), 1)
+                    patched = patched.replace(location_call, 'location = scope:owner.location')
+                    # on_end七处与已报错阶段三处均为正向查询；归一化后仍逐token精确比原版。
+                    membership = re.compile(r'tca_exam_member_in_activity_subset_trigger = \{ NAME = (\w+) \}')
+                    names = membership.findall(patched)
+                    self.assertCountEqual(names, ['guests', 'guests', 'entrants', 'entrants', 'scoreboard', 'failees', 'failees', 'imperial_examiners', 'entrants', 'failees'])
+                    patched = membership.sub(r'is_in_guest_subset = { name = \1 }', patched)
+                    patched = patched.replace('tca_exam_activity_gather_guests_effect = yes', 'imperial_examination_gather_guests_effect = yes')
+                    patched = patched.replace('tca_exam_activity_scoreboard_setup_effect = yes', 'metropolitan_examination_scoreboard_setup_effect = yes')
                 gate = 'tca_exam_can_take_exam_trigger = yes'
                 if key.endswith('_intent'):
                     gate = 'custom_tooltip = { text = tca_exam_not_serving_tt ' + gate + ' }'
@@ -50,6 +61,45 @@ class ExamContractTests(unittest.TestCase):
                     self.assertIn('id_override_priority = 1', patched)
                     patched = patched.replace('id_override_priority = 1', '')
                 self.assertEqual(tokens(patched.replace(gate, '')), native)
+
+    def test_activity_collectors_guard_each_member_before_native_conditions(self):
+        effects = definitions((ROOT/'common/scripted_effects/tca_exam_activity_effects.txt').read_text(encoding='utf-8-sig'))
+        native = definitions((ROOT/'tools/baselines/tca_exam_activity_native_helpers.txt').read_text(encoding='utf-8-sig'))
+        pairs = [('tca_exam_activity_gather_guests_effect', 'imperial_examination_gather_guests_effect'),
+                 ('tca_exam_activity_scoreboard_setup_effect', 'metropolitan_examination_scoreboard_setup_effect')]
+        for name, original in pairs:
+            body = list(effects[name])
+            text = ' '.join(body)
+            prefix = tokens('limit = { tca_exam_is_current_activity_member_trigger = yes } if = {')
+            self.assertIn('every_attending_character = { ' + ' '.join(prefix) + ' limit = {', text)
+            start = body.index('every_attending_character') + 3
+            depth = 1
+            end = start
+            while depth:
+                depth += (body[end] == '{') - (body[end] == '}')
+                end += 1
+            self.assertEqual(body[start:start + len(prefix)], prefix)
+            # 只剥除新增member limit与if壳，原NOR/容量/顺序及所有动作逐token精确比较。
+            self.assertEqual(body[end - 2], '}')
+            restored = body[:start] + body[start + len(prefix):end - 2] + body[end - 1:]
+            self.assertEqual(restored, native[original])
+        triggers = definitions((ROOT/'common/scripted_triggers/tca_exam_triggers.txt').read_text(encoding='utf-8-sig'))
+        region = ' '.join(triggers['tca_exam_local_guest_region_trigger'])
+        self.assertIn('custom_tooltip = { text = tca_exam_local_guest_region_tt trigger_if = {', region)
+        self.assertNotIn('hidden_trigger', region)
+        self.assertNotIn('hidden_tooltip', region)
+
+    def test_host_reward_optional_activity_preserves_native_body(self):
+        # 只允许首层活动link变为可选；原奖励、嵌套顺序及末尾虔诚入口均精确保留。
+        effects = definitions((ROOT / 'common/scripted_effects/zz_tca_merit_entry_effects.txt').read_text(encoding='utf-8-sig'))
+        actual = ' '.join(effects['local_examination_disburse_activity_host_rewards'])
+        self.assertTrue(actual.startswith('{ involved_activity ?= {'))
+        actual = actual.replace('involved_activity ?= {', 'involved_activity = {', 1)
+        for hook in ('tca_merit_before_reward_effect = yes', 'tca_merit_after_reward_effect = yes'):
+            self.assertEqual(actual.count(hook), 1)
+            actual = actual.replace(hook, '')
+        native = definitions((ROOT / 'tools/baselines/tca_merit_local_examination_disburse_activity_host_rewards.txt').read_text(encoding='utf-8-sig'))
+        self.assertEqual(tokens(actual), native['local_examination_disburse_activity_host_rewards'])
 
     def test_family_notification_actor_and_bilingual_keys_are_wired(self):
         # 只检查通知的引用契约，不把静态通过当作头像、姓名或送达已经实机验证。

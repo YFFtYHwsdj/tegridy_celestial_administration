@@ -166,3 +166,67 @@ tca_test_replace_judicial_approver_effect = {
     scope:tca_test_replacement_target = { save_scope_as = recipient }
     scope:tca_test_replacement_old_approver = { save_scope_as = intermediary }
 }
+
+# 仅供司法41/42；在替换前由报告者调用，不改真实原任人物的变量、超时或保护。
+# 输入intermediary与tca_test_law_position；输出原任、实际官署/领主与当日剩余任期快照。
+# 与下列cleanup成对使用；不得在其它替换用例中隐式调用或覆盖其生命周期。
+tca_test_snapshot_replaced_approver_effect = {
+    scope:tca_test_law_position = { save_scope_as = tca_test_replacement_restore_office }
+    scope:intermediary = {
+        save_scope_as = tca_test_replacement_restore_actor
+        liege = { save_scope_as = tca_test_replacement_restore_liege }
+        save_scope_value_as = { name = tca_test_replacement_restore_timeout value = appointment_timeout_days }
+    }
+}
+
+# 仅供司法41/42，原六条业务断言后由同一报告者同步调用。
+# 输入上面的快照与本例唯一新建tca_test_replacement；无跨日缓存，不取消任何世界计谋。
+# 先隔离新人物，再以granted事务精确交还原任（appointment可能按候选缓存另选），
+# 后走正式辖属/继承法/契约维护并恢复原剩余任期。原任必须仍存活，不杀原任或其它旧人物。
+# 只有官署已实际回到原任，才销毁新人物自己的家门并按既有测试清理恢复保护、结束新人物。
+# 若快照或交还失败，保留现场供新增断言失败，不通过销毁真实官署掩盖恢复失败。
+tca_test_cleanup_replaced_approver_effect = {
+    if = {
+        limit = {
+            exists = scope:tca_test_replacement_restore_office
+            exists = scope:tca_test_replacement_restore_actor
+            exists = scope:tca_test_replacement
+            scope:tca_test_replacement_restore_actor = { is_alive = yes }
+            scope:tca_test_replacement = { is_alive = yes NOT = { this = scope:tca_test_replacement_restore_actor } }
+        }
+        scope:tca_test_replacement = { tca_test_cleanup_merit_probe_character_effect = yes }
+        create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_test_replacement_restore_change }
+        scope:tca_test_replacement_restore_office = {
+            change_title_holder = { holder = scope:tca_test_replacement_restore_actor change = scope:tca_test_replacement_restore_change }
+        }
+        resolve_title_and_vassal_change = scope:tca_test_replacement_restore_change
+        scope:tca_test_replacement_restore_office = {
+            tca_sync_judicial_holder_liege_effect = yes
+            holder = { tca_ensure_native_judicial_realm_succession_effect = yes tca_ensure_official_contract_effect = yes }
+        }
+        scope:tca_test_replacement_restore_actor = {
+            clear_appointment_timeout = yes
+            if = {
+                limit = { scope:tca_test_replacement_restore_timeout > 0 }
+                # duration字段按命名script value读取，不能直接传scope:数字。
+                # 与既有退休/中央任官夹具相同：临时角色变量→命名数值→恢复后清理。
+                set_variable = { name = tca_test_replacement_restore_timeout_days value = scope:tca_test_replacement_restore_timeout }
+                set_appointment_timeout = { days = tca_test_replacement_restore_timeout_days_value }
+                remove_variable = tca_test_replacement_restore_timeout_days
+            }
+        }
+        if = {
+            limit = { scope:tca_test_replacement_restore_office = { holder = scope:tca_test_replacement_restore_actor } }
+            scope:tca_test_replacement = {
+                # 与司法拘捕夹具相同：只销毁本人物实际持有的新家门，不碰已交回的官署。
+                every_held_title = {
+                    limit = { is_noble_family_title = yes }
+                    save_scope_as = tca_test_replacement_owned_family
+                    holder = { destroy_title = scope:tca_test_replacement_owned_family }
+                }
+                # cleanup已移除本例保护；使用其它测试已验证的原生死因，不留下活的AI方案主体。
+                death = { death_reason = death_natural_causes }
+            }
+        }
+    }
+}

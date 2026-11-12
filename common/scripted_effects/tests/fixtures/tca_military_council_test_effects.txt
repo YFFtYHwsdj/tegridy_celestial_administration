@@ -1,32 +1,136 @@
 ﻿# 军事内阁夹具；仅供独立可丢弃测试局，报告者为天朝皇帝。
 # 自备王国级地方主官和廷臣；借用一个真实路及治所并保存持有人，清理时归还。
 # 输出scope:tca_mcp_governor、tca_mcp_officer、tca_mcp_backup、tca_mcp_county与tca_mcp_office。
-# 同链保存两名原持有人及tca_mcp_auto_courtiers列表；无合适路及无腐败治所时不创建人物，由用例报前置失败。
+# 参数MILITARY_ONLY指定必须借用既有单路军制名额；否则文武均可。ready=1才允许消费本次人物输出。
+# 同链保存原任契约/主头衔/首府/领属/继承法/冷却，保护到归还；无合法来源按前置未执行。
 tca_test_military_council_prepare_effect = {
+    tca_test_military_council_prepare_mode_effect = { MILITARY_ONLY = $MILITARY_ONLY$ SUBCOUNTY = 0 }
+}
+
+# 跨日只借县。改制用例借军制子封臣；继任用例使用文制子封臣，不给原生继任者附加军制契约。
+tca_test_military_council_prepare_county_effect = {
+    tca_test_military_council_prepare_mode_effect = { MILITARY_ONLY = $MILITARY_ONLY$ SUBCOUNTY = 1 }
+}
+
+tca_test_military_council_prepare_mode_effect = {
+    save_scope_value_as = { name = tca_mcp_subcounty value = $SUBCOUNTY$ }
+    save_scope_value_as = { name = tca_mcp_borrow_ready value = 0 }
+    save_scope_value_as = { name = tca_mcp_borrow_started value = 0 }
+    save_scope_value_as = { name = tca_mcp_candidate_found value = 0 }
+    save_scope_value_as = { name = tca_mcp_restore_exact value = 0 }
+    clear_variable_list = tca_mcp_original_people
+    clear_variable_list = tca_mcp_original_vassals
+    set_variable = { name = tca_mcp_borrowed_date value = current_date }
+    tca_test_military_council_count_contracts_effect = yes
+    set_variable = { name = tca_mcp_military_before value = var:tca_mcp_military_count }
+    set_variable = { name = tca_mcp_cap_before value = var:tca_mcp_cap_count }
     clear_saved_scope = tca_mcp_governor
     clear_saved_scope = tca_mcp_officer
     clear_saved_scope = tca_mcp_backup
     clear_saved_scope = tca_mcp_county
     clear_saved_scope = tca_mcp_office
     random_vassal_or_below = {
-        limit = { is_landed = yes government_has_flag = government_is_celestial highest_held_title_tier = tier_kingdom liege = root capital_county = { has_county_corruption_trigger = no } }
+        limit = {
+            is_alive = yes is_landed = yes government_has_flag = government_is_celestial
+            highest_held_title_tier = tier_kingdom liege = root
+            has_subject_contract_group = celestial_vassal
+            capital_county = { has_county_corruption_trigger = no holder = prev }
+            primary_title = { has_variable = tca_circuit_kind }
+            # 军制路不能拆出第九个实际军制主官；只借单一路且契约与冻结kind相符的原任。
+            trigger_if = { limit = { primary_title = { var:tca_circuit_kind = 2 } }
+                vassal_contract_has_flag = celestial_province_military
+                any_held_title = { tier = tier_kingdom count = 1 }
+            }
+            trigger_else = { primary_title = { var:tca_circuit_kind = 1 } NOT = { vassal_contract_has_flag = celestial_province_military } }
+            trigger_if = { limit = { always = $MILITARY_ONLY$ }
+                vassal_contract_has_flag = celestial_province_military
+                primary_title = { var:tca_circuit_kind = 2 }
+            }
+            trigger_if = { limit = { scope:tca_mcp_subcounty = 1 NOT = { always = $MILITARY_ONLY$ } }
+                primary_title = { var:tca_circuit_kind = 1 } NOT = { vassal_contract_has_flag = celestial_province_military }
+            }
+        }
         primary_title = { save_scope_as = tca_mcp_office }
-        capital_county = { save_scope_as = tca_mcp_county }
+        # 原路主保留自己的治所与男爵，避免县易主时寺院撤租。
+        # 仅借皇帝非首府的实县；不改变皇帝本职、契约与冷却。
+        root = { random_held_title = {
+            limit = { tier = tier_county is_landless_type_title = no is_noble_family_title = no this != root.capital_county has_county_corruption_trigger = no }
+            save_scope_as = tca_mcp_county
+        } }
+        save_scope_value_as = { name = tca_mcp_candidate_found value = 1 }
     }
     if = {
-        limit = { exists = scope:tca_mcp_county exists = scope:tca_mcp_office }
+        limit = { scope:tca_mcp_candidate_found = 1 is_alive = yes exists = default_location exists = scope:tca_mcp_county exists = scope:tca_mcp_office }
         scope:tca_mcp_county.holder = { save_scope_as = tca_mcp_old_holder }
         scope:tca_mcp_office.holder = { save_scope_as = tca_mcp_old_office_holder }
+        scope:tca_mcp_office = { set_variable = { name = tca_mcp_original_kind value = var:tca_circuit_kind } }
+        # 逐一冻结借县现有男爵领的实持者；归还不得替换原男爵。
+        clear_variable_list = tca_mcp_baronies
+        scope:tca_mcp_county = { every_county_province = {
+            limit = { exists = barony.holder }
+            barony = {
+            set_variable = { name = tca_mcp_saved_baron value = holder }
+            save_scope_as = tca_mcp_saved_barony
+            root = { add_to_variable_list = { name = tca_mcp_baronies target = scope:tca_mcp_saved_barony } }
+            }
+        } }
+        scope:tca_mcp_old_office_holder = {
+            tca_test_military_council_snapshot_original_effect = yes
+            set_variable = { name = tca_mcp_original_kingdoms value = 0 }
+            every_held_title = { limit = { tier = tier_kingdom } holder = { change_variable = { name = tca_mcp_original_kingdoms add = 1 } } }
+            debug_log = "TCA_MCP_BORROW ORIGINAL id=[THIS.Char.GetID] kingdoms=[THIS.Char.MakeScope.Var('tca_mcp_original_kingdoms').GetValue] contract=[THIS.Char.MakeScope.Var('tca_mcp_saved_contract').GetValue]"
+        }
+        # 原任失去王国后，旧直属低阶封臣会被原生事务提升为皇帝直属；
+        # 同步接给本次新主官并在归还后接回原任，不能让借还永久改变全朝军制人数。
+        if = { limit = { scope:tca_mcp_subcounty = 0 }
+        scope:tca_mcp_old_office_holder = {
+            every_vassal = {
+                # 男爵仍随原路主的治所；其余封臣随路职临时转隶。
+                set_variable = { name = tca_mcp_saved_vassal_liege value = liege }
+                set_variable = { name = tca_mcp_vassal_timeout value = appointment_timeout_days }
+                set_appointment_timeout = { years = 150 desc = appointment_timeout_desc_refusing }
+                if = { limit = { NOT = { has_trait = tca_test_death_protection } }
+                    add_trait = tca_test_death_protection
+                    set_variable = { name = tca_mcp_vassal_protection_owned value = yes }
+                }
+                save_scope_as = tca_mcp_snapshot_vassal
+                root = { add_to_variable_list = { name = tca_mcp_original_vassals target = scope:tca_mcp_snapshot_vassal } }
+                debug_log = "TCA_MCP_BORROW VASSAL_SNAPSHOT id=[THIS.Char.GetID]"
+            }
+        }
+        }
+        save_scope_value_as = { name = tca_mcp_borrow_started value = 1 }
+        # 仅单路军制分支释放原名额，授职回调仍读取原kind=2并真实建立新军制契约。
+        if = { limit = { scope:tca_mcp_subcounty = 0 scope:tca_mcp_office = { var:tca_mcp_original_kind = 2 } }
+            scope:tca_mcp_old_office_holder = { vassal_contract_set_obligation_level = { type = celestial_provinces level = celestial_province_standard } }
+        }
+        # 显式以报告者遮蔽旧输出；生成失败绝不拿继承的旧人物继续授职。
+        save_scope_as = tca_mcp_governor
         create_character = { age = 40 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_mcp_governor }
+        if = { limit = { scope:tca_mcp_governor = { is_alive = yes this != root is_courtier_of = root exists = default_location } }
         create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_mcp_grant }
-        scope:tca_mcp_county = { change_title_holder = { holder = scope:tca_mcp_governor change = scope:tca_mcp_grant } }
-        scope:tca_mcp_office = { change_title_holder = { holder = scope:tca_mcp_governor change = scope:tca_mcp_grant } }
+        scope:tca_mcp_county = { change_title_holder = { holder = scope:tca_mcp_governor change = scope:tca_mcp_grant take_baronies = no } }
+        if = { limit = { scope:tca_mcp_subcounty = 0 } scope:tca_mcp_office = { change_title_holder = { holder = scope:tca_mcp_governor change = scope:tca_mcp_grant } } }
+        # 头衔与原直属封臣在同一原生事务提交，不能先使旧封臣临时升为皇帝直属。
+        every_in_list = { variable = tca_mcp_original_vassals
+            # 通判不能跟随将改为封建制的测试主官，否则正式退出回调会合法裁撤官署。
+            # 原任仍持有实县与公国，保留男爵和县级无地官员；借还前后均检查其真实领主。
+            if = { limit = { highest_held_title_tier > tier_barony NOT = { AND = { highest_held_title_tier = tier_county primary_title = { is_landless_type_title = yes } } } } change_liege = { liege = scope:tca_mcp_governor change = scope:tca_mcp_grant } }
+            else = {
+                set_variable = { name = tca_mcp_stayed_with_county value = yes }
+            }
+        }
         resolve_title_and_vassal_change = scope:tca_mcp_grant
+        # create_character输出只有仍存活且属于本次真实雇主才可用于后续事务。
         scope:tca_mcp_governor = {
             change_government = celestial_government
             create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_mcp_fealty }
-            change_liege = { liege = root change = scope:tca_mcp_fealty }
+            if = { limit = { scope:tca_mcp_subcounty = 1 } change_liege = { liege = scope:tca_mcp_old_office_holder change = scope:tca_mcp_fealty } }
+            else = { change_liege = { liege = root change = scope:tca_mcp_fealty } }
             resolve_title_and_vassal_change = scope:tca_mcp_fealty
+            if = { limit = { scope:tca_mcp_subcounty = 1 liege = scope:tca_mcp_old_office_holder liege = { vassal_contract_has_flag = celestial_military_appointment } }
+                vassal_contract_set_obligation_level = { type = celestial_provinces level = celestial_province_military }
+            }
             tca_test_protect_character_effect = yes
             set_appointment_timeout = { years = 150 desc = appointment_timeout_desc_refusing }
             add_character_flag = ai_will_not_convert
@@ -38,6 +142,41 @@ tca_test_military_council_prepare_effect = {
             tca_test_military_council_create_officer_effect = { ACTOR = tca_mcp_officer MARTIAL = 30 }
             tca_test_military_council_create_officer_effect = { ACTOR = tca_mcp_backup MARTIAL = 20 }
         }
+        every_in_list = { variable = tca_mcp_original_people set_appointment_timeout = { years = 150 desc = appointment_timeout_desc_refusing } }
+        tca_test_military_council_count_contracts_effect = yes
+        if = { limit = {
+            scope:tca_mcp_office = { var:tca_circuit_kind = var:tca_mcp_original_kind
+                trigger_if = { limit = { scope:tca_mcp_subcounty = 1 } holder = scope:tca_mcp_old_office_holder }
+                trigger_else = { holder = scope:tca_mcp_governor }
+            }
+            scope:tca_mcp_county = { holder = scope:tca_mcp_governor }
+            scope:tca_mcp_governor = { is_alive = yes government_has_flag = government_is_celestial
+                trigger_if = { limit = { scope:tca_mcp_subcounty = 1 } liege = scope:tca_mcp_old_office_holder }
+                trigger_else = { liege = root }
+            }
+            var:tca_mcp_military_count = var:tca_mcp_military_before
+            var:tca_mcp_cap_count = var:tca_mcp_cap_before
+            scope:tca_mcp_officer = { is_alive = yes is_courtier_of = scope:tca_mcp_governor }
+            scope:tca_mcp_backup = { is_alive = yes is_courtier_of = scope:tca_mcp_governor }
+            NOT = { any_in_list = { variable = tca_mcp_original_vassals OR = {
+                AND = { has_variable = tca_mcp_stayed_with_county NOT = { liege = var:tca_mcp_saved_vassal_liege } }
+                AND = { NOT = { has_variable = tca_mcp_stayed_with_county } NOT = { liege = scope:tca_mcp_governor } }
+            } } }
+            trigger_if = { limit = { scope:tca_mcp_office = { var:tca_mcp_original_kind = 2 } }
+                scope:tca_mcp_governor = { vassal_contract_has_flag = celestial_province_military }
+                trigger_if = { limit = { scope:tca_mcp_subcounty = 0 } scope:tca_mcp_old_office_holder = { NOT = { vassal_contract_has_flag = celestial_province_military } } }
+                trigger_else = { scope:tca_mcp_old_office_holder = { vassal_contract_has_flag = celestial_province_military } }
+            }
+        } save_scope_value_as = { name = tca_mcp_borrow_ready value = 1 } }
+        else = {
+            debug_log = "TCA_MCP_BORROW PREPARATION_FAILED"
+            tca_test_military_council_cleanup_effect = yes
+        }
+        }
+        else = {
+            debug_log = "TCA_MCP_BORROW GOVERNOR_CREATION_FAILED"
+            tca_test_military_council_cleanup_effect = yes
+        }
     }
 }
 
@@ -45,15 +184,21 @@ tca_test_military_council_prepare_effect = {
 # 原版create_character支持固定技能范围，生成时准备以确保知兵前置；后加技能的即时派生刷新未确认。
 # 教育、品级和功绩仍走真实原生接口。
 tca_test_military_council_create_officer_effect = {
+    if = { limit = { is_alive = yes is_landed = yes exists = default_location }
+    save_scope_as = tca_mcp_creating_officer_employer
     create_character = { age = 30 gender_female_chance = 0 random_traits = no dynasty = none employer = this culture = this.culture faith = this.faith rite = this.rite martial = { $MARTIAL$ $MARTIAL$ } stewardship = { 20 20 } learning = { 20 20 } save_scope_as = $ACTOR$ }
     scope:$ACTOR$ = {
+        if = { limit = { is_alive = yes is_courtier_of = scope:tca_mcp_creating_officer_employer }
         add_trait = education_martial_3
         set_merit_level = 1
         tca_merit_initialize_character_effect = yes
         tca_test_protect_character_effect = yes
         set_appointment_timeout = { years = 150 desc = appointment_timeout_desc_refusing }
         add_character_flag = ai_will_not_convert
+        }
     }
+    }
+    else = { debug_log = "TCA_MCP_BORROW OFFICER_EMPLOYER_INVALID" }
 }
 
 # 报告者作用域；暂时授权只覆盖正式除授调用，不在人物上遗留任免权限。
@@ -73,7 +218,8 @@ tca_test_military_council_revoke_effect = {
 # 报告者作用域；关闭新主官的玩家仿真后撤职，避免清理时重新补位。
 # 归还暂存廷臣及借用头衔，恢复新人物的测试保护；用例自行撤销其额外创建的高级差遣并恢复县级控制力。
 tca_test_military_council_cleanup_effect = {
-    if = { limit = { exists = scope:tca_mcp_governor scope:tca_mcp_governor = { is_alive = yes } }
+    if = { limit = { exists = scope:tca_mcp_borrow_started scope:tca_mcp_borrow_started = 1 }
+    if = { limit = { exists = scope:tca_mcp_governor scope:tca_mcp_governor = { is_alive = yes this != root } }
     scope:tca_mcp_governor = {
         remove_character_flag = tca_test_force_player_governor
         if = { limit = { employs_court_position = tca_military_supervisor_court_position } tca_test_military_council_revoke_effect = yes }
@@ -85,17 +231,174 @@ tca_test_military_council_cleanup_effect = {
     every_in_list = {
         list = tca_mcp_auto_courtiers
         if = { limit = { scope:tca_mcp_governor = { is_alive = yes } } scope:tca_mcp_governor = { add_courtier = prev } }
-        else_if = { limit = { scope:tca_mcp_office = { exists = holder } } scope:tca_mcp_office.holder = { add_courtier = prev } }
+        else_if = { limit = { scope:tca_mcp_subcounty = 1 exists = scope:tca_mcp_county.holder } scope:tca_mcp_county.holder = { add_courtier = prev } }
+        else_if = { limit = { scope:tca_mcp_subcounty = 0 exists = scope:tca_mcp_office.holder } scope:tca_mcp_office.holder = { add_courtier = prev } }
         remove_from_list = tca_mcp_auto_courtiers
     }
     if = {
-        limit = { exists = scope:tca_mcp_county exists = scope:tca_mcp_old_holder scope:tca_mcp_old_holder = { is_alive = yes } }
+        limit = { scope:tca_mcp_borrow_started = 1 scope:tca_mcp_old_holder = { is_alive = yes } scope:tca_mcp_old_office_holder = { is_alive = yes } }
+        if = { limit = { scope:tca_mcp_office = { var:tca_mcp_original_kind = 2 exists = holder } }
+            scope:tca_mcp_office.holder = {
+                if = { limit = { this != scope:tca_mcp_old_office_holder is_alive = yes vassal_contract_has_flag = celestial_province_military }
+                    vassal_contract_set_obligation_level = { type = celestial_provinces level = celestial_province_standard }
+                }
+            }
+        }
+        scope:tca_mcp_office = { set_variable = { name = tca_circuit_kind value = var:tca_mcp_original_kind } }
         create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_mcp_restore }
-        scope:tca_mcp_county = { change_title_holder = { holder = scope:tca_mcp_old_holder change = scope:tca_mcp_restore } }
-        scope:tca_mcp_office = { change_title_holder = { holder = scope:tca_mcp_old_office_holder change = scope:tca_mcp_restore } }
+        scope:tca_mcp_county = { change_title_holder = { holder = scope:tca_mcp_old_holder change = scope:tca_mcp_restore take_baronies = no } }
+        if = { limit = { scope:tca_mcp_subcounty = 0 } scope:tca_mcp_office = { change_title_holder = { holder = scope:tca_mcp_old_office_holder change = scope:tca_mcp_restore } } }
+        # 路主死亡触发原生继任时，路治所在交还前也可能换手。
+        scope:tca_mcp_old_office_holder.var:tca_mcp_saved_capital = {
+            if = { limit = { NOT = { holder = scope:tca_mcp_old_office_holder } }
+                change_title_holder = { holder = scope:tca_mcp_old_office_holder change = scope:tca_mcp_restore take_baronies = no }
+            }
+        }
         resolve_title_and_vassal_change = scope:tca_mcp_restore
+        # 先恢复真实路主的王国等级，再在同一事务中归还封臣与男爵领。
+        # 遍历中只登记转授；提交放在列表外，原生回调不能在迭代中改写领属。
+        create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_mcp_restore_dependants }
+        every_in_list = { variable = tca_mcp_original_vassals
+            limit = { is_alive = yes exists = primary_title NOT = { liege = var:tca_mcp_saved_vassal_liege } var:tca_mcp_saved_vassal_liege = { is_alive = yes highest_held_title_tier > prev.highest_held_title_tier } }
+            change_liege = { liege = var:tca_mcp_saved_vassal_liege change = scope:tca_mcp_restore_dependants }
+        }
+        every_in_list = { variable = tca_mcp_baronies
+            limit = { var:tca_mcp_saved_baron = { is_alive = yes } NOT = { holder = var:tca_mcp_saved_baron } }
+            change_title_holder = { holder = var:tca_mcp_saved_baron change = scope:tca_mcp_restore_dependants }
+        }
+        resolve_title_and_vassal_change = scope:tca_mcp_restore_dependants
+        debug_log = "TCA_MCP_RESTORE dependants_resolved"
+    }
+    if = { limit = { scope:tca_mcp_borrow_started = 1 }
+        every_in_list = { variable = tca_mcp_original_people tca_test_military_council_restore_original_effect = yes }
+        every_in_list = { variable = tca_mcp_original_vassals
+            if = { limit = { is_alive = yes is_ruler = yes }
+                debug_log = "TCA_MCP_RESTORE vassal_timeout id=[THIS.Char.GetID]"
+                tca_test_restore_central_timeout_only_effect = { TIMEOUT = var:tca_mcp_vassal_timeout ELAPSED = root.var:tca_mcp_elapsed }
+            }
+            if = { limit = { has_variable = tca_mcp_vassal_protection_owned } remove_trait = tca_test_death_protection }
+        }
+        tca_test_military_council_count_contracts_effect = yes
+        save_scope_value_as = { name = tca_mcp_restore_exact value = 1 }
+        if = { limit = { OR = {
+            NOT = { scope:tca_mcp_office = { holder = scope:tca_mcp_old_office_holder var:tca_circuit_kind = var:tca_mcp_original_kind } }
+            NOT = { scope:tca_mcp_county = { holder = scope:tca_mcp_old_holder } }
+            any_in_list = { variable = tca_mcp_baronies NOT = { holder = var:tca_mcp_saved_baron } }
+            NOT = { var:tca_mcp_military_count = var:tca_mcp_military_before }
+            NOT = { var:tca_mcp_cap_count = var:tca_mcp_cap_before }
+            any_in_list = { variable = tca_mcp_original_vassals OR = {
+                is_alive = no NOT = { liege = var:tca_mcp_saved_vassal_liege }
+                NOT = { appointment_timeout_days = { value = var:tca_mcp_vassal_timeout subtract = root.var:tca_mcp_elapsed min = 0 } }
+                AND = { has_variable = tca_mcp_vassal_protection_owned has_trait = tca_test_death_protection }
+            } }
+        } } save_scope_value_as = { name = tca_mcp_restore_exact value = 0 } }
+        every_in_list = { variable = tca_mcp_original_people
+            if = { limit = { NOT = { AND = {
+                is_alive = yes liege = var:tca_mcp_saved_liege
+                primary_title = var:tca_mcp_saved_primary capital_county = var:tca_mcp_saved_capital
+                government_has_flag = government_is_celestial
+                vassal_contract_obligation_level:celestial_provinces = var:tca_mcp_saved_contract
+                trigger_if = { limit = { var:tca_mcp_saved_law = 2 } has_realm_law = celestial_military_appointment_succession_law }
+                trigger_if = { limit = { var:tca_mcp_saved_law = 1 } has_realm_law = celestial_appointment_succession_law }
+                appointment_timeout_days = { value = var:tca_mcp_saved_timeout subtract = root.var:tca_mcp_elapsed min = 0 }
+                trigger_if = { limit = { has_variable = tca_mcp_protection_owned } NOT = { has_trait = tca_test_death_protection } }
+            } } } save_scope_value_as = { name = tca_mcp_restore_exact value = 0 }
+                if = { limit = { NOT = { liege = var:tca_mcp_saved_liege } } debug_log = "TCA_MCP_RESTORE liege id=[THIS.Char.GetID]" }
+                if = { limit = { NOT = { primary_title = var:tca_mcp_saved_primary } } debug_log = "TCA_MCP_RESTORE primary id=[THIS.Char.GetID]" }
+                if = { limit = { NOT = { capital_county = var:tca_mcp_saved_capital } } debug_log = "TCA_MCP_RESTORE capital id=[THIS.Char.GetID]" }
+                if = { limit = { NOT = { vassal_contract_obligation_level:celestial_provinces = var:tca_mcp_saved_contract } } debug_log = "TCA_MCP_RESTORE contract id=[THIS.Char.GetID]" }
+                if = { limit = { NOT = { appointment_timeout_days = { value = var:tca_mcp_saved_timeout subtract = root.var:tca_mcp_elapsed min = 0 } } } debug_log = "TCA_MCP_RESTORE timeout id=[THIS.Char.GetID]" }
+                if = { limit = { NOT = { trigger_if = { limit = { var:tca_mcp_saved_law = 2 } has_realm_law = celestial_military_appointment_succession_law } trigger_if = { limit = { var:tca_mcp_saved_law = 1 } has_realm_law = celestial_appointment_succession_law } } } debug_log = "TCA_MCP_RESTORE law id=[THIS.Char.GetID]" }
+            }
+        }
+        if = { limit = { scope:tca_mcp_restore_exact = 0 }
+            add_character_flag = tca_test_tca_military_court_positions_test_case_failed
+            debug_log = "TCA_MCP_BORROW EXACT_RESTORE_FAILED"
+            every_in_list = { variable = tca_mcp_baronies limit = { NOT = { holder = var:tca_mcp_saved_baron } } debug_log = "TCA_MCP_RESTORE barony=[THIS.Title.GetKey]" }
+            every_in_list = { variable = tca_mcp_original_vassals limit = { OR = { is_alive = no NOT = { liege = var:tca_mcp_saved_vassal_liege } } } debug_log = "TCA_MCP_RESTORE vassal=[THIS.Char.GetID]" }
+            if = { limit = { NOT = { scope:tca_mcp_office = { holder = scope:tca_mcp_old_office_holder var:tca_circuit_kind = var:tca_mcp_original_kind } } } debug_log = "TCA_MCP_RESTORE office" }
+            if = { limit = { NOT = { scope:tca_mcp_county = { holder = scope:tca_mcp_old_holder } } } debug_log = "TCA_MCP_RESTORE county" }
+        }
+        every_in_list = { variable = tca_mcp_original_people
+            remove_variable = tca_mcp_saved_contract remove_variable = tca_mcp_saved_timeout remove_variable = tca_mcp_saved_law
+            remove_variable = tca_mcp_saved_liege remove_variable = tca_mcp_saved_primary remove_variable = tca_mcp_saved_capital
+            remove_variable = tca_mcp_original_kingdoms remove_variable = tca_mcp_protection_owned
+        }
+        every_in_list = { variable = tca_mcp_baronies remove_variable = tca_mcp_saved_baron }
+        clear_variable_list = tca_mcp_baronies
+        clear_variable_list = tca_mcp_original_people
+        every_in_list = { variable = tca_mcp_original_vassals
+            remove_variable = tca_mcp_vassal_timeout remove_variable = tca_mcp_stayed_with_county remove_variable = tca_mcp_saved_vassal_liege remove_variable = tca_mcp_vassal_protection_owned
+        }
+        clear_variable_list = tca_mcp_original_vassals
+        scope:tca_mcp_office = { remove_variable = tca_mcp_original_kind }
+        save_scope_value_as = { name = tca_mcp_borrow_started value = 0 }
     }
     scope:tca_mcp_officer ?= { tca_test_restore_character_effect = yes }
     scope:tca_mcp_backup ?= { tca_test_restore_character_effect = yes }
-    scope:tca_mcp_governor ?= { tca_test_restore_character_effect = yes }
+    scope:tca_mcp_governor ?= { if = { limit = { this != root } tca_test_restore_character_effect = yes } }
+    }
+}
+
+# 皇帝报告者作用域；按真实契约计数，同时保留原生AI天朝上限所计的王国级人数。
+tca_test_military_council_count_contracts_effect = {
+    save_scope_as = tca_mcp_contract_reporter
+    set_variable = { name = tca_mcp_military_count value = 0 }
+    set_variable = { name = tca_mcp_cap_count value = 0 }
+    every_vassal = {
+        limit = { vassal_contract_has_flag = celestial_province_military }
+        scope:tca_mcp_contract_reporter = { change_variable = { name = tca_mcp_military_count add = 1 } }
+        if = { limit = { highest_held_title_tier >= tier_kingdom }
+            scope:tca_mcp_contract_reporter = { change_variable = { name = tca_mcp_cap_count add = 1 } }
+        }
+    }
+    debug_log = "TCA_MCP_BORROW QUOTA actual=[THIS.Char.MakeScope.Var('tca_mcp_military_count').GetValue] cap_count=[THIS.Char.MakeScope.Var('tca_mcp_cap_count').GetValue]"
+}
+
+# 原任人物作用域；同一人物兼县主/路主时只拍一次。既有保护不取得所有权。
+tca_test_military_council_snapshot_original_effect = {
+    if = { limit = { NOT = { has_variable = tca_mcp_saved_timeout } }
+        set_variable = { name = tca_mcp_saved_timeout value = appointment_timeout_days }
+        set_variable = { name = tca_mcp_saved_contract value = vassal_contract_obligation_level:celestial_provinces }
+        set_variable = { name = tca_mcp_saved_law value = 0 }
+        if = { limit = { has_realm_law = celestial_military_appointment_succession_law } set_variable = { name = tca_mcp_saved_law value = 2 } }
+        else_if = { limit = { has_realm_law = celestial_appointment_succession_law } set_variable = { name = tca_mcp_saved_law value = 1 } }
+        set_variable = { name = tca_mcp_saved_primary value = primary_title }
+        set_variable = { name = tca_mcp_saved_capital value = capital_county }
+        set_variable = { name = tca_mcp_saved_liege value = liege }
+        if = { limit = { NOT = { has_trait = tca_test_death_protection } }
+            add_trait = tca_test_death_protection set_variable = { name = tca_mcp_protection_owned value = yes }
+        }
+        set_appointment_timeout = { years = 150 desc = appointment_timeout_desc_refusing }
+        save_scope_as = tca_mcp_snapshot_original
+        root = { add_to_variable_list = { name = tca_mcp_original_people target = scope:tca_mcp_snapshot_original } }
+    }
+}
+
+# 原任人物作用域；头衔已经真实归还，恢复原领属/主头衔/首府/契约及自然剩余冷却。
+tca_test_military_council_restore_original_effect = {
+    if = { limit = { is_alive = yes }
+        if = { limit = { NOT = { liege = var:tca_mcp_saved_liege } }
+            create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_mcp_restore_liege }
+            change_liege = { liege = var:tca_mcp_saved_liege change = scope:tca_mcp_restore_liege }
+            resolve_title_and_vassal_change = scope:tca_mcp_restore_liege
+        }
+        if = { limit = { NOT = { government_has_flag = government_is_celestial } } change_government = celestial_government }
+        if = { limit = { has_title = var:tca_mcp_saved_primary NOT = { primary_title = var:tca_mcp_saved_primary } } set_primary_title_to = var:tca_mcp_saved_primary }
+        if = { limit = { has_title = var:tca_mcp_saved_capital NOT = { capital_county = var:tca_mcp_saved_capital } } set_realm_capital = var:tca_mcp_saved_capital }
+        if = { limit = { NOT = { vassal_contract_obligation_level:celestial_provinces = var:tca_mcp_saved_contract } }
+            switch = { trigger = var:tca_mcp_saved_contract
+                0 = { vassal_contract_set_obligation_level = { type = celestial_provinces level = 0 } }
+                1 = { vassal_contract_set_obligation_level = { type = celestial_provinces level = 1 } }
+                2 = { vassal_contract_set_obligation_level = { type = celestial_provinces level = 2 } }
+                3 = { vassal_contract_set_obligation_level = { type = celestial_provinces level = 3 } }
+                4 = { vassal_contract_set_obligation_level = { type = celestial_provinces level = 4 } }
+            }
+        }
+        if = { limit = { var:tca_mcp_saved_law = 2 NOT = { has_realm_law = celestial_military_appointment_succession_law } } add_realm_law_skip_effects = celestial_military_appointment_succession_law }
+        else_if = { limit = { var:tca_mcp_saved_law = 1 NOT = { has_realm_law = celestial_appointment_succession_law } } add_realm_law_skip_effects = celestial_appointment_succession_law }
+        root = { set_variable = { name = tca_mcp_elapsed value = { value = current_date subtract = var:tca_mcp_borrowed_date } } }
+        tca_test_restore_central_timeout_only_effect = { TIMEOUT = var:tca_mcp_saved_timeout ELAPSED = root.var:tca_mcp_elapsed }
+        if = { limit = { has_variable = tca_mcp_protection_owned } remove_trait = tca_test_death_protection }
+    }
 }

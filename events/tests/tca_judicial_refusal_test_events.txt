@@ -77,6 +77,11 @@ tca_judicial_refusal_test.1001 = {
                 scope:tca_test_rf_target = { var:tca_pending_judicial_title = scope:tca_test_rf_office var:tca_pending_judicial_governor = root }
             } debug_log = "TCA_TEST CHECK_PASS tca_test_imperial_refusal_war 2" }
             else = { add_character_flag = tca_test_tca_judicial_refusal_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_imperial_refusal_war 2" }
+            # 已有同一拒捕战争时再次经过正式宣战effect，须幂等保留该战争，不能再start_war。
+            scope:tca_test_rf_commissioner = { save_scope_as = tca_authority }
+            tca_judicial_war_for_imprison_effect = { LIEGE = root REBEL = scope:tca_test_rf_target }
+            if = { limit = { exists = scope:tca_test_rf_war scope:tca_test_rf_target = { any_character_war = { count = 1 using_cb = refused_liege_demand_war casus_belli = { primary_attacker = scope:tca_test_rf_target primary_defender = root } } } } debug_log = "TCA_TEST CHECK_PASS tca_test_imperial_refusal_war 5" }
+            else = { add_character_flag = tca_test_tca_judicial_refusal_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_imperial_refusal_war 5" }
             # 通过原生防守方胜利结束实际战争，不用 imprison 替代。
             scope:tca_test_rf_war ?= { end_war = defender }
             trigger_event = { id = tca_judicial_refusal_test.1002 days = 2 }

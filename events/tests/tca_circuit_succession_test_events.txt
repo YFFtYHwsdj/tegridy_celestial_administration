@@ -518,80 +518,254 @@ tca_circuit_succession_test.1011 = {
 # ---------------------------------------------------------------------------
 # 用例13-18：在任资格审计与文官路补法（P1/P2/P4）。
 # 全部用例直接调用正式 trigger/effect，期望值用等价脚本条件计算；不修改业务实现。
-# 需要改真实人物功绩等级的用例在写入后跨日再验（原生 merit 等级刷新），结束恢复原等级。
+# 等级写入后须跨日读取原生派生值；用例13只改变自有夹具，不把恢复可见等级当作真实人物经验恢复。
 # 审计用例先清空目标路既有审计变量作为基线；结束清回审计变量、全局变量与维护排队标记。
 # 一人多路用例临时压低全局上限只做信息/策略断言；结束必须移除全局变量与诊断/强制开关。
 # ---------------------------------------------------------------------------
 
-# 用例13：第一顺位继承人的功绩等级门槛（P1）。
-# 取真实登记路的第一顺位继承人：先压到 1 级，断言正式 trigger 判定“第一顺位不合格、有效继承为否、
-# 季度预清命中”；再抬到该头衔等级的期望值，断言恢复“第一顺位合格、有效继承为是、不再预清”。
-# 等级写入后各等一日再验（原生 merit 等级刷新）；结束恢复被改人物的原等级并清掉测试变量。
+# 用例13：短借真实路／治所给自有父子，验证旧法亲属首位的官品护栏。
+# 原七项仍读真实current_heir；真实原任仅借还头衔和保护，不写其Merit或经验。
 tca_circuit_succession_test.13 = {
     type = character_event
     hidden = yes
     immediate = {
         debug_log = "TCA_TEST BEGIN tca_circuit_succession_test.13 tca_test_circuit_heir_level_gate"
         remove_character_flag = tca_test_tca_circuit_succession_test_case_failed
+        remove_character_flag = tca_cs_precondition_failed
+        remove_variable = tca_cs13_road
+        remove_variable = tca_cs13_holder
+        remove_variable = tca_cs13_heir
+        remove_variable = tca_cs13_family
+        remove_variable = tca_cs13_borrowed
+        root = { save_scope_as = tca_cs_road save_scope_as = tca_cs13_holder save_scope_as = tca_cs_heir }
+        save_scope_value_as = { name = tca_cs13_road_found value = 0 }
+        save_scope_value_as = { name = tca_cs13_prep_stage value = 0 }
         if = {
-            limit = { debug_only = yes is_alive = yes root = { has_title = title:h_china } }
-            if = { limit = { NOT = { has_global_variable_list = tca_circuit_titles } } tca_circuit_rebuild_registry_effect = yes }
-            clear_saved_scope = tca_cs_road
-            clear_saved_scope = tca_cs_heir
-            random_in_global_list = {
-                variable = tca_circuit_titles
+            limit = { debug_only = yes is_alive = yes title:h_china.holder = root }
+            # 复用既有local_domain已验证的同持有人县／路借还方式；选择本次明确命中的对象。
+            random_vassal = {
                 limit = {
-                    tca_circuit_is_tracked_road_trigger = yes
-                    tca_circuit_has_celestial_vassal_holder_trigger = yes
-                    NOT = { has_variable = tca_circuit_pending_appointment }
-                    exists = current_heir
-                    current_heir = { is_alive = yes NOT = { has_title = title:h_china } }
+                    government_has_flag = government_is_celestial
+                    highest_held_title_tier = tier_kingdom
+                    primary_title = { tca_circuit_is_tracked_road_trigger = yes var:tca_circuit_kind = 1 NOT = { has_variable = tca_circuit_pending_appointment } }
+                    has_realm_law = celestial_appointment_succession_law
+                    vassal_contract_has_flag = celestial_province_standard
+                    exists = capital_county
+                    # 治所可由路主兼持，或由另一原任持有；只需当前真holder及可恢复的原场景。
+                    capital_county = { holder = { is_alive = yes government_has_flag = government_is_celestial has_realm_law = celestial_appointment_succession_law exists = primary_title exists = capital_county exists = liege NOT = { has_variable = tca_merit_grant_phase } } }
+                    any_held_title = { count = 1 tier = tier_kingdom is_landless_type_title = no is_noble_family_title = no }
+                    NOT = { has_variable = tca_merit_grant_phase }
                 }
-                save_scope_as = tca_cs_road
+                primary_title = { save_scope_as = tca_cs_road }
+                save_scope_as = tca_cs13_original_holder
+                save_scope_value_as = { name = tca_cs13_road_found value = 1 }
             }
             if = {
-                limit = { exists = scope:tca_cs_road }
-                scope:tca_cs_road = { current_heir = { save_scope_as = tca_cs_heir } }
-                scope:tca_cs_heir = {
-                    set_variable = { name = tca_cs13_original_level value = merit_level }
-                    set_merit_level = 0
-                    set_merit_level = 1
-                }
-                # 与正式 trigger 的 tier 分支同口径计算期望等级，不写死具体数值。
-                if = {
-                    limit = { scope:tca_cs_road = { tier = tier_kingdom } }
-                    scope:tca_cs_heir = { set_variable = { name = tca_cs13_expected value = merit_level_expected_kingdom_value } }
-                }
-                else_if = {
-                    limit = { scope:tca_cs_road = { tier = tier_duchy } }
-                    scope:tca_cs_heir = { set_variable = { name = tca_cs13_expected value = merit_level_expected_duchy_value } }
-                }
-                else = {
-                    scope:tca_cs_heir = { set_variable = { name = tca_cs13_expected value = merit_level_expected_county_value } }
-                }
+                limit = { scope:tca_cs13_road_found = 1 }
+                save_scope_value_as = { name = tca_cs13_prep_stage value = 1 }
                 set_variable = { name = tca_cs13_road value = scope:tca_cs_road }
-                set_variable = { name = tca_cs13_heir value = scope:tca_cs_heir }
-                debug_log = "TCA_TEST WAIT tca_test_circuit_heir_level_gate 2 days"
-                trigger_event = { id = tca_circuit_succession_test.1013 days = 2 }
+                set_variable = { name = tca_cs13_original_holder value = scope:tca_cs13_original_holder }
+                set_variable = { name = tca_cs13_original_primary value = scope:tca_cs13_original_holder.primary_title }
+                set_variable = { name = tca_cs13_original_capital value = scope:tca_cs13_original_holder.capital_county }
+                set_variable = { name = tca_cs13_original_liege value = scope:tca_cs13_original_holder.liege }
+                set_variable = { name = tca_cs13_county_holder value = scope:tca_cs13_original_holder.capital_county.holder }
+                set_variable = { name = tca_cs13_county_primary value = var:tca_cs13_county_holder.primary_title }
+                set_variable = { name = tca_cs13_county_capital value = var:tca_cs13_county_holder.capital_county }
+                set_variable = { name = tca_cs13_county_liege value = var:tca_cs13_county_holder.liege }
+                set_variable = { name = tca_cs13_county_timeout value = var:tca_cs13_county_holder.appointment_timeout_days }
+                set_variable = { name = tca_cs13_parent value = scope:tca_cs_road.de_jure_liege }
+                set_variable = { name = tca_cs13_county_parent value = scope:tca_cs13_original_holder.capital_county.de_jure_liege }
+                set_variable = { name = tca_cs13_original_kind value = scope:tca_cs_road.var:tca_circuit_kind }
+                set_variable = { name = tca_cs13_original_timeout value = scope:tca_cs13_original_holder.appointment_timeout_days }
+                set_variable = { name = tca_cs13_borrowed_date value = current_date }
+                if = { limit = { scope:tca_cs_road = { is_target_in_global_variable_list = { name = tca_circuit_titles target = this } } } set_variable = { name = tca_cs13_original_registered value = 1 } }
+                else = { set_variable = { name = tca_cs13_original_registered value = 0 } }
+                if = { limit = { scope:tca_cs13_original_holder = { has_trait = tca_test_death_protection } } set_variable = { name = tca_cs13_original_protected value = 1 } }
+                else = { set_variable = { name = tca_cs13_original_protected value = 0 } }
+                if = { limit = { scope:tca_cs_road = { has_title_law = single_heir_succession_law } } set_variable = { name = tca_cs13_original_title_she value = 1 } }
+                else = { set_variable = { name = tca_cs13_original_title_she value = 0 } }
+                if = { limit = { var:tca_cs13_county_holder = { has_trait = tca_test_death_protection } } set_variable = { name = tca_cs13_county_protected value = 1 } }
+                else = { set_variable = { name = tca_cs13_county_protected value = 0 } }
+                scope:tca_cs13_original_holder = { tca_test_protect_circuit_heir_original_effect = yes }
+                var:tca_cs13_county_holder = { tca_test_protect_circuit_heir_original_effect = yes }
+                var:tca_cs13_county_liege = { tca_test_protect_circuit_heir_original_effect = yes }
+                create_character = { age = 60 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite trait = education_learning_3 save_scope_as = tca_cs13_holder }
+                if = {
+                    limit = { NOT = { scope:tca_cs13_holder = root } }
+                    save_scope_value_as = { name = tca_cs13_prep_stage value = 2 }
+                    set_variable = { name = tca_cs13_holder value = scope:tca_cs13_holder }
+                    scope:tca_cs13_holder = {
+                        add_character_flag = tca_cs13_owned_parent
+                        add_character_flag = tca_merit_grant_suppress
+                        add_character_flag = ai_will_not_convert
+                        add_character_flag = cannot_be_diarch
+                        set_variable = { name = block_hire_councillor value = root }
+                        tca_test_protect_character_effect = yes
+                        create_dynasty = { spread_to_descendants = yes }
+                    }
+                    # 与已验证夹具相同：同一事务先给实际治所县，再给真实王国，不授空titular。
+                    set_variable = { name = tca_cs13_borrowed value = yes }
+                    create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_cs13_grant }
+                    var:tca_cs13_original_capital = { change_title_holder = { holder = scope:tca_cs13_holder change = scope:tca_cs13_grant } }
+                    scope:tca_cs_road = { change_title_holder = { holder = scope:tca_cs13_holder change = scope:tca_cs13_grant } }
+                    resolve_title_and_vassal_change = scope:tca_cs13_grant
+                    scope:tca_cs13_holder = {
+                        change_government = celestial_government
+                        create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_cs13_fealty }
+                        change_liege = { liege = root change = scope:tca_cs13_fealty }
+                        resolve_title_and_vassal_change = scope:tca_cs13_fealty
+                        if = { limit = { NOT = { vassal_contract_has_flag = celestial_province_standard } } vassal_contract_set_obligation_level = { type = celestial_provinces level = celestial_province_standard } }
+                    }
+                    if = {
+                        limit = { scope:tca_cs13_holder = { has_title = scope:tca_cs_road has_title = root.var:tca_cs13_original_capital } }
+                        save_scope_value_as = { name = tca_cs13_prep_stage value = 3 }
+                        scope:tca_cs13_holder = {
+                            if = { limit = { NOT = { primary_title = scope:tca_cs_road } } set_primary_title_to = scope:tca_cs_road }
+                            if = { limit = { NOT = { capital_county = root.var:tca_cs13_original_capital } } set_realm_capital = root.var:tca_cs13_original_capital }
+                            if = { limit = { NOT = { has_realm_law = single_heir_succession_law } } add_realm_law_skip_effects = single_heir_succession_law }
+                            if = { limit = { NOT = { any_held_title = { is_noble_family_title = yes } } } give_noble_family_title = { name = noble_family_name tier = county article = DEFAULT_TITLE_NAME_ARTICLE government = celestial_government save_scope_as = tca_cs13_family } }
+                            add_character_modifier = { modifier = tca_merit_probe_stasis_modifier }
+                            add_character_flag = tca_merit_active
+                            set_variable = { name = tca_merit_approved_level value = 9 }
+                            tca_merit_refresh_cap_effect = yes
+                            set_merit_level = 0
+                            set_merit_level = 9
+                        }
+                        root.primary_title = { save_scope_as = tca_cs13_family }
+                        scope:tca_cs13_holder = { every_held_title = { limit = { is_noble_family_title = yes } save_scope_as = tca_cs13_family } }
+                        if = {
+                            limit = { scope:tca_cs13_family = { is_noble_family_title = yes holder = scope:tca_cs13_holder } }
+                            save_scope_value_as = { name = tca_cs13_prep_stage value = 4 }
+                            set_variable = { name = tca_cs13_family value = scope:tca_cs13_family }
+                            scope:tca_cs_road = { set_variable = { name = tca_cs13_borrowed_road value = yes } }
+                            create_character = { age = 35 gender_female_chance = 0 random_traits = no dynasty = scope:tca_cs13_holder.dynasty employer = scope:tca_cs13_holder culture = root.culture faith = root.faith rite = root.rite trait = education_learning_3 save_scope_as = tca_cs_heir }
+                            if = {
+                                limit = { NOT = { scope:tca_cs_heir = root } }
+                                save_scope_value_as = { name = tca_cs13_prep_stage value = 5 }
+                                set_variable = { name = tca_cs13_heir value = scope:tca_cs_heir }
+                                scope:tca_cs_heir = {
+                                    add_character_flag = tca_cs13_owned
+                                    add_character_flag = tca_merit_grant_suppress
+                                    add_character_flag = ai_will_not_convert
+                                    add_character_flag = cannot_be_diarch
+                                    set_variable = { name = block_hire_councillor value = scope:tca_cs13_holder }
+                                    set_father = scope:tca_cs13_holder
+                                    tca_test_protect_character_effect = yes
+                                    add_character_modifier = { modifier = tca_merit_probe_stasis_modifier }
+                                    tca_test_add_native_merit_probe_exams_effect = yes
+                                    clear_appointment_timeout = yes
+                                    set_variable = { name = tca_cs13_expected value = merit_level_expected_kingdom_value }
+                                    add_character_flag = tca_merit_active
+                                    set_variable = { name = tca_merit_approved_level value = 9 }
+                                    tca_merit_refresh_cap_effect = yes
+                                    set_merit_level = 0
+                                    set_merit_level = 9
+                                }
+                                scope:tca_cs13_holder = { scriptedtests_recalculate_succession = yes }
+                                debug_log = "TCA_TEST WAIT tca_test_circuit_heir_level_gate 2 days native family succession"
+                                trigger_event = { id = tca_circuit_succession_test.3013 days = 2 }
+                            }
+                            else = { add_character_flag = tca_cs_precondition_failed }
+                        }
+                        else = { add_character_flag = tca_cs_precondition_failed }
+                    }
+                    else = { add_character_flag = tca_cs_precondition_failed }
+                }
+                else = { add_character_flag = tca_cs_precondition_failed }
             }
-            else = {
-                add_character_flag = tca_cs_precondition_failed
-                debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_circuit_heir_level_gate"
-            }
+            else = { add_character_flag = tca_cs_precondition_failed }
         }
-        else = {
-            add_character_flag = tca_cs_precondition_failed
-            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_circuit_heir_level_gate"
-        }
+        else = { add_character_flag = tca_cs_precondition_failed }
         if = {
             limit = { has_character_flag = tca_cs_precondition_failed }
+            # 阶段0=选路，1=选中，2=创建父，3=真实授职，4=NF，5=创建子；清理前留原现场。
+            if = { limit = { scope:tca_cs13_road_found = 0 }
+                random_vassal = {
+                    limit = { government_has_flag = government_is_celestial highest_held_title_tier = tier_kingdom vassal_contract_has_flag = celestial_province_standard }
+                    save_scope_as = tca_cs13_failed_probe_holder
+                    primary_title ?= { save_scope_as = tca_cs13_failed_probe_road }
+                    capital_county ?= {
+                        save_scope_as = tca_cs13_failed_probe_capital
+                        holder ?= { save_scope_as = tca_cs13_failed_probe_county_holder primary_title ?= { save_scope_as = tca_cs13_failed_probe_county_primary } }
+                    }
+                }
+            }
+            debug_log = "TCA_CS13_PREPARATION_FAILED STAGE_SNAPSHOT"
+            debug_log_scopes = yes
+            tca_test_cleanup_circuit_heir_fixture_effect = yes
+            tca_test_release_circuit_heir_original_protection_effect = yes
+            tca_test_clear_circuit_heir_fixture_fields_effect = yes
             remove_character_flag = tca_cs_precondition_failed
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_circuit_heir_level_gate"
             if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
             tca_test_lane_end_effect = { GROUP = tca_circuit_succession_test }
         }
     }
 }
-# 续接：核对低等级下的正式判定，再把第一顺位抬到期望等级等下一日复核。
+# 续接：必须由原版亲属法形成实际第一顺位；已知父子关系不能代替实际名单。
+tca_circuit_succession_test.3013 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            var:tca_cs13_road = { save_scope_as = tca_cs_road }
+            var:tca_cs13_heir = { save_scope_as = tca_cs_heir }
+            # 等待期间原版可按can_keep换法；本例仅重建自有旧法输入后再读真实first。
+            tca_test_prepare_circuit_heir_family_law_effect = yes
+            scope:tca_cs_heir = {
+                save_scope_value_as = { name = tca_cs13_initial_actual value = merit_level }
+                save_scope_value_as = { name = tca_cs13_initial_approved value = var:tca_merit_approved_level }
+                save_scope_value_as = { name = tca_cs13_initial_applied value = var:tca_merit_applied_level }
+                save_scope_value_as = { name = tca_cs13_initial_cap_base value = tca_merit_native_cap_base_value }
+                save_scope_value_as = { name = tca_cs13_initial_applied_cap_base value = var:tca_merit_applied_cap_base }
+                save_scope_value_as = { name = tca_cs13_initial_timeout value = appointment_timeout_days }
+                top_liege ?= { save_scope_as = tca_cs13_initial_realm }
+                liege ?= { save_scope_as = tca_cs13_initial_liege }
+                if = { limit = { government_has_flag = government_is_celestial } debug_log = "TCA_CS13_INITIAL CELESTIAL_GOVERNMENT" }
+                else = { debug_log = "TCA_CS13_INITIAL NOT_CELESTIAL_GOVERNMENT" }
+                if = { limit = { is_civilian_candidate_trigger = yes } debug_log = "TCA_CS13_INITIAL CIVILIAN_CANDIDATE" }
+                else = { debug_log = "TCA_CS13_INITIAL NOT_CIVILIAN_CANDIDATE" }
+                if = { limit = { can_be_granted_titles_by = { RULER = root } } debug_log = "TCA_CS13_INITIAL CAN_BE_GRANTED_TITLES" }
+                else = { debug_log = "TCA_CS13_INITIAL CANNOT_BE_GRANTED_TITLES" }
+                if = { limit = { has_character_flag = passed_provincial_exam has_character_flag = passed_metropolitan_exam has_character_flag = passed_palace_exam has_character_modifier = tgp_passed_provincial_exam_modifier has_character_modifier = tgp_passed_metropolitan_exam_modifier has_character_modifier = tgp_passed_palace_exam_modifier has_trait = education_learning_3 } debug_log = "TCA_CS13_INITIAL EXAMS_AND_EDUCATION_READY" }
+                else = { debug_log = "TCA_CS13_INITIAL EXAMS_OR_EDUCATION_MISSING" }
+            }
+            scope:tca_cs_road = {
+                current_heir ?= { save_scope_as = tca_cs13_initial_actual_heir }
+                if = { limit = { holder = { has_realm_law = single_heir_succession_law } } debug_log = "TCA_CS13_INITIAL HEREDITARY_REALM_LAW" }
+                else = { debug_log = "TCA_CS13_INITIAL HEREDITARY_REALM_LAW_MISSING" }
+                # 非任命法没有可查询的任命评分；只记录原生实际名单和等级，不能在MakeScope丢失外层scope。
+                every_title_heir = { debug_log = "TCA_CS13_NATIVE_FAMILY_HEIR id=[THIS.Char.GetID] level=[THIS.Char.GetMeritLevel]" }
+            }
+            debug_log = "TCA_CS13_INITIAL STATE"
+            debug_log_scopes = yes
+            if = {
+                limit = { scope:tca_cs_road = { current_heir = scope:tca_cs_heir holder = { has_realm_law = single_heir_succession_law } tca_circuit_is_tracked_road_trigger = yes tca_circuit_has_celestial_vassal_holder_trigger = yes } var:tca_cs13_family = { is_noble_family_title = yes holder = root.var:tca_cs13_holder } scope:tca_cs_heir = { has_character_flag = tca_cs13_owned father = root.var:tca_cs13_holder top_liege = root government_has_flag = government_is_celestial merit_level = 9 var:tca_merit_approved_level = 9 var:tca_merit_applied_level = 9 } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_heir_level_gate 8"
+                # 只改变本例owned人物；保持回调抑制到清理结束，不吞真实人物的任何升降品。
+                scope:tca_cs_heir = {
+                    set_variable = { name = tca_merit_approved_level value = 1 }
+                    tca_merit_refresh_cap_effect = yes
+                    set_merit_level = 0
+                    set_merit_level = 1
+                }
+                var:tca_cs13_holder = { scriptedtests_recalculate_succession = yes }
+                debug_log = "TCA_TEST WAIT tca_test_circuit_heir_level_gate 2 days"
+                trigger_event = { id = tca_circuit_succession_test.1013 days = 2 }
+            }
+            else = {
+                add_character_flag = tca_test_tca_circuit_succession_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_heir_level_gate 8"
+                debug_log = "TCA_CIRCUIT_HEIR_LEVEL INITIAL_CANDIDACY_FAILED"
+                # 未建立真实第一顺位便不执行原低／高阶段，仍保留失败并完整归还自有夹具。
+                trigger_event = { id = tca_circuit_succession_test.4013 }
+            }
+        }
+    }
+}
+# 续接：原低档三断言读取真实current_heir；若低品使原生改选，明确失败而非跳过。
 tca_circuit_succession_test.1013 = {
     type = character_event
     hidden = yes
@@ -601,37 +775,29 @@ tca_circuit_succession_test.1013 = {
             limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
             var:tca_cs13_road = { save_scope_as = tca_cs_road }
             var:tca_cs13_heir = { save_scope_as = tca_cs_heir }
-            if = {
-                limit = { scope:tca_cs_road = { tca_circuit_heir_meets_level_trigger = no } }
-                debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_heir_level_gate 1"
+            # 等待期间原版可按can_keep换法；本例仅重建自有旧法输入后再读真实first。
+            tca_test_prepare_circuit_heir_family_law_effect = yes
+            scope:tca_cs_road = { current_heir ?= { save_scope_as = tca_cs13_low_actual_heir } }
+            scope:tca_cs_heir = { save_scope_value_as = { name = tca_cs13_low_actual value = merit_level } }
+            if = { limit = { scope:tca_cs_road = { current_heir = scope:tca_cs_heir tca_circuit_heir_meets_level_trigger = no } } debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_heir_level_gate 1" }
+            else = { add_character_flag = tca_test_tca_circuit_succession_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_heir_level_gate 1" debug_log_scopes = yes }
+            if = { limit = { scope:tca_cs_road = { current_heir = scope:tca_cs_heir NOT = { tca_circuit_has_valid_heir_trigger = yes } } } debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_heir_level_gate 2" }
+            else = { add_character_flag = tca_test_tca_circuit_succession_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_heir_level_gate 2" }
+            if = { limit = { scope:tca_cs_road = { current_heir = scope:tca_cs_heir tca_circuit_should_preclear_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_heir_level_gate 3" }
+            else = { add_character_flag = tca_test_tca_circuit_succession_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_heir_level_gate 3" }
+            scope:tca_cs_heir = {
+                set_variable = { name = tca_merit_approved_level value = var:tca_cs13_expected }
+                tca_merit_refresh_cap_effect = yes
+                set_merit_level = 0
+                set_merit_level = var:tca_cs13_expected
             }
-            else = {
-                add_character_flag = tca_test_tca_circuit_succession_test_case_failed
-                debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_heir_level_gate 1"
-            }
-            if = {
-                limit = { scope:tca_cs_road = { NOT = { tca_circuit_has_valid_heir_trigger = yes } } }
-                debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_heir_level_gate 2"
-            }
-            else = {
-                add_character_flag = tca_test_tca_circuit_succession_test_case_failed
-                debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_heir_level_gate 2"
-            }
-            if = {
-                limit = { scope:tca_cs_road = { tca_circuit_should_preclear_trigger = yes } }
-                debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_heir_level_gate 3"
-            }
-            else = {
-                add_character_flag = tca_test_tca_circuit_succession_test_case_failed
-                debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_heir_level_gate 3"
-            }
-            scope:tca_cs_heir = { set_merit_level = 0 set_merit_level = var:tca_cs13_expected }
+            var:tca_cs13_holder = { scriptedtests_recalculate_succession = yes }
             debug_log = "TCA_TEST WAIT tca_test_circuit_heir_level_gate 2 days"
             trigger_event = { id = tca_circuit_succession_test.2013 days = 2 }
         }
     }
 }
-# 续接：核对抬到期望等级后的正式判定，恢复原等级并结束用例。
+# 续接：原高档四断言之后归还借用县／路，清理自有家门及人物。
 tca_circuit_succession_test.2013 = {
     type = character_event
     hidden = yes
@@ -641,47 +807,82 @@ tca_circuit_succession_test.2013 = {
             limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
             var:tca_cs13_road = { save_scope_as = tca_cs_road }
             var:tca_cs13_heir = { save_scope_as = tca_cs_heir }
-            if = {
-                limit = { scope:tca_cs_road = { tca_circuit_heir_meets_level_trigger = yes } }
-                debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_heir_level_gate 4"
+            # 等待期间原版可按can_keep换法；本例仅重建自有旧法输入后再读真实first。
+            tca_test_prepare_circuit_heir_family_law_effect = yes
+            scope:tca_cs_road = { current_heir ?= { save_scope_as = tca_cs13_high_actual_heir } }
+            if = { limit = { scope:tca_cs_road = { current_heir = scope:tca_cs_heir tca_circuit_heir_meets_level_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_heir_level_gate 4" }
+            else = { add_character_flag = tca_test_tca_circuit_succession_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_heir_level_gate 4" }
+            if = { limit = { scope:tca_cs_road = { current_heir = scope:tca_cs_heir tca_circuit_has_valid_heir_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_heir_level_gate 5" }
+            else = { add_character_flag = tca_test_tca_circuit_succession_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_heir_level_gate 5" }
+            if = { limit = { scope:tca_cs_road = { current_heir = scope:tca_cs_heir NOT = { tca_circuit_should_preclear_trigger = yes } } } debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_heir_level_gate 6" }
+            else = { add_character_flag = tca_test_tca_circuit_succession_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_heir_level_gate 6" }
+            if = { limit = { scope:tca_cs_heir = { merit_level = var:tca_cs13_expected } } debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_heir_level_gate 7" }
+            else = { add_character_flag = tca_test_tca_circuit_succession_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_heir_level_gate 7" }
+            trigger_event = { id = tca_circuit_succession_test.4013 }
+
+        }
+    }
+}
+# 初始候选失败和正常结束共用清理；所有引用来自本例root持久字段。
+tca_circuit_succession_test.4013 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            var:tca_cs13_heir = {
+                save_scope_value_as = { name = tca_cs13_diag_actual value = merit_level }
+                save_scope_value_as = { name = tca_cs13_diag_expected value = var:tca_cs13_expected }
+                save_scope_value_as = { name = tca_cs13_diag_approved value = var:tca_merit_approved_level }
+                save_scope_value_as = { name = tca_cs13_diag_applied value = var:tca_merit_applied_level }
             }
-            else = {
-                add_character_flag = tca_test_tca_circuit_succession_test_case_failed
-                debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_heir_level_gate 4"
+            debug_log = "TCA_CIRCUIT_HEIR_LEVEL OWNED_FAMILY_CLEANUP_STATE"
+            debug_log_scopes = yes
+            tca_test_cleanup_circuit_heir_fixture_effect = yes
+            debug_log = "TCA_TEST WAIT tca_test_circuit_heir_level_gate 3 days restored callback"
+            trigger_event = { id = tca_circuit_succession_test.5013 days = 3 }
+        }
+    }
+}
+# 续接：自有父子／家门退出；核对真实县／路归还与原任状态恢复。
+tca_circuit_succession_test.5013 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            tca_test_release_circuit_heir_original_protection_effect = yes
+            save_scope_value_as = { name = tca_cs13_expected_remaining_timeout value = { value = var:tca_cs13_original_timeout subtract = { value = current_date subtract = root.var:tca_cs13_borrowed_date } min = 0 } }
+            if = { limit = { var:tca_cs13_county_holder = var:tca_cs13_original_holder }
+                save_scope_value_as = { name = tca_cs13_county_expected_timeout value = scope:tca_cs13_expected_remaining_timeout }
             }
-            if = {
-                limit = { scope:tca_cs_road = { tca_circuit_has_valid_heir_trigger = yes } }
-                debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_heir_level_gate 5"
-            }
-            else = {
-                add_character_flag = tca_test_tca_circuit_succession_test_case_failed
-                debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_heir_level_gate 5"
-            }
-            if = {
-                limit = { scope:tca_cs_road = { NOT = { tca_circuit_should_preclear_trigger = yes } } }
-                debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_heir_level_gate 6"
-            }
-            else = {
-                add_character_flag = tca_test_tca_circuit_succession_test_case_failed
-                debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_heir_level_gate 6"
-            }
-            if = {
-                limit = { scope:tca_cs_heir = { merit_level = var:tca_cs13_expected } }
-                debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_heir_level_gate 7"
-            }
-            else = {
-                add_character_flag = tca_test_tca_circuit_succession_test_case_failed
-                debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_heir_level_gate 7"
-            }
-            # 恢复现场：原等级、测试变量。
-            scope:tca_cs_heir = {
-                set_merit_level = 0
-                set_merit_level = var:tca_cs13_original_level
-                remove_variable = tca_cs13_original_level
-                remove_variable = tca_cs13_expected
-            }
-            remove_variable = tca_cs13_road
-            remove_variable = tca_cs13_heir
+            else = { save_scope_value_as = { name = tca_cs13_county_expected_timeout value = { value = var:tca_cs13_county_timeout subtract = { value = current_date subtract = root.var:tca_cs13_borrowed_date } min = 0 } } }
+            if = { limit = {
+                var:tca_cs13_heir = { is_alive = no }
+                var:tca_cs13_holder = { is_alive = no }
+                trigger_if = { limit = { exists = var:tca_cs13_family } var:tca_cs13_family = { NOT = { exists = holder } } }
+                var:tca_cs13_road = { holder = root.var:tca_cs13_original_holder NOT = { has_variable = tca_cs13_borrowed_road } }
+                var:tca_cs13_original_capital = { holder = root.var:tca_cs13_county_holder }
+            } debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_heir_level_gate 9" }
+            else = { add_character_flag = tca_test_tca_circuit_succession_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_heir_level_gate 9" debug_log_scopes = yes }
+            if = { limit = {
+                var:tca_cs13_original_holder = { is_alive = yes primary_title = root.var:tca_cs13_original_primary capital_county = root.var:tca_cs13_original_capital liege = root.var:tca_cs13_original_liege government_has_flag = government_is_celestial has_realm_law = celestial_appointment_succession_law appointment_timeout_days = scope:tca_cs13_expected_remaining_timeout }
+                var:tca_cs13_road = { de_jure_liege = root.var:tca_cs13_parent var:tca_circuit_kind = root.var:tca_cs13_original_kind }
+                var:tca_cs13_original_capital = { de_jure_liege = root.var:tca_cs13_county_parent }
+                var:tca_cs13_county_holder = { is_alive = yes primary_title = root.var:tca_cs13_county_primary capital_county = root.var:tca_cs13_county_capital liege = root.var:tca_cs13_county_liege government_has_flag = government_is_celestial has_realm_law = celestial_appointment_succession_law appointment_timeout_days = scope:tca_cs13_county_expected_timeout }
+                trigger_if = { limit = { var:tca_cs13_county_protected = 1 } var:tca_cs13_county_holder = { has_trait = tca_test_death_protection } }
+                trigger_else = { var:tca_cs13_county_holder = { NOT = { has_trait = tca_test_death_protection } } }
+                trigger_if = { limit = { var:tca_cs13_original_registered = 1 } var:tca_cs13_road = { is_target_in_global_variable_list = { name = tca_circuit_titles target = this } } }
+                trigger_else = { var:tca_cs13_road = { NOT = { is_target_in_global_variable_list = { name = tca_circuit_titles target = this } } } }
+                trigger_if = { limit = { var:tca_cs13_original_protected = 1 } var:tca_cs13_original_holder = { has_trait = tca_test_death_protection } }
+                trigger_else = { var:tca_cs13_original_holder = { NOT = { has_trait = tca_test_death_protection } } }
+                trigger_if = { limit = { var:tca_cs13_original_title_she = 1 } var:tca_cs13_road = { has_title_law = single_heir_succession_law } }
+                trigger_else = { var:tca_cs13_road = { NOT = { has_title_law = single_heir_succession_law } } }
+            } debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_heir_level_gate 10" }
+            else = { add_character_flag = tca_test_tca_circuit_succession_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_heir_level_gate 10" debug_log_scopes = yes }
+            tca_test_clear_circuit_heir_fixture_fields_effect = yes
             if = { limit = { has_character_flag = tca_test_tca_circuit_succession_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_circuit_heir_level_gate" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
             else = { debug_log = "TCA_TEST PASS tca_test_circuit_heir_level_gate" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
             remove_character_flag = tca_test_tca_circuit_succession_test_case_failed

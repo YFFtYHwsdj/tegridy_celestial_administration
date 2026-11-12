@@ -1,8 +1,15 @@
-﻿# 人物作用域；清除当前缓存所有者的统计行及排序，不更改世界人口或宗教。
+﻿# 缓存所有者作用域；释放本轮访问标记。列表只用于线性清理，不作逐人物成员搜索。
+# 收集和释放为同步过程，不在其中触发延迟事件或嵌套其他政权的刷新。
+tca_release_confucian_statistics_visits_effect = {
+    every_in_list = { variable = tca_stats_seen remove_character_flag = tca_stats_visited }
+    clear_variable_list = tca_stats_seen
+}
+
+# 人物作用域；清除当前缓存所有者的统计行及排序，不更改世界人口或宗教。
 tca_clear_confucian_statistics_effect = {
     every_in_list = { variable = tca_stats_rows end_story = yes }
     clear_variable_list = tca_stats_rows
-    clear_variable_list = tca_stats_seen
+    tca_release_confucian_statistics_visits_effect = yes
     remove_variable = tca_stats_updated
     clear_variable_list = tca_stats_display_rows
     set_variable = { name = tca_stats_total value = 0 }
@@ -20,6 +27,12 @@ tca_collect_confucian_statistics_member_effect = {
         limit = { tca_is_confucian_statistics_member_trigger = yes }
         rite = { save_scope_as = tca_stats_member_rite }
         save_scope_as = tca_stats_member
+        # 数值在人物作用域各算一次，随后显式读取保存值；不能把人物 local_var 隐式带入story作用域。
+        # 每次合格收集均覆盖全部分项，零贡献也须写入，避免前一人物的值污染下一人物。
+        save_scope_value_as = { name = tca_stats_member_education value = tca_confucian_education_strength_value }
+        save_scope_value_as = { name = tca_stats_member_titles value = tca_confucian_title_strength_value }
+        save_scope_value_as = { name = tca_stats_member_families value = tca_confucian_family_strength_value }
+        save_scope_value_as = { name = tca_stats_member_strength value = { value = 1 add = scope:tca_stats_member_education add = scope:tca_stats_member_titles add = scope:tca_stats_member_families } }
         clear_saved_scope = tca_stats_row
         scope:tca_stats_viewer = {
             every_in_list = {
@@ -45,18 +58,22 @@ tca_collect_confucian_statistics_member_effect = {
                 change_variable = { name = tca_stats_rite_count add = 1 }
             }
             change_variable = { name = tca_stats_total add = 1 }
-            change_variable = { name = tca_stats_strength add = scope:tca_stats_member.tca_confucian_person_strength_value }
-            change_variable = { name = tca_stats_education add = scope:tca_stats_member.tca_confucian_education_strength_value }
-            change_variable = { name = tca_stats_titles add = scope:tca_stats_member.tca_confucian_title_strength_value }
-            change_variable = { name = tca_stats_families add = scope:tca_stats_member.tca_confucian_family_strength_value }
+            change_variable = { name = tca_stats_strength add = scope:tca_stats_member_strength }
+            change_variable = { name = tca_stats_education add = scope:tca_stats_member_education }
+            change_variable = { name = tca_stats_titles add = scope:tca_stats_member_titles }
+            change_variable = { name = tca_stats_families add = scope:tca_stats_member_families }
         }
         scope:tca_stats_row = {
             change_variable = { name = tca_stats_count add = 1 }
-            change_variable = { name = tca_stats_strength add = scope:tca_stats_member.tca_confucian_person_strength_value }
-            change_variable = { name = tca_stats_education add = scope:tca_stats_member.tca_confucian_education_strength_value }
-            change_variable = { name = tca_stats_titles add = scope:tca_stats_member.tca_confucian_title_strength_value }
-            change_variable = { name = tca_stats_families add = scope:tca_stats_member.tca_confucian_family_strength_value }
+            change_variable = { name = tca_stats_strength add = scope:tca_stats_member_strength }
+            change_variable = { name = tca_stats_education add = scope:tca_stats_member_education }
+            change_variable = { name = tca_stats_titles add = scope:tca_stats_member_titles }
+            change_variable = { name = tca_stats_families add = scope:tca_stats_member_families }
         }
+        clear_saved_scope = tca_stats_member_education
+        clear_saved_scope = tca_stats_member_titles
+        clear_saved_scope = tca_stats_member_families
+        clear_saved_scope = tca_stats_member_strength
     }
 }
 
@@ -96,14 +113,15 @@ tca_finalize_confucian_statistics_effect = {
 }
 
 # 候选人物作用域；必需 tca_stats_viewer、tca_stats_realm。局部遍历的路径可能重叠，
-# 例如本朝廷臣同时被本朝人物囚禁；临时列表仅在本次构建内去重，结束即清除。
+# 例如本朝廷臣同时被本朝人物囚禁；人物临时flag作常数时间判重，列表仅记录待清理对象。
 tca_visit_confucian_statistics_member_effect = {
     save_scope_as = tca_stats_candidate
     if = {
         limit = {
             tca_is_confucian_statistics_member_trigger = yes
-            NOT = { scope:tca_stats_viewer = { any_in_list = { variable = tca_stats_seen this = scope:tca_stats_candidate } } }
+            NOT = { has_character_flag = tca_stats_visited }
         }
+        add_character_flag = tca_stats_visited
         scope:tca_stats_viewer = { add_to_variable_list = { name = tca_stats_seen target = scope:tca_stats_candidate } }
         tca_collect_confucian_statistics_member_effect = yes
     }
@@ -133,7 +151,7 @@ tca_refresh_confucian_statistics_effect = {
         every_vassal_or_below = { tca_visit_confucian_statistics_court_effect = yes }
     }
     tca_finalize_confucian_statistics_effect = yes
-    clear_variable_list = tca_stats_seen
+    tca_release_confucian_statistics_visits_effect = yes
     set_variable = { name = tca_stats_updated value = current_date }
 }
 

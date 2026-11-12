@@ -409,6 +409,37 @@ tca_military_fill_single_position_effect = {
 	}
 }
 
+# 人物作用域；按当前硬资格、任职与磨勘状态收集本轮候选。
+# 无输入scope；只追加到待阙／在职都监／在职监押临时名单，不任免或修改人物。
+# 调用者逐人调用一次并在轮末清理名单；皇帝宫廷与封臣宫廷共用此入口。
+tca_military_collect_officer_effect = {
+    if = {
+        limit = { tca_military_officer_base_eligibility_trigger = yes }
+
+        if = {
+            limit = {
+                tca_does_not_hold_any_military_court_position_trigger = yes
+                court_position_does_not_already_have_a_job_trigger = yes
+            }
+            add_to_list = tca_military_unassigned_pool
+        }
+        else_if = {
+            limit = {
+                has_court_position = tca_military_inspector_court_position
+                NOT = { has_character_flag = tca_military_appointment_cooldown }
+            }
+            add_to_list = tca_military_serving_inspectors
+        }
+        else_if = {
+            limit = {
+                has_court_position = tca_military_supervisor_court_position
+                NOT = { has_character_flag = tca_military_appointment_cooldown }
+            }
+            add_to_list = tca_military_serving_supervisors
+        }
+    }
+}
+
 # 独立天朝最高领主作用域；由开局与季度回调调用，调用者负责政体与独立条件。
 # 同链建立五类出缺队列与待阙/在任候选列表，按都虞候、都监、监押顺序分配，轮末清空列表。
 # 选中人物及原雇主等saved scopes服务同轮调任与通知；单职入口在每次抽选前重新清空候选输出。
@@ -443,64 +474,14 @@ tca_military_quarterly_fill_vacancies_effect = {
 		# 采用单一基础资格守门（tca_military_officer_base_eligibility_trigger），消除重复全量扫描
 		# -------------------------------------------------------------
 		# 3.1 收集皇帝宫廷廷臣；这里不遍历宾客。
-		every_courtier = {
-			limit = {
-				tca_military_officer_base_eligibility_trigger = yes
-			}
-			if = {
-				limit = {
-					tca_does_not_hold_any_military_court_position_trigger = yes
-					court_position_does_not_already_have_a_job_trigger = yes
-				}
-				add_to_list = tca_military_unassigned_pool
-			}
-			else_if = {
-				limit = {
-					has_court_position = tca_military_inspector_court_position
-					NOT = { has_character_flag = tca_military_appointment_cooldown }
-				}
-				add_to_list = tca_military_serving_inspectors
-			}
-			else_if = {
-				limit = {
-					has_court_position = tca_military_supervisor_court_position
-					NOT = { has_character_flag = tca_military_appointment_cooldown }
-				}
-				add_to_list = tca_military_serving_supervisors
-			}
-		}
+		every_courtier = { tca_military_collect_officer_effect = yes }
 
 		# 3.2 收集各级封臣宫廷武官
 		every_vassal_or_below = {
 			limit = {
 				government_has_flag = government_is_celestial
 			}
-			every_courtier = {
-				limit = {
-					tca_military_officer_base_eligibility_trigger = yes
-				}
-				if = {
-					limit = {
-						tca_does_not_hold_any_military_court_position_trigger = yes
-						court_position_does_not_already_have_a_job_trigger = yes
-					}
-					add_to_list = tca_military_unassigned_pool
-				}
-				else_if = {
-					limit = {
-						has_court_position = tca_military_inspector_court_position
-						NOT = { has_character_flag = tca_military_appointment_cooldown }
-					}
-					add_to_list = tca_military_serving_inspectors
-				}
-				else_if = {
-					limit = {
-						has_court_position = tca_military_supervisor_court_position
-						NOT = { has_character_flag = tca_military_appointment_cooldown }
-					}
-					add_to_list = tca_military_serving_supervisors
-				}
-			}
+			every_courtier = { tca_military_collect_officer_effect = yes }
 		}
 
 		# -------------------------------------------------------------

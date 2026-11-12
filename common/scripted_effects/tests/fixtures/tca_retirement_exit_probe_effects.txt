@@ -74,6 +74,23 @@ tca_test_capture_retirement_heir_effect = {
     remove_character_flag = $FLAG$
     $TITLE$.holder = { scriptedtests_recalculate_succession = yes }
     $TITLE$ = {
+        debug_log = "TCA_RETIREMENT_NATIVE_PHASE title=[THIS.Title.GetKey]"
+        holder = {
+            debug_log = "TCA_RETIREMENT_NATIVE_HOLDER id=[THIS.Char.GetID]"
+            liege ?= { debug_log = "TCA_RETIREMENT_NATIVE_HOLDER_LIEGE id=[THIS.Char.GetID]" }
+        }
+        every_title_heir = { debug_log = "TCA_RETIREMENT_NATIVE_MEMBER id=[THIS.Char.GetID] rank=[THIS.Char.GetMeritLevel] timeout=[THIS.Char.MakeScope.ScriptValue('tca_merit_diag_timeout_value')|0]" }
+    }
+    $CANDIDATE$ = {
+        debug_log = "TCA_RETIREMENT_NATIVE_CONTROL_STATE id=[THIS.Char.GetID] rank=[THIS.Char.GetMeritLevel] timeout=[THIS.Char.MakeScope.ScriptValue('tca_merit_diag_timeout_value')|0] influence=[THIS.Char.MakeScope.ScriptValue('tca_retirement_probe_influence_value')] influence_level=[THIS.Char.MakeScope.ScriptValue('tca_retirement_probe_influence_level_value')|0]"
+        primary_title ?= { debug_log = "TCA_RETIREMENT_NATIVE_CONTROL_TITLE [THIS.Title.GetKey]" }
+        liege_or_court_owner ?= { debug_log = "TCA_RETIREMENT_NATIVE_CONTROL_LIEGE id=[THIS.Char.GetID]" }
+        if = { limit = { tca_retirement_candidate_is_exited_trigger = yes } debug_log = "TCA_RETIREMENT_NATIVE_CONTROL EXITED" }
+        if = { limit = { tca_retirement_excludes_appointment_trigger = yes } debug_log = "TCA_RETIREMENT_NATIVE_CONTROL EXCLUDED" }
+        if = { limit = { is_imprisoned = yes } debug_log = "TCA_RETIREMENT_NATIVE_CONTROL IMPRISONED" }
+        if = { limit = { tca_is_landless_official_trigger = yes } debug_log = "TCA_RETIREMENT_NATIVE_CONTROL OFFICIAL" }
+    }
+    $TITLE$ = {
         every_title_heir = {
             if = { limit = { this = $CANDIDATE$ } scope:tca_re_reporter = { add_character_flag = $FLAG$ } }
         }
@@ -130,8 +147,14 @@ tca_test_fengci_retirement_native_heir_effect = {
 }
 tca_test_resume_retirement_native_heir_effect = {
     if = { limit = { has_character_flag = tca_re_native_borrowed has_trait = tca_retirement_probe_fengci }
-        change_influence = { value = 500 subtract = influence }
+        # 身份过滤回归不把真实候选的余额强行降至500；只补足实际起复所需费用。
+        if = { limit = { influence < 60 } change_influence = { value = 60 subtract = influence } }
         tca_retirement_candidate_resume_effect = yes
+        if = {
+            limit = { NOT = { has_trait = tca_retirement_probe_fengci } }
+            # 本例只测身份退出/恢复，费用由独立正式用例验证；恢复借用输入以免改动原生排序因素。
+            change_influence = { value = var:tca_re_native_original_influence subtract = influence }
+        }
         # 原生通判候选可能在新一轮名单计算时重设5年冷却；本夹具进入前原冷却为0，
         # 起复对照必须恢复同一初始状态，而不是把测试注入的冷却当作业务结果。
         if = { limit = { NOT = { has_trait = tca_retirement_probe_fengci } } clear_appointment_timeout = yes }
@@ -282,4 +305,27 @@ tca_test_diag_retirement_native_heir_effect = {
         }
         else = { debug_log = "TCA_RETIREMENT_EXIT_DIAG $LABEL$ FAIL TITLE_GONE" }
     } }
+}
+
+# 新建健康／压力人物作用域；调用者提供tca_rh_host。只隔离原生离庭、邀请和议会招聘，
+# 不改变健康、压力、年龄、身份或候选起复资格。用例结束释放本项新增的邀请／离庭状态。
+tca_test_lock_retirement_health_court_effect = {
+    add_character_flag = blocked_from_leaving
+    set_variable = { name = invite_to_court_cooldown value = yes days = 100 }
+    set_variable = { name = block_hire_councillor value = scope:tca_rh_host days = 100 }
+}
+# 失败时只读输出真实衍生值和环境；不搬回宫廷、不修健康或重试断言。
+tca_test_diag_retirement_stress_health_effect = {
+    debug_log = "TCA_RH_STRESS_VALUES id=[THIS.Char.GetID] health=[THIS.Char.MakeScope.ScriptValue('tca_retirement_probe_health_value')] stress=[THIS.Char.MakeScope.ScriptValue('tca_retirement_probe_stress_value')]"
+    liege_or_court_owner ?= { debug_log = "TCA_RH_STRESS_COURT actual=[THIS.Char.GetID]" }
+    scope:tca_rh_host = { debug_log = "TCA_RH_STRESS_COURT expected=[THIS.Char.GetID]" }
+    if = { limit = { has_trait = tca_test_death_protection } debug_log = "TCA_RH_STRESS_HEALTH PROTECTED" }
+    else = { debug_log = "TCA_RH_STRESS_HEALTH UNPROTECTED" }
+    if = { limit = { has_trait = tca_retirement_probe_fengci } debug_log = "TCA_RH_STRESS_HEALTH FENGCI" }
+    if = { limit = { has_trait = tca_retirement_probe_retired } debug_log = "TCA_RH_STRESS_HEALTH RETIRED" }
+    if = { limit = { has_character_modifier = tca_retirement_test_health_minus_001 } debug_log = "TCA_RH_STRESS_HEALTH MINUS_001" }
+    if = { limit = { has_character_modifier = tca_retirement_test_health_minus_003 } debug_log = "TCA_RH_STRESS_HEALTH MINUS_003" }
+    if = { limit = { has_character_modifier = tca_retirement_test_health_minus_005 } debug_log = "TCA_RH_STRESS_HEALTH MINUS_005" }
+    if = { limit = { has_character_modifier = tca_retirement_test_health_minus_007 } debug_log = "TCA_RH_STRESS_HEALTH MINUS_007" }
+    if = { limit = { has_character_modifier = tca_retirement_test_health_minus_010 } debug_log = "TCA_RH_STRESS_HEALTH MINUS_010" }
 }

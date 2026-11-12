@@ -14,7 +14,7 @@
 - `tca_exam.1` 由皇帝选择亲自主持、小比／常科／大开代为主持或暂缓。亲自主持选项打开原版活动主办窗口，选中后事件关闭；选项只显示档位名称，悬浮用原生扣款效果显示该档费用；不再手写“抽取多少名考生”，知贡举的录取尺度随机也不展开为“X%概率”。代为主持按所选规模、当前侧重和知贡举自动决定的录取标准结算，实际扣费使用 `remove_treasury` 扣除选项展示的同一档费用。暂缓无费用，下一年再检查。
 - 代为主持扣皇帝国库费用，设置 `title:h_china` 的 `tca_exam_cooldown`（5 年），同时归零原版 `years_since_imperial_examination`；隐藏事件 `tca_exam.4` 结算后，有考生则触发 `.2` 放榜，并在有首名时进入 `.3` 传胪；零考生转入 `.5`「本科无人应试」后结束，保留费用、主持收益和冷却。代为主持的等级随机与扣费均包在 `hidden_effect` 内，避免 CK3 把内部 `random` 渲染成选项悬浮的百分比。
 - 会试分数复刻原版 `imperial_examination_entry_value`；侧重由知贡举自动选择，学识永远可选，军事仅扩张阶段、管理仅推进阶段可选，阶段侧重 75%、学识 25%。
-- 考生来自 `situation:dynastic_cycle` 的非 `other_rulers` 参与者，按规模随机抽 150／300／600 个普通名额；有 `command_to_attend_flag` 时，已过乡试的玩家近亲先从普通抽样池排除，再作为额外名额追加，人数预估也按同样口径去重。未过乡试者不禁止入池，分数除以 3。
+- 考生来自 `situation:dynastic_cycle` 的非 `other_rulers` 参与者，按规模随机抽 150／300／600 个普通名额；有 `command_to_attend_flag` 时，已过乡试的玩家近亲先从普通抽样池排除，再作为额外名额追加，候选池显示人数也按同样资格去重，普通池最多显示600人，再加优先近亲；这是选规模前的候选池，不是所选档位的入选人数。未过乡试者不禁止入池，分数除以 3。
 - 代办和原版乡试／会试活动统一排除三省六部、提刑／通判、councillor 等在任官员及现任知贡举，玩家与 AI 使用同一任职门槛。有地人物继续不能应试；无地冒险者、仅有家族头衔者、普通廷臣和其他宫廷职位持有者放行。限制只针对考生，官员仍可按原版规则担任考官、协助或陪同；辞官后重新按当前身份判断资格。
 - 录取标准由知贡举按原版 `imperial_examination_passing_grade` 的加权随机与自身属性决定：宽取 10%、依例 15%、严取 30%、极严 50% 落榜配额；剩余前 10 名进殿试；非前十 AI 按原版条件 20% 补殿试；玩家亲属排除补录。
 - 皇帝收益按所选规模与录取标准发放影响力、合法性、威望：影响力 ×1／×2／×4；代为主持不降低收益。知贡举本人没有额外考试奖励，适配度不影响考试。
@@ -28,8 +28,10 @@
 - `common/scripted_triggers/tca_exam_triggers.txt`：官员排除、考生资格、近亲优先、事件入口条件。
 - `common/activities/intents/zz_tca_exam_intents.txt`：覆盖原版乡试、会试应试意图，增加共用任职门槛与双语原因提示，不限制其他意图。
 - `common/scripted_effects/zz_tca_native_exam_effects.txt`：覆盖原版乡试／会试初始考生收集及随行补入入口，保留原版评分、子集和配额；随行临时名单使用时再次校验，防止旧名单绕过限制。
-- `common/activities/activity_types/zz_tca_local_examination.txt` 与 `events/travel_events/zz_tca_exam_travel_events.txt`：仅给原版乡试到场、乡试／会试出发时自动设置考生意图的分支加入任职门槛，保留辞官应试选项。
+- `common/activities/activity_types/zz_tca_local_examination.txt` 与 `events/travel_events/zz_tca_exam_travel_events.txt`：仅给原版乡试到场、乡试／会试出发时自动设置考生意图的分支加入任职门槛，保留辞官应试选项。乡试随行权重仍要求考生与主持人当前位置相同；双方必须存活且有有效地点，缺主持人或地点时安全拒绝。
 - `common/scripted_effects/tca_exam_effects.txt`：侧重选择、候选收集、评分、配额、前十、奖励、冷却和代为主持入口；`tca_exam_award_candidate_effect` 在考生作用域直接调用原生 `create_character_memory`，按落榜／会试及第／殿试及第写入原版记忆类型，不依赖活动上下文。真实收集、池内近亲去重、已收集池的人数预估与抽样有独立正式入口，由显示和结算流程复用，约定见代码附近注释。
+  - 临时候选及已选名单按原生单次遍历清空；普通名额在剩余池中等概率不放回抽取，入选者随即移出候选池。优先近亲仍先排除、后额外追加；抽样会消耗候选池，人数预估必须在抽样前完成。
+  - 末位落榜仍单独按负分数排序；剩余前十的殿试标记与显示名次共用一次排序，同分者沿用该次原生排序的顺序。
 - `common/script_values/tca_exam_values.txt`：分数、费用、收益、落榜比例、人数上限。
 - `events/tca_exam_events.txt`：`tca_exam.1` 请开科、`.2` 会试放榜、`.3` 殿试传胪、`.4` 隐藏结算、`.5` 本科无人应试。
 - `common/activities/activity_types/zz_tca_imperial_examination.txt`：原版会试活动整份覆盖；在 `can_start_showing_failures_only` 增加自定义五年冷却，AI 不受该冷却影响；到场自动设置应试意图前增加共用任职门槛。

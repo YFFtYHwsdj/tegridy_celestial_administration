@@ -1,0 +1,83 @@
+﻿# 乡试已有活动阶段专用；不创建活动，不覆盖原生effect。
+# gather入口为人物，scoreboard入口为活动；均要求scope:activity与scope:host来自真实活动。
+# 仅把原版每个attending人物的原条件与处理置于同活动成员门槛之后；
+# 失联或转活动人物不查询子集，合法成员仍按原NOR、榜单容量、遍历顺序处理，无随机或金额变化。
+
+tca_exam_activity_gather_guests_effect = {
+	scope:activity = {
+		every_attending_character = {
+			limit = { tca_exam_is_current_activity_member_trigger = yes }
+			if = {
+				limit = {
+					has_character_flag = passed_palace_exam
+					NOR = {
+						this = scope:host
+						is_in_guest_subset = { name = imperial_examiners }
+						is_in_guest_subset = { name = entrants }
+					}
+				}
+				save_temporary_scope_as = temp_character
+				scope:activity = {
+					add_to_guest_subset = {
+						name = guests
+						target = scope:temp_character
+					}
+				}
+			}
+		}
+	}
+}
+
+tca_exam_activity_scoreboard_setup_effect = {
+	set_variable = {
+		name = scoreboard_size
+		value = 0
+	}
+	if = {
+		limit = {
+			any_guest_subset = {
+				name = entrants
+				count >= 10
+			}
+		}
+		change_variable = {
+			name = scoreboard_size
+			add = 10
+		}
+	}
+	else = {
+		every_guest_subset = {
+			name = entrants
+			scope:activity = {
+				change_variable = {
+					name = scoreboard_size
+					add = 1
+				}
+			}
+		}
+	}
+	every_attending_character = {
+		limit = { tca_exam_is_current_activity_member_trigger = yes }
+		if = {
+			limit = {
+				is_in_guest_subset = { name = entrants }
+				NOR = {
+					is_in_guest_subset = { name = scoreboard }
+					scope:activity = {
+						any_guest_subset = {
+							name = scoreboard
+							count = scope:activity.var:scoreboard_size
+						}
+					}
+				}
+			}
+			save_temporary_scope_as = temp_character
+			scope:activity = {
+				add_to_guest_subset = {
+					name = scoreboard
+					target = scope:temp_character
+				}
+			}
+		}
+	}
+}

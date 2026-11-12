@@ -8,6 +8,17 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class JudicialLoadingTests(unittest.TestCase):
+    def test_replacement_fixture_duration_uses_declared_named_script_value(self):
+        # set_appointment_timeout.days解析命名数值；scope:值不能直接放在duration字段。
+        effects = definitions((ROOT/'common/scripted_effects/tests/fixtures/tca_judicial_law_test_effects.txt').read_text(encoding='utf-8-sig'))
+        cleanup = ' '.join(effects['tca_test_cleanup_replaced_approver_effect'])
+        self.assertIn('days = tca_test_replacement_restore_timeout_days_value', cleanup)
+        self.assertNotIn('days = scope:', cleanup)
+        values = definitions((ROOT/'common/script_values/tca_judicial_test_values.txt').read_text(encoding='utf-8-sig'))
+        self.assertEqual(values['tca_test_replacement_restore_timeout_days_value'],
+                         ['{', 'value', '=', 'var:tca_test_replacement_restore_timeout_days', '}'])
+        self.assertIn('remove_variable = tca_test_replacement_restore_timeout_days', cleanup)
+
     def test_review_linked_tooltip_does_not_require_event_role_aliases(self):
         # #tooltip 本地化不继承事件 actor／recipient 上下文。
         for language in ('english', 'simp_chinese'):
@@ -153,7 +164,8 @@ class JudicialLoadingTests(unittest.TestCase):
         self.assertIn('has_variable', request)
         self.assertLess(request.index('set_variable'), request.index('trigger_event'))
         worker = effects['tca_run_judicial_maintenance_effect']
-        self.assertLess(worker.index('tca_refresh_held_judicial_positions_effect'), worker.index('remove_variable'))
+        self.assertLess(worker.index('tca_refresh_held_judicial_positions_in_batch_effect'), worker.index('remove_variable'))
+        self.assertEqual(worker.count('tca_clear_judicial_candidate_pool_effect'), 2)
 
     def test_reform_laws_use_shared_permission_triggers(self):
         laws = definitions((ROOT / 'common/laws/tca_court_system_laws.txt').read_text(encoding='utf-8-sig'))
@@ -164,6 +176,51 @@ class JudicialLoadingTests(unittest.TestCase):
                 self.assertIn('tca_names_reform_can_pass_trigger', body)
 
 
+
+
+class MilitaryFixtureLoadingTests(unittest.TestCase):
+    """只验证原生加载结构，防止局部替换把调用与顶层定义括号串接。"""
+
+    def assert_fixture_structure(self, text):
+        effects = definitions(text)
+        required = ('tca_test_military_council_prepare_effect',
+                    'tca_test_military_council_create_officer_effect',
+                    'tca_test_military_council_cleanup_effect')
+        for name in required:
+            self.assertIn(name, effects, f'{name} must be a unique top-level definition')
+        # definitions已拒绝重复顶层名；重组必须覆盖全部token，不能遗留悬空括号或语句。
+        flattened = [part for name, body in effects.items() for part in [name, '=', *body]]
+        self.assertEqual(tokens(text), flattened)
+        self.assertTrue(all(name.startswith('tca_test_military_council_') for name in effects))
+        parameters = set(re.findall(r'\$(\w+)\$', ' '.join(effects[required[0]])))
+        self.assertEqual(parameters, {'MILITARY_ONLY'})
+        creator = ' '.join(effects[required[1]])
+        self.assertIn('$ACTOR$', creator)
+        self.assertIn('$MARTIAL$', creator)
+
+    def test_shared_military_fixture_keeps_unique_top_level_entries_and_parameters(self):
+        path = ROOT/'common/scripted_effects/tests/fixtures/tca_military_council_test_effects.txt'
+        self.assert_fixture_structure(path.read_text(encoding='utf-8-sig'))
+
+    def test_nested_creator_definition_is_rejected(self):
+        # 复现guard误插入调用后，真正creator被吞入prepare的加载故障。
+        broken = ('tca_test_military_council_prepare_effect = { '
+                  'always = $MILITARY_ONLY$ '
+                  'tca_test_military_council_create_officer_effect = { '
+                  'create_character = { martial = { $MARTIAL$ $MARTIAL$ } save_scope_as = $ACTOR$ } } } '
+                  'tca_test_military_council_cleanup_effect = { always = yes }')
+        with self.assertRaisesRegex(AssertionError, 'must be a unique top-level definition'):
+            self.assert_fixture_structure(broken)
+
+    def test_prepare_cannot_leak_creator_template_parameters(self):
+        # 即使三个入口仍在顶层，prepare也不能要求调用者提供本应由子调用封闭的参数。
+        broken = ('tca_test_military_council_prepare_effect = { '
+                  'always = $MILITARY_ONLY$ martial = $MARTIAL$ save_scope_as = $ACTOR$ } '
+                  'tca_test_military_council_create_officer_effect = { '
+                  'create_character = { martial = $MARTIAL$ save_scope_as = $ACTOR$ } } '
+                  'tca_test_military_council_cleanup_effect = { always = yes }')
+        with self.assertRaises(AssertionError):
+            self.assert_fixture_structure(broken)
 
 if __name__ == '__main__':
     unittest.main()

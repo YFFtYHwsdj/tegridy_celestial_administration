@@ -1,5 +1,5 @@
 ﻿# 头衔作用域；先创建／绑定，再维护原生领地法、独立官署继承和官职身份。
-tca_ensure_judicial_title_effect = {
+tca_ensure_judicial_title_in_batch_effect = {
     tca_register_historical_characters_effect = yes
     if = {
         limit = {
@@ -56,7 +56,7 @@ tca_ensure_judicial_title_effect = {
             tca_has_judicial_title_trigger = yes
         }
         save_scope_as = tca_circuit
-        var:song_judicial_title = { tca_refresh_judicial_position_effect = yes }
+        var:song_judicial_title = { tca_refresh_judicial_position_in_batch_effect = yes }
     }
 }
 
@@ -199,7 +199,7 @@ tca_restore_judicial_title_effect = {
 }
 
 # 角色作用域；在头衔转移、政体和领主变化完成后执行。
-tca_refresh_character_circuits_effect = {
+tca_refresh_character_circuits_in_batch_effect = {
     tca_ensure_court_system_law_effect = yes
     tca_refresh_official_name_flags_effect = yes
     save_scope_as = tca_lifecycle_actor
@@ -207,7 +207,7 @@ tca_refresh_character_circuits_effect = {
         limit = { tier = tier_kingdom }
         if = {
             limit = { tca_is_judicial_circuit_trigger = yes }
-            tca_ensure_judicial_title_effect = yes
+            tca_ensure_judicial_title_in_batch_effect = yes
         }
         else_if = {
             limit = { has_variable = song_judicial_title }
@@ -249,17 +249,19 @@ tca_refresh_all_judicial_titles_effect = {
         }
     }
     every_independent_ruler = {
+        tca_clear_judicial_candidate_pool_effect = yes
         if = {
             limit = { government_has_flag = government_is_celestial }
-            tca_refresh_character_circuits_effect = yes
+            tca_refresh_character_circuits_in_batch_effect = yes
         }
         every_vassal_or_below = {
             limit = {
                 government_has_flag = government_is_celestial
                 any_held_title = { tier = tier_kingdom }
             }
-            tca_refresh_character_circuits_effect = yes
+            tca_refresh_character_circuits_in_batch_effect = yes
         }
+        tca_clear_judicial_candidate_pool_effect = yes
     }
 }
 
@@ -304,8 +306,24 @@ tca_run_judicial_maintenance_effect = {
     if = {
         limit = { is_alive = yes }
         set_variable = { name = tca_judicial_maintenance_pending value = yes days = 3 }
-        tca_refresh_character_circuits_effect = yes
-        tca_refresh_held_judicial_positions_effect = yes
+        tca_clear_judicial_candidate_pool_effect = yes
+        tca_refresh_character_circuits_in_batch_effect = yes
+        tca_refresh_held_judicial_positions_in_batch_effect = yes
+        tca_clear_judicial_candidate_pool_effect = yes
         remove_variable = tca_judicial_maintenance_pending
     }
+}
+
+# 公开独立入口；批内维护直接调用内部worker，不读取继承的batch标记。
+tca_ensure_judicial_title_effect = {
+    tca_clear_judicial_candidate_pool_effect = yes
+    tca_ensure_judicial_title_in_batch_effect = yes
+    tca_clear_judicial_candidate_pool_effect = yes
+}
+
+# 公开独立入口；批内维护直接调用内部worker，不读取继承的batch标记。
+tca_refresh_character_circuits_effect = {
+    tca_clear_judicial_candidate_pool_effect = yes
+    tca_refresh_character_circuits_in_batch_effect = yes
+    tca_clear_judicial_candidate_pool_effect = yes
 }

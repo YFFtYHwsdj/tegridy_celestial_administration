@@ -1,10 +1,11 @@
 ﻿# 仅供可丢弃测试局；报告者为天朝皇帝。
-# ACTOR输出新人物scope，LEVEL为原版行省契约。保存并恢复原路与治所持有人。
+# ACTOR输出新人物scope，LEVEL为原版行省契约。借用同类型原路，保存并恢复原路与治所持有人。
+# 军制取样复用既有名额，避免把州制文官路改为军制时撞上全朝原生军制数量上限。
 tca_test_create_local_domain_actor_effect = {
     clear_saved_scope = tca_domain_test_circuit
     clear_saved_scope = tca_domain_test_county
     random_vassal_or_below = {
-        limit = { government_has_flag = government_is_celestial is_landed = yes highest_held_title_tier = tier_kingdom liege = root vassal_contract_has_flag = celestial_province_standard NOT = { has_character_flag = tca_local_domain_test_actor } }
+        limit = { government_has_flag = government_is_celestial is_landed = yes highest_held_title_tier = tier_kingdom liege = root vassal_contract_has_flag = $LEVEL$ NOT = { has_character_flag = tca_local_domain_test_actor } }
         primary_title = { save_scope_as = tca_domain_test_circuit }
         capital_county = { save_scope_as = tca_domain_test_county }
     }
@@ -15,6 +16,10 @@ tca_test_create_local_domain_actor_effect = {
             set_variable = { name = tca_domain_test_county value = scope:tca_domain_test_county }
             set_variable = { name = tca_domain_test_old_circuit_holder value = scope:tca_domain_test_circuit.holder }
             set_variable = { name = tca_domain_test_old_county_holder value = scope:tca_domain_test_county.holder }
+            if = {
+                limit = { scope:tca_domain_test_circuit = { has_variable = tca_circuit_kind } }
+                set_variable = { name = tca_domain_test_old_kind value = scope:tca_domain_test_circuit.var:tca_circuit_kind }
+            }
         }
         # 原持有人可能在长时间等待、保存重载或自然年中被抽取死亡；借出期间由本夹具保护，
         # 否则清理事务会向死者交还头衔。只记录并撤销本夹具添加的保护。
@@ -45,7 +50,8 @@ tca_test_create_local_domain_actor_effect = {
             create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_domain_test_fealty }
             change_liege = { liege = root change = scope:tca_domain_test_fealty }
             resolve_title_and_vassal_change = scope:tca_domain_test_fealty
-            vassal_contract_set_obligation_level = { type = celestial_provinces level = $LEVEL$ }
+            # 真实交接若已继承同类契约，无须重设；否则只使用本次借出的同类名额。
+            if = { limit = { NOT = { vassal_contract_has_flag = $LEVEL$ } } vassal_contract_set_obligation_level = { type = celestial_provinces level = $LEVEL$ } }
             add_character_modifier = { modifier = tca_test_local_domain_capacity }
             add_character_flag = tca_local_domain_test_actor
             add_character_flag = ai_will_not_convert
@@ -72,6 +78,14 @@ tca_test_prepare_local_domain_effect = {
 # 新人物作用域；只恢复本例借出的头衔，不处理任意历史人物的家门。
 tca_test_restore_local_domain_actor_effect = {
     save_scope_as = tca_domain_test_restoring
+    # 真实交还前先归还路类型，避免授失职回调把临时类型重新同步到原持有人契约。
+    var:tca_domain_test_circuit = {
+        if = {
+            limit = { scope:tca_domain_test_restoring = { has_variable = tca_domain_test_old_kind } }
+            set_variable = { name = tca_circuit_kind value = scope:tca_domain_test_restoring.var:tca_domain_test_old_kind }
+        }
+        else = { remove_variable = tca_circuit_kind }
+    }
     create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_domain_test_restore }
     # 先确认原持有人仍可接收；死者不能作为change_title_holder目标。
     # 存活时照常精确归还；死亡时保留明确诊断，不能静默跳过。

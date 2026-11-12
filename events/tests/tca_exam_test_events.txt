@@ -134,7 +134,25 @@ tca_exam_test.1 = {
                     rite = root.rite
                     save_scope_as = tca_test_exam_high
                 }
+                # 空池及不足名额直接走正式抽样；连续清理必须幂等。
+                if = { limit = { has_character_flag = command_to_attend_flag } set_variable = tca_test_exam_small_had_command }
+                remove_character_flag = command_to_attend_flag
                 tca_exam_clear_candidate_lists_effect = yes
+                tca_exam_sample_candidates_effect = yes
+                if = { limit = { var:tca_exam_num_candidates = 0 list_size:tca_exam_sampled = 0 } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 39" }
+                else = { add_character_flag = tca_test_tca_exam_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 39" }
+                scope:tca_test_exam_candidate = { add_to_list = tca_exam_candidates }
+                scope:tca_test_exam_middle = { add_to_list = tca_exam_candidates }
+                scope:tca_test_exam_high = { add_to_list = tca_exam_candidates }
+                tca_exam_sample_candidates_effect = yes
+                if = { limit = { var:tca_exam_num_candidates = 3 list_size:tca_exam_sampled = 3 scope:tca_test_exam_candidate = { is_in_list = tca_exam_sampled } scope:tca_test_exam_middle = { is_in_list = tca_exam_sampled } scope:tca_test_exam_high = { is_in_list = tca_exam_sampled } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 40" }
+                else = { add_character_flag = tca_test_tca_exam_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 40" }
+                tca_exam_clear_candidate_lists_effect = yes
+                tca_exam_clear_candidate_lists_effect = yes
+                if = { limit = { list_size:tca_exam_candidates = 0 list_size:tca_exam_sampled = 0 } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 41" }
+                else = { add_character_flag = tca_test_tca_exam_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 41" }
+                if = { limit = { has_variable = tca_test_exam_small_had_command } add_character_flag = command_to_attend_flag }
+                remove_variable = tca_test_exam_small_had_command
                 scope:tca_test_exam_candidate = { add_to_list = tca_exam_sampled }
                 scope:tca_test_exam_middle = { add_to_list = tca_exam_sampled }
                 scope:tca_test_exam_high = { add_to_list = tca_exam_sampled }
@@ -147,8 +165,6 @@ tca_exam_test.1 = {
                 set_variable = { name = tca_exam_grade value = 2 }
                 set_variable = { name = tca_exam_num_candidates value = 3 }
                 tca_exam_mark_results_effect = yes
-                tca_exam_store_rank_effect = { RANK = 1 POSITION = 0 }
-                tca_exam_store_rank_effect = { RANK = 2 POSITION = 1 }
                 if = { limit = { scope:tca_test_exam_candidate = { has_variable = tca_exam_failed } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 19" }
                 else = { add_character_flag = tca_test_tca_exam_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 19" }
                 if = { limit = { scope:tca_test_exam_high = { NOT = { has_variable = tca_exam_failed } has_variable = tca_exam_palace } var:tca_exam_top_1 = scope:tca_test_exam_high } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 20" }
@@ -167,7 +183,6 @@ tca_exam_test.1 = {
                 scope:tca_test_exam_middle = { tca_exam_prepare_candidate_effect = yes set_variable = { name = imperial_examination_score value = 50 } }
                 scope:tca_test_exam_high = { tca_exam_prepare_candidate_effect = yes set_variable = { name = imperial_examination_score value = 90 } }
                 tca_exam_mark_results_effect = yes
-                tca_exam_store_rank_effect = { RANK = 1 POSITION = 0 }
                 if = { limit = { var:tca_exam_top_1 = scope:tca_test_exam_candidate scope:tca_test_exam_candidate = { NOT = { has_variable = tca_exam_failed } has_variable = tca_exam_palace } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 23" }
                 else = { add_character_flag = tca_test_tca_exam_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 23" }
                 every_in_list = { list = tca_exam_sampled tca_exam_award_candidate_effect = yes }
@@ -255,14 +270,15 @@ tca_exam_test.1 = {
                 else = { add_character_flag = tca_test_tca_exam_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 35" }
                 scope:tca_test_exam_noble = { death = { death_reason = death_natural_causes } }
                 # 真实局势收集已由32断言覆盖；满池边界直接调用正式共享预估／抽样入口。
-                # 构造150名已过乡试的普通人及1名优先近亲，近亲也放进普通输入池以验证去重。
+                # 构造160名已过乡试的普通人及1名优先近亲，近亲也放进普通输入池以验证去重。
                 every_close_family_member = {
                     limit = { tca_exam_candidate_trigger = yes }
                     add_to_list = tca_test_exam_pool_hidden
                     add_character_flag = passed_palace_exam
                 }
+                set_variable = { name = tca_test_exam_fixture_score value = 0 }
                 while = {
-                    count = 150
+                    count = 160
                     create_character = {
                         age = 40
                         gender_female_chance = 0
@@ -275,9 +291,40 @@ tca_exam_test.1 = {
                         after_creation = {
                             add_character_flag = passed_provincial_exam
                             add_to_list = tca_test_exam_pool_people
+                            root = { change_variable = { name = tca_test_exam_fixture_score add = 1 } }
+                            set_variable = { name = imperial_examination_score value = root.var:tca_test_exam_fixture_score }
                         }
                     }
                 }
+                tca_exam_clear_candidate_lists_effect = yes
+                tca_exam_clear_results_effect = yes
+                every_in_list = { list = tca_test_exam_pool_people add_to_list = tca_exam_sampled }
+                set_variable = { name = tca_exam_num_candidates value = 160 }
+                set_variable = { name = tca_exam_grade value = 0 }
+                tca_exam_mark_results_effect = yes
+                if = { limit = { var:tca_exam_top_1 = { var:imperial_examination_score = 160 has_variable = tca_exam_palace NOT = { has_variable = tca_exam_failed } } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 42" }
+                else = { add_character_flag = tca_test_tca_exam_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 42" }
+                if = { limit = { var:tca_exam_top_2 = { var:imperial_examination_score = 159 has_variable = tca_exam_palace NOT = { has_variable = tca_exam_failed } } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 43" }
+                else = { add_character_flag = tca_test_tca_exam_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 43" }
+                if = { limit = { var:tca_exam_top_3 = { var:imperial_examination_score = 158 has_variable = tca_exam_palace NOT = { has_variable = tca_exam_failed } } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 44" }
+                else = { add_character_flag = tca_test_tca_exam_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 44" }
+                if = { limit = { var:tca_exam_top_4 = { var:imperial_examination_score = 157 has_variable = tca_exam_palace NOT = { has_variable = tca_exam_failed } } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 45" }
+                else = { add_character_flag = tca_test_tca_exam_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 45" }
+                if = { limit = { var:tca_exam_top_5 = { var:imperial_examination_score = 156 has_variable = tca_exam_palace NOT = { has_variable = tca_exam_failed } } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 46" }
+                else = { add_character_flag = tca_test_tca_exam_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 46" }
+                if = { limit = { var:tca_exam_top_6 = { var:imperial_examination_score = 155 has_variable = tca_exam_palace NOT = { has_variable = tca_exam_failed } } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 47" }
+                else = { add_character_flag = tca_test_tca_exam_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 47" }
+                if = { limit = { var:tca_exam_top_7 = { var:imperial_examination_score = 154 has_variable = tca_exam_palace NOT = { has_variable = tca_exam_failed } } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 48" }
+                else = { add_character_flag = tca_test_tca_exam_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 48" }
+                if = { limit = { var:tca_exam_top_8 = { var:imperial_examination_score = 153 has_variable = tca_exam_palace NOT = { has_variable = tca_exam_failed } } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 49" }
+                else = { add_character_flag = tca_test_tca_exam_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 49" }
+                if = { limit = { var:tca_exam_top_9 = { var:imperial_examination_score = 152 has_variable = tca_exam_palace NOT = { has_variable = tca_exam_failed } } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 50" }
+                else = { add_character_flag = tca_test_tca_exam_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 50" }
+                if = { limit = { var:tca_exam_top_10 = { var:imperial_examination_score = 151 has_variable = tca_exam_palace NOT = { has_variable = tca_exam_failed } } } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 51" }
+                else = { add_character_flag = tca_test_tca_exam_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 51" }
+                every_in_list = { list = tca_test_exam_pool_people remove_variable = tca_exam_palace remove_variable = tca_exam_failed }
+                remove_variable = tca_test_exam_fixture_score
+                tca_exam_clear_candidate_lists_effect = yes
                 create_character = {
                     age = 18
                     gender_female_chance = 0
@@ -303,9 +350,33 @@ tca_exam_test.1 = {
                 tca_exam_sample_candidates_effect = yes
                 if = { limit = { var:tca_exam_num_candidates = 150 } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 38" }
                 else = { add_character_flag = tca_test_tca_exam_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 38" }
+                set_variable = { name = tca_test_exam_unique_sample value = yes }
+                every_in_list = {
+                    list = tca_exam_sampled
+                    if = {
+                        limit = { has_variable = tca_test_exam_sample_seen }
+                        root = { set_variable = { name = tca_test_exam_unique_sample value = no } }
+                    }
+                    set_variable = tca_test_exam_sample_seen
+                }
+                if = { limit = { var:tca_test_exam_unique_sample = yes list_size:tca_exam_sampled = 150 } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 52" }
+                else = { add_character_flag = tca_test_tca_exam_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 52" }
+                every_in_list = { list = tca_test_exam_pool_people remove_variable = tca_test_exam_sample_seen }
+                remove_variable = tca_test_exam_unique_sample
                 add_character_flag = command_to_attend_flag
                 tca_exam_clear_candidate_lists_effect = yes
                 every_in_list = { list = tca_test_exam_pool_people add_to_list = tca_exam_candidates }
+                # 请开科尚未选择规模，显示的是候选池而非小比入选人数：160普通+1近亲。
+                tca_exam_count_collected_candidates_effect = yes
+                if = { limit = { var:tca_exam_expected_entrants = 161 } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 53" }
+                else = { add_character_flag = tca_test_tca_exam_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_exam_contract 53" }
+                # 恢复原150普通+1近亲的预估边界，保留37的精确预期。
+                # 首次预估已排除近亲；十名额外普通人由夹具唯一分数识别。
+                every_in_list = {
+                    list = tca_exam_candidates
+                    limit = { var:imperial_examination_score > 150 }
+                    remove_from_list = tca_exam_candidates
+                }
                 tca_exam_count_collected_candidates_effect = yes
                 save_scope_value_as = { name = tca_test_exam_pool_estimated value = var:tca_exam_expected_entrants }
                 if = { limit = { var:tca_exam_expected_entrants = 151 } debug_log = "TCA_TEST CHECK_PASS tca_test_exam_contract 37" }

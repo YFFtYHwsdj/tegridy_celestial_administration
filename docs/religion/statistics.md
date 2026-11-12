@@ -25,7 +25,7 @@
 
 `quarterly_playable_pulse`追加独立天朝君主的维护入口，每季度重建一次，无须打开窗口。原生季度是相对于角色年度脉冲的季度，不保证恰逢1／4／7／10月首日。首次机制读取会立即建立快照；主要头衔变化或距更新满90天时再读也会补算，以覆盖季度回调尚未执行或旧存档缺少缓存的情况。季度内的出生、成年、死亡、改信、教育和官职变化通常在下次更新反映，手动刷新可立即反映。
 
-生产收集只访问最高君主、`every_vassal_or_below`以及每人的 `every_courtier_or_guest`、`every_prisoner`，再按人口口径过滤。临时 `tca_stats_seen` 变量列表对重叠访问去重，构建结束立即清除；不持久标记被统计人物。全世界扫描只作为测试参照。未对大型后期存档作耗时实测；不能据此承诺固定耗时。去重列表查找和逐Rite归组仍随人数增长。
+生产收集只访问最高君主、`every_vassal_or_below`以及每人的 `every_courtier_or_guest`、`every_prisoner`，再按人口口径过滤。人物临时 `tca_stats_visited` flag 对重叠访问去重；`tca_stats_seen` 列表仅记录待清理人物，不再逐人搜索列表。构建结束逐一移除 flag 后清空列表，显式清除缓存也释放未完成收集的标记。收集与清理同步完成，其间不触发延迟事件或嵌套其他政权刷新；连续及跨政权刷新均重新收集。每个合格人物的教育、普通头衔和世族贡献各算一次，通过保存的数值同时累计到总计和Rite行，随后清除数值作用域。全世界扫描只作为测试参照。未对大型后期存档作耗时实测；不能据此承诺固定耗时。逐Rite归组仍随学统数增长。
 
 调试决议与窗口只在debug且所属最高君主为天朝时可用。打开确保缓存有效，关闭只隐藏本人窗口；其他查看者和正式机制仍可使用数据。手动刷新强制重建本朝共享快照，暂停时也可使用。GUI直接读取当前最高君主的数据，显示距更新天数、两个占比、排行和贡献分项，不在显示表达式内扫描人口。旧版本已排队的每日事件只消费标记，不再续排。玩家更换最高君主且其尚无缓存时，重新打开窗口即可补建。
 
@@ -37,7 +37,7 @@
 - `tca_refresh_confucian_statistics_effect`：当前人物作为缓存所有者，按其最高领主构建；正式机制仅在最高君主上调用，测试可使用独立人物作临时存储。
 - `tca_quarterly_confucian_statistics_effect`：独立天朝君主作用域，季度回调的正式维护效果；自身检查资格。
 - `tca_force_confucian_statistics_effect`：debug查看者作用域，手动强制刷新本朝共享快照。
-- `tca_collect_confucian_statistics_member_effect`：候选人物作用域，调用者提供 `tca_stats_viewer` 缓存所有者及 `tca_stats_realm` 最高君主；内部检查人口口径，单独收集不去重。生产遍历通过visit入口去重。
+- `tca_collect_confucian_statistics_member_effect`：候选人物作用域，调用者提供 `tca_stats_viewer` 缓存所有者及 `tca_stats_realm` 最高君主；内部检查人口口径，单独收集不去重。生产遍历通过visit入口去重；测试若直接调用visit，必须在该批结束后调用clear或 `tca_release_confucian_statistics_visits_effect` 释放标记。collect的贡献数值保存为显式 `scope:` 值，不能改用跨人物／story作用域隐式读取的 `local_var:`。
 
 缓存变量：`tca_stats_updated`记录日期，`tca_stats_realm`记录最高君主，`tca_stats_primary_title`绑定主要头衔，`tca_stats_total`人数，`tca_stats_rite_count`行数，`tca_stats_strength`及education／titles／families分别记录总强度及贡献。`tca_stats_rows`为原始行列表，`tca_stats_display_rows`为强度降序列表。行由 `tca_confucian_statistics_row` story承载，保存rite、count、percent、strength、strength_percent、rank及贡献分项。刷新会结束旧行，不能将行引用作为永久Rite标识。
 
@@ -47,6 +47,6 @@
 
 ## 验证与待接入
 
-原生源为 `events/tests/tca_confucian_statistics_test_events.txt` 和 `events/tests/tca_confucian_strength_test_events.txt`，覆盖局部／全世界参照、Rite聚合、加法贡献、零分母、并列排序、共享读取、89／91日缓存边界、主要头衔变化和季度入口。季度自然回调曾在日志中实际出现，未独立证明每次间隔及跨季度 GUI 重绘。自然回调的旧观察只能作为线索，周期与重绘仍需在目标版本复核。
+原生源为 `events/tests/tca_confucian_statistics_test_events.txt` 和 `events/tests/tca_confucian_strength_test_events.txt`，覆盖局部／全世界参照、Rite聚合、加法贡献、零分母、重复访问、清理后重访、强弱贡献交替、连续及双政权交替刷新、并列排序、共享读取、89／91日缓存边界、主要头衔变化和季度入口。季度自然回调曾在日志中实际出现，未独立证明每次间隔及跨季度 GUI 重绘。自然回调的旧观察只能作为线索，周期与重绘仍需在目标版本复核。
 
 当前仅提供统计与缓存，尚未接入人物生成或随机 Rite 选择。debug入口的实际隐藏、不同角色共享窗口、保存重载、继任后缓存重建、动态 Rite 及大型后期存档耗时仍待验收。不要保存跨季度 story 行引用，也不要以直接维护断言替代自然季度、继任及界面路径。

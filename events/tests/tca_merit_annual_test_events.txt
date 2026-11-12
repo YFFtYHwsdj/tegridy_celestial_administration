@@ -204,8 +204,22 @@ tca_merit_annual_test.1004 = {
                 set_variable = { name = tca_ma_work_n_1_2 value = 0 }
                 tca_merit_annual_draw_pool_effect = { ROUTE = 1 SOURCE = 1 TARGET = 2 }
             }
-            if = { limit = { scope:tca_mat_valid_a = { var:tca_merit_approved_level = 2 merit = 1000 } scope:tca_mat_valid_b = { var:tca_merit_approved_level = 2 merit = 2460 } scope:tca_mat_invalid = { var:tca_merit_approved_level = 1 merit = 60000 NOT = { has_variable = tca_merit_last_ordinary_year } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_annual_draw 2" }
-            else = { add_character_flag = tca_test_tca_merit_annual_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_annual_draw 2" }
+            # 三万功绩的正式结余并非旧近似值2460；按B冻结原额与已提交的路线输入读取正式结余接口。
+            # 只在提交后读取，不能提前prepare导致phase1改变年度硬资格；A仍精确校验1000，退休者仍精确校验60000。
+            scope:tca_mat_valid_b = {
+                save_scope_value_as = { name = tca_merit_before value = var:tca_ma_frozen_merit }
+                save_scope_value_as = { name = tca_mat_draw_b_expected value = { value = merit_level_2_value add = tca_merit_carryover_bonus_value } }
+            }
+            if = { limit = { scope:tca_mat_valid_a = { var:tca_merit_approved_level = 2 merit = 1000 } scope:tca_mat_valid_b = { var:tca_merit_approved_level = 2 var:tca_merit_grant_source = 1 var:tca_merit_grant_target = 2 var:tca_merit_grant_mode = 1 merit = scope:tca_mat_draw_b_expected } scope:tca_mat_invalid = { var:tca_merit_approved_level = 1 merit = 60000 NOT = { has_variable = tca_merit_last_ordinary_year } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_annual_draw 2" }
+            else = {
+                add_character_flag = tca_test_tca_merit_annual_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_annual_draw 2"
+                # 精确余额失败时记录真实读数，区分提交、上限与夹具等待问题；不放宽预期。
+                scope:tca_mat_valid_a = { save_scope_value_as = { name = tca_mat_draw_a_merit value = merit } save_scope_value_as = { name = tca_mat_draw_a_level value = var:tca_merit_approved_level } }
+                scope:tca_mat_valid_b = { save_scope_value_as = { name = tca_mat_draw_b_merit value = merit } save_scope_value_as = { name = tca_mat_draw_b_level value = var:tca_merit_approved_level } }
+                scope:tca_mat_invalid = { save_scope_value_as = { name = tca_mat_draw_invalid_merit value = merit } save_scope_value_as = { name = tca_mat_draw_invalid_level value = var:tca_merit_approved_level } }
+                debug_log_scopes = yes
+            }
             # 确定性遍历不写 attempts/attempt_limit；成功数与工作账只按真实提交变化。
             if = { limit = { scope:tca_ma_anchor = { var:tca_ma_success_1_1 = 2 var:tca_ma_quota_1_1 = 1 var:tca_ma_work_n_1_1 = 1 var:tca_ma_work_n_1_2 = 2 NOT = { has_variable = tca_ma_attempts } } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_annual_draw 3" }
             else = { add_character_flag = tca_test_tca_merit_annual_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_annual_draw 3" }
@@ -463,5 +477,73 @@ tca_merit_annual_test.5003 = {
             remove_character_flag = tca_test_tca_merit_annual_test_case_failed
             tca_test_lane_end_effect = { GROUP = tca_merit_annual_worker }
         }
+    }
+}
+
+# 加权关的小池边界；冻结后全体退出也必须有限耗尽，零配额及空池不得提交。
+# 直接调用正式抽选，不模拟概率；不代表自然年度时序或性能耗时验收。
+tca_merit_annual_test.6 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_merit_annual_test.6 tca_test_merit_annual_draw_boundaries"
+        remove_character_flag = tca_test_tca_merit_annual_test_case_failed
+        if = {
+            limit = { debug_only = yes is_alive = yes exists = primary_title }
+            every_in_list = { list = tca_ma_candidates remove_from_list = tca_ma_candidates }
+            every_in_list = { list = tca_ma_remaining remove_from_list = tca_ma_remaining }
+            primary_title = { save_scope_as = tca_ma_anchor }
+            create_character = { age = 40 gender_female_chance = 0 random_traits = no employer = root culture = root.culture faith = root.faith save_scope_as = tca_mat_boundary_a }
+            create_character = { age = 40 gender_female_chance = 0 random_traits = no employer = root culture = root.culture faith = root.faith save_scope_as = tca_mat_boundary_b }
+            scope:tca_mat_boundary_a = { add_to_list = tca_mat_boundary_people set_variable = { name = tca_ma_frozen_merit value = 1000 } }
+            # 差距超过权重截断：先必抽池顶，随后必须重算池顶才能抽到原先零权重者。
+            scope:tca_mat_boundary_b = { add_to_list = tca_mat_boundary_people set_variable = { name = tca_ma_frozen_merit value = 1000000 } }
+            every_in_list = {
+                list = tca_mat_boundary_people
+                add_character_flag = tca_merit_retired
+                set_variable = { name = tca_ma_frozen_anchor value = scope:tca_ma_anchor }
+                set_variable = { name = tca_ma_frozen_route value = 1 }
+                set_variable = { name = tca_ma_frozen_level value = 2 }
+                add_to_list = tca_ma_candidates
+            }
+            scope:tca_ma_anchor = {
+                set_variable = { name = tca_ma_quota_1_2 value = 0 }
+                set_variable = { name = tca_ma_success_1_2 value = 0 }
+                tca_merit_annual_draw_pool_effect = { ROUTE = 1 SOURCE = 2 TARGET = 3 }
+            }
+            if = { limit = { scope:tca_ma_anchor = { var:tca_ma_success_1_2 = 0 } list_size:tca_ma_remaining = 0 list_size:tca_ma_candidates = 2 }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_merit_annual_draw_boundaries 1" }
+            else = { add_character_flag = tca_test_tca_merit_annual_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_annual_draw_boundaries 1" }
+            scope:tca_ma_anchor = {
+                set_variable = { name = tca_ma_quota_1_2 value = 4 }
+                tca_merit_annual_draw_pool_effect = { ROUTE = 1 SOURCE = 2 TARGET = 3 }
+            }
+            if = { limit = { scope:tca_ma_anchor = { var:tca_ma_success_1_2 = 0 var:tca_ma_attempts = 2 var:tca_ma_attempt_limit = 2 } list_size:tca_ma_remaining = 0 }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_merit_annual_draw_boundaries 2" }
+            else = { add_character_flag = tca_test_tca_merit_annual_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_annual_draw_boundaries 2" }
+            every_in_list = { list = tca_ma_candidates remove_from_list = tca_ma_candidates }
+            scope:tca_ma_anchor = { tca_merit_annual_draw_pool_effect = { ROUTE = 1 SOURCE = 2 TARGET = 3 } }
+            if = { limit = { scope:tca_ma_anchor = { var:tca_ma_success_1_2 = 0 var:tca_ma_attempts = 0 var:tca_ma_attempt_limit = 0 NOT = { has_variable = tca_ma_max_dirty } } list_size:tca_ma_remaining = 0 }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_merit_annual_draw_boundaries 3" }
+            else = { add_character_flag = tca_test_tca_merit_annual_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_annual_draw_boundaries 3" }
+            if = { limit = { scope:tca_mat_boundary_a = { NOT = { has_variable = tca_merit_grant_phase } } scope:tca_mat_boundary_b = { NOT = { has_variable = tca_merit_grant_phase } } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_merit_annual_draw_boundaries 4" }
+            else = { add_character_flag = tca_test_tca_merit_annual_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_annual_draw_boundaries 4" }
+            every_in_list = {
+                list = tca_mat_boundary_people
+                remove_character_flag = tca_merit_retired
+                remove_variable = tca_ma_frozen_anchor remove_variable = tca_ma_frozen_route remove_variable = tca_ma_frozen_level remove_variable = tca_ma_frozen_merit
+                remove_from_list = tca_mat_boundary_people
+                death = { death_reason = death_natural_causes }
+            }
+            scope:tca_ma_anchor = {
+                remove_variable = tca_ma_quota_1_2 remove_variable = tca_ma_success_1_2
+                remove_variable = tca_ma_route remove_variable = tca_ma_source remove_variable = tca_ma_target
+                remove_variable = tca_ma_half_gap remove_variable = tca_ma_max remove_variable = tca_ma_attempt_limit remove_variable = tca_ma_attempts remove_variable = tca_ma_max_dirty
+            }
+            if = { limit = { has_character_flag = tca_test_tca_merit_annual_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_merit_annual_draw_boundaries" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_merit_annual_draw_boundaries" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_merit_annual_draw_boundaries" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } }
+        remove_character_flag = tca_test_tca_merit_annual_test_case_failed
     }
 }
