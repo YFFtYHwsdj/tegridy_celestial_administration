@@ -1,0 +1,139 @@
+﻿# 主动交还专用夹具；报告者为最高领主，仅借两个伯爵领，原持有人保持存活并精确归还。
+# 输出scope:tca_vcrt_actor、tca_vcrt_home、tca_vcrt_target；不改变国家政策。
+tca_test_prepare_county_return_effect = {
+    clear_saved_scope = tca_vcrt_home
+    clear_saved_scope = tca_vcrt_target
+    clear_saved_scope = tca_vcrt_actor
+    random_vassal_or_below = {
+        limit = {
+            tca_is_admin_rectification_target_official_trigger = yes
+            highest_held_title_tier = tier_county
+            NOT = { has_variable = tca_retract_pending_actor }
+            NOT = { has_variable = tca_rectify_pending_actor }
+        }
+        primary_title = { save_scope_as = tca_vcrt_home }
+    }
+    random_vassal_or_below = {
+        limit = {
+            tca_is_admin_rectification_target_official_trigger = yes
+            highest_held_title_tier = tier_county
+            primary_title != scope:tca_vcrt_home
+            NOT = { has_variable = tca_retract_pending_actor }
+            NOT = { has_variable = tca_rectify_pending_actor }
+        }
+        primary_title = { save_scope_as = tca_vcrt_target }
+    }
+    if = {
+        limit = { exists = scope:tca_vcrt_home exists = scope:tca_vcrt_target }
+        scope:tca_vcrt_home.holder = { save_scope_as = tca_vcrt_home_owner tca_test_protect_character_effect = yes }
+        scope:tca_vcrt_target.holder = { save_scope_as = tca_vcrt_target_owner tca_test_protect_character_effect = yes }
+        create_character = { age = 75 random_traits = no gender_female_chance = 0 dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_vcrt_actor }
+        scope:tca_vcrt_actor = {
+            tca_test_protect_character_effect = yes
+            tca_circuit_prepare_landless_recipient_effect = { RULER = root TITLE = scope:tca_vcrt_home }
+            set_variable = { name = tca_vcrt_home value = scope:tca_vcrt_home }
+            set_variable = { name = tca_vcrt_target value = scope:tca_vcrt_target }
+            set_variable = { name = tca_vcrt_home_owner value = scope:tca_vcrt_home_owner }
+            set_variable = { name = tca_vcrt_target_owner value = scope:tca_vcrt_target_owner }
+            set_variable = { name = tca_vcrt_home_liege value = scope:tca_vcrt_home_owner.liege }
+            set_variable = { name = tca_vcrt_target_liege value = scope:tca_vcrt_target_owner.liege }
+            set_variable = { name = tca_vcrt_home_primary value = scope:tca_vcrt_home_owner.primary_title }
+            set_variable = { name = tca_vcrt_target_primary value = scope:tca_vcrt_target_owner.primary_title }
+            set_variable = { name = tca_vcrt_home_capital value = scope:tca_vcrt_home_owner.capital_county }
+            set_variable = { name = tca_vcrt_target_capital value = scope:tca_vcrt_target_owner.capital_county }
+            add_character_flag = tca_vcrt_fixture
+            set_appointment_timeout = { years = 150 desc = appointment_timeout_desc_refusing }
+        }
+    }
+}
+
+# 报告者作用域；准备家门后真实等待一天再授地，避免当日建家门接有地头衔。
+tca_test_grant_county_return_fixture_effect = {
+    scope:tca_vcrt_home.holder = { tca_circuit_transfer_title_granted_effect = { TITLE = scope:tca_vcrt_home HOLDER = scope:tca_vcrt_actor } }
+    scope:tca_vcrt_target.holder = { tca_circuit_transfer_title_granted_effect = { TITLE = scope:tca_vcrt_target HOLDER = scope:tca_vcrt_actor } }
+    scope:tca_vcrt_actor = {
+        set_primary_title_to = scope:tca_vcrt_home
+        set_realm_capital = scope:tca_vcrt_home
+        change_government = celestial_government
+        create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_vcrt_fealty }
+        change_liege = { liege = root change = scope:tca_vcrt_fealty }
+        resolve_title_and_vassal_change = scope:tca_vcrt_fealty
+        if = { limit = { NOT = { has_realm_law = tca_local_domain_restricted_law } } add_realm_law_skip_effects = tca_local_domain_restricted_law }
+    }
+}
+
+# 夹具人物作用域；可在重载后仅凭人物变量恢复，不能依赖其他测试留下的scope。
+tca_test_cleanup_county_return_effect = {
+    save_scope_as = tca_vcrt_cleanup_actor
+    tca_county_return_clear_effect = yes
+    var:tca_vcrt_home = { holder = { tca_circuit_transfer_title_granted_effect = { TITLE = scope:tca_vcrt_cleanup_actor.var:tca_vcrt_home HOLDER = scope:tca_vcrt_cleanup_actor.var:tca_vcrt_home_owner } } }
+    var:tca_vcrt_target = { holder = { tca_circuit_transfer_title_granted_effect = { TITLE = scope:tca_vcrt_cleanup_actor.var:tca_vcrt_target HOLDER = scope:tca_vcrt_cleanup_actor.var:tca_vcrt_target_owner } } }
+    var:tca_vcrt_home_owner = {
+        set_primary_title_to = scope:tca_vcrt_cleanup_actor.var:tca_vcrt_home_primary
+        set_realm_capital = scope:tca_vcrt_cleanup_actor.var:tca_vcrt_home_capital
+        create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_vcrt_restore_home }
+        change_liege = { liege = scope:tca_vcrt_cleanup_actor.var:tca_vcrt_home_liege change = scope:tca_vcrt_restore_home }
+        resolve_title_and_vassal_change = scope:tca_vcrt_restore_home
+        tca_test_restore_character_effect = yes
+    }
+    var:tca_vcrt_target_owner = {
+        set_primary_title_to = scope:tca_vcrt_cleanup_actor.var:tca_vcrt_target_primary
+        set_realm_capital = scope:tca_vcrt_cleanup_actor.var:tca_vcrt_target_capital
+        create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_vcrt_restore_target }
+        change_liege = { liege = scope:tca_vcrt_cleanup_actor.var:tca_vcrt_target_liege change = scope:tca_vcrt_restore_target }
+        resolve_title_and_vassal_change = scope:tca_vcrt_restore_target
+        tca_test_restore_character_effect = yes
+    }
+    remove_character_flag = tca_vcrt_fixture
+    tca_test_restore_character_effect = yes
+}
+
+# 共用唯一保存检查点的在途快照夹具；正常次日链另由交还用例验证。
+# GUI保存／破坏需要真实等待，本探针独立构造在途态并把真实业务事件排到45日，
+# 预留延至90日；不调用start后篡改队列，也不以本探针证明正常次日／超时调度。
+tca_test_freeze_county_return_checkpoint_effect = {
+    if = { limit = { exists = scope:tca_vcrt_actor }
+        tca_test_grant_county_return_fixture_effect = yes
+        title:h_china = {
+            set_variable = { name = tca_vcrt_checkpoint_actor value = scope:tca_vcrt_actor }
+            set_variable = { name = tca_vcrt_checkpoint_restored value = 0 }
+        }
+        scope:tca_vcrt_actor = {
+            set_variable = { name = tca_county_return_serial value = 77 }
+            set_variable = { name = tca_county_return_title value = scope:tca_vcrt_target }
+            set_variable = { name = tca_county_return_sovereign value = root }
+            set_variable = { name = tca_county_return_attempt value = 0 }
+            tca_county_return_select_effect = yes
+            if = { limit = { exists = var:tca_county_return_successor }
+                set_variable = { name = tca_vcrt_checkpoint_successor value = var:tca_county_return_successor }
+                var:tca_county_return_successor = {
+                    set_variable = { name = tca_admin_rectification_reserved_successor value = scope:tca_vcrt_target days = 90 }
+                    set_variable = { name = tca_county_return_reserved_by value = scope:tca_vcrt_actor days = 90 }
+                    set_variable = { name = tca_county_return_reserved_serial value = 77 days = 90 }
+                }
+            }
+            save_scope_value_as = { name = tca_vcr_event_serial value = 77 }
+            save_scope_value_as = { name = tca_vcr_event_attempt value = 0 }
+            trigger_event = { id = tca_county_return.1 days = 45 }
+        }
+    }
+}
+
+# 重载首帧只读验证快照，不重建候选、不同步法律、不重新排队事件。
+tca_test_county_return_checkpoint_early_effect = {
+    if = { limit = {
+        exists = title:h_china.var:tca_vcrt_checkpoint_actor
+        title:h_china.var:tca_vcrt_checkpoint_actor = {
+            var:tca_county_return_serial = 77
+            var:tca_county_return_attempt = 0
+            var:tca_county_return_title = var:tca_vcrt_target
+            var:tca_county_return_sovereign = title:h_china.holder
+            var:tca_county_return_successor = var:tca_vcrt_checkpoint_successor
+            var:tca_county_return_successor = { var:tca_admin_rectification_reserved_successor = prev.var:tca_vcrt_target var:tca_county_return_reserved_by = prev var:tca_county_return_reserved_serial = 77 }
+        }
+    }
+        title:h_china = { set_variable = { name = tca_vcrt_checkpoint_restored value = 1 } }
+        debug_log = "TCA_TEST CHECK_PASS tca_test_merit_saveload_contract 45"
+    }
+    else = { add_character_flag = tca_test_tca_merit_saveload_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 45" }
+}

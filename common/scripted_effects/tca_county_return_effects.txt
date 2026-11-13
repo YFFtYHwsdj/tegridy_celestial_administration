@@ -1,0 +1,200 @@
+﻿# 主动交还生命周期。人物变量保存目标、最高领主、继任者、单调序号与补选次数。
+# 延迟事件携带序号及尝试号；旧事件、重复事件均不能执行或清理后来的申请。
+# start的TITLE是伯爵领；execute的SERIAL/ATTEMPT是冻结数值。所有入口为申请者作用域。
+tca_county_return_start_effect = {
+    if = {
+        limit = {
+            tca_county_return_can_start_trigger = yes
+            $TITLE$ = { tca_county_return_target_trigger = { HOLDER = prev } }
+        }
+        if = { limit = { NOT = { has_variable = tca_county_return_serial } } set_variable = { name = tca_county_return_serial value = 0 } }
+        change_variable = { name = tca_county_return_serial add = 1 }
+        set_variable = { name = tca_county_return_title value = $TITLE$ }
+        set_variable = { name = tca_county_return_sovereign value = top_liege }
+        set_variable = { name = tca_county_return_attempt value = 0 }
+        tca_county_return_select_effect = yes
+        if = {
+            limit = { has_variable = tca_county_return_successor }
+            save_scope_value_as = { name = tca_vcr_event_serial value = var:tca_county_return_serial }
+            save_scope_value_as = { name = tca_vcr_event_attempt value = var:tca_county_return_attempt }
+            trigger_event = { id = tca_county_return.1 days = 1 }
+            # 明确超时事件清理，不依赖变量到期；30日候选占位只作灾难性中断的后备。
+            trigger_event = { id = tca_county_return.2 days = 31 }
+            if = { limit = { is_ai = no }
+                var:tca_county_return_title = { save_scope_as = tca_vcr_notice_title }
+                send_interface_message = { type = event_generic_neutral_text title = tca_county_return_pending_title desc = tca_county_return_pending_desc }
+            }
+        }
+        else = { tca_county_return_fail_effect = yes }
+    }
+}
+
+# 申请者作用域；调用唯一正式选官入口。成功才保存本单输出，候选预留增加所有者与序号。
+tca_county_return_select_effect = {
+    save_scope_as = tca_vcr_select_owner
+    var:tca_county_return_sovereign = { save_scope_as = tca_vcr_select_sovereign }
+    var:tca_county_return_title = {
+        tca_admin_rectification_select_or_generate_successor_effect = { TOP_LIEGE = scope:tca_vcr_select_sovereign }
+    }
+    if = {
+        limit = { scope:tca_ar_selection_succeeded = 1 exists = scope:tca_admin_rectification_selected_successor }
+        set_variable = { name = tca_county_return_successor value = scope:tca_admin_rectification_selected_successor }
+        var:tca_county_return_successor = {
+            set_variable = { name = tca_county_return_reserved_by value = scope:tca_vcr_select_owner days = 30 }
+            set_variable = { name = tca_county_return_reserved_serial value = scope:tca_vcr_select_owner.var:tca_county_return_serial days = 30 }
+        }
+    }
+}
+
+# 只释放自己仍拥有的占位；不清除被别单改写的共用预留或所有者标记。
+tca_county_return_release_successor_effect = {
+    save_scope_as = tca_vcr_release_owner
+    if = {
+        limit = { exists = var:tca_county_return_successor }
+        var:tca_county_return_successor = {
+            if = {
+                limit = {
+                    var:tca_county_return_reserved_by ?= scope:tca_vcr_release_owner
+                    var:tca_county_return_reserved_serial ?= scope:tca_vcr_release_owner.var:tca_county_return_serial
+                }
+                if = {
+                    limit = { var:tca_admin_rectification_reserved_successor ?= scope:tca_vcr_release_owner.var:tca_county_return_title }
+                    remove_variable = tca_admin_rectification_reserved_successor
+                }
+                remove_variable = tca_county_return_reserved_by
+                remove_variable = tca_county_return_reserved_serial
+            }
+        }
+    }
+    remove_variable = tca_county_return_successor
+}
+tca_county_return_clear_effect = {
+    tca_county_return_release_successor_effect = yes
+    remove_variable = tca_county_return_title
+    remove_variable = tca_county_return_sovereign
+    remove_variable = tca_county_return_attempt
+    # 序号永久保留，避免旧延迟事件与再次申请撞号。
+}
+tca_county_return_fail_effect = {
+    debug_log = "TCA_COUNTY_RETURN CANCELLED"
+    if = { limit = { NOT = { tca_county_return_official_trigger = yes } }
+        tca_county_return_cancel_notice_effect = { REASON = tca_county_return_failed_office_desc }
+    }
+    else_if = { limit = { NOT = { top_liege ?= var:tca_county_return_sovereign } }
+        tca_county_return_cancel_notice_effect = { REASON = tca_county_return_failed_realm_desc }
+    }
+    else_if = { limit = { domain_size <= domain_limit }
+        tca_county_return_cancel_notice_effect = { REASON = tca_county_return_failed_limit_desc }
+    }
+    else_if = { limit = { OR = {
+        NOT = { exists = var:tca_county_return_title }
+        var:tca_county_return_title = { NOT = { tca_county_return_target_trigger = { HOLDER = prev } } }
+    } }
+        tca_county_return_cancel_notice_effect = { REASON = tca_county_return_failed_target_desc }
+    }
+    else_if = { limit = { OR = { has_variable = tca_rectify_pending_actor has_variable = tca_retract_pending_actor has_variable = tca_retirement_request_kind } }
+        tca_county_return_cancel_notice_effect = { REASON = tca_county_return_failed_conflict_desc }
+    }
+    else = {
+        tca_county_return_cancel_notice_effect = { REASON = tca_county_return_failed_desc }
+    }
+    tca_county_return_clear_effect = yes
+}
+
+# 申请者作用域；REASON为本地化键，只向存活玩家发送实际终止原因。
+tca_county_return_cancel_notice_effect = {
+    if = { limit = { is_alive = yes is_ai = no }
+        send_interface_message = { type = event_generic_neutral_text title = tca_county_return_failed_title desc = $REASON$ }
+    }
+}
+
+# 只有本单、本次尝试可执行；继任者失格最多补选一次，补选一律再等待一天。
+tca_county_return_execute_effect = {
+    if = {
+        limit = {
+            has_variable = tca_county_return_title
+            var:tca_county_return_serial = $SERIAL$
+            var:tca_county_return_attempt = $ATTEMPT$
+        }
+        if = {
+            limit = { tca_county_return_pending_valid_trigger = yes }
+            save_scope_as = tca_vcr_exec_owner
+            if = {
+                limit = {
+                    exists = var:tca_county_return_successor
+                    var:tca_county_return_successor = { tca_county_return_successor_valid_trigger = { OWNER = scope:tca_vcr_exec_owner } }
+                }
+                tca_county_return_transfer_effect = yes
+            }
+            else_if = {
+                limit = { var:tca_county_return_attempt = 0 }
+                tca_county_return_release_successor_effect = yes
+                change_variable = { name = tca_county_return_attempt add = 1 }
+                tca_county_return_select_effect = yes
+                if = {
+                    limit = { has_variable = tca_county_return_successor }
+                    save_scope_value_as = { name = tca_vcr_event_serial value = var:tca_county_return_serial }
+                    save_scope_value_as = { name = tca_vcr_event_attempt value = var:tca_county_return_attempt }
+                    trigger_event = { id = tca_county_return.1 days = 1 }
+                }
+                else = { tca_county_return_fail_effect = yes }
+            }
+            else = { tca_county_return_fail_effect = yes }
+        }
+        else = { tca_county_return_fail_effect = yes }
+    }
+}
+
+# 申请者作用域；仅由完整复验成功的execute调用。候选没有其他伯爵级实职，无跨辖区升迁腾退。
+# 先冻结合法上级，再复用granted+include_vassals直接移交；原上级从不持有目标。
+tca_county_return_transfer_effect = {
+    save_scope_as = tca_vcr_transfer_owner
+    var:tca_county_return_title = { save_scope_as = tca_vcr_transfer_title }
+    var:tca_county_return_successor = { save_scope_as = tca_vcr_transfer_successor }
+    var:tca_county_return_sovereign = { save_scope_as = tca_vcr_transfer_liege }
+    if = {
+        limit = {
+            exists = scope:tca_vcr_transfer_title.de_jure_liege.holder
+            scope:tca_vcr_transfer_title.de_jure_liege.holder = {
+                is_alive = yes
+                government_has_flag = government_is_celestial
+                top_liege = scope:tca_vcr_transfer_owner.var:tca_county_return_sovereign
+                highest_held_title_tier > tier_county
+                NOT = { target_is_liege_or_above = scope:tca_vcr_transfer_successor }
+            }
+        }
+        scope:tca_vcr_transfer_title.de_jure_liege.holder = { save_scope_as = tca_vcr_transfer_liege }
+    }
+    tca_circuit_transfer_title_granted_effect = { TITLE = scope:tca_vcr_transfer_title HOLDER = scope:tca_vcr_transfer_successor }
+    if = {
+        limit = { scope:tca_vcr_transfer_title = { holder ?= scope:tca_vcr_transfer_successor } }
+        scope:tca_vcr_transfer_successor = {
+            tca_circuit_ensure_holder_state_effect = yes
+            set_primary_title_to = scope:tca_vcr_transfer_title
+            tca_set_official_appointment_cooldown_effect = yes
+            if = {
+                limit = { NOT = { liege ?= scope:tca_vcr_transfer_liege } }
+                create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_vcr_transfer_fealty }
+                change_liege = { liege = scope:tca_vcr_transfer_liege change = scope:tca_vcr_transfer_fealty }
+                resolve_title_and_vassal_change = scope:tca_vcr_transfer_fealty
+            }
+            tca_request_judicial_maintenance_effect = yes
+            tca_request_tongpan_maintenance_effect = yes
+        }
+        if = {
+            limit = { scope:tca_vcr_transfer_successor = { liege ?= scope:tca_vcr_transfer_liege government_has_flag = government_is_celestial } }
+            debug_log = "TCA_COUNTY_RETURN TRANSFERRED"
+            if = { limit = { is_ai = no }
+                send_interface_message = { type = event_generic_good_text title = tca_county_return_done_title desc = tca_county_return_done_desc }
+            }
+        }
+        else = {
+            debug_log = "TCA_COUNTY_RETURN PARTIAL_TRANSFER"
+            if = { limit = { is_ai = no }
+                send_interface_message = { type = event_generic_neutral_text title = tca_county_return_partial_title desc = tca_county_return_partial_desc }
+            }
+        }
+        tca_county_return_clear_effect = yes
+    }
+    else = { tca_county_return_fail_effect = yes }
+}

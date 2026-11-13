@@ -1,0 +1,188 @@
+﻿# 主动交还真实延迟流程；同组串行，借用真实伯爵领故登记独占。
+namespace = tca_county_return_test
+
+tca_county_return_test.1 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_county_return_test.1 tca_test_county_return_handoff"
+        remove_character_flag = tca_test_tca_county_return_test_case_failed
+        tca_test_prepare_county_return_effect = yes
+        if = { limit = { exists = scope:tca_vcrt_actor }
+            debug_log = "TCA_TEST WAIT tca_test_county_return_handoff 1 day prepare"
+            trigger_event = { id = tca_county_return_test.101 days = 1 }
+        }
+        else = {
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_county_return_handoff"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+            tca_test_lane_end_effect = { GROUP = tca_county_return_test }
+        }
+    }
+}
+tca_county_return_test.101 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_grant_county_return_fixture_effect = yes
+        debug_log = "TCA_TEST WAIT tca_test_county_return_handoff 1 day capacity"
+        trigger_event = { id = tca_county_return_test.102 days = 1 }
+    }
+}
+tca_county_return_test.102 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = {
+            scope:tca_vcrt_actor = { tca_county_return_can_start_trigger = yes }
+            scope:tca_vcrt_target = { tca_county_return_target_trigger = { HOLDER = scope:tca_vcrt_actor } }
+            NOT = { scope:tca_vcrt_home = { tca_county_return_target_trigger = { HOLDER = scope:tca_vcrt_actor } } }
+        } debug_log = "TCA_TEST CHECK_PASS tca_test_county_return_handoff 1" }
+        else = { add_character_flag = tca_test_tca_county_return_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_county_return_handoff 1" }
+        scope:tca_vcrt_actor = {
+            set_variable = { name = tca_retirement_request_kind value = 2 }
+        }
+        if = { limit = { scope:tca_vcrt_actor = { NOT = { tca_county_return_can_start_trigger = yes } } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_county_return_handoff 4" }
+        else = { add_character_flag = tca_test_tca_county_return_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_county_return_handoff 4" }
+        scope:tca_vcrt_actor = { remove_variable = tca_retirement_request_kind }
+        # 用原生列表同名输入进入正式确认事件，核对实际消费selected_item。
+        scope:tca_vcrt_target = { save_scope_as = selected_item }
+        scope:tca_vcrt_actor = { trigger_event = tca_county_return.3 }
+        if = { limit = { scope:tca_vcrt_actor = {
+            var:tca_county_return_title = scope:tca_vcrt_target
+            var:tca_county_return_successor = { var:tca_admin_rectification_reserved_successor = scope:tca_vcrt_target }
+            NOT = { tca_county_return_can_start_trigger = yes }
+            NOT = { tca_retirement_can_retire_trigger = yes }
+            NOT = { tca_retract_concurrent_still_valid_trigger = { ACTOR = root TITLE = scope:tca_vcrt_target } }
+        } scope:tca_vcrt_target = { holder = scope:tca_vcrt_actor } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_county_return_handoff 2" }
+        else = { add_character_flag = tca_test_tca_county_return_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_county_return_handoff 2" }
+        debug_log = "TCA_TEST WAIT tca_test_county_return_handoff 2 days natural handoff"
+        trigger_event = { id = tca_county_return_test.103 days = 2 }
+    }
+}
+tca_county_return_test.103 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = {
+            scope:tca_vcrt_home = { holder = scope:tca_vcrt_actor }
+            scope:tca_vcrt_actor = { primary_title = scope:tca_vcrt_home capital_county = scope:tca_vcrt_home NOT = { has_variable = tca_county_return_title } }
+            scope:tca_vcrt_target = { holder != scope:tca_vcrt_actor holder != root holder = {
+                government_has_flag = government_is_celestial
+                top_liege = root
+                highest_held_title_tier = tier_county
+                NOT = { has_variable = tca_admin_rectification_reserved_successor }
+                NOT = { liege = scope:tca_vcrt_actor }
+            } }
+        } debug_log = "TCA_TEST CHECK_PASS tca_test_county_return_handoff 3" }
+        else = { add_character_flag = tca_test_tca_county_return_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_county_return_handoff 3" }
+        scope:tca_vcrt_actor = { tca_test_cleanup_county_return_effect = yes }
+        if = {
+            limit = { has_character_flag = tca_test_tca_county_return_test_case_failed }
+            debug_log = "TCA_TEST FAIL tca_test_county_return_handoff"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+        }
+        else = {
+            debug_log = "TCA_TEST PASS tca_test_county_return_handoff"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } }
+        }
+        remove_character_flag = tca_test_tca_county_return_test_case_failed
+        tca_test_lane_end_effect = { GROUP = tca_county_return_test }
+    }
+}
+
+tca_county_return_test.2 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_county_return_test.2 tca_test_county_return_invalidation"
+        remove_character_flag = tca_test_tca_county_return_test_case_failed
+        tca_test_prepare_county_return_effect = yes
+        if = { limit = { exists = scope:tca_vcrt_actor }
+            debug_log = "TCA_TEST WAIT tca_test_county_return_invalidation 1 day prepare"
+            trigger_event = { id = tca_county_return_test.201 days = 1 }
+        }
+        else = {
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_county_return_invalidation"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+            tca_test_lane_end_effect = { GROUP = tca_county_return_test }
+        }
+    }
+}
+tca_county_return_test.201 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_grant_county_return_fixture_effect = yes
+        debug_log = "TCA_TEST WAIT tca_test_county_return_invalidation 1 day capacity"
+        trigger_event = { id = tca_county_return_test.202 days = 1 }
+    }
+}
+tca_county_return_test.202 = {
+    type = character_event hidden = yes
+    immediate = {
+        scope:tca_vcrt_actor = {
+            tca_county_return_start_effect = { TITLE = scope:tca_vcrt_target }
+            var:tca_county_return_successor = { save_scope_as = tca_vcrt_reserved }
+            save_scope_value_as = { name = tca_vcrt_old_token value = var:tca_county_return_serial }
+            # 首府改至交还目标，真实次日事件必须取消，不能夺走新首府。
+            set_realm_capital = scope:tca_vcrt_target
+        }
+        debug_log = "TCA_TEST WAIT tca_test_county_return_invalidation 2 days invalidation"
+        trigger_event = { id = tca_county_return_test.203 days = 2 }
+    }
+}
+tca_county_return_test.203 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { scope:tca_vcrt_target = { holder = scope:tca_vcrt_actor }
+            scope:tca_vcrt_actor = { NOT = { has_variable = tca_county_return_title } }
+            scope:tca_vcrt_reserved = { NOT = { has_variable = tca_admin_rectification_reserved_successor } }
+        } debug_log = "TCA_TEST CHECK_PASS tca_test_county_return_invalidation 1" }
+        else = { add_character_flag = tca_test_tca_county_return_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_county_return_invalidation 1" }
+        scope:tca_vcrt_actor = {
+            set_realm_capital = scope:tca_vcrt_home
+            tca_county_return_start_effect = { TITLE = scope:tca_vcrt_target }
+            # 旧事件不能执行或清理新单；旧占位已被释放后，新单应能启动。
+            tca_county_return_execute_effect = { SERIAL = scope:tca_vcrt_old_token ATTEMPT = 0 }
+        }
+        if = { limit = { scope:tca_vcrt_actor = { has_variable = tca_county_return_title var:tca_county_return_serial > scope:tca_vcrt_old_token }
+            scope:tca_vcrt_target = { holder = scope:tca_vcrt_actor }
+        } debug_log = "TCA_TEST CHECK_PASS tca_test_county_return_invalidation 2" }
+        else = { add_character_flag = tca_test_tca_county_return_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_county_return_invalidation 2" }
+        scope:tca_vcrt_actor = {
+            var:tca_county_return_successor = {
+                save_scope_as = tca_vcrt_other_reservation
+                # 模拟占位被其他流程取得，原单不得删掉他单标记；同时强制触发一次补选。
+                set_variable = { name = tca_admin_rectification_reserved_successor value = scope:tca_vcrt_home days = 30 }
+                set_variable = { name = tca_county_return_reserved_by value = root days = 30 }
+                set_variable = { name = tca_county_return_reserved_serial value = 999 days = 30 }
+            }
+        }
+        debug_log = "TCA_TEST WAIT tca_test_county_return_invalidation 3 days replacement"
+        trigger_event = { id = tca_county_return_test.204 days = 3 }
+    }
+}
+tca_county_return_test.204 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = {
+            scope:tca_vcrt_target = { holder != scope:tca_vcrt_actor holder != root }
+            scope:tca_vcrt_actor = { NOT = { has_variable = tca_county_return_title } }
+            scope:tca_vcrt_other_reservation = { var:tca_admin_rectification_reserved_successor = scope:tca_vcrt_home var:tca_county_return_reserved_by = root var:tca_county_return_reserved_serial = 999 }
+        } debug_log = "TCA_TEST CHECK_PASS tca_test_county_return_invalidation 3" }
+        else = { add_character_flag = tca_test_tca_county_return_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_county_return_invalidation 3" }
+        scope:tca_vcrt_other_reservation = {
+            remove_variable = tca_admin_rectification_reserved_successor
+            remove_variable = tca_county_return_reserved_by
+            remove_variable = tca_county_return_reserved_serial
+        }
+        scope:tca_vcrt_actor = { tca_test_cleanup_county_return_effect = yes }
+        if = {
+            limit = { has_character_flag = tca_test_tca_county_return_test_case_failed }
+            debug_log = "TCA_TEST FAIL tca_test_county_return_invalidation"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+        }
+        else = {
+            debug_log = "TCA_TEST PASS tca_test_county_return_invalidation"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } }
+        }
+        remove_character_flag = tca_test_tca_county_return_test_case_failed
+        tca_test_lane_end_effect = { GROUP = tca_county_return_test }
+    }
+}

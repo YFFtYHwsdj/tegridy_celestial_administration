@@ -1,0 +1,48 @@
+﻿# 主动交还资格；角色／头衔作用域分开，不借用皇帝或宰相的强制裁撤权限。
+tca_county_return_official_trigger = {
+    tca_is_admin_rectification_target_official_trigger = yes
+    is_adult = yes
+    is_imprisoned = no
+    highest_held_title_tier = tier_county
+}
+
+# 头衔作用域；HOLDER为主动交还者。保留主头衔与首府，原生计数不改成伯爵领计数。
+tca_county_return_target_trigger = {
+    tier = tier_county
+    tca_is_retractable_concurrent_title_trigger = { HOLDER = $HOLDER$ }
+    this != $HOLDER$.capital_county
+}
+
+# 角色作用域；新申请与次日执行共用，故不检查自己的在途标记。
+tca_county_return_available_trigger = {
+    tca_county_return_official_trigger = yes
+    domain_size > domain_limit
+    NOT = { has_variable = tca_rectify_pending_actor }
+    NOT = { has_variable = tca_retract_pending_actor }
+    NOT = { has_variable = tca_retirement_request_kind }
+}
+tca_county_return_can_start_trigger = {
+    tca_county_return_available_trigger = yes
+    NOT = { has_variable = tca_county_return_title }
+    any_held_title = { tca_county_return_target_trigger = { HOLDER = prev } }
+}
+
+# 角色作用域；完整复验在途目标与最高领主，不因首府／主头衔变化强行收地。
+tca_county_return_pending_valid_trigger = {
+    tca_county_return_available_trigger = yes
+    exists = var:tca_county_return_sovereign
+    top_liege = var:tca_county_return_sovereign
+    exists = var:tca_county_return_title
+    var:tca_county_return_title = { tca_county_return_target_trigger = { HOLDER = prev } }
+}
+
+# 候选人作用域；OWNER为申请者。调用方只允许本单预留，完整资格仍由整饬模块维护。
+tca_county_return_successor_valid_trigger = {
+    var:tca_admin_rectification_reserved_successor ?= $OWNER$.var:tca_county_return_title
+    var:tca_county_return_reserved_by ?= $OWNER$
+    var:tca_county_return_reserved_serial ?= $OWNER$.var:tca_county_return_serial
+    tca_admin_rectification_candidate_eligibility_trigger = {
+        TITLE = $OWNER$.var:tca_county_return_title
+        TOP_LIEGE = $OWNER$.var:tca_county_return_sovereign
+    }
+}

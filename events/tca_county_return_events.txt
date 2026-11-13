@@ -1,0 +1,42 @@
+﻿# root为主动交还者；携带本单序号和尝试号，变量及排队事件随存档保存。
+namespace = tca_county_return
+tca_county_return.1 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_county_return_execute_effect = { SERIAL = scope:tca_vcr_event_serial ATTEMPT = scope:tca_vcr_event_attempt }
+    }
+}
+# 超时不检查尝试号，覆盖本单所有补选；序号不同的旧超时完全无副作用。
+tca_county_return.2 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = {
+            limit = { has_variable = tca_county_return_title var:tca_county_return_serial = scope:tca_vcr_event_serial }
+            debug_log = "TCA_COUNTY_RETURN TIMED_OUT"
+            tca_county_return_cancel_notice_effect = { REASON = tca_county_return_failed_timeout_desc }
+            tca_county_return_clear_effect = yes
+        }
+    }
+}
+
+# 决议确认入口；root为决议者，所选头衔scope:selected_item由原生列表传入并继承至此。
+# 隐藏事件隔离界面效果预览，真正执行时仍由正式起单入口复验。
+tca_county_return.3 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = {
+            limit = { exists = scope:selected_item }
+            tca_county_return_start_effect = { TITLE = scope:selected_item }
+        }
+        else_if = {
+            # 测试或其他脚本直接触发本事件时，AI仍可按正式目标条件选择；玩家必须有列表输入。
+            limit = { is_ai = yes tca_county_return_can_start_trigger = yes }
+            save_scope_as = tca_vcr_decider
+            random_held_title = {
+                limit = { tca_county_return_target_trigger = { HOLDER = scope:tca_vcr_decider } }
+                save_scope_as = tca_vcr_ai_title
+            }
+            tca_county_return_start_effect = { TITLE = scope:tca_vcr_ai_title }
+        }
+    }
+}

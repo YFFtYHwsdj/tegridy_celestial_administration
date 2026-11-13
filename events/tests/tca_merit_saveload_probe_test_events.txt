@@ -87,6 +87,7 @@ tca_merit_saveload_probe_test.1000 = {
                 # 持久头衔引用给 GUI 使用；事件 saved scope 另由原链跨保存恢复。
                 # 州郡法律共用本次检查点，不额外保存／重启；各自保留独立的正式夹具。
                 tca_test_prepare_local_domain_effect = yes
+                tca_test_prepare_county_return_effect = yes
                 title:h_china = { set_variable = { name = tca_local_domain_saveload_actor value = scope:tca_domain_civil } }
                 title:h_china = {
                     set_variable = { name = tca_merit_saveload_actor value = scope:tca_msl_actor }
@@ -142,6 +143,7 @@ tca_merit_saveload_probe_test.1001 = {
                 set_variable = { name = tca_rsl_payment_first_date value = var:tca_retirement_probe_attempted }
             }
             tca_test_freeze_retirement_saveload_effect = yes
+            tca_test_freeze_county_return_checkpoint_effect = yes
             # GUI 的保存／破坏按真实时间执行，不能与30个游戏日赛跑；延长到60日，
             # 让保存、现场破坏与 TCA_CLI RELOAD_SAVE 先发生，续接事件仍由原存档恢复。
             debug_log = "TCA_TEST WAIT tca_test_merit_saveload_contract 60 days"
@@ -332,6 +334,13 @@ tca_merit_saveload_probe_test.9001 = {
             if = {
                 limit = { NOT = { has_character_flag = tca_merit_saveload_corruption_logged } }
                 add_character_flag = tca_merit_saveload_corruption_logged
+                title:h_china.var:tca_vcrt_checkpoint_actor ?= {
+                    tca_county_return_clear_effect = yes
+                    set_variable = { name = tca_county_return_serial value = 999 }
+                }
+                if = { limit = { title:h_china.var:tca_vcrt_checkpoint_actor = { var:tca_county_return_serial = 999 NOT = { has_variable = tca_county_return_title } } }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_merit_saveload_contract 47" }
+                else = { add_character_flag = tca_test_tca_merit_saveload_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 47" }
                 add_realm_law_skip_effects = tca_local_domain_original_law
                 remove_variable = tca_local_domain_reform_cooldown
                 tca_sync_local_domain_realm_effect = yes
@@ -422,6 +431,18 @@ tca_merit_saveload_probe_test.1004 = {
                 var:tca_merit_feedback_band_target_1_2 >= 5.499 var:tca_merit_feedback_band_target_1_2 <= 5.501
             } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_saveload_contract 22" }
             else = { add_character_flag = tca_test_tca_merit_saveload_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 22" }
+            if = { limit = {
+                title:h_china = { var:tca_vcrt_checkpoint_restored = 1 }
+                title:h_china.var:tca_vcrt_checkpoint_actor = {
+                    NOT = { has_variable = tca_county_return_title }
+                    var:tca_vcrt_home = { holder = prev }
+                    var:tca_vcrt_target = { holder = prev.var:tca_vcrt_checkpoint_successor }
+                    var:tca_vcrt_checkpoint_successor = { NOT = { has_variable = tca_admin_rectification_reserved_successor } }
+                }
+            } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_saveload_contract 46" }
+            else = { add_character_flag = tca_test_tca_merit_saveload_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_saveload_contract 46" }
+            title:h_china.var:tca_vcrt_checkpoint_actor ?= { tca_test_cleanup_county_return_effect = yes }
+            title:h_china = { remove_variable = tca_vcrt_checkpoint_actor remove_variable = tca_vcrt_checkpoint_restored }
             tca_test_cleanup_local_domain_effect = yes
             remove_variable = tca_local_domain_reform_cooldown
             title:h_china = { remove_variable = tca_local_domain_saveload_actor }

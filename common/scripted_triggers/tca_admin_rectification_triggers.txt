@@ -284,6 +284,7 @@ tca_recipient_has_any_approval_retractable_title_trigger = {
 # 审批回调与裁撤兼领书信事件执行前的二次校验（第五章 5.4）：
 # 确认原官员仍持有指定头衔、双方仍同属同一最高领主、且该头衔仍满足裁撤兼领条件。
 tca_retract_concurrent_still_valid_trigger = {
+    NOT = { has_variable = tca_county_return_title }
     is_alive = yes
     tca_is_admin_rectification_target_official_trigger = yes
     $ACTOR$ = {
@@ -331,6 +332,7 @@ tca_rectify_subordination_target_valid_trigger = {
         text = tca_admin_rectification_pending_in_flight_tt
         NOT = { has_variable = tca_rectify_pending_actor }
         NOT = { has_variable = tca_retract_pending_actor }
+        NOT = { has_variable = tca_county_return_title }
     }
     custom_tooltip = {
         text = tca_rectify_subordination_recipient_eligible_tt
@@ -382,6 +384,7 @@ tca_rectify_subordination_target_valid_trigger = {
 
 # 角色作用域（recipient）；归正辖属书信事件执行前的静默二次校验（5.4）。
 tca_rectify_subordination_still_valid_trigger = {
+    NOT = { has_variable = tca_county_return_title }
     tca_is_admin_rectification_target_official_trigger = yes
     primary_title = {
         OR = {
@@ -420,13 +423,19 @@ tca_rectify_subordination_still_valid_trigger = {
 #   5. 必须满足目标官署正常的 Merit Level 门槛（王国级 >= 5，公国级 >= 3，伯爵级 >= 1），不特批放宽；
 #   6. 引擎安全边界：候选人须已有地或已持有家门头衔，确保有地头衔交接不会触发同 tick 建家门销毁风险。
 tca_admin_rectification_is_qualified_candidate_trigger = {
+    NOT = { has_variable = tca_admin_rectification_reserved_successor }
+    tca_admin_rectification_candidate_eligibility_trigger = { TITLE = $TITLE$ TOP_LIEGE = $TOP_LIEGE$ }
+}
+
+# 候选人作用域；完整任职资格，预留所有权由调用方检查。
+# 普通选拔使用上面的未预留入口，主动交还执行则仅接受自己仍拥有的预留。
+tca_admin_rectification_candidate_eligibility_trigger = {
     is_alive = yes
     is_adult = yes
     is_clergy = no
     is_imprisoned = no
     this != $TOP_LIEGE$
     NOT = { this ?= $TITLE$.holder }
-    NOT = { has_variable = tca_admin_rectification_reserved_successor }
     OR = {
         liege ?= $TOP_LIEGE$
         liege_or_court_owner ?= { top_liege ?= $TOP_LIEGE$ }

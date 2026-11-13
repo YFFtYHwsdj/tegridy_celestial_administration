@@ -1,0 +1,80 @@
+﻿# 主动交还一处州县；原生列表setup_items以scope:actor为决议者，scope:selected_item为所选。
+tca_return_excess_county_decision = {
+    decision_group_type = admin
+    picture = { reference = "gfx/interface/illustrations/decisions/tgp_career.dds" }
+    desc = {
+        first_valid = {
+            triggered_desc = {
+                trigger = { exists = var:tca_county_return_title }
+                desc = tca_county_return_in_progress_desc
+            }
+            desc = tca_return_excess_county_decision_desc
+        }
+    }
+    selection_tooltip = tca_return_excess_county_decision_tooltip
+    confirm_text = tca_return_excess_county_decision_confirm
+    sort_order = 77
+    is_shown = {
+        tca_county_return_official_trigger = yes
+        OR = {
+            has_variable = tca_county_return_title
+            any_held_title = { tca_county_return_target_trigger = { HOLDER = prev } }
+        }
+    }
+    is_valid = {
+        custom_tooltip = { text = tca_county_return_over_limit_tt domain_size > domain_limit }
+        custom_tooltip = {
+            text = tca_county_return_no_pending_tt
+            NOT = { has_variable = tca_county_return_title }
+            NOT = { has_variable = tca_rectify_pending_actor }
+            NOT = { has_variable = tca_retract_pending_actor }
+            NOT = { has_variable = tca_retirement_request_kind }
+        }
+    }
+    # 原生入口只在条件失败时展开，正常可用时不重复显示底层身份资格。
+    is_valid_showing_failures_only = {
+        tca_county_return_official_trigger = yes
+        any_held_title = { tca_county_return_target_trigger = { HOLDER = prev } }
+    }
+    widget = {
+        # 复用原版领内州县列表，直接显示名称和纹章，不再打开通用头衔选择器。
+        gui = "decision_view_widget_select_realm_county"
+        controller = select_scope_object
+        setup_items = {
+            scope:actor = {
+                every_held_title = {
+                    limit = { tca_county_return_target_trigger = { HOLDER = scope:actor } }
+                    add_to_list = item_list
+                }
+            }
+        }
+        # 明确提供默认选项，供决议列表在打开详情前判定可用性；玩家仍可改选。
+        default_item = {
+            scope:actor = {
+                random_held_title = {
+                    limit = { tca_county_return_target_trigger = { HOLDER = scope:actor } }
+                    save_scope_as = selected_item
+                }
+            }
+        }
+        is_item_valid = { tca_county_return_target_trigger = { HOLDER = scope:actor } }
+        ai_select_item = {
+            scope:actor = {
+                random_held_title = {
+                    limit = { tca_county_return_target_trigger = { HOLDER = scope:actor } }
+                    save_scope_as = selected_item
+                }
+            }
+        }
+    }
+    effect = {
+        custom_tooltip = tca_county_return_effect_tt
+        # 隐藏事件不在预览中展开选官及在途变量，只在确认时执行。
+        hidden_effect = { trigger_event = tca_county_return.3 }
+    }
+
+    # 原生ai_check_interval的单位是月，不是游戏日。
+    ai_check_interval = 1
+    ai_potential = { tca_county_return_official_trigger = yes }
+    ai_will_do = { base = 100 }
+}
