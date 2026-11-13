@@ -18,13 +18,26 @@ tca_retirement_ai_days_since_entry_value = {
         subtract = var:tca_retirement_entered_date
     }
 }
+# 人物作用域；原版身体抱恙为健康1至3，差值在0至2间连续增长。
+# 只调意愿，不开放提前资格；极端健康沿用原有加权，避免重复累计。
+tca_retirement_ai_poor_health_gap_value = {
+    value = 0
+    if = { limit = { NOT = { tca_retirement_extreme_health_trigger = yes } }
+        value = 3
+        subtract = health
+        min = 0
+        max = 2
+    }
+}
 # 人物作用域；保持现状始终有正权重，年龄与健康只影响AI意愿。
 tca_retirement_ai_keep_weight_value = {
     value = 100
     if = { limit = { age >= tca_retirement_ai_retire_reference_age_value } multiply = 0.75 }
     if = { limit = { age >= { value = tca_retirement_ai_retire_reference_age_value add = 10 } } multiply = 0.5 }
     if = { limit = { age >= { value = tca_retirement_ai_retire_reference_age_value add = 20 } } multiply = 0.5 }
+    # 中度衰病的原有抑制更强；不再叠乘身体抱恙，以免重复放大同类原因。
     if = { limit = { tca_retirement_ailment_mid_trigger = yes } multiply = 0.6 }
+    else = { multiply = { value = 1 subtract = { value = tca_retirement_ai_poor_health_gap_value multiply = 0.15 } } }
     if = { limit = { tca_retirement_ailment_severe_trigger = yes } multiply = 0.5 }
     if = { limit = { tca_retirement_extreme_health_trigger = yes } multiply = 0.1 }
     min = 1
@@ -34,7 +47,12 @@ tca_retirement_ai_fengci_weight_value = {
     if = { limit = { tca_retirement_can_fengci_trigger = yes tca_retirement_ai_request_available_trigger = yes }
         value = 5
         add = { value = age subtract = tca_retirement_ai_fengci_reference_age_value min = 0 max = 20 }
-        if = { limit = { tca_retirement_ailment_mid_trigger = yes } add = 15 }
+        # 健康与衰病加分取较高者；极端健康的额外加分仍走下方原分支。
+        add = {
+            value = tca_retirement_ai_poor_health_gap_value
+            multiply = 10
+            if = { limit = { tca_retirement_ailment_mid_trigger = yes } min = 15 }
+        }
         if = { limit = { tca_retirement_extreme_health_trigger = yes } add = 40 }
         if = { limit = { has_trait = content } add = 15 }
         if = { limit = { has_trait = lazy } add = 15 }
@@ -52,7 +70,11 @@ tca_retirement_ai_retire_weight_value = {
         value = 2
         if = { limit = { age >= tca_retirement_ai_retire_reference_age_value } add = 15 }
         add = { value = age subtract = tca_retirement_ai_retire_reference_age_value min = 0 max = 20 multiply = 2 }
-        if = { limit = { tca_retirement_ailment_severe_trigger = yes } add = 30 }
+        add = {
+            value = tca_retirement_ai_poor_health_gap_value
+            multiply = 5
+            if = { limit = { tca_retirement_ailment_severe_trigger = yes } min = 30 }
+        }
         if = { limit = { tca_retirement_extreme_health_trigger = yes } add = 60 }
         if = { limit = { has_trait = tca_fengci } add = 10 }
         if = { limit = { has_trait = content } add = 10 }

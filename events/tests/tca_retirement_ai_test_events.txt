@@ -131,6 +131,28 @@ tca_retirement_ai_test.2 = {
             if = { limit = { NOT = { has_realm_law = celestial_retirement_law_5 } } add_realm_law_skip_effects = celestial_retirement_law_5 }
             tca_test_create_merit_interface_character_with_age_effect = { CHARACTER = tca_raw_actor GOVERNMENT = celestial_government AGE = 59 }
             scope:tca_raw_actor = { tca_test_add_native_merit_probe_exams_effect = yes add_trait = education_stewardship_1 set_merit_level = 4 change_influence = 1000 }
+            # 自建同龄、同宫廷人物比较实际健康，不借用世界人物；避开阈值附近的医师微量加成。
+            create_character = { age = 70 health = 3.2 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_raw_well }
+            scope:tca_raw_well = {
+                add_character_flag = tca_merit_interface_probe
+                tca_test_protect_character_effect = yes
+                tca_test_add_native_merit_probe_exams_effect = yes
+                add_trait = education_stewardship_1 set_merit_level = 4
+            }
+            create_character = { age = 70 health = 2.2 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_raw_poor }
+            scope:tca_raw_poor = {
+                add_character_flag = tca_merit_interface_probe
+                tca_test_protect_character_effect = yes
+                tca_test_add_native_merit_probe_exams_effect = yes
+                add_trait = education_stewardship_1 set_merit_level = 4
+            }
+            create_character = { age = 70 health = 1.2 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_raw_worse }
+            scope:tca_raw_worse = {
+                add_character_flag = tca_merit_interface_probe
+                tca_test_protect_character_effect = yes
+                tca_test_add_native_merit_probe_exams_effect = yes
+                add_trait = education_stewardship_1 set_merit_level = 4
+            }
             trigger_event = { id = tca_retirement_ai_test.2000 days = 2 }
         }
         else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_retirement_ai_weights" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_lane_end_effect = { GROUP = tca_retirement_law } }
@@ -170,6 +192,59 @@ tca_retirement_ai_test.2000 = {
             scope:tca_raw_actor = { tca_retirement_enter_effect = { KIND = 2 } tca_retirement_step_down_effect = yes }
             if = { limit = { scope:tca_raw_actor = { tca_retirement_ai_can_evaluate_trigger = no tca_retirement_ai_resume_weight_value = 0 tca_retirement_ai_keep_weight_value > 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_ai_weights 8" }
             else = { add_character_flag = tca_test_tca_retirement_ai_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_ai_weights 8" }
+            # 原生不朽会把健康读数固定为7；等待期后撤去本例死亡保护，才读取真实健康。
+            # 所有比较和清理在同一效果链完成，不在无保护状态下推进日期。
+            scope:tca_raw_well = { tca_test_restore_character_effect = yes }
+            scope:tca_raw_poor = { tca_test_restore_character_effect = yes }
+            scope:tca_raw_worse = { tca_test_restore_character_effect = yes }
+            # 三者均有年龄资格；健康越差越偏向退出，不能仅由年龄或衰病特质产生差异。
+            scope:tca_raw_well = {
+                set_variable = { name = tca_raw_keep value = tca_retirement_ai_keep_weight_value }
+                set_variable = { name = tca_raw_fengci value = tca_retirement_ai_fengci_weight_value }
+                set_variable = { name = tca_raw_retire value = tca_retirement_ai_retire_weight_value }
+            }
+            if = { limit = { scope:tca_raw_poor = {
+                health >= 1 health < 3
+                tca_retirement_ai_keep_weight_value < scope:tca_raw_well.var:tca_raw_keep
+                tca_retirement_ai_fengci_weight_value > scope:tca_raw_well.var:tca_raw_fengci
+                tca_retirement_ai_retire_weight_value > scope:tca_raw_well.var:tca_raw_retire
+            } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_ai_weights 9" }
+            else = { add_character_flag = tca_test_tca_retirement_ai_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_ai_weights 9" }
+            scope:tca_raw_poor = {
+                set_variable = { name = tca_raw_keep value = tca_retirement_ai_keep_weight_value }
+                set_variable = { name = tca_raw_fengci value = tca_retirement_ai_fengci_weight_value }
+                set_variable = { name = tca_raw_retire value = tca_retirement_ai_retire_weight_value }
+            }
+            if = { limit = { scope:tca_raw_worse = {
+                health >= 1 health < 3
+                tca_retirement_ai_keep_weight_value < scope:tca_raw_poor.var:tca_raw_keep
+                tca_retirement_ai_fengci_weight_value > scope:tca_raw_poor.var:tca_raw_fengci
+                tca_retirement_ai_retire_weight_value > scope:tca_raw_poor.var:tca_raw_retire
+            } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_ai_weights 10" }
+            else = { add_character_flag = tca_test_tca_retirement_ai_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_ai_weights 10" }
+            scope:tca_raw_poor = { set_age = 20 }
+            if = { limit = { scope:tca_raw_poor = {
+                tca_retirement_can_fengci_trigger = no tca_retirement_can_retire_trigger = no
+                tca_retirement_ai_fengci_weight_value = 0 tca_retirement_ai_retire_weight_value = 0
+            } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_ai_weights 11" }
+            else = { add_character_flag = tca_test_tca_retirement_ai_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_ai_weights 11" }
+            # 眼疾不降低健康本身；同档衰病下，身体抱恙不再重复叠加一份健康权重。
+            scope:tca_raw_well = { add_trait = clouded_eyes add_trait_xp = { trait = clouded_eyes value = 75 } }
+            scope:tca_raw_poor = { set_age = 70 add_trait = clouded_eyes add_trait_xp = { trait = clouded_eyes value = 75 } }
+            scope:tca_raw_well = {
+                set_variable = { name = tca_raw_keep value = tca_retirement_ai_keep_weight_value }
+                set_variable = { name = tca_raw_fengci value = tca_retirement_ai_fengci_weight_value }
+                set_variable = { name = tca_raw_retire value = tca_retirement_ai_retire_weight_value }
+            }
+            if = { limit = { scope:tca_raw_poor = {
+                tca_retirement_ai_keep_weight_value = scope:tca_raw_well.var:tca_raw_keep
+                tca_retirement_ai_fengci_weight_value = scope:tca_raw_well.var:tca_raw_fengci
+                tca_retirement_ai_retire_weight_value = scope:tca_raw_well.var:tca_raw_retire
+            } } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_ai_weights 12" }
+            else = { add_character_flag = tca_test_tca_retirement_ai_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_ai_weights 12" }
+            scope:tca_raw_well = { tca_test_cleanup_merit_probe_character_effect = yes }
+            scope:tca_raw_poor = { tca_test_cleanup_merit_probe_character_effect = yes }
+            scope:tca_raw_worse = { tca_test_cleanup_merit_probe_character_effect = yes }
             if = { limit = { scope:tca_raw_old_age = 50 } if = { limit = { NOT = { has_realm_law = celestial_retirement_law_0 } } add_realm_law_skip_effects = celestial_retirement_law_0 } }
             else_if = { limit = { scope:tca_raw_old_age = 60 } if = { limit = { NOT = { has_realm_law = celestial_retirement_law_1 } } add_realm_law_skip_effects = celestial_retirement_law_1 } }
             else_if = { limit = { scope:tca_raw_old_age = 70 } if = { limit = { NOT = { has_realm_law = celestial_retirement_law_2 } } add_realm_law_skip_effects = celestial_retirement_law_2 } }
