@@ -103,6 +103,8 @@ python tools/run_game_tests.py --parallel 4 --timeout 1800
 
 先启动Steam。安装目录和偏好文件由`tools/platform_paths.py`按平台定位，`CK3_GAME_DIR`可覆盖默认安装目录；macOS默认安装位置为`~/Library/Application Support/Steam/steamapps/common/Crusader Kings III`；`--game-dir`指定包含`binaries/`的安装根目录。使用原生`-debug_mode -develop -skip -bookmark=bm_1066_china -play=h_china`，工作目录为安装的`binaries/`，子进程`SteamAppId=1158310`。
 
+macOS受限执行环境可能无法读取系统进程或连接同一用户的Steam进程间通信，使SteamAPI报告未运行，即使客户端实际已启动。遇到 `ipcserver init failed` 或 `Could not determine Steam client install directory` 时，先在正常桌面权限下核对Steam进程，再以同等权限运行独立测试工具；以同次 `stdout.txt` 中Steam客户端库加载结果与观察者确认判定是否恢复，不能只凭错误文字认定客户端缺失。
+
 `--timeout`按每个子局计算，包含两阶段启动及执行，不包含排队、任务准备和运行结束后的日志验收及快照校验；默认240秒只适合单项或小范围。全量回归应显式使用`--timeout 1800`（机器繁忙或留更多余量时可用2400）：预算不足会让第二局不执行并整次按超时失败，事后核对仍需再花1至2分钟。`terminal.json`的`seconds`是计时器内的实际耗时，整次墙钟还需加上排队与开头所述的验收时间，报告耗时时应分开说明。`--seed`为0至4294967295的原生随机种子。固定种子不能保证异步时点及不同脚本版本的随机调用序列相同。`--strict-title-heir`将实际继任与死亡前预览首位不一致升级为失败，普通通过不代表此严格模式通过。`--parallel N`取1至32，默认1，控制同局延迟lane并发上限，见[并行运行](#并行运行)。
 
 `--prepare-only`只封存任务，不启动游戏，不表示测试通过。`--run-root "<仓库外持久产物目录>"`指定输出根目录，必须位于源码目录之外，防止递归复制。默认使用系统临时目录，持久目录范例及保留规则见[证据保存](../development/README.md#测试证据如何保存)。`--settings`指定只读偏好来源，仅复制game／Graphics配置、关闭云存档并改为1280×800窗口，不复制账户段，不修改原文件。

@@ -3,6 +3,8 @@
 tca_court_civil_route_trigger = { is_civilian_candidate_trigger = yes is_military_candidate_trigger = no }
 tca_court_military_route_trigger = { is_military_candidate_trigger = yes is_civilian_candidate_trigger = no }
 tca_court_holds_position_trigger = { OR = {
+    AND = { has_court_position = royal_architect_court_position liege_or_court_owner = { government_has_flag = government_is_celestial } }
+    has_court_position = fire_dragon_engineer_court_position
     has_court_position = tca_corps_inspector_court_position
     has_court_position = tca_military_inspector_court_position
     has_court_position = tca_civil_adjutant_court_position
@@ -65,15 +67,11 @@ tca_court_target_person_trigger = {
     $SKILL$ >= 6
     trigger_if = { limit = { scope:tca_court_admission = 1 } tca_court_civil_route_trigger = yes }
     trigger_if = { limit = { scope:tca_court_admission = 2 } tca_court_military_route_trigger = yes }
-    trigger_if = {
-        limit = { scope:tca_court_bias = 2 scope:target_liege = { tca_is_landed_celestial_governor_trigger = yes } }
-        can_be_marshal_trigger = { COURT_OWNER = scope:target_liege }
-        trigger_if = { limit = { has_variable = block_fire_councillor }
-            OR = {
-                var:block_fire_councillor = scope:target_liege
-                # 只有本模块拥有且仍指向真实来源雇主的锁，才可在撤旧时安全释放。
-                AND = { exists = liege_or_court_owner var:tca_military_council_lock_owner ?= liege_or_court_owner var:block_fire_councillor = liege_or_court_owner }
-            }
+    # 外部保护对全部差遣有效；自己拥有且仍指向来源雇主的内阁锁可在获任后释放。
+    trigger_if = { limit = { has_variable = block_fire_councillor }
+        OR = {
+            var:block_fire_councillor = scope:target_liege
+            AND = { exists = liege_or_court_owner var:tca_military_council_lock_owner ?= liege_or_court_owner var:block_fire_councillor = liege_or_court_owner }
         }
     }
 }
@@ -88,8 +86,38 @@ tca_court_person_assignment_validity_trigger = {
     tca_court_person_eligible_trigger = yes $SKILL$ >= 6
     $ROUTE$ = yes
     is_courtier_of = $OWNER$
-    $POSITION$_council_person_trigger = { OWNER = $OWNER$ }
+    tca_court_person_for_$POSITION$_trigger = { OWNER = $OWNER$ }
     trigger_if = { limit = { has_variable = block_fire_councillor } var:block_fire_councillor = $OWNER$ }
     OR = { has_court_position = $POSITION$ NOT = { tca_court_holds_position_trigger = yes } }
     custom_tooltip = { text = tca_court_system_appointment_required OR = { has_court_position = $POSITION$ has_character_flag = tca_military_appointment_allowed } }
+}
+
+# 神机提督为军器专职：偏武仅影响评分，文武皆可，不要求军事总管资格。
+# 官署作用域；合并原版显示与有效条件用于集中补缺，不扩大王国级、火药或军制范围。
+tca_fire_dragon_office_valid_trigger = {
+    government_has_flag = government_is_celestial
+    highest_held_title_tier >= tier_kingdom
+    culture = { has_innovation = innovation_fire_medicine }
+    OR = { is_independent_ruler = yes vassal_contract_has_flag = celestial_military_appointment }
+}
+# 人物作用域；共用持续资格宏要求静态路线入口，文武冲突或无途径仍拒绝。
+tca_court_any_route_trigger = { OR = { tca_court_civil_route_trigger = yes tca_court_military_route_trigger = yes } }
+# 原生valid_character进入人物作用域，必需scope:liege；原版基础限制与共用授权同时复验。
+tca_fire_dragon_actual_validity_trigger = {
+    base_court_position_validity_trigger = { EMPLOYER = scope:liege }
+    tca_court_actual_validity_trigger = { POSITION = fire_dragon_engineer_court_position SKILL = learning ROUTE = tca_court_any_route_trigger }
+}
+
+# 官署作用域；仅接入原版已开放的天朝王国级及以上宫廷，皇帝本廷同样参与。
+# 同时复验原版显示与有效条件，不按地方官身份缩窄或扩张范围。
+tca_royal_architect_office_valid_trigger = {
+    government_has_flag = government_is_celestial
+    is_landed_or_landless_administrative_or_theocratic = yes
+    has_ep1_court_positions_dlc_trigger = yes
+    highest_held_title_tier >= tier_kingdom
+}
+# 人物作用域，必需原生scope:liege；原版人物底线与文途专用授权共同约束。
+tca_royal_architect_actual_validity_trigger = {
+    royal_architect_validity_trigger = { EMPLOYER = scope:liege }
+    tca_court_actual_validity_trigger = { POSITION = royal_architect_court_position SKILL = stewardship ROUTE = tca_court_civil_route_trigger }
 }

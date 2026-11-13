@@ -62,6 +62,7 @@ tca_experience_clerical_eligible_trigger = {
                 has_court_position = tca_household_registrar_court_position
                 has_court_position = tca_judicial_advisor_court_position
                 has_court_position = tca_army_judge_court_position
+                has_court_position = royal_architect_court_position
             }
         }
         AND = {
@@ -81,11 +82,45 @@ tca_experience_military_eligible_trigger = {
                 has_court_position = tca_military_supervisor_court_position
                 has_court_position = tca_military_inspector_court_position
                 has_court_position = tca_corps_inspector_court_position
+                has_court_position = fire_dragon_engineer_court_position
             }
         }
         AND = {
             tca_experience_council_eligible_trigger = { OWNER = $OWNER$ }
             has_council_position = councillor_marshal
+        }
+    }
+}
+
+# 辅助差遣的实际雇主范围：现任地方主官（含登记的无地官署）及原生九部职。
+# 皇帝、纯家门与退休头衔不提供本项经验；不复用牧守经验较宽的独立有地范围。
+tca_experience_support_owner_trigger = {
+    is_alive = yes
+    OR = {
+        tca_is_celestial_governor_trigger = yes
+        tca_experience_central_eligible_trigger = yes
+    }
+}
+
+# 员工人物作用域；OWNER为实际雇主。无其他头衔的廷臣或仅持家门者才有资格。
+# 使用原生精确职位雇主接口核对本人，防止用别处同类型职位或错误OWNER冒领；不修改任职排他规则。
+# 必须先确认持有具体职位，原生雇主接口在没有该职位时会报错。
+tca_experience_support_eligible_trigger = {
+    is_alive = yes
+    NOT = { any_held_title = { is_noble_family_title = no } }
+    OR = {
+        is_courtier_of = $OWNER$
+        any_held_title = { is_noble_family_title = yes }
+    }
+    $OWNER$ = { tca_experience_support_owner_trigger = yes }
+    OR = {
+        AND = {
+            has_court_position = travel_leader_court_position
+            is_court_position_employer = { court_position = travel_leader_court_position who = $OWNER$ }
+        }
+        AND = {
+            has_court_position = antiquarian_court_position
+            is_court_position_employer = { court_position = antiquarian_court_position who = $OWNER$ }
         }
     }
 }

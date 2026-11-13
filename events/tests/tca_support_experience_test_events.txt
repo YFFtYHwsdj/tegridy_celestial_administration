@@ -1,0 +1,170 @@
+﻿# 前驱官与掌藏的低档吏事经验回归；只在独立测试局运行，借用官署按军事夹具精确归还。
+namespace = tca_support_experience_test
+
+tca_support_experience_test.1 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_support_experience_test.1 tca_test_support_experience_staff"
+        remove_character_flag = tca_test_tca_support_experience_test_case_failed
+        tca_test_military_council_prepare_effect = { MILITARY_ONLY = no }
+        if = { limit = { scope:tca_mcp_borrow_ready = 1 }
+            scope:tca_mcp_governor = { appoint_court_position = { recipient = scope:tca_mcp_officer court_position = travel_leader_court_position } tca_experience_quarterly_effect = yes }
+            if = { limit = { scope:tca_mcp_officer = {
+                has_court_position = travel_leader_court_position
+                has_trait_xp = { trait = tca_clerical_experience value = 0.5 }
+                NOT = { has_trait = tca_military_experience }
+                court_position_does_not_already_have_a_job_trigger = no
+                NOT = { would_be_valid_for_court_position = { employer = scope:tca_mcp_governor court_position = antiquarian_court_position } }
+            } } debug_log = "TCA_TEST CHECK_PASS tca_test_support_experience_staff 1" }
+            else = { add_character_flag = tca_test_tca_support_experience_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_support_experience_staff 1" }
+            # 两职分别使用自建员工。原生AI古物职位要求雇主已有宝物；自建一件并在清理前销毁。
+            scope:tca_mcp_governor = {
+                create_artifact = { name = tca_antiquarian_local description = tca_antiquarian_local_desc type = journal visuals = book modifier = double_moon_modifier save_scope_as = tca_support_experience_test_artifact }
+            }
+            scope:tca_mcp_governor = { revoke_court_position = { recipient = scope:tca_mcp_officer court_position = travel_leader_court_position } }
+            create_character = { age = 30 gender_female_chance = 0 random_traits = no dynasty = none employer = scope:tca_mcp_governor culture = root.culture faith = root.faith save_scope_as = tca_support_experience_test_curator learning = { 20 20 } }
+            scope:tca_mcp_governor = {
+                appoint_court_position = { recipient = scope:tca_support_experience_test_curator court_position = antiquarian_court_position }
+                tca_experience_quarterly_effect = yes
+                debug_log = "TCA_SUPPORT_NAME local=[GetCourtPositionType('antiquarian_court_position').CalcTriggeredNameNoTooltip(THIS.Char)]"
+            }
+            if = { limit = { scope:tca_support_experience_test_curator = {
+                has_court_position = antiquarian_court_position
+                has_trait_xp = { trait = tca_clerical_experience value = 0.5 }
+                court_position_does_not_already_have_a_job_trigger = no
+                NOT = { would_be_valid_for_court_position = { employer = scope:tca_mcp_governor court_position = travel_leader_court_position } }
+                NOT = { tca_experience_support_eligible_trigger = { OWNER = title:e_minister_of_revenue.holder } }
+            } } debug_log = "TCA_TEST CHECK_PASS tca_test_support_experience_staff 2" }
+            else = { add_character_flag = tca_test_tca_support_experience_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_support_experience_staff 2" }
+            # 改制后仍调用正式季度入口，不能只测一条身份trigger而遗漏误发。
+            scope:tca_mcp_governor = { change_government = feudal_government tca_experience_quarterly_effect = yes change_government = celestial_government }
+            if = { limit = { scope:tca_support_experience_test_curator = { has_trait_xp = { trait = tca_clerical_experience value = 0.5 } } } debug_log = "TCA_TEST CHECK_PASS tca_test_support_experience_staff 3" }
+            else = { add_character_flag = tca_test_tca_support_experience_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_support_experience_staff 3" }
+            scope:tca_mcp_officer = { tca_experience_settle_staff_effect = { OWNER = scope:tca_mcp_governor } }
+            if = { limit = { scope:tca_mcp_officer = { has_trait_xp = { trait = tca_clerical_experience value = 0.5 } NOT = { tca_experience_support_eligible_trigger = { OWNER = scope:tca_mcp_governor } } } } debug_log = "TCA_TEST CHECK_PASS tca_test_support_experience_staff 4" }
+            else = { add_character_flag = tca_test_tca_support_experience_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_support_experience_staff 4" }
+            # 仅家门持有人可作为封臣任职，不能强制要求is_courtier_of；混入任何非家门头衔即停发。
+            scope:tca_support_experience_test_curator = {
+                create_dynasty = { spread_to_descendants = yes }
+                give_noble_family_title = { name = noble_family_name tier = county article = DEFAULT_TITLE_NAME_ARTICLE government = celestial_government save_scope_as = tca_support_experience_test_family }
+                create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_support_experience_test_change }
+                change_liege = { liege = scope:tca_mcp_governor change = scope:tca_support_experience_test_change }
+                resolve_title_and_vassal_change = scope:tca_support_experience_test_change
+                change_government = celestial_government
+            }
+            # 建立家门／授予无地头衔会触发原生离廷清理；重新实际聘任后再测经验身份，不能把丢职当作头衔排除。
+            scope:tca_mcp_governor = {
+                if = { limit = { scope:tca_support_experience_test_curator = { NOT = { has_court_position = antiquarian_court_position } } }
+                    appoint_court_position = { recipient = scope:tca_support_experience_test_curator court_position = antiquarian_court_position }
+                }
+                tca_experience_quarterly_effect = yes
+            }
+            if = { limit = { scope:tca_support_experience_test_curator = {
+                has_court_position = antiquarian_court_position
+                any_held_title = { is_noble_family_title = yes }
+                NOT = { any_held_title = { is_noble_family_title = no } }
+                NOT = { tca_experience_support_eligible_trigger = { OWNER = title:e_minister_of_revenue.holder } }
+                has_trait_xp = { trait = tca_clerical_experience value = 1 }
+            } } debug_log = "TCA_TEST CHECK_PASS tca_test_support_experience_staff 5" }
+            else = { add_character_flag = tca_test_tca_support_experience_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_support_experience_staff 5" }
+            scope:tca_support_experience_test_curator = { create_dynamic_title = { tier = duchy name = tca_tongpan_retirement_name } }
+            scope:new_title = { save_scope_as = tca_support_experience_test_office set_capital_county = scope:tca_mcp_county set_landless_title = yes }
+            scope:tca_support_experience_test_curator = {
+                create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_support_experience_test_change }
+                scope:tca_support_experience_test_office = { change_title_holder = { holder = scope:tca_support_experience_test_curator change = scope:tca_support_experience_test_change } }
+                resolve_title_and_vassal_change = scope:tca_support_experience_test_change
+                # 动态头衔授予会重置领属；精确接回测试主官，再检验带其他头衔的实际员工。
+                create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_support_experience_test_change }
+                change_liege = { liege = scope:tca_mcp_governor change = scope:tca_support_experience_test_change }
+                resolve_title_and_vassal_change = scope:tca_support_experience_test_change
+            }
+            # 建立家门／授予无地头衔会触发原生离廷清理；重新实际聘任后再测经验身份，不能把丢职当作头衔排除。
+            scope:tca_mcp_governor = {
+                if = { limit = { scope:tca_support_experience_test_curator = { NOT = { has_court_position = antiquarian_court_position } } }
+                    appoint_court_position = { recipient = scope:tca_support_experience_test_curator court_position = antiquarian_court_position }
+                }
+                tca_experience_quarterly_effect = yes
+            }
+            if = { limit = { scope:tca_support_experience_test_curator = {
+                has_court_position = antiquarian_court_position
+                has_title = scope:tca_support_experience_test_office
+                any_held_title = { is_noble_family_title = no }
+                has_trait_xp = { trait = tca_clerical_experience value = 1 }
+                NOT = { tca_experience_support_eligible_trigger = { OWNER = scope:tca_mcp_governor } }
+            } } debug_log = "TCA_TEST CHECK_PASS tca_test_support_experience_staff 6" }
+            else = {
+                add_character_flag = tca_test_tca_support_experience_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_support_experience_staff 6"
+                # 失败时分开记录持职、头衔与经验，避免将原生任职失效误判为经验身份错误。
+                scope:tca_support_experience_test_curator = {
+                    set_variable = { name = tca_support_experience_test_xp value = "this.has_trait_xp(tca_clerical_experience)" }
+                    debug_log = "TCA_SUPPORT_DIAG xp=[THIS.Char.MakeScope.Var('tca_support_experience_test_xp').GetValue] title=[THIS.Char.GetPrimaryTitle.GetKey] liege=[THIS.Char.GetLiege.GetID]"
+                    if = { limit = { has_court_position = antiquarian_court_position } debug_log = "TCA_SUPPORT_DIAG holds_antiquarian=yes" }
+                    if = { limit = { any_held_title = { is_noble_family_title = no } } debug_log = "TCA_SUPPORT_DIAG nonfamily_title=yes" }
+                    if = { limit = { tca_experience_support_eligible_trigger = { OWNER = scope:tca_mcp_governor } } debug_log = "TCA_SUPPORT_DIAG eligible=yes" }
+                    remove_variable = tca_support_experience_test_xp
+                }
+            }
+            scope:tca_mcp_governor = {
+                if = { limit = { scope:tca_support_experience_test_curator = { has_court_position = antiquarian_court_position } }
+                    revoke_court_position = { recipient = scope:tca_support_experience_test_curator court_position = antiquarian_court_position }
+                }
+            }
+            scope:tca_support_experience_test_curator = { destroy_title = scope:tca_support_experience_test_office destroy_title = scope:tca_support_experience_test_family death = { death_reason = death_vanished } }
+            destroy_artifact = scope:tca_support_experience_test_artifact
+            title:h_china.holder = { debug_log = "TCA_SUPPORT_NAME imperial=[GetCourtPositionType('antiquarian_court_position').CalcTriggeredNameNoTooltip(THIS.Char)]" }
+            tca_test_experience_cleanup_effect = yes
+            if = { limit = { scope:tca_mcp_restore_exact = 1 } debug_log = "TCA_TEST CHECK_PASS tca_test_support_experience_staff 7" }
+            else = { add_character_flag = tca_test_tca_support_experience_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_support_experience_staff 7" }
+            if = { limit = { has_character_flag = tca_test_tca_support_experience_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_support_experience_staff" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_support_experience_staff" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_support_experience_staff" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } }
+        remove_character_flag = tca_test_tca_support_experience_test_case_failed
+    }
+}
+
+# 实际无地官署及中央官署各借一个空缺旅行席位，自建员工并立即归还；不伪造官署登记。
+tca_support_experience_test.2 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_support_experience_test.2 tca_test_support_experience_offices"
+        remove_character_flag = tca_test_tca_support_experience_test_case_failed
+        clear_saved_scope = tca_support_experience_test_judicial
+        clear_saved_scope = tca_support_experience_test_tongpan
+        random_vassal_or_below = { limit = { tca_is_judicial_official_trigger = yes NOT = { employs_court_position = travel_leader_court_position } } save_scope_as = tca_support_experience_test_judicial }
+        random_vassal_or_below = { limit = { tca_is_tongpan_official_trigger = yes NOT = { employs_court_position = travel_leader_court_position } } save_scope_as = tca_support_experience_test_tongpan }
+        if = { limit = {
+            exists = scope:tca_support_experience_test_judicial exists = scope:tca_support_experience_test_tongpan
+            title:e_minister_of_revenue.holder = { tca_experience_central_eligible_trigger = yes NOT = { employs_court_position = travel_leader_court_position } }
+        }
+            scope:tca_support_experience_test_judicial = { add_to_list = tca_support_experience_test_owners }
+            scope:tca_support_experience_test_tongpan = { add_to_list = tca_support_experience_test_owners }
+            title:e_minister_of_revenue.holder = { add_to_list = tca_support_experience_test_owners }
+            every_in_list = {
+                list = tca_support_experience_test_owners
+                save_scope_as = tca_support_experience_test_owner
+                create_character = { age = 30 gender_female_chance = 0 random_traits = no dynasty = none employer = this culture = this.culture faith = this.faith save_scope_as = tca_support_experience_test_actor }
+                appoint_court_position = { recipient = scope:tca_support_experience_test_actor court_position = travel_leader_court_position }
+                tca_experience_quarterly_effect = yes
+                if = { limit = { scope:tca_support_experience_test_actor = {
+                    has_court_position = travel_leader_court_position
+                    is_courtier_of = scope:tca_support_experience_test_owner
+                    has_trait_xp = { trait = tca_clerical_experience value = 0.5 }
+                } } }
+                else = { root = { add_character_flag = tca_test_tca_support_experience_test_case_failed } }
+                revoke_court_position = { recipient = scope:tca_support_experience_test_actor court_position = travel_leader_court_position }
+                scope:tca_support_experience_test_actor = { death = { death_reason = death_vanished } }
+                remove_from_list = tca_support_experience_test_owners
+            }
+            if = { limit = { NOT = { has_character_flag = tca_test_tca_support_experience_test_case_failed } } debug_log = "TCA_TEST CHECK_PASS tca_test_support_experience_offices 1" }
+            else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_support_experience_offices 1" }
+            if = { limit = { NOT = { tca_experience_support_owner_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_support_experience_offices 2" }
+            else = { add_character_flag = tca_test_tca_support_experience_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_support_experience_offices 2" }
+            if = { limit = { has_character_flag = tca_test_tca_support_experience_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_support_experience_offices" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_support_experience_offices" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_support_experience_offices" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } }
+        remove_character_flag = tca_test_tca_support_experience_test_case_failed
+    }
+}

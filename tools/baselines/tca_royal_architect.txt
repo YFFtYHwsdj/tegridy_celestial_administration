@@ -1,0 +1,294 @@
+royal_architect_court_position = { # EP1
+	sort_order = 199
+	max_available_positions = 1
+	minimum_rank = kingdom # Should only be available for kings and emperors
+	skill = stewardship
+
+	court_position_asset = {
+		trigger = {
+			government_has_flag = government_is_celestial
+		}
+		animation = survey
+		background = "gfx/interface/illustrations/event_scenes/tgp_chinese_city.dds"
+		localization_key = royal_architect_celestial
+	}
+
+	court_position_asset = {
+		trigger = {
+			culture = { has_cultural_pillar = heritage_japonic }
+		}
+		animation = survey
+		background = "gfx/interface/illustrations/event_scenes/tgp_japanese_city.dds"
+	}
+
+	court_position_asset = {
+		trigger = {
+			culture_has_east_asian_heritage_pillar_trigger = yes
+		}
+		animation = survey
+		background = "gfx/interface/illustrations/event_scenes/tgp_market_asia.dds"
+	}
+
+	court_position_asset = {
+		trigger = {
+			OR = {
+				culture_has_mena_heritage_pillar_trigger = yes
+				culture_has_south_asian_heritage_pillar_trigger = yes
+			}
+		}
+		animation = survey
+		background = "gfx/interface/illustrations/event_scenes/market_east.dds"
+	}
+
+	court_position_asset = {
+		trigger = {
+			culture_has_south_european_heritage_pillar_trigger = yes
+		}
+		animation = survey
+		background = "gfx/interface/illustrations/event_scenes/ep3_medi_market.dds"
+	}
+
+	court_position_asset = {
+		animation = survey
+		background = "gfx/interface/illustrations/event_scenes/market_west.dds"
+	}
+
+	opinion = {
+		value = regular_court_position_opinion
+	}
+
+	# How high the aptitude has to be to reach the 5 different modifier levels
+	aptitude_level_breakpoints = { 20 40 60 80 }
+
+	# How good is this character in this position? root scope is the holder of the court position
+	aptitude = {
+		value = 25
+		add = {
+			value = stewardship
+			multiply = 2.5
+			max = 50
+			desc = court_position_skill_stewardship
+		}
+		if = {
+			limit = {
+				dynasty ?= { has_dynasty_perk = fp3_khvarenah_legacy_1 }
+			}
+			add = {
+				value = 10
+				desc =  court_position_khvarenah_legacy_1
+			}
+		}
+		if = {
+			limit = {
+				has_trait = architect
+			}
+			add = {
+				value = 40
+				desc = court_position_architect_trait
+			}
+		}
+		if = { #Hard to design building if you can't see them
+			limit = {
+				has_trait = blind
+			}
+			add = {
+				value = -50
+				desc = court_position_blind_trait
+			}
+		}
+		# Bonus from court.8311
+		if = {
+			limit = { var:bonus_aptitude_role ?= flag:royal_architect }
+			add = {
+				value = cp_bonus_aptitude_value
+				desc = cp_bonus_aptitude
+			}
+		}
+		# Japan
+		if = {
+			limit = {
+				liege.house ?= { has_house_aspiration_parameter = improved_stewardship_court_position_efficiency }
+			}
+			add = {
+				value = cp_bonus_aptitude_value
+				desc = improved_stewardship_court_position_efficiency_desc
+			}
+		}
+		if = {
+			limit = {
+				has_variable = fund_inspiration_6508_architect_improvement
+			}
+			add = {
+				value = 5
+				desc = court_position_architect_study_experience
+			}
+		}
+
+		# add = court_position_aptitude_low_penalty_value
+		add = general_aptitude_bonus
+	}
+
+	is_shown = {
+		is_landed_or_landless_administrative_or_theocratic = yes
+		has_ep1_court_positions_dlc_trigger = yes
+		NOT = { government_has_flag = government_is_nomadic }
+		trigger_if = {
+			limit = {
+				is_ai = yes
+				highest_held_title_tier <= tier_county
+			}
+			always = no
+		}
+	}
+
+	valid_position = {
+		is_landed_or_landless_administrative_or_theocratic = yes
+		highest_held_title_tier >= tier_kingdom
+	}
+
+	is_shown_character = {
+		scope:employee = {
+			court_position_employee_shown_trigger = yes
+		}
+	}
+
+	valid_character = {
+		scope:employee = {
+			royal_architect_validity_trigger = { EMPLOYER = scope:liege }
+		}
+	}
+
+	revoke_cost = { # root is the liege, no other scopes are passed here!
+		prestige =  {
+			value = major_court_position_prestige_revoke_cost
+			if = {
+				limit = { free_court_position_revoke_trigger = { POS = royal_architect } }
+				multiply = 0
+			}
+			#Lowering for LAAMPS, to match Camp Officer revoke cost
+			if = {
+				limit = {
+					exists = this
+					government_has_flag = government_is_landless_adventurer
+				}
+				value = minor_court_position_prestige_revoke_cost
+			}
+		}
+	}
+
+	salary = {
+		gold = {
+			value = 0
+			if = {
+				limit = {
+					scope:liege = {
+						has_treasury = no
+					}
+				}
+				add = royal_architect_total_salary_value
+			}
+		}
+		treasury = {
+			value = 0
+			if = {
+				limit = {
+					scope:liege = {
+						has_treasury = yes
+					}
+				}
+				add = royal_architect_total_salary_value
+			}
+		}
+		prestige = {
+			value = royal_architect_prestige_salary_value
+		}
+		round = no
+	}
+
+	received_salary = {
+		gold = {
+			value = royal_architect_total_salary_value
+		}
+		prestige = {
+			value = royal_architect_prestige_salary_value
+		}
+		round = no
+	}
+
+	# These modifiers are employed based on what level the aptitude reaches (levels are defined as breakpoints)
+	scaling_employer_modifiers = {
+		terrible = {
+			build_speed = -0.05
+			domicile_build_speed = -0.05
+			holding_build_speed = -0.02
+		}
+		poor = {
+			build_speed = -0.1
+			domicile_build_speed = -0.1
+			holding_build_speed = -0.04
+		}
+		average = {
+			build_speed = -0.15
+			domicile_build_speed = -0.15
+			holding_build_speed = -0.08
+		}
+		good = {
+			build_speed = -0.2
+			domicile_build_speed = -0.2
+			holding_build_speed = -0.12
+		}
+		excellent = {
+			build_speed = -0.3
+			domicile_build_speed = -0.3
+			holding_build_speed = -0.2
+		}
+	}
+
+	modifier = {
+		build_speed = -0.15
+		build_gold_cost = -0.15
+		monthly_stewardship_lifestyle_xp_gain_mult = 0.1
+	}
+
+	on_court_position_received = {
+		royal_architect_title_accepted_effect = yes
+	}
+	on_court_position_revoked = {
+		royal_architect_title_revoked_effect = yes
+	}
+	on_court_position_invalidated = {
+		royal_architect_title_invalidated_effect = yes
+	}
+	on_court_position_vacated = {
+		court_position_vacated_event_effect = {
+			COURT_POSITION_TYPE = royal_architect_court_position
+		}
+	}
+	# Scripted value to determine whether an AI will hire/fire a position or not. Hires over 0, fires under -50. Look in _court_positions.info for more extensive documentation!
+	ai_position_score = {
+		value = 50
+		scope:liege = {
+			# Unless you have lots of gold to spend on buildings, there's no point
+			if = {
+				limit = {
+					short_term_gold < 500
+					monthly_character_income < monthly_character_expenses_plus_fourty_percent
+				}
+				add = -100
+			}
+		}
+		add = court_position_debt_considerations_value
+	}
+	ai_candidate_score = {
+		value = 50
+		add = scope:base_value
+		add = court_position_candidate_score_base_value
+		add = court_position_candidate_aptitude_value
+		if = { # To stop petitioned positions immediately being fired by the AI
+			limit = {
+				court_position_petition_ai_weight_trigger = { ROLE = royal_architect }
+			}
+			add = 1000
+		}
+	}
+}

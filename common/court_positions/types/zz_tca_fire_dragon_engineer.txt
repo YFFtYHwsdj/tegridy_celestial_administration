@@ -1,0 +1,203 @@
+﻿# 原版神机提督的单对象覆盖；原生职位没有可独立追加的资格、AI与生命周期入口。
+# 称职度、官署显示、薪资和效果沿用原版，任务继续引用原生对象；不绑定内阁。
+# 原生回调提供scope:employee和scope:liege；先保留原生效果，再维护730日任期与离任清理。
+fire_dragon_engineer_court_position = {
+	sort_order = {
+		value = 225
+	}
+	max_available_positions = 1
+	skill = learning
+
+	court_position_asset = {
+		animation = reading
+		background = "gfx/interface/illustrations/event_scenes/mpo_rural_village_asian.dds"
+	}
+
+	opinion = {
+		value = regular_court_position_opinion
+	}
+	aptitude_level_breakpoints = { 20 40 60 80 }
+	aptitude = {
+		value = 1
+		add = {
+			value = learning
+			multiply = 1.75
+			max = 50
+			desc = court_position_skill_learning
+		}
+		if = {
+			limit = {
+				has_trait = erudite
+			}
+			add = {
+				value = 15
+				desc = court_position_erudite_trait
+			}
+		}
+		if = {
+			limit = {
+				has_trait = architect
+			}
+			add = {
+				value = 15
+				desc = court_position_architect_trait
+			}
+		}
+		if = {
+			limit = {
+				has_trait = diligent
+			}
+			add = {
+				value = 15
+				desc = court_position_diligent_trait
+			}
+		}
+		if = {
+			limit = {
+				has_trait = patient
+			}
+			add = {
+				value = 15
+				desc = court_position_patient_trait
+			}
+		}
+		if = {
+			limit = {
+				has_trait = lazy
+			}
+			add = {
+				value = -15
+				desc = court_position_lazy_trait
+			}
+		}
+		if = {
+			limit = {
+				has_trait = impatient
+			}
+			add = {
+				value = -15
+				desc = court_position_impatient_trait
+			}
+		}
+
+		add = {
+			value = aptitude_military_engineer_value
+			multiply = 2
+			desc = court_position_military_engineer_trait
+		}
+
+		add = court_position_aptitude_low_penalty_value
+		add = general_aptitude_bonus
+	}
+
+	is_shown = {
+		government_has_flag = government_is_celestial
+		culture = {
+			has_innovation = innovation_fire_medicine
+		}
+		OR = {
+			is_independent_ruler = yes
+			vassal_contract_has_flag = celestial_military_appointment
+		}
+	}
+	valid_position = {
+		highest_held_title_tier >= tier_kingdom
+		government_has_flag = government_is_celestial
+	}
+
+	is_shown_character = {
+		scope:employee = {
+			court_position_employee_shown_trigger = yes
+		}
+	}
+
+	valid_character = {
+		scope:employee = {
+			tca_fire_dragon_actual_validity_trigger = yes
+		}
+	}
+
+	revoke_cost = {
+		prestige =  {
+			value = major_court_position_prestige_revoke_cost
+			if = {
+				limit = { free_court_position_revoke_trigger = { POS = fire_dragon_engineer } }
+				multiply = 0
+			}
+		}
+	}
+
+	salary = {
+		gold = {
+			value = 0
+			if = {
+				limit = {
+					scope:liege = {
+						has_treasury = no
+					}
+				}
+				add = fire_dragon_engineer_total_salary_value
+			}
+		}
+		treasury = {
+			value = 0
+			if = {
+				limit = {
+					scope:liege = {
+						has_treasury = yes
+					}
+				}
+				add = fire_dragon_engineer_total_salary_value
+			}
+		}
+		prestige = {
+			value = minor_court_position_prestige_salary
+		}
+		round = no
+	}
+
+	received_salary = {
+		gold = {
+			value = fire_dragon_engineer_total_salary_value
+		}
+		prestige = {
+			value = minor_court_position_prestige_salary
+		}
+		round = no
+	}
+	scaling_employer_modifiers = {
+		terrible = {
+			siege_phase_time = -0.05
+		}
+		poor = {
+			siege_phase_time = -0.1
+		}
+		average = {
+			siege_phase_time = -0.15
+		}
+		good = {
+			siege_phase_time = -0.2
+		}
+		excellent = {
+			siege_phase_time = -0.25
+		}
+	}
+
+	on_court_position_received = {
+		basic_gained_court_position_effect = yes
+		tca_court_on_received_effect = yes
+		pam_celestial_hierarchy_hire_fulfillment_effect = { COURT_POSITION = fire_dragon_engineer_court_position }
+	}
+	on_court_position_revoked = {
+		basic_revoked_court_position_effect = yes
+		tca_court_on_departure_effect = yes
+	}
+	on_court_position_invalidated = {
+		basic_invalidated_court_position_effect = yes
+		tca_court_on_departure_effect = yes
+	}
+	# AI缺额由朝廷统一铨选；原生直接聘任不绕过授权或最低任期。
+	ai_position_score = { value = 0 }
+	ai_candidate_score = { value = 0 }
+	on_court_position_vacated = { tca_court_on_departure_effect = yes }
+}
