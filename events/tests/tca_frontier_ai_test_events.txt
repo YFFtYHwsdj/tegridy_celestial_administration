@@ -1,0 +1,120 @@
+﻿# 自然互动AI用例；借用真实宋夏人物和唯一Situation，跨日独占。
+# 不发送互动、不强制开战；只改变候选评分开关并等待原生AI调度。
+namespace = tca_frontier_ai_test
+
+tca_frontier_ai_test.1 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_frontier_ai_test.1 tca_test_frontier_natural_ai"
+        remove_character_flag = tca_test_tca_frontier_ai_test_case_failed
+        title:k_xia.holder ?= {
+            random_vassal_or_below = {
+                limit = { is_alive = yes is_adult = yes is_ai = yes is_landed = yes is_at_war = no highest_held_title_tier = tier_county capital_county = { title_province = { geographical_region = tca_frontier_west_region } } NOT = { has_variable = tca_frontier_probe_target } }
+                save_scope_as = tca_frontier_ai_actor
+            }
+        }
+        # 西夏在本开局只有一位合格县级封臣；以其为进攻者，宋方提供两个不同候选。
+        random_vassal_or_below = {
+            limit = { is_alive = yes is_adult = yes is_landed = yes is_at_war = no highest_held_title_tier = tier_county capital_county = { holder = prev title_province = { geographical_region = tca_frontier_west_region } } liege = { is_alive = yes } }
+            save_scope_as = tca_frontier_ai_high
+        }
+        random_vassal_or_below = {
+            limit = { is_alive = yes is_adult = yes is_landed = yes is_at_war = no highest_held_title_tier = tier_county NOT = { this = scope:tca_frontier_ai_high } capital_county = { holder = prev title_province = { geographical_region = tca_frontier_west_region } } liege = { is_alive = yes } }
+            save_scope_as = tca_frontier_ai_low
+        }
+        # 前置诊断仅记录实际筛选结果，不补造人物、不降低业务资格。
+        if = { limit = { exists = scope:tca_frontier_ai_actor } debug_log = "TCA_FRONTIER_AI FIXTURE_ACTOR_FOUND" }
+        if = { limit = { exists = scope:tca_frontier_ai_high } debug_log = "TCA_FRONTIER_AI FIXTURE_HIGH_FOUND" }
+        if = { limit = { exists = scope:tca_frontier_ai_low } debug_log = "TCA_FRONTIER_AI FIXTURE_LOW_FOUND" }
+        if = { limit = { exists = situation:tca_northern_frontier } debug_log = "TCA_FRONTIER_AI FIXTURE_SITUATION_BUSY" }
+        if = { limit = { exists = scope:tca_frontier_ai_actor exists = scope:tca_frontier_ai_high exists = scope:tca_frontier_ai_low NOT = { exists = situation:tca_northern_frontier } }
+            tca_frontier_situation_start_effect = yes
+            scope:tca_frontier_ai_actor = { tca_test_protect_character_effect = yes add_character_flag = tca_frontier_ai_probe_enabled }
+            scope:tca_frontier_ai_high = { tca_test_protect_character_effect = yes add_character_flag = tca_frontier_ai_probe_candidate add_character_flag = tca_frontier_ai_probe_high }
+            scope:tca_frontier_ai_low = { tca_test_protect_character_effect = yes add_character_flag = tca_frontier_ai_probe_candidate }
+            debug_log = "TCA_TEST WAIT tca_test_frontier_natural_ai 90 days"
+            trigger_event = { id = tca_frontier_ai_test.2 days = 90 }
+        }
+        else = {
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_frontier_natural_ai"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+            tca_test_lane_end_effect = { GROUP = tca_frontier_ai_test }
+        }
+    }
+}
+
+tca_frontier_ai_test.2 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_frontier_ai_actor = { is_ai = yes has_character_flag = tca_frontier_ai_probe_enabled NOT = { has_character_flag = tca_frontier_ai_probe_accepted } NOT = { any_character_war = { using_cb = tca_frontier_probe_county_cb } } } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_natural_ai 1"
+            }
+            else = { add_character_flag = tca_test_tca_frontier_ai_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_natural_ai 1" }
+            if = { limit = { situation:tca_northern_frontier.situation_sub_region:tca_frontier_west = { any_situation_sub_region_participant = { this = scope:tca_frontier_ai_actor is_at_war = no } any_situation_sub_region_participant = { this = scope:tca_frontier_ai_high is_at_war = no highest_held_title_tier = tier_county } any_situation_sub_region_participant = { this = scope:tca_frontier_ai_low is_at_war = no highest_held_title_tier = tier_county } } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_natural_ai 2"
+            }
+            else = { add_character_flag = tca_test_tca_frontier_ai_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_natural_ai 2" }
+            scope:tca_frontier_ai_actor = { add_character_flag = tca_frontier_ai_probe_score_open }
+            debug_log = "TCA_TEST WAIT tca_test_frontier_natural_ai 180 days"
+            trigger_event = { id = tca_frontier_ai_test.3 days = 180 }
+        }
+    }
+}
+
+tca_frontier_ai_test.3 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_frontier_ai_actor = { has_character_flag = tca_frontier_ai_probe_accepted var:tca_frontier_ai_probe_chosen = scope:tca_frontier_ai_high } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_natural_ai 3"
+            }
+            else = { add_character_flag = tca_test_tca_frontier_ai_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_natural_ai 3" }
+            if = { limit = { scope:tca_frontier_ai_actor = { has_character_flag = tca_frontier_ai_probe_war_created NOT = { has_character_flag = tca_frontier_ai_probe_enabled } } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_natural_ai 4"
+            }
+            else = { add_character_flag = tca_test_tca_frontier_ai_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_natural_ai 4" }
+            # 只结束本探针产生且仍进行的战争，不访问已消失战争；支援回调随后自行取消。
+            scope:tca_frontier_ai_actor = {
+                every_character_war = { limit = { using_cb = tca_frontier_probe_county_cb primary_attacker = scope:tca_frontier_ai_actor primary_defender = scope:tca_frontier_ai_high } end_war = white_peace }
+                remove_character_flag = tca_frontier_ai_probe_enabled
+                remove_character_flag = tca_frontier_ai_probe_score_open
+                remove_character_flag = tca_frontier_ai_probe_accepted
+                remove_character_flag = tca_frontier_ai_probe_war_created
+                remove_variable = tca_frontier_ai_probe_chosen
+                remove_variable = tca_frontier_probe_target
+                tca_test_restore_character_effect = yes
+            }
+            scope:tca_frontier_ai_high = { remove_character_flag = tca_frontier_ai_probe_candidate remove_character_flag = tca_frontier_ai_probe_high tca_test_restore_character_effect = yes }
+            scope:tca_frontier_ai_low = { remove_character_flag = tca_frontier_ai_probe_candidate tca_test_restore_character_effect = yes }
+            tca_frontier_situation_end_effect = yes
+            # 为最后一次可能的自然宣战保留完整30日支援清理窗口，再释放独占lane。
+            trigger_event = { id = tca_frontier_ai_test.4 days = 35 }
+        }
+    }
+}
+
+tca_frontier_ai_test.4 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_frontier_ai_actor = { NOT = { has_variable = tca_frontier_probe_pending } NOT = { any_character_war = { using_cb = tca_frontier_probe_county_cb } } } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_natural_ai 5"
+            }
+            else = { add_character_flag = tca_test_tca_frontier_ai_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_natural_ai 5" }
+            if = { limit = { has_character_flag = tca_test_tca_frontier_ai_test_case_failed }
+                debug_log = "TCA_TEST FAIL tca_test_frontier_natural_ai"
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+            }
+            else = {
+                debug_log = "TCA_TEST PASS tca_test_frontier_natural_ai"
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } }
+            }
+            remove_character_flag = tca_test_tca_frontier_ai_test_case_failed
+            tca_test_lane_end_effect = { GROUP = tca_frontier_ai_test }
+        }
+    }
+}

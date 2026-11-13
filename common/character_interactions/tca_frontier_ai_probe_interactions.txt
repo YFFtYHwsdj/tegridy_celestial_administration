@@ -1,0 +1,37 @@
+﻿# P0自然AI探针；只有测试显式标记的单一进攻者可用，普通debug局也不会自行启用。
+# 两个候选同走原生局势参与者列表；不预填唯一目标，不以on_action或run_interaction投递。
+tca_frontier_ai_probe_war_interaction = {
+    category = interaction_category_hostile
+    common_interaction = yes
+    icon = declare_war_interaction
+    desc = tca_frontier_probe_war_interaction_desc
+    auto_accept = yes
+    is_available = { debug_only = yes has_character_flag = tca_frontier_ai_probe_enabled is_ai = yes is_at_war = no }
+    is_shown = { scope:recipient = { has_character_flag = tca_frontier_ai_probe_candidate } }
+    is_valid_showing_failures_only = {
+        scope:actor = { is_alive = yes is_landed = yes is_at_war = no NOT = { has_variable = tca_frontier_probe_pending } }
+        scope:recipient = { is_alive = yes is_landed = yes is_at_war = no highest_held_title_tier = tier_county is_independent_ruler = no top_liege != scope:actor.top_liege capital_county = { holder = scope:recipient } liege = { is_alive = yes } }
+    }
+    ai_targets = { ai_recipients = situation_participant_group parameter = tca_northern_frontier }
+    ai_frequency = 1
+    # 先验证0分拒绝；测试开放评分后，只有高分候选为100，另一个仍为0。
+    # 原版定义这是0—100的发送概率，不能当成跨候选的全局最大值优化器。
+    ai_will_do = {
+        base = 0
+        modifier = { add = 100 scope:actor = { has_character_flag = tca_frontier_ai_probe_score_open } scope:recipient = { has_character_flag = tca_frontier_ai_probe_high } }
+    }
+    on_accept = {
+        scope:actor = {
+            remove_character_flag = tca_frontier_ai_probe_enabled
+            add_character_flag = tca_frontier_ai_probe_accepted
+            set_variable = { name = tca_frontier_ai_probe_chosen value = scope:recipient }
+            # 目标由自然互动实际选择后才提交给既有最终开战入口；由该入口重查资格。
+            set_variable = { name = tca_frontier_probe_target value = scope:recipient }
+        }
+        tca_frontier_probe_start_effect = yes
+        if = { limit = { exists = scope:tca_frontier_probe_war scope:tca_frontier_probe_war = { primary_attacker = scope:actor primary_defender = scope:recipient } }
+            scope:actor = { add_character_flag = tca_frontier_ai_probe_war_created }
+            debug_log = "TCA_FRONTIER_AI NATURAL_INTERACTION_WAR_CREATED"
+        }
+    }
+}

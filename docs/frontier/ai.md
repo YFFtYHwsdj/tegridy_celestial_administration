@@ -71,7 +71,7 @@
 
 自定义寇边现采用专属人物互动加自有宣战界面的设计方向，旨在独立判断地方目标并灵活配置AI评分。早先优先普通宣战窗口的设想由此替代；原生军力与参战接口仍可作为可复用依据，不能假定互动会自动调用完整的自然宣战评估。
 
-`game/common/character_interactions/_character_interactions.info` 提供 `ai_targets`、`ai_frequency`、`ai_frequency_by_tier` 和 `ai_will_do`。其说明还指出，头衔互动会逐个评估目标头衔，存在选项时选取最高评分组合。这为互动自身驱动AI提供依据，但自有界面中的全部选择能否进入同一评估路径，仍须验证。
+`game/common/character_interactions/_character_interactions.info` 提供 `ai_targets`、`ai_frequency`、`ai_frequency_by_tier` 和 `ai_will_do`。其说明将`ai_will_do`定义为选出候选后检查的0—100发送概率；头衔互动另会逐个评估目标头衔，存在选项时选取最高评分组合。不能由此推断普通人物收件人必定取全局最高分。这为互动自身驱动AI提供依据，但自有界面中的全部选择能否进入同一评估路径，仍须验证。
 
 `ai_will_do`在接口说明中是选定目标后执行的0至100意愿／概率，并会被限制在此范围；不能把它理解为任意大的CB分数，也不能只改一个值就假定有完整战略规划。候选目标和选项的优选说明不代表可以无代价穷举全国角色与头衔，需要限制候选范围和检查频率。
 
