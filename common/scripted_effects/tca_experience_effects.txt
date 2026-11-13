@@ -1,0 +1,57 @@
+﻿# 官僚经验季度结算。人物入口只读取当前任职，不记录天数，不修改 Merit、原版主动经验或任免规则。
+
+# 人物作用域；TRAIT 是静态特质 ID，XP 是该次经验。先添加再独立发经验，保证首发不漏。
+# 原生经验轨道负责满值处理；本入口不自行维护经验变量。
+tca_experience_grant_trait_effect = {
+    if = { limit = { NOT = { has_trait = $TRAIT$ } } add_trait = $TRAIT$ }
+    add_trait_xp = { trait = $TRAIT$ value = $XP$ }
+}
+
+# 人物作用域；只发本人正式任官经验，绝不在此结算宫廷／内阁，避免家门持有者自身脉冲重复发放。
+tca_experience_settle_ruler_effect = {
+    if = {
+        limit = { tca_experience_central_eligible_trigger = yes }
+        tca_experience_grant_trait_effect = { TRAIT = tca_central_experience XP = 1.5 }
+    }
+    if = {
+        limit = { tca_experience_governor_eligible_trigger = yes }
+        tca_experience_grant_trait_effect = { TRAIT = governor XP = 0.5 }
+    }
+}
+
+# 员工人物作用域，OWNER 为本次真实官署；同种经验通过 OR 合并来源，不按职位次数累加。
+# 不发本人的治理／朝事经验，这部分只由本人原生季度脉冲负责。
+tca_experience_settle_staff_effect = {
+    if = {
+        limit = { tca_experience_clerical_eligible_trigger = { OWNER = $OWNER$ } }
+        tca_experience_grant_trait_effect = { TRAIT = tca_clerical_experience XP = 1.5 }
+    }
+    if = {
+        limit = { tca_experience_military_eligible_trigger = { OWNER = $OWNER$ } }
+        tca_experience_grant_trait_effect = { TRAIT = tca_military_experience XP = 1.5 }
+    }
+}
+
+# 天朝官署人物作用域；原生季度回调和测试共用。只扫描在职宫廷员工和三个内阁，不扫描全世界。
+# 输出无持久状态。临时 scope:tca_experience_owner 与 list:tca_experience_staff 在结束时清理。
+# 同署宫廷职位／内阁员工先去重，再逐人判当前资格；有头衔内阁官也要收集，由资格精确排除。
+tca_experience_quarterly_effect = {
+    tca_experience_settle_ruler_effect = yes
+    save_scope_as = tca_experience_owner
+    every_in_list = { list = tca_experience_staff remove_from_list = tca_experience_staff }
+    every_court_position_holder = { add_to_list = tca_experience_staff }
+    cp:councillor_steward ?= { if = { limit = { NOT = { is_in_list = tca_experience_staff } } add_to_list = tca_experience_staff } }
+    cp:councillor_chancellor ?= { if = { limit = { NOT = { is_in_list = tca_experience_staff } } add_to_list = tca_experience_staff } }
+    cp:councillor_marshal ?= { if = { limit = { NOT = { is_in_list = tca_experience_staff } } add_to_list = tca_experience_staff } }
+    every_in_list = {
+        list = tca_experience_staff
+        tca_experience_settle_staff_effect = { OWNER = scope:tca_experience_owner }
+        remove_from_list = tca_experience_staff
+    }
+    # 原生 playable 脉冲只覆盖伯爵及以上；直属男爵由其主君结算，不另设全局人物扫描。
+    every_vassal = {
+        limit = { highest_held_title_tier = tier_barony }
+        tca_experience_settle_ruler_effect = yes
+    }
+    clear_saved_scope = tca_experience_owner
+}

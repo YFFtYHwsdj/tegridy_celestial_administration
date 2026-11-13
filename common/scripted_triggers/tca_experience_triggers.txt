@@ -1,0 +1,82 @@
+﻿# 官僚经验资格。均为人物作用域；OWNER 是明确的实际雇主，不读取测试标记或历史任职缓存。
+# 职位资格与经验资格分离：本文件只判断现在是否任职，不重新要求入品／文武途。
+tca_experience_celestial_context_trigger = {
+    OR = {
+        government_has_flag = government_is_celestial
+        AND = { exists = top_liege top_liege = { government_has_flag = government_is_celestial } }
+    }
+}
+
+# 中央仅认原版实际九部职，不以帝国级或无地身份替代。退休／家门／地方官署均不匹配。
+tca_experience_central_eligible_trigger = {
+    is_alive = yes
+    government_has_flag = government_is_celestial
+    tgp_is_any_minister = yes
+}
+
+# 有地天朝人物只排除真正独立的帝国君主；无地帝国级尚书不因头衔等级被误认为皇帝。
+# 转运使是现有有地地方官名，随有地分支纳入；提刑和通判复用实际在任身份。
+tca_experience_governor_eligible_trigger = {
+    is_alive = yes
+    government_has_flag = government_is_celestial
+    OR = {
+        AND = {
+            is_landed = yes
+            NOT = { AND = { is_independent_ruler = yes highest_held_title_tier >= tier_empire } }
+        }
+        tca_is_judicial_official_trigger = yes
+        tca_is_tongpan_official_trigger = yes
+    }
+}
+
+# 普通廷臣须有真实廷臣关系；持家门者可为封臣，但所有持有头衔都必须是家门。
+# 不允许退休公国、无地官署或任何实土头衔通过 is_landed = no 绕过限制。
+tca_experience_council_eligible_trigger = {
+    is_alive = yes
+    $OWNER$ = { tca_experience_governor_eligible_trigger = yes is_landed = yes }
+    is_councillor_of = $OWNER$
+    NOT = { any_held_title = { is_noble_family_title = no } }
+    OR = {
+        is_courtier_of = $OWNER$
+        any_held_title = { is_noble_family_title = yes }
+    }
+}
+
+tca_experience_clerical_eligible_trigger = {
+    is_alive = yes
+    $OWNER$ = { government_has_flag = government_is_celestial }
+    OR = {
+        AND = {
+            is_courtier_of = $OWNER$
+            OR = {
+                has_court_position = tca_civil_adjutant_court_position
+                has_court_position = tca_household_registrar_court_position
+                has_court_position = tca_judicial_advisor_court_position
+                has_court_position = tca_army_judge_court_position
+            }
+        }
+        AND = {
+            tca_experience_council_eligible_trigger = { OWNER = $OWNER$ }
+            OR = { has_council_position = councillor_steward has_council_position = councillor_chancellor }
+        }
+    }
+}
+
+tca_experience_military_eligible_trigger = {
+    is_alive = yes
+    $OWNER$ = { government_has_flag = government_is_celestial }
+    OR = {
+        AND = {
+            is_courtier_of = $OWNER$
+            OR = {
+                has_court_position = tca_military_supervisor_court_position
+                has_court_position = tca_military_inspector_court_position
+                has_court_position = tca_corps_inspector_court_position
+            }
+        }
+        AND = {
+            tca_experience_council_eligible_trigger = { OWNER = $OWNER$ }
+            has_council_position = councillor_marshal
+        }
+    }
+}
