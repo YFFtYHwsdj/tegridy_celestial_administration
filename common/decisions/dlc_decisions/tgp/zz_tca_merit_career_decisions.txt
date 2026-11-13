@@ -1,5 +1,5 @@
 ﻿# 原版文武仕途与辞谢决议覆盖；
-# tgp_choose_career_path_decision: 放宽在任与尚书限制并为AI启用换轨，差遣倒逼为主导，配合军事能力、性格、爵位、尚书与品级阶梯阻遏及5年冷却，原生压力与夙愿结算，同步刷新天朝核定路线；
+# tgp_choose_career_path_decision: 放宽在任与尚书限制并为AI启用换轨，AI转武军事至少12，差遣、军事教育与经验计分，转文性格轻微影响，头衔、尚书与品级仅作阻力及5年冷却，原生压力与夙愿结算，同步刷新天朝核定路线；
 # tgp_refuse_appointments_decision / tgp_resume_appointments_decision: 仅在effect末尾增加天朝离散退出维护，原生条件与效果保留。
 tgp_choose_career_path_decision = {
 	decision_group_type = admin
@@ -47,7 +47,7 @@ tgp_choose_career_path_decision = {
 		decision_to_second_step_button = "SELECT_ACTION"
 		show_from_start = no
 
-		item = { # Choose a civilian career
+		item = { # 选择文官路线
 			value = civilian_career
 			is_valid = {
 				custom_tooltip = {
@@ -62,12 +62,12 @@ tgp_choose_career_path_decision = {
 			ai_chance = {
 				value = 0
 
-				# 差遣倒逼
+				# 现任差遣只增加倾向，不豁免能力门槛
 				if = {
 					limit = {
 						vassal_contract_has_flag = celestial_province_standard
 					}
-					add = 200
+					add = 50
 				}
 
 				# 军事属性（两档）
@@ -80,17 +80,24 @@ tgp_choose_career_path_decision = {
 					add = -40
 				}
 
-				# 将领特质（两档）
+				# 将领经验轻量计分（两档互斥）
 				if = {
 					limit = { number_of_commander_traits == 1 }
-					add = -20
+					add = -5
 				}
 				if = {
 					limit = { number_of_commander_traits >= 2 }
-					add = -50
+					add = -10
 				}
 
-				# 性格特质
+				# 真实军事教育等级；不读取路线override，避免把主动换轨误当受过军事教育。
+				if = { limit = { has_trait = education_martial_1 } add = -5 }
+				if = { limit = { has_trait = education_martial_2 } add = -10 }
+				if = { limit = { has_trait = education_martial_3 } add = -15 }
+				if = { limit = { has_trait = education_martial_4 } add = -20 }
+				if = { limit = { has_trait = education_martial_5 } add = -25 }
+
+				# 转文保留轻微性格倾向；每个OR组只计算一次
 				if = {
 					limit = {
 						OR = {
@@ -100,7 +107,7 @@ tgp_choose_career_path_decision = {
 							has_trait = patient
 						}
 					}
-					add = 20
+					add = 5
 				}
 				if = {
 					limit = {
@@ -109,10 +116,10 @@ tgp_choose_career_path_decision = {
 							has_trait = wrathful
 						}
 					}
-					add = -25
+					add = -5
 				}
 
-				# 官职级别阶梯阻遏（公爵、王国、帝国不同）
+				# 最高头衔阶梯阻力；只影响评分，不筛除AI
 				if = {
 					limit = { highest_held_title_tier = tier_empire }
 					add = -80
@@ -124,6 +131,10 @@ tgp_choose_career_path_decision = {
 				else_if = {
 					limit = { highest_held_title_tier = tier_duchy }
 					add = -25
+				}
+				else_if = {
+					limit = { highest_held_title_tier = tier_county }
+					add = -10
 				}
 
 				# 朝廷部寺大僚（Minister 独立扣分）
@@ -148,9 +159,10 @@ tgp_choose_career_path_decision = {
 			}
 		}
 
-		item = { # Choose a military career
+		item = { # 选择武官路线
 			value = military_career
 			is_valid = {
+				OR = { is_ai = no martial >= 12 }
 				custom_tooltip = {
 					text = you_have_a_military_career_desc
 					is_military_candidate_trigger = no
@@ -163,12 +175,12 @@ tgp_choose_career_path_decision = {
 			ai_chance = {
 				value = 0
 
-				# 差遣倒逼
+				# 现任差遣只增加倾向，不豁免能力门槛
 				if = {
 					limit = {
 						vassal_contract_has_flag = celestial_military_appointment
 					}
-					add = 200
+					add = 50
 				}
 
 				# 军事属性（两档）
@@ -180,47 +192,25 @@ tgp_choose_career_path_decision = {
 					limit = { martial >= 16 }
 					add = 25
 				}
-				if = {
-					limit = { martial <= 8 }
-					add = -40
-				}
 
-				# 将领特质（两档）
+				# 将领经验轻量计分（两档互斥）
 				if = {
 					limit = { number_of_commander_traits == 1 }
-					add = 20
+					add = 5
 				}
 				if = {
 					limit = { number_of_commander_traits >= 2 }
-					add = 45
+					add = 10
 				}
 
-				# 性格特质
-				if = {
-					limit = {
-						OR = {
-							has_trait = brave
-							has_trait = wrathful
-							has_trait = ambitious
-						}
-					}
-					add = 20
-				}
-				if = {
-					limit = { has_trait = craven }
-					add = -30
-				}
-				if = {
-					limit = {
-						OR = {
-							has_trait = calm
-							has_trait = content
-						}
-					}
-					add = -15
-				}
+				# 真实军事教育等级；不读取路线override，避免把主动换轨误当受过军事教育。
+				if = { limit = { has_trait = education_martial_1 } add = 5 }
+				if = { limit = { has_trait = education_martial_2 } add = 10 }
+				if = { limit = { has_trait = education_martial_3 } add = 15 }
+				if = { limit = { has_trait = education_martial_4 } add = 20 }
+				if = { limit = { has_trait = education_martial_5 } add = 25 }
 
-				# 官职级别阶梯阻遏（公爵、王国、帝国不同）
+				# 最高头衔阶梯阻力；只影响评分，不筛除AI
 				if = {
 					limit = { highest_held_title_tier = tier_empire }
 					add = -80
@@ -232,6 +222,10 @@ tgp_choose_career_path_decision = {
 				else_if = {
 					limit = { highest_held_title_tier = tier_duchy }
 					add = -25
+				}
+				else_if = {
+					limit = { highest_held_title_tier = tier_county }
+					add = -10
 				}
 
 				# 朝廷部寺大僚（Minister 独立扣分）
@@ -347,36 +341,9 @@ tgp_choose_career_path_decision = {
 
 	ai_check_interval = 12
 
+	# 预筛选只保留必要条件；功绩、头衔、部寺身份与差遣全部只计分。
 	ai_potential = {
-		is_adult = yes
-		is_alive = yes
-		influence >= 50
-		NOT = { has_character_flag = tca_changed_career_path_recently }
-		OR = {
-			AND = {
-				is_civilian_candidate_trigger = yes
-				vassal_contract_has_flag = celestial_military_appointment
-			}
-			AND = {
-				is_military_candidate_trigger = yes
-				vassal_contract_has_flag = celestial_province_standard
-			}
-			AND = {
-				merit_level <= 4
-				highest_held_title_tier <= tier_county
-				tgp_has_minister_title = no
-				OR = {
-					AND = {
-						is_civilian_candidate_trigger = yes
-						martial >= 12
-					}
-					AND = {
-						is_military_candidate_trigger = yes
-						martial <= 8
-					}
-				}
-			}
-		}
+		tca_merit_ai_career_potential_trigger = yes
 	}
 }
 

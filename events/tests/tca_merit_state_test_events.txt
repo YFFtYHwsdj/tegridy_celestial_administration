@@ -89,13 +89,53 @@ tca_merit_state_test.3 = {
             scope:tca_ms_career_recipient = { remove_variable = tca_merit_last_ordinary_year }
             if = { limit = { scope:tca_ms_career_recipient = { tca_merit_ordinary_candidate_trigger = yes var:tca_merit_route = 2 } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_state_career 4" }
             else = { add_character_flag = tca_test_tca_merit_state_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_state_career 4" }
-            scope:tca_ms_career_recipient = { tca_merit_leave_celestial_effect = yes tca_test_cleanup_merit_probe_character_effect = yes }
+            # 固定基础军事且无雇主，避免同一时点技能修改缓存及宫廷加成污染11/12边界。
+            # 只调用正式AI准入；两名无地私有探针不加入官员人口，用后隔离清理。
+            create_character = { age = 35 gender_female_chance = 0 random_traits = no dynasty = none location = root.capital_province culture = root.culture faith = root.faith rite = root.rite martial = 11 save_scope_as = tca_ms_career_low }
+            scope:tca_ms_career_low = { change_influence = 100 set_variable = { name = appointment_trait_override value = trait:education_stewardship_1 } }
+            create_character = { age = 35 gender_female_chance = 0 random_traits = no dynasty = none location = root.capital_province culture = root.culture faith = root.faith rite = root.rite martial = 12 save_scope_as = tca_ms_career_high }
+            scope:tca_ms_career_high = { change_influence = 100 set_variable = { name = appointment_trait_override value = trait:education_stewardship_1 } }
+            if = { limit = { scope:tca_ms_career_low = { is_ai = yes martial = 11 tca_merit_ai_career_potential_trigger = no } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_state_career 5" }
+            else = { add_character_flag = tca_test_tca_merit_state_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_state_career 5" }
+            if = { limit = { scope:tca_ms_career_high = { martial = 12 tca_merit_ai_career_potential_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_state_career 6" }
+            else = { add_character_flag = tca_test_tca_merit_state_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_state_career 6" }
+            # 高品边界使用既有真实天朝家门人物；按正式cap刷新顺序准备核定等级。
+            scope:tca_ms_career_recipient = {
+                change_influence = 100
+                add_character_flag = tca_merit_grant_suppress
+                set_variable = { name = tca_merit_approved_level value = 7 }
+                tca_merit_refresh_cap_effect = yes
+                set_merit_level = 7
+            }
+            # 原生等级为异步刷新，跨四天确认真实等级，不把核定变量当作实际等级。
+            debug_log = "TCA_TEST WAIT tca_test_merit_state_career 4 days"
+            trigger_event = { id = tca_merit_state_test.103 days = 4 }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_merit_state_career" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } remove_character_flag = tca_test_tca_merit_state_test_case_failed tca_test_lane_end_effect = { GROUP = tca_merit_annual_worker } }
+    }
+}
+
+# 仅续接本用例私有scope；等待原生品级刷新后验收，不替代自然AI路径。
+tca_merit_state_test.103 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_ms_career_recipient = { merit_level = 7 highest_held_title_tier = tier_county tca_merit_ai_career_potential_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_state_career 7" }
+            else = { add_character_flag = tca_test_tca_merit_state_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_state_career 7" }
+            scope:tca_ms_career_high = { set_variable = { name = appointment_trait_override value = trait:education_martial_1 } }
+            if = { limit = { scope:tca_ms_career_high = { is_military_candidate_trigger = yes martial = 12 tca_merit_ai_career_potential_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_merit_state_career 8" }
+            else = { add_character_flag = tca_test_tca_merit_state_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_merit_state_career 8" }
+            scope:tca_ms_career_low = { tca_test_cleanup_merit_probe_character_effect = yes }
+            scope:tca_ms_career_high = { tca_test_cleanup_merit_probe_character_effect = yes }
+            scope:tca_ms_career_recipient = { remove_character_flag = tca_merit_grant_suppress tca_merit_leave_celestial_effect = yes tca_test_cleanup_merit_probe_character_effect = yes }
             scope:tca_ms_career_actor = { tca_merit_leave_celestial_effect = yes tca_test_cleanup_merit_probe_character_effect = yes }
             if = { limit = { has_character_flag = tca_test_tca_merit_state_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_merit_state_career" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
             else = { debug_log = "TCA_TEST PASS tca_test_merit_state_career" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
         }
-        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_merit_state_career" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } }
         remove_character_flag = tca_test_tca_merit_state_test_case_failed
+        tca_test_lane_end_effect = { GROUP = tca_merit_annual_worker }
     }
 }
 
