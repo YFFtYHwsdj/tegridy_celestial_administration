@@ -75,6 +75,14 @@ tca_court_natural_test.1 = {
                 change_liege = { liege = scope:tca_court_natural_emperor change = scope:tca_court_natural_county_fealty }
                 resolve_title_and_vassal_change = scope:tca_court_natural_county_fealty
             }
+            # 神机提督纳入本廷后，提供专门的文途工程人才；其低军事不能竞争县署统兵差遣。
+            # 两名候选依正式评分各任其职，同时验收本廷冻结，避免新增高职空缺吸走原县署用例人物。
+            scope:tca_court_natural_emperor = { tca_test_military_council_create_officer_effect = { ACTOR = tca_court_natural_engineer MARTIAL = 1 } }
+            scope:tca_court_natural_engineer = {
+                remove_trait = education_martial_3 add_trait = education_learning_3
+                add_trait = erudite add_trait = architect add_trait = diligent add_trait = patient
+                add_character_flag = tca_history_defined_character
+            }
             set_variable = { name = tca_court_natural_started value = current_date }
             scope:tca_mcp_officer = {
                 set_variable = { name = tca_court_natural_reporter value = root }
@@ -138,6 +146,17 @@ tca_court_natural_test.2 = {
                 AND = { has_court_position = tca_corps_inspector_court_position tca_corps_inspector_validity_trigger = yes }
             } } } debug_log = "TCA_TEST CHECK_PASS tca_test_court_positions_natural_quarter 5" }
             else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_positions_natural_quarter 5" }
+            if = { limit = {
+                scope:tca_court_natural_engineer = {
+                    is_courtier_of = scope:tca_court_natural_emperor
+                    has_court_position = fire_dragon_engineer_court_position
+                    has_character_flag = tca_military_appointment_cooldown
+                    is_councillor = no
+                    tca_experience_military_eligible_trigger = { OWNER = scope:tca_court_natural_emperor }
+                    NOT = { tca_experience_clerical_eligible_trigger = { OWNER = scope:tca_court_natural_emperor } }
+                }
+            } debug_log = "TCA_TEST CHECK_PASS tca_test_court_positions_natural_quarter 6" }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_positions_natural_quarter 6" }
             # 120日真实推进允许其他路自然改制，不能强求全世界军事人数等于开局冻结值。
             # 只读冻结清理前其他真实主官的当前贡献；排除本例私有主官及需恢复的原文制路主。
             save_scope_as = tca_court_natural_quota_reporter
@@ -208,20 +227,21 @@ tca_court_natural_test.2 = {
                 if = { limit = { is_alive = yes is_ruler = no } scope:tca_court_natural_emperor = { add_courtier = prev } }
                 remove_from_list = tca_court_natural_initial_courtiers
             }
-            # 第6条仍在测试人物存活时核对真实锁清理与借县/男爵领恢复。
+            # 第7条仍在测试人物存活时核对真实锁清理与借县/男爵领恢复。
             if = { limit = {
                 scope:tca_mcp_county = { holder = scope:tca_mcp_old_holder }
                 scope:tca_court_natural_capital_county = { holder = scope:tca_court_natural_capital_old_owner }
                 NOT = { any_in_list = { variable = tca_court_natural_capital_baronies NOT = { holder = var:tca_court_natural_capital_saved_baron } } }
                 scope:tca_mcp_officer = { NOT = { has_variable = tca_military_council_lock_owner } NOT = { has_variable = block_fire_councillor } }
-            } debug_log = "TCA_TEST CHECK_PASS tca_test_court_positions_natural_quarter 6" }
-            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_positions_natural_quarter 6" }
+            } debug_log = "TCA_TEST CHECK_PASS tca_test_court_positions_natural_quarter 7" }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_positions_natural_quarter 7" }
             # 私有帝国与全部自备人物先退出世界，再读取全朝真实计数；不提前改写统计或清失败。
             scope:tca_court_natural_emperor = {
                 tca_test_restore_character_effect = yes
                 destroy_title = scope:tca_court_natural_empire
                 death = { death_reason = death_natural_causes }
             }
+            scope:tca_court_natural_engineer ?= { tca_test_restore_character_effect = yes death = { death_reason = death_natural_causes } }
             scope:tca_mcp_officer ?= { death = { death_reason = death_natural_causes } }
             scope:tca_mcp_backup ?= { death = { death_reason = death_natural_causes } }
             scope:tca_mcp_governor ?= { death = { death_reason = death_natural_causes } }
@@ -247,8 +267,8 @@ tca_court_natural_test.2 = {
                 var:tca_mcp_military_count = var:tca_court_natural_expected_military
                 var:tca_mcp_cap_count = var:tca_court_natural_expected_cap
                 NOT = { has_character_flag = tca_mcp_defer_quota_audit }
-            } debug_log = "TCA_TEST CHECK_PASS tca_test_court_positions_natural_quarter 7" }
-            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_positions_natural_quarter 7" }
+            } debug_log = "TCA_TEST CHECK_PASS tca_test_court_positions_natural_quarter 8" }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_positions_natural_quarter 8" }
             remove_variable = tca_court_natural_expected_military
             remove_variable = tca_court_natural_expected_cap
             if = { limit = { has_character_flag = tca_test_tca_military_court_positions_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_court_positions_natural_quarter" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }

@@ -1,5 +1,5 @@
-﻿# 神机提督原生接入验证；仅借报告者空缺，自建人物在本次同步调用内授撤职。
-# 不改变文化革新或已有任职；原生容量不允许测试时记为前置未满足。
+﻿# 神机提督原生接入验证；复用军事GROUP的精确借还夹具，自建王国与候选保证职位空缺。
+# 不改变文化革新或已有神机任职；原生官署条件不满足时仍记为前置未满足。
 namespace = tca_fire_dragon_test
 
 tca_fire_dragon_test.1 = {
@@ -7,58 +7,94 @@ tca_fire_dragon_test.1 = {
     immediate = {
         debug_log = "TCA_TEST BEGIN tca_fire_dragon_test.1 tca_test_fire_dragon_flow"
         remove_character_flag = tca_test_tca_fire_dragon_test_case_failed
-        if = { limit = { tca_fire_dragon_office_valid_trigger = yes can_employ_court_position_type = fire_dragon_engineer_court_position NOT = { employs_court_position = fire_dragon_engineer_court_position } }
-            tca_court_visit_positions_effect = { VISITOR = tca_court_snapshot_position_effect }
-            if = { limit = { has_variable = tca_court_vacant_fire_dragon_engineer_court_position tca_court_next_vacancy_value >= 300 }
+        save_scope_value_as = { name = tca_fire_dragon_test_ready value = 0 }
+        clear_saved_scope = tca_fire_dragon_test_kingdom
+        clear_saved_scope = tca_fire_dragon_test_employer
+        tca_test_military_council_prepare_effect = { MILITARY_ONLY = yes }
+        if = { limit = { scope:tca_mcp_borrow_ready = 1 }
+            scope:tca_mcp_governor = {
+                save_scope_as = tca_fire_dragon_test_employer
+                create_dynamic_title = { tier = kingdom name = tca_test_arrest_office_name }
+                scope:new_title = { save_scope_as = tca_fire_dragon_test_kingdom set_capital_county = scope:tca_mcp_county set_landless_title = no }
+                create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_fire_dragon_test_grant }
+                scope:tca_fire_dragon_test_kingdom = { change_title_holder = { holder = scope:tca_fire_dragon_test_employer change = scope:tca_fire_dragon_test_grant } }
+                resolve_title_and_vassal_change = scope:tca_fire_dragon_test_grant
+                vassal_contract_set_obligation_level = { type = celestial_provinces level = celestial_province_military }
+            }
+        }
+        if = { limit = { scope:tca_mcp_borrow_ready = 1 scope:tca_fire_dragon_test_employer = { tca_fire_dragon_office_valid_trigger = yes can_employ_court_position_type = fire_dragon_engineer_court_position NOT = { employs_court_position = fire_dragon_engineer_court_position } } }
+            save_scope_value_as = { name = tca_fire_dragon_test_ready value = 1 }
+            scope:tca_fire_dragon_test_employer = { tca_court_visit_positions_effect = { VISITOR = tca_court_snapshot_position_effect } }
+            if = { limit = { scope:tca_fire_dragon_test_employer = { has_variable = tca_court_vacant_fire_dragon_engineer_court_position tca_court_next_vacancy_value >= 300 } }
                 debug_log = "TCA_TEST CHECK_PASS tca_test_fire_dragon_flow 1"
             }
             else = { add_character_flag = tca_test_tca_fire_dragon_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_fire_dragon_flow 1" }
-            tca_court_visit_positions_effect = { VISITOR = tca_court_clear_snapshot_effect }
-            create_character = { age = 30 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite learning = { 20 20 } martial = { 1 1 } save_scope_as = tca_fire_dragon_test_actor }
+            scope:tca_fire_dragon_test_employer = { tca_court_visit_positions_effect = { VISITOR = tca_court_clear_snapshot_effect } }
+            create_character = { age = 30 gender_female_chance = 0 random_traits = no dynasty = none employer = scope:tca_fire_dragon_test_employer culture = root.culture faith = root.faith rite = root.rite learning = { 20 20 } martial = { 1 1 } save_scope_as = tca_fire_dragon_test_actor }
             scope:tca_fire_dragon_test_actor = { add_trait = education_learning_3 set_merit_level = 1 tca_merit_initialize_character_effect = yes }
             if = { limit = { scope:tca_fire_dragon_test_actor = {
                 tca_court_civil_route_trigger = yes
-                NOT = { would_be_valid_for_court_position = { employer = root court_position = fire_dragon_engineer_court_position } }
+                NOT = { would_be_valid_for_court_position = { employer = scope:tca_fire_dragon_test_employer court_position = fire_dragon_engineer_court_position } }
             } } debug_log = "TCA_TEST CHECK_PASS tca_test_fire_dragon_flow 2" }
             else = { add_character_flag = tca_test_tca_fire_dragon_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_fire_dragon_flow 2" }
             # 直接调用正式补缺链；仅收集本例人物，不借朝廷其他候选。
             every_in_list = { list = tca_court_candidates remove_from_list = tca_court_candidates }
             scope:tca_fire_dragon_test_actor = { tca_court_collect_officer_effect = yes }
-            save_scope_as = target_liege
-            tca_court_fill_position_effect = { POSITION = fire_dragon_engineer_court_position BASE = tca_court_importance_rank_3 BIAS = 2 ADMISSION = 0 SKILL = learning OFFICE = tca_fire_dragon_office_valid_trigger KEEP_CURRENT = tca_court_no_council_precedence_trigger }
+            scope:tca_fire_dragon_test_employer = {
+                save_scope_as = target_liege
+                tca_court_fill_position_effect = { POSITION = fire_dragon_engineer_court_position BASE = tca_court_importance_rank_3 BIAS = 2 ADMISSION = 0 SKILL = learning OFFICE = tca_fire_dragon_office_valid_trigger KEEP_CURRENT = tca_court_no_council_precedence_trigger }
+            }
             every_in_list = { list = tca_court_candidates remove_from_list = tca_court_candidates }
             if = { limit = { scope:tca_fire_dragon_test_actor = {
                 has_court_position = fire_dragon_engineer_court_position tca_court_holds_position_trigger = yes
                 has_character_flag = tca_military_appointment_cooldown
                 tca_court_current_importance >= 300 is_councillor = no
                 tca_military_has_no_other_full_time_job_trigger = yes
-                tca_experience_military_eligible_trigger = { OWNER = root }
-                NOT = { tca_experience_clerical_eligible_trigger = { OWNER = root } }
+                tca_experience_military_eligible_trigger = { OWNER = scope:tca_fire_dragon_test_employer }
+                NOT = { tca_experience_clerical_eligible_trigger = { OWNER = scope:tca_fire_dragon_test_employer } }
             } } debug_log = "TCA_TEST CHECK_PASS tca_test_fire_dragon_flow 3" }
             else = { add_character_flag = tca_test_tca_fire_dragon_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_fire_dragon_flow 3" }
-            scope:tca_fire_dragon_test_actor = { tca_experience_settle_staff_effect = { OWNER = root } }
+            scope:tca_fire_dragon_test_actor = { tca_experience_settle_staff_effect = { OWNER = scope:tca_fire_dragon_test_employer } }
             if = { limit = { scope:tca_fire_dragon_test_actor = { has_trait_xp = { trait = tca_military_experience value = 1.5 } NOT = { has_trait = tca_clerical_experience } } } debug_log = "TCA_TEST CHECK_PASS tca_test_fire_dragon_flow 4" }
             else = { add_character_flag = tca_test_tca_fire_dragon_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_fire_dragon_flow 4" }
-            if = { limit = { has_character_flag = free_revoke_cost }
-                revoke_court_position = { recipient = scope:tca_fire_dragon_test_actor court_position = fire_dragon_engineer_court_position }
+            scope:tca_fire_dragon_test_employer = {
+                if = { limit = { has_character_flag = free_revoke_cost }
+                    revoke_court_position = { recipient = scope:tca_fire_dragon_test_actor court_position = fire_dragon_engineer_court_position }
+                }
+                else = {
+                    add_character_flag = free_revoke_cost
+                    revoke_court_position = { recipient = scope:tca_fire_dragon_test_actor court_position = fire_dragon_engineer_court_position }
+                    remove_character_flag = free_revoke_cost
+                }
             }
-            else = {
-                add_character_flag = free_revoke_cost
-                revoke_court_position = { recipient = scope:tca_fire_dragon_test_actor court_position = fire_dragon_engineer_court_position }
-                remove_character_flag = free_revoke_cost
-            }
-            if = { limit = { scope:tca_fire_dragon_test_actor = { NOT = { has_character_flag = tca_military_appointment_cooldown } tca_court_current_importance = 0 NOT = { tca_experience_military_eligible_trigger = { OWNER = root } } has_trait = tca_military_experience } } debug_log = "TCA_TEST CHECK_PASS tca_test_fire_dragon_flow 5" }
+            if = { limit = { scope:tca_fire_dragon_test_actor = { NOT = { has_character_flag = tca_military_appointment_cooldown } tca_court_current_importance = 0 NOT = { tca_experience_military_eligible_trigger = { OWNER = scope:tca_fire_dragon_test_employer } } has_trait = tca_military_experience } } debug_log = "TCA_TEST CHECK_PASS tca_test_fire_dragon_flow 5" }
             else = { add_character_flag = tca_test_tca_fire_dragon_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_fire_dragon_flow 5" }
             scope:tca_fire_dragon_test_actor = { remove_trait = education_learning_3 add_trait = education_martial_3 add_character_flag = tca_military_appointment_allowed }
-            if = { limit = { scope:tca_fire_dragon_test_actor = { tca_court_military_route_trigger = yes would_be_valid_for_court_position = { employer = root court_position = fire_dragon_engineer_court_position } } } debug_log = "TCA_TEST CHECK_PASS tca_test_fire_dragon_flow 6" }
+            if = { limit = { scope:tca_fire_dragon_test_actor = { tca_court_military_route_trigger = yes would_be_valid_for_court_position = { employer = scope:tca_fire_dragon_test_employer court_position = fire_dragon_engineer_court_position } } } debug_log = "TCA_TEST CHECK_PASS tca_test_fire_dragon_flow 6" }
             else = { add_character_flag = tca_test_tca_fire_dragon_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_fire_dragon_flow 6" }
             # 自建人物不留在朝廷待阙池中，防止污染同轮后续自然铨选。
             scope:tca_fire_dragon_test_actor = { remove_character_flag = tca_military_appointment_allowed death = { death_reason = death_vanished } }
             clear_saved_scope = tca_fire_dragon_test_actor
+
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_fire_dragon_flow" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } }
+        scope:tca_fire_dragon_test_employer ?= { if = { limit = { exists = scope:tca_fire_dragon_test_kingdom } destroy_title = scope:tca_fire_dragon_test_kingdom } }
+        tca_test_military_council_cleanup_effect = yes
+        if = { limit = { scope:tca_fire_dragon_test_ready = 1 }
+            if = { limit = {
+                scope:tca_mcp_county = { holder = scope:tca_mcp_old_holder }
+                scope:tca_mcp_office = { holder = scope:tca_mcp_old_office_holder }
+                NOT = { exists = scope:tca_fire_dragon_test_kingdom.holder }
+            } debug_log = "TCA_TEST CHECK_PASS tca_test_fire_dragon_flow 7" }
+            else = { add_character_flag = tca_test_tca_fire_dragon_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_fire_dragon_flow 7" }
             if = { limit = { has_character_flag = tca_test_tca_fire_dragon_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_fire_dragon_flow" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
             else = { debug_log = "TCA_TEST PASS tca_test_fire_dragon_flow" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
         }
-        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_fire_dragon_flow" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } }
+        scope:tca_mcp_officer ?= { death = { death_reason = death_vanished } }
+        scope:tca_mcp_backup ?= { death = { death_reason = death_vanished } }
+        scope:tca_mcp_governor ?= { death = { death_reason = death_vanished } }
+        clear_saved_scope = tca_fire_dragon_test_kingdom
+        clear_saved_scope = tca_fire_dragon_test_employer
         remove_character_flag = tca_test_tca_fire_dragon_test_case_failed
     }
 }
