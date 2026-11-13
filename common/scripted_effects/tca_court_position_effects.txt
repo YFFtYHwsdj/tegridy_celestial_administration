@@ -5,7 +5,7 @@ tca_court_snapshot_position_effect = {
     tca_court_metadata_contract_effect = { POSITION = $POSITION$ BASE = $BASE$ BIAS = $BIAS$ ADMISSION = $ADMISSION$ SKILL = $SKILL$ OFFICE = $OFFICE$ KEEP_CURRENT = $KEEP_CURRENT$ }
     save_scope_value_as = { name = tca_court_bias value = $BIAS$ }
     if = { limit = { $OFFICE$ = yes NOT = { employs_court_position = $POSITION$ }
-        $POSITION$_council_available_trigger = yes }
+        tca_court_available_for_$POSITION$_trigger = yes }
         set_variable = { name = tca_court_vacant_$POSITION$ value = $BASE$ }
         if = { limit = { scope:tca_court_bias = 1 } change_variable = { name = tca_court_vacant_$POSITION$ add = tca_court_civil_office_weight } }
         else = { change_variable = { name = tca_court_vacant_$POSITION$ add = tca_military_office_strategic_weight } }
@@ -43,7 +43,7 @@ tca_court_restore_previous_effect = {
     if = { limit = { scope:tca_chosen_officer = { var:tca_court_old_position ?= flag:$POSITION$ } }
         scope:tca_court_previous_liege = {
             if = { limit = { is_alive = yes $OFFICE$ = yes NOT = { employs_court_position = $POSITION$ }
-        $POSITION$_council_available_trigger = yes }
+        tca_court_available_for_$POSITION$_trigger = yes }
                 appoint_court_position = { recipient = scope:tca_chosen_officer court_position = $POSITION$ }
             }
         }
@@ -120,14 +120,14 @@ tca_court_fill_position_effect = {
     else = { save_scope_value_as = { name = tca_court_target_importance value = { value = $BASE$ add = tca_military_office_strategic_weight } } }
     if = { limit = {
         $OFFICE$ = yes NOT = { employs_court_position = $POSITION$ }
-        $POSITION$_council_available_trigger = yes
-        trigger_if = { limit = { scope:tca_court_bias = 2 } tca_military_linked_council_available_trigger = { KEEP_CURRENT = $KEEP_CURRENT$ } }
+        tca_court_available_for_$POSITION$_trigger = yes
+        # 是否绑定内阁由各职council_available入口决定，不能从军事倾向推断。
     }
         # 原生候选称职度仍使用人物的真实宫廷上下文；不人为迁廷后再评估或重算原始分。
         every_in_list = { list = tca_court_candidates
             if = { limit = {
                 tca_court_target_person_trigger = { SKILL = $SKILL$ }
-                $POSITION$_council_person_trigger = { OWNER = scope:target_liege }
+                tca_court_person_for_$POSITION$_trigger = { OWNER = scope:target_liege }
                 trigger_if = { limit = { has_variable = block_fire_councillor }
                     OR = {
                         var:block_fire_councillor = scope:target_liege
@@ -213,6 +213,9 @@ tca_court_dispatch_position_effect = {
 tca_court_quarterly_fill_effect = {
     if = { limit = { NOT = { has_character_flag = tca_court_batch_active } }
         add_character_flag = tca_court_batch_active
+        # 皇帝本廷也有神机提督；与封臣官署共用同轮冻结和排序。
+        tca_court_visit_positions_effect = { VISITOR = tca_court_snapshot_position_effect }
+        if = { limit = { tca_court_next_vacancy_value > 0 } add_to_list = tca_court_vacant_offices }
         every_vassal_or_below = {
             limit = { government_has_flag = government_is_celestial }
             # 先按现行层级／军制清理旧档或改制后失格军职，释放锁与磨勘期后再收集候选。
@@ -238,6 +241,7 @@ tca_court_quarterly_fill_effect = {
             }
         }
         # 无候选时也清除全部尚未消费的冻结变量，不让下季读取旧权重。
+        tca_court_visit_positions_effect = { VISITOR = tca_court_clear_snapshot_effect }
         every_vassal_or_below = { tca_court_visit_positions_effect = { VISITOR = tca_court_clear_snapshot_effect } }
         every_in_list = { list = tca_court_vacant_offices remove_from_list = tca_court_vacant_offices }
         every_in_list = { list = tca_court_candidates remove_from_list = tca_court_candidates }
