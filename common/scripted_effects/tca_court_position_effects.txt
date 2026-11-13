@@ -50,8 +50,50 @@ tca_court_restore_previous_effect = {
         scope:tca_chosen_officer = { remove_character_flag = tca_military_appointment_cooldown }
     }
 }
-# 回调scope:employee为任职者；任何成功授职都从就任时计算730天。
+# 人物作用域；原生没有已确认的通用内阁类型读取接口，五席显式对应原生资格。
+# VISITOR接收COUNCIL与ELIGIBILITY；配偶不可撤换、部寺在任者持正式头衔，均不在普通候选中。
+tca_court_visit_unlinked_council_effect = {
+    $VISITOR$ = { COUNCIL = councillor_chancellor ELIGIBILITY = can_be_chancellor_trigger }
+    $VISITOR$ = { COUNCIL = councillor_steward ELIGIBILITY = can_be_steward_trigger }
+    $VISITOR$ = { COUNCIL = councillor_marshal ELIGIBILITY = can_be_marshal_trigger }
+    $VISITOR$ = { COUNCIL = councillor_spymaster ELIGIBILITY = can_be_spymaster_trigger }
+    $VISITOR$ = { COUNCIL = councillor_court_chaplain ELIGIBILITY = can_be_court_chaplain_trigger }
+}
+# 人物作用域；调用前已确认是可流转普通内阁，必需scope:tca_court_previous_liege。
+# 旧席只在本次同步铨选链保存；不保存AI任务，失败恢复后由原生AI重新选任务。
+tca_court_snapshot_unlinked_council_slot_effect = {
+    if = { limit = { has_council_position = $COUNCIL$ $ELIGIBILITY$ = { COURT_OWNER = scope:tca_court_previous_liege } }
+        set_variable = { name = tca_court_old_council value = flag:$COUNCIL$ }
+    }
+}
+# 人物作用域；调用者已复验原雇主与人物身份，仅恢复仍空缺、资格仍合法的旧席。
+tca_court_restore_unlinked_council_slot_effect = {
+    if = { limit = {
+        var:tca_court_old_council ?= flag:$COUNCIL$
+        scope:tca_court_previous_liege = { NOT = { exists = cp:$COUNCIL$ } }
+        $ELIGIBILITY$ = { COURT_OWNER = scope:tca_court_previous_liege }
+    } scope:tca_court_previous_liege = {
+        assign_councillor_type = { type = $COUNCIL$ target = scope:tca_chosen_officer fire_on_actions = yes }
+    } }
+}
+# 任命失败且人物已回原宫廷后调用；必需chosen_officer及previous_liege。
+# 不抢占原生补位者，不在改制或玩家接管后恢复旧席；无旧席快照则无副作用。
+tca_court_restore_unlinked_council_effect = {
+    if = { limit = {
+        scope:tca_court_previous_liege = { is_alive = yes is_ai = yes government_has_flag = government_is_celestial NOT = { has_character_flag = tca_test_force_player_governor } }
+        scope:tca_chosen_officer = { has_variable = tca_court_old_council is_councillor = no is_courtier_of = scope:tca_court_previous_liege tca_court_person_eligible_trigger = yes }
+    } scope:tca_chosen_officer = { tca_court_visit_unlinked_council_effect = { VISITOR = tca_court_restore_unlinked_council_slot_effect } } }
+}
+# 回调scope:employee为任职者、scope:liege为新雇主；成功授职才清理普通内阁旧席。
+# 同署转换必须先清旧席再由调用者同步对应内阁；跨署旧席通常已由原生离廷处理。
+# 短暂许可在回调内消费，失败授职由fill入口兜底清除，不预先撤掉同署普通内阁。
 tca_court_on_received_effect = {
+    if = { limit = { scope:employee = {
+        has_character_flag = tca_court_unlinked_council_transfer
+        is_councillor_of = scope:liege
+        tca_court_ai_council_releasable_trigger = yes
+    } } scope:liege = { fire_councillor = scope:employee } }
+    scope:employee = { remove_character_flag = tca_court_unlinked_council_transfer }
     scope:employee = { add_character_flag = { flag = tca_military_appointment_cooldown days = 730 } }
 }
 tca_court_on_departure_effect = {
@@ -115,7 +157,13 @@ tca_court_fill_position_effect = {
             scope:tca_chosen_officer = {
                 remove_from_list = tca_court_candidates
                 remove_variable = tca_court_old_position
+                remove_variable = tca_court_old_council
+                remove_character_flag = tca_court_unlinked_council_transfer
                 liege_or_court_owner = { save_scope_as = tca_court_previous_liege }
+                if = { limit = { tca_court_unlinked_council_candidate_trigger = yes }
+                    tca_court_visit_unlinked_council_effect = { VISITOR = tca_court_snapshot_unlinked_council_slot_effect }
+                    add_character_flag = tca_court_unlinked_council_transfer
+                }
                 tca_court_visit_lifecycle_positions_effect = { RESTORE = 0 }
                 add_character_flag = tca_military_appointment_allowed
             }
@@ -141,11 +189,12 @@ tca_court_fill_position_effect = {
                     if = { limit = { is_alive = yes }
                         add_courtier = scope:tca_chosen_officer
                         tca_court_visit_lifecycle_positions_effect = { RESTORE = 1 }
+                        tca_court_restore_unlinked_council_effect = yes
                     }
                 }
                 debug_log = "TCA_COURT appointment failed; original court restored where valid"
             }
-            scope:tca_chosen_officer = { remove_character_flag = tca_military_appointment_allowed remove_variable = tca_court_old_position }
+            scope:tca_chosen_officer = { remove_character_flag = tca_military_appointment_allowed remove_character_flag = tca_court_unlinked_council_transfer remove_variable = tca_court_old_position remove_variable = tca_court_old_council }
         }
     }
 }

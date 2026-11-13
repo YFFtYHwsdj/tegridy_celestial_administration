@@ -557,7 +557,7 @@ def reload_request(log, run):
 
 
 def checkpoint_request(log, run, used):
-    """两个独立用途各限一次；玩家阶段只能最后加载，不能借新token重开业务重载。"""
+    """业务重载至多一次且先于人类阶段；每个已选人类用例仅接受自己的固定检查点一次。"""
     kinds = checkpoint_records(log)
     if not kinds:
         return None
@@ -565,31 +565,63 @@ def checkpoint_request(log, run, used):
         raise ValueError('Invalid or repeated checkpoint request')
     marker, name = kinds[0]
     kind = 'human' if marker == 'HUMAN_SAVE' else 'reload'
-    if kind in used or 'human' in used:
-        raise ValueError('Each checkpoint purpose may only reload once; human session must be last')
+    human_started = any(token == 'human' or token.startswith('human:') for token in used)
+    token = 'human:' + name if kind == 'human' else 'reload'
+    if token in used or 'human' in used or (kind == 'reload' and human_started):
+        raise ValueError('Checkpoint repeated or business reload requested after a human session')
     if kind == 'human':
         selection = json.loads((run / 'selection.json').read_text(encoding='utf-8'))
-        if name != 'tca_cli_human_session' or not any(
-                row.get('event') == 'tca_retirement_session.1' for row in selection['cases']):
-            raise ValueError('Human checkpoint not authorized by the frozen selection')
+        if not any(HUMAN_SESSION_EVENTS.get(row.get('event')) == name
+                   for row in selection['cases']):
+            raise ValueError('Human checkpoint not authorized by the frozen case and name')
     # 复用既有原生保存完成、路径、文件头和尺寸检查；不执行任意日志命令。
     checked = reload_request(log.replace('TCA_CLI HUMAN_SAVE ', 'TCA_CLI RELOAD_SAVE '), run)
     return kind, checked
 
 
-def human_phase_issues(log):
-    """人类阶段必须先有原生身份确认、真实传家，再回观察者；最终观察者不能覆盖开局误observe。"""
-    markers = ('TCA_RETIREMENT_HUMAN INITIAL_PLAYER_CONFIRMED',
-               'TCA_TEST BEGIN tca_retirement_session.1 tca_test_retirement_player_session',
-               'TCA_RETIREMENT_SESSION PLAYER_CONFIRMED',
-               'TCA_TEST CHECK_PASS tca_test_retirement_player_session 4',
-               'console_success: Going to observe mode',
-               'TCA_TEST CHECK_PASS tca_test_retirement_player_session 5')
-    positions = [log.find(marker) for marker in markers]
-    if any(pos < 0 for pos in positions) or positions != sorted(positions):
-        return ['Human phase missing native identity, transfer or final observer confirmation in order']
-    if log.count(markers[0]) != 1:
+HUMAN_SESSION_EVENTS = {
+    'tca_retirement_session.1': 'tca_cli_human_session',
+    'tca_court_session.1': 'tca_cli_court_human_session',
+}
+
+
+def human_phase_issues(log, expected_event=None):
+    """每个人类进程独立核对原生初始身份、该会话业务断言及回观察者，不复用上个进程的身份。"""
+    initial = 'TCA_RETIREMENT_HUMAN INITIAL_PLAYER_CONFIRMED'
+    first = log.find(initial)
+    observe = 'console_success: Going to observe mode'
+    if first < 0 or log.count(initial) != 1:
         return ['Human phase initial native identity must be confirmed exactly once']
+    if 0 <= log.find(observe) < first:
+        return ['Human phase entered observer before initial native identity']
+    sessions = (
+        ('tca_retirement_session.1 tca_test_retirement_player_session',
+         'TCA_RETIREMENT_SESSION PLAYER_CONFIRMED',
+         'TCA_TEST CHECK_PASS tca_test_retirement_player_session 4',
+         'TCA_TEST CHECK_PASS tca_test_retirement_player_session 5'),
+        ('tca_court_session.1 tca_test_court_player_session',
+         'TCA_COURT_SESSION PLAYER_CONFIRMED',
+         'TCA_TEST CHECK_PASS tca_test_court_player_session 5',
+         'TCA_TEST CHECK_PASS tca_test_court_player_session 6'),
+    )
+    found_cases = [case for case, *_ in sessions if 'TCA_TEST BEGIN ' + case in log]
+    if len(found_cases) != 1:
+        return ['Each human process must execute exactly one native session case']
+    if expected_event is not None and found_cases[0].split()[0] != expected_event:
+        return ['Human process case does not match its authorized checkpoint']
+    found = False
+    for case, identity, business, final in sessions:
+        begin = 'TCA_TEST BEGIN ' + case
+        start = log.find(begin)
+        if start < 0:
+            continue
+        found = True
+        positions = [first, start, log.find(identity, start), log.find(business, start)]
+        positions += [log.find(observe, max(positions)), log.find(final, start)]
+        if any(pos < 0 for pos in positions) or positions != sorted(positions):
+            return ['Human phase missing native identity, business or final observer confirmation in order']
+    if not found:
+        return ['Human phase missing selected native session BEGIN']
     return []
 
 
@@ -695,7 +727,7 @@ def run_game(args, run):
                     archive_phase_logs(run, phase)
                     monitor.next_phase()
                     phase += 1
-                    used_checkpoints.add(kind)
+                    used_checkpoints.add('human:' + save_name if kind == 'human' else 'reload')
                     phase_modes.append('human' if kind == 'human' else 'observer')
                     command = game_command(args, run, save_name=save_name)
                     try:
@@ -708,7 +740,7 @@ def run_game(args, run):
                         break
                     write_json(run / 'process.json', {'pid': process.pid, 'args': command, 'owned': True,
                                'environment': game_environment(args.game_dir), 'phase': phase,
-                               'checkpoint_kind': kind,
+                               'checkpoint_kind': kind, 'checkpoint_name': save_name,
                                'checkpoint_sha256': hashlib.sha256((run / 'save games' / (save_name + '.ck3')).read_bytes()).hexdigest()})
                     print(f'Reloading native checkpoint in isolated CK3 PID {process.pid}', flush=True)
                 time.sleep(2)
@@ -747,10 +779,16 @@ def run_game(args, run):
     human_phases = [index + 1 for index, mode in enumerate(phase_modes) if mode == 'human']
     for index in human_phases:
         phase_log = phase_logs[index - 1].read_text(encoding='utf-8', errors='replace') if phase_logs[index - 1].is_file() else ''
-        snapshot_issues += human_phase_issues(phase_log)
+        process_path = run / 'phases' / str(index) / 'process.json' if phase > 1 else run / 'process.json'
+        phase_process = json.loads(process_path.read_text(encoding='utf-8')) if process_path.is_file() else {}
+        expected_event = next((event for event, name in HUMAN_SESSION_EVENTS.items()
+                               if name == phase_process.get('checkpoint_name')), None)
+        if expected_event is None:
+            snapshot_issues.append('Human process has no authorized checkpoint name')
+        snapshot_issues += human_phase_issues(phase_log, expected_event)
     # 选择真实玩家用例必须实际经历新进程；纯观察者中伪造全部CHECK也不能通过。
     selection = json.loads((run / 'selection.json').read_text(encoding='utf-8'))
-    if any(row['event'] == 'tca_retirement_session.1' for row in selection['cases']) and not human_phases:
+    if any(row['event'] in HUMAN_SESSION_EVENTS for row in selection['cases']) and not human_phases:
         snapshot_issues.append('Selected player-session case did not enter a native human process phase')
     code = outcome(condition, state['observer_confirmed'], checker.returncode)
     if not state['observer_confirmed']:

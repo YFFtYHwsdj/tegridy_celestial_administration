@@ -6,7 +6,7 @@ widget = {
  datacontext = "[GetTitleByKey('h_china')]"
  # prepare写阶段2后仍保持本UI会话可见，否则后续保存/请求状态可能中断。
  # 新进程的UI会话started标记为空，不能凭存档里的阶段2重新保存或发token。
- visible = "[And(InDebugMode, And(IsInGame, Or(EqualTo_CFixedPoint(Title.MakeScope.Var('tca_cli_human_phase').GetValue, '(CFixedPoint)1'), And(EqualTo_CFixedPoint(Title.MakeScope.Var('tca_cli_human_phase').GetValue, '(CFixedPoint)2'), GetVariableSystem.HasValue('tca_cli_human_started', 'yes')))))]"
+ visible = "[And(Not(EqualTo_CFixedPoint(Title.MakeScope.Var('tca_cli_human_case').GetValue, '(CFixedPoint)2')), And(InDebugMode, And(IsInGame, Or(EqualTo_CFixedPoint(Title.MakeScope.Var('tca_cli_human_phase').GetValue, '(CFixedPoint)1'), And(EqualTo_CFixedPoint(Title.MakeScope.Var('tca_cli_human_phase').GetValue, '(CFixedPoint)2'), GetVariableSystem.HasValue('tca_cli_human_started', 'yes'))))))]"
  state = { name = _show on_start = "[GetVariableSystem.Set('tca_cli_human_started', 'yes')]" on_start = "[SetGameSpeed('(int32)1')]" duration = 1 next = tca_cli_human_prepare }
  state = {
   name = tca_cli_human_prepare
@@ -27,7 +27,7 @@ widget = {
   on_start = "[GetVariableSystem.Set('tca_cli_human_requested', 'yes')]"
  }
 }
-# 关闭CLI自动恢复暂停后才停靠；重载保存态仍是ready=1，由原有unpause恢复日期。
+# 关闭CLI自动恢复暂停后才停靠；所有case复用同一暂停控件。
 widget = {
  name = "tca_cli_human_checkpoint_pause"
  size = { 1 1 } alwaystransparent = yes alpha = 0 visible_at_creation = no
@@ -36,20 +36,76 @@ widget = {
  state = { name = _show on_start = "[OnPause]" }
 }
 
-# 人类事件处理位于两个真实原生窗口中，保留其EventWindow实例上下文。
+# 宫廷用例使用独立检查点名与UI一次性标记，退休旧名称保持兼容。
+# CLI末项玩家会话：保存同局原生检查点，再由运行器重启；不在观察者中用play冒充真人。
+# 阶段1请求、2已准备保存、3原生新进程已恢复。保存动作与请求均独立防重复。
+widget = {
+ name = "tca_cli_court_human_checkpoint"
+ size = { 1 1 } alwaystransparent = yes alpha = 0 visible_at_creation = no
+ datacontext = "[GetTitleByKey('h_china')]"
+ # prepare写阶段2后仍保持本UI会话可见，否则后续保存/请求状态可能中断。
+ # 新进程的UI会话started标记为空，不能凭存档里的阶段2重新保存或发token。
+ visible = "[And(EqualTo_CFixedPoint(Title.MakeScope.Var('tca_cli_human_case').GetValue, '(CFixedPoint)2'), And(InDebugMode, And(IsInGame, Or(EqualTo_CFixedPoint(Title.MakeScope.Var('tca_cli_human_phase').GetValue, '(CFixedPoint)1'), And(EqualTo_CFixedPoint(Title.MakeScope.Var('tca_cli_human_phase').GetValue, '(CFixedPoint)2'), GetVariableSystem.HasValue('tca_cli_court_human_started', 'yes'))))))]"
+ state = { name = _show on_start = "[GetVariableSystem.Set('tca_cli_court_human_started', 'yes')]" on_start = "[SetGameSpeed('(int32)1')]" duration = 1 next = tca_cli_court_human_prepare }
+ state = {
+  name = tca_cli_court_human_prepare
+  on_start = "[ExecuteConsoleCommand('effect title:h_china = { if = { limit = { var:tca_cli_human_phase = 1 } set_variable = { name = tca_cli_human_phase value = 2 } } }')]"
+  # 让阶段2进入原生快照；等待本身不证明存档成功，运行器另核对保存完成日志和文件。
+  duration = 6 next = tca_cli_court_human_save
+ }
+ state = {
+  name = tca_cli_court_human_save
+  on_start = "[ExecuteConsoleCommand(Select_CString(And(EqualTo_CFixedPoint(Title.MakeScope.Var('tca_cli_human_phase').GetValue, '(CFixedPoint)2'), Not(GetVariableSystem.HasValue('tca_cli_court_human_saved', 'yes'))), 'save tca_cli_court_human_session', ''))]"
+  on_start = "[GetVariableSystem.Set('tca_cli_court_human_saved', 'yes')]"
+  duration = 8 next = tca_cli_court_human_request
+ }
+ state = {
+  name = tca_cli_court_human_request
+  # 请求另有UI防重复；存档只保存脚本阶段，不保存本进程的started/requested。
+  on_start = "[ExecuteConsoleCommand(Select_CString(And(EqualTo_CFixedPoint(Title.MakeScope.Var('tca_cli_human_phase').GetValue, '(CFixedPoint)2'), Not(GetVariableSystem.HasValue('tca_cli_court_human_requested', 'yes'))), 'effect title:h_china = { if = { limit = { var:tca_cli_human_phase = 2 } set_variable = { name = tca_cli_ready value = 0 } debug_log = \"TCA_CLI HUMAN_SAVE tca_cli_court_human_session\" } }', ''))]"
+  on_start = "[GetVariableSystem.Set('tca_cli_court_human_requested', 'yes')]"
+ }
+}
 
-# -loadsave不保证触发on_game_start_after_lobby。新UI会话没有首进程started标记，
-# 仅保存态2启动原生入口；GUI不写phase3或human_run，真人身份必须由原生is_ai核验。
+# 保存重启后的fresh-UI分别接入同一原生身份核验入口。
+widget = {
+ name = "tca_cli_court_human_load_boot"
+ size = { 1 1 } alwaystransparent = yes alpha = 0 visible_at_creation = no
+ datacontext = "[GetTitleByKey('h_china')]"
+ visible = "[And(EqualTo_CFixedPoint(Title.MakeScope.Var('tca_cli_human_case').GetValue, '(CFixedPoint)2'), And(InDebugMode, And(IsInGame, And(EqualTo_CFixedPoint(Title.MakeScope.Var('tca_cli_human_phase').GetValue, '(CFixedPoint)2'), Not(GetVariableSystem.HasValue('tca_cli_court_human_started', 'yes'))))))]"
+ state = { name = _show duration = 2 next = tca_cli_court_human_native_boot }
+ state = {
+  name = tca_cli_court_human_native_boot
+  # UI重建仍只执行一次；直接event命令显式指定当前皇帝ID，避免effect内trigger_event被接受却不投递。
+  on_start = "[ExecuteConsoleCommand(Select_CString(And(EqualTo_CFixedPoint(Title.MakeScope.Var('tca_cli_human_phase').GetValue, '(CFixedPoint)2'), Not(GetVariableSystem.HasValue('tca_cli_court_human_booted', 'yes'))), Concatenate('event tca_cli.2 ', UIntToString(Title.GetHolder.GetID)), ''))]"
+  on_start = "[GetVariableSystem.Set('tca_cli_court_human_booted', 'yes')]"
+ }
+}
+
 widget = {
  name = "tca_cli_human_load_boot"
  size = { 1 1 } alwaystransparent = yes alpha = 0 visible_at_creation = no
  datacontext = "[GetTitleByKey('h_china')]"
- visible = "[And(InDebugMode, And(IsInGame, And(EqualTo_CFixedPoint(Title.MakeScope.Var('tca_cli_human_phase').GetValue, '(CFixedPoint)2'), Not(GetVariableSystem.HasValue('tca_cli_human_started', 'yes')))))]"
+ visible = "[And(Not(EqualTo_CFixedPoint(Title.MakeScope.Var('tca_cli_human_case').GetValue, '(CFixedPoint)2')), And(InDebugMode, And(IsInGame, And(EqualTo_CFixedPoint(Title.MakeScope.Var('tca_cli_human_phase').GetValue, '(CFixedPoint)2'), Not(GetVariableSystem.HasValue('tca_cli_human_started', 'yes'))))))]"
  state = { name = _show duration = 2 next = tca_cli_human_native_boot }
  state = {
   name = tca_cli_human_native_boot
-  # UI重建可以再次到达此状态，但不能再投递事件；原生阶段守门仍独立拒绝重复。
-  on_start = "[ExecuteConsoleCommand(Select_CString(And(EqualTo_CFixedPoint(Title.MakeScope.Var('tca_cli_human_phase').GetValue, '(CFixedPoint)2'), Not(GetVariableSystem.HasValue('tca_cli_human_booted', 'yes'))), 'effect title:h_china.holder = { trigger_event = tca_cli.2 }', ''))]"
+  # UI重建仍只执行一次；直接event命令显式指定当前皇帝ID，避免effect内trigger_event被接受却不投递。
+  on_start = "[ExecuteConsoleCommand(Select_CString(And(EqualTo_CFixedPoint(Title.MakeScope.Var('tca_cli_human_phase').GetValue, '(CFixedPoint)2'), Not(GetVariableSystem.HasValue('tca_cli_human_booted', 'yes'))), Concatenate('event tca_cli.2 ', UIntToString(Title.GetHolder.GetID)), ''))]"
   on_start = "[GetVariableSystem.Set('tca_cli_human_booted', 'yes')]"
+ }
+}
+
+# 原生身份核验只授权，业务入口再由独立界面动作直接event；不从事件回调同步内投。
+# 每个人类进程只执行一个业务用例；UI防重与业务入口持久防重共同避免重复BEGIN。
+widget = {
+ name = "tca_cli_human_business_dispatch"
+ size = { 1 1 } alwaystransparent = yes alpha = 0 visible_at_creation = no
+ datacontext = "[GetTitleByKey('h_china')]"
+ visible = "[And(InDebugMode, And(IsInGame, And(EqualTo_CFixedPoint(Title.MakeScope.Var('tca_cli_human_phase').GetValue, '(CFixedPoint)3'), Or(And(EqualTo_CFixedPoint(Title.MakeScope.Var('tca_cli_human_case').GetValue, '(CFixedPoint)2'), EqualTo_CFixedPoint(Title.MakeScope.Var('tca_court_human_run').GetValue, '(CFixedPoint)1')), And(Not(EqualTo_CFixedPoint(Title.MakeScope.Var('tca_cli_human_case').GetValue, '(CFixedPoint)2')), EqualTo_CFixedPoint(Title.MakeScope.Var('tca_retirement_human_run').GetValue, '(CFixedPoint)1'))))))]"
+ state = {
+  name = _show
+  on_start = "[ExecuteConsoleCommand(Select_CString(Not(GetVariableSystem.HasValue('tca_cli_human_business_dispatched', 'yes')), Concatenate(Select_CString(EqualTo_CFixedPoint(Title.MakeScope.Var('tca_cli_human_case').GetValue, '(CFixedPoint)2'), 'event tca_court_session.1 ', 'event tca_retirement_session.1 '), UIntToString(Title.GetHolder.GetID)), ''))]"
+  on_start = "[GetVariableSystem.Set('tca_cli_human_business_dispatched', 'yes')]"
  }
 }

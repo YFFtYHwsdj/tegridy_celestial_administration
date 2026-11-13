@@ -1,0 +1,208 @@
+﻿# 真实玩家宫廷验收；CLI先保存并用新进程建立人类席位，GUI再接管自备地方官署。
+# 复用同局框架lane；普通内阁与已有差遣分别调用正式收集、目录分发和持续资格入口。
+namespace = tca_court_session
+
+tca_court_session.1 = {
+    type = character_event hidden = yes
+    immediate = {
+        # 持久标记只拒绝重复投递；不替代真实身份、已认领lane或业务断言。
+        if = { limit = { title:h_china = { var:tca_court_human_business_started ?= 1 } }
+            debug_log = "TCA_CLI HUMAN_BUSINESS_DUPLICATE_REJECTED court"
+        }
+        else_if = { limit = { debug_only = yes is_ai = yes title:h_china.holder = root title:h_china = { var:tca_cli_ready ?= 1 NOT = { var:tca_court_human_run ?= 1 } } }
+            title:h_china = {
+                set_variable = { name = tca_cli_human_case value = 2 }
+                set_variable = { name = tca_cli_human_phase value = 1 }
+            }
+            debug_log = "TCA_CLI HUMAN_SESSION_REQUESTED court"
+        }
+        else = {
+            if = { limit = { debug_only = yes is_ai = no title:h_china.holder = root
+                has_character_flag = tca_test_lane_tca_military_court_positions_test_active
+                title:h_china = { var:tca_cli_human_phase ?= 3 var:tca_court_human_run ?= 1 }
+            }
+                title:h_china = { set_variable = { name = tca_court_human_business_started value = 1 } }
+                debug_log = "TCA_TEST BEGIN tca_court_session.1 tca_test_court_player_session"
+                remove_character_flag = tca_test_tca_military_court_positions_test_case_failed
+                title:h_china = { if = { limit = { NOT = { has_variable = tca_court_human_run } } set_variable = { name = tca_court_human_run value = 0 } } }
+                if = { limit = { debug_only = yes is_ai = no title:h_china.holder = root title:h_china = { var:tca_court_human_run ?= 1 } }
+                    tca_test_military_council_prepare_county_effect = { MILITARY_ONLY = no }
+                    if = { limit = { scope:tca_mcp_borrow_ready = 1 }
+                        scope:tca_mcp_governor = {
+                            set_house = root.house
+                            assign_councillor_type = { type = councillor_chancellor target = scope:tca_mcp_backup fire_on_actions = yes }
+                        }
+                        tca_test_military_council_appoint_effect = yes
+                        # 自备公国只提高本署官署等级，保留原有县级监押；不借第二块真实领地。
+                        create_dynamic_title = { tier = duchy name = tca_test_arrest_office_name }
+                        scope:new_title = { save_scope_as = tca_court_session_duchy set_capital_county = scope:tca_mcp_county set_landless_title = no }
+                        create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_court_session_grant }
+                        scope:tca_court_session_duchy = { change_title_holder = { holder = scope:tca_mcp_governor change = scope:tca_court_session_grant } }
+                        resolve_title_and_vassal_change = scope:tca_court_session_grant
+                        title:h_china = {
+                            set_variable = { name = tca_court_session_actor value = scope:tca_mcp_governor }
+                            set_variable = { name = tca_court_session_phase value = 0 }
+                            set_variable = { name = tca_court_session_request value = 0 }
+                        }
+                        trigger_event = { id = tca_court_session.1001 days = 2 }
+                    }
+                    else = {
+                        debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_court_player_session"
+                        if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+                        tca_test_lane_end_effect = { GROUP = tca_military_court_positions_test }
+                    }
+                }
+                else = {
+                    debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_court_player_session"
+                    if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+                    tca_test_lane_end_effect = { GROUP = tca_military_court_positions_test }
+                }
+            }
+            else = { debug_log = "TCA_CLI HUMAN_BUSINESS_ENTRY_REJECTED court" }
+        }
+    }
+}
+
+tca_court_session.1001 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            title:h_china = { set_variable = { name = tca_court_session_phase value = 1 } }
+            trigger_event = { id = tca_court_session.1010 days = 1 }
+        }
+    }
+}
+
+# 原报告者保持saved scopes并等待GUI接管请求；日期真实推进，控制台只写请求。
+tca_court_session.1010 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { has_character_flag = tca_test_lane_tca_military_court_positions_test_active }
+                if = { limit = { title:h_china = { var:tca_court_session_request ?= 1 var:tca_court_session_phase ?= 1 } }
+                    title:h_china = { set_variable = { name = tca_court_session_request value = 0 } set_variable = { name = tca_court_session_phase value = 2 } }
+                    trigger_event = { id = tca_court_session.1002 days = 2 }
+                }
+                else = { trigger_event = { id = tca_court_session.1010 days = 1 } }
+            }
+        }
+    }
+}
+
+tca_court_session.1002 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_mcp_governor = { is_ai = no government_has_flag = government_is_celestial NOT = { has_character_flag = tca_test_force_player_governor } } }
+                debug_log = "TCA_COURT_SESSION PLAYER_CONFIRMED"
+                debug_log = "TCA_TEST CHECK_PASS tca_test_court_player_session 1"
+            }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_player_session 1" }
+            every_in_list = { list = tca_court_candidates remove_from_list = tca_court_candidates }
+            scope:tca_mcp_backup = { tca_court_collect_officer_effect = yes }
+            if = { limit = { scope:tca_mcp_backup = { is_councillor_of = scope:tca_mcp_governor has_council_position = councillor_chancellor tca_court_person_eligible_trigger = no NOT = { is_in_list = tca_court_candidates } } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_court_player_session 2"
+            }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_player_session 2" }
+            scope:tca_mcp_governor = { save_scope_as = liege save_scope_as = target_liege }
+            scope:tca_mcp_officer = { tca_court_collect_officer_effect = yes }
+            if = { limit = { scope:tca_mcp_officer = { has_court_position = tca_military_supervisor_court_position tca_military_supervisor_validity_trigger = yes has_character_flag = tca_military_appointment_cooldown NOT = { is_in_list = tca_court_candidates } } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_court_player_session 3"
+            }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_player_session 3" }
+            # 仅解除夹具任期以复验既有迁转准入；不在生产入口取消两年任期。
+            scope:tca_mcp_officer = { remove_character_flag = tca_military_appointment_cooldown tca_court_collect_officer_effect = yes }
+            if = { limit = { scope:tca_mcp_officer = { tca_court_person_eligible_trigger = yes is_in_list = tca_court_candidates has_council_position = councillor_marshal } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_court_player_session 4"
+            }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_player_session 4" }
+            scope:tca_mcp_governor = {
+                # 诊断只记录正式守门与冻结值，不改变候选、空缺或分发条件。
+                if = { limit = { tca_military_inspector_office_valid_trigger = yes } debug_log = "TCA_COURT_SESSION DIAG inspector office valid" }
+                else = { debug_log = "TCA_COURT_SESSION DIAG inspector office invalid" }
+                if = { limit = { tca_military_inspector_court_position_council_available_trigger = yes } debug_log = "TCA_COURT_SESSION DIAG inspector council available" }
+                else = { debug_log = "TCA_COURT_SESSION DIAG inspector council blocked" }
+                tca_court_visit_positions_effect = { VISITOR = tca_court_snapshot_position_effect }
+                if = { limit = { has_variable = tca_court_vacant_tca_military_inspector_court_position }
+                    debug_log = "TCA_COURT_SESSION DIAG inspector frozen=[THIS.Char.MakeScope.Var('tca_court_vacant_tca_military_inspector_court_position').GetValue]"
+                }
+                else = { debug_log = "TCA_COURT_SESSION DIAG inspector not frozen" }
+                save_scope_value_as = { name = tca_court_dispatch_importance value = tca_court_next_vacancy_value }
+                clear_saved_scope = tca_court_dispatched
+                if = { limit = { exists = scope:tca_court_dispatched } debug_log = "TCA_COURT_SESSION DIAG dispatched marker survived clear" }
+                if = { limit = { var:tca_court_vacant_tca_military_inspector_court_position ?= scope:tca_court_dispatch_importance } debug_log = "TCA_COURT_SESSION DIAG inspector is highest frozen vacancy" }
+                debug_log_scopes = yes
+                tca_court_visit_positions_effect = { VISITOR = tca_court_dispatch_position_effect }
+                if = { limit = { exists = scope:tca_court_dispatched } debug_log = "TCA_COURT_SESSION DIAG dispatcher entered" }
+                else = { debug_log = "TCA_COURT_SESSION DIAG dispatcher not entered" }
+                if = { limit = { scope:tca_mcp_officer = { has_court_position = tca_military_inspector_court_position } } debug_log = "TCA_COURT_SESSION DIAG inspector held immediately" }
+                else = { debug_log = "TCA_COURT_SESSION DIAG inspector absent immediately" }
+                tca_court_visit_positions_effect = { VISITOR = tca_court_clear_snapshot_effect }
+            }
+            # 另等两日，持续资格与内阁联动必须真实保留，不能只看强制appoint瞬间。
+            trigger_event = { id = tca_court_session.1003 days = 2 }
+        }
+    }
+}
+
+tca_court_session.1003 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            scope:tca_mcp_governor = { save_scope_as = liege }
+            if = { limit = {
+                scope:tca_mcp_governor = { is_ai = no }
+                scope:tca_mcp_officer = { has_court_position = tca_military_inspector_court_position tca_military_inspector_validity_trigger = yes NOT = { has_court_position = tca_military_supervisor_court_position } has_council_position = councillor_marshal var:tca_military_council_lock_owner = scope:tca_mcp_governor }
+                scope:tca_mcp_backup = { has_council_position = councillor_chancellor is_councillor_of = scope:tca_mcp_governor }
+            } debug_log = "TCA_TEST CHECK_PASS tca_test_court_player_session 5" }
+            else = {
+                add_character_flag = tca_test_tca_military_court_positions_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_court_player_session 5"
+                if = { limit = { scope:tca_mcp_governor = { is_ai = no } } debug_log = "TCA_COURT_SESSION DIAG still human" }
+                if = { limit = { scope:tca_mcp_officer = { has_court_position = tca_military_supervisor_court_position } } debug_log = "TCA_COURT_SESSION DIAG old supervisor retained" }
+                if = { limit = { scope:tca_mcp_officer = { has_court_position = tca_military_inspector_court_position } } debug_log = "TCA_COURT_SESSION DIAG inspector retained" }
+                if = { limit = { scope:tca_mcp_officer = { tca_military_inspector_validity_trigger = yes } } debug_log = "TCA_COURT_SESSION DIAG inspector validity true" }
+                if = { limit = { scope:tca_mcp_backup = { has_council_position = councillor_chancellor is_councillor_of = scope:tca_mcp_governor } } debug_log = "TCA_COURT_SESSION DIAG ordinary council retained" }
+                debug_log_scopes = yes
+            }
+            title:h_china = { set_variable = { name = tca_court_session_phase value = 3 } }
+            trigger_event = { id = tca_court_session.1004 days = 5 }
+        }
+    }
+}
+
+tca_court_session.1004 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_mcp_governor = { is_ai = yes } title:h_china = { var:tca_court_session_phase = 3 } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_court_player_session 6"
+            }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_player_session 6" }
+            scope:tca_mcp_governor = {
+                add_character_flag = free_revoke_cost
+                if = { limit = { employs_court_position = tca_military_inspector_court_position } revoke_court_position = { recipient = scope:tca_mcp_officer court_position = tca_military_inspector_court_position } }
+                remove_character_flag = free_revoke_cost
+                destroy_title = scope:tca_court_session_duchy
+            }
+            every_in_list = { list = tca_court_candidates remove_from_list = tca_court_candidates }
+            tca_test_military_council_cleanup_effect = yes
+            scope:tca_mcp_officer ?= { death = { death_reason = death_natural_causes } }
+            scope:tca_mcp_backup ?= { death = { death_reason = death_natural_causes } }
+            scope:tca_mcp_governor ?= { death = { death_reason = death_natural_causes } }
+            title:h_china = { remove_variable = tca_court_session_actor remove_variable = tca_court_session_request set_variable = { name = tca_court_session_phase value = 5 } }
+            if = { limit = { has_character_flag = tca_test_tca_military_court_positions_test_case_failed }
+                debug_log = "TCA_TEST FAIL tca_test_court_player_session"
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+            }
+            else = { debug_log = "TCA_TEST PASS tca_test_court_player_session" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            remove_character_flag = tca_test_tca_military_court_positions_test_case_failed
+            tca_test_lane_end_effect = { GROUP = tca_military_court_positions_test }
+        }
+    }
+}

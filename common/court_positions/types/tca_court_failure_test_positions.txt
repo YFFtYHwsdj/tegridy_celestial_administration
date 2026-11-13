@@ -1,0 +1,46 @@
+﻿# 同步回调撤销授职的故障注入夹具：真实任命后立即原生撤销，使正式fill的后置条件失败。
+# 独立对象，不覆盖正式职位、不加入季度目录；仅本例debug执行期间可用，平时隐藏且AI永不雇用。
+tca_court_failure_test_position = {
+    sort_order = 999 max_available_positions = 1 minimum_rank = county skill = martial
+    aptitude = { value = 100 }
+    # 原生雇用容量会读取is_shown；测试期间必须真实开放，不能始终隐藏。
+    is_shown = { tca_court_failure_test_office_trigger = yes }
+    valid_position = { tca_court_failure_test_office_trigger = yes }
+    is_shown_character = {
+        scope:liege = { tca_court_failure_test_office_trigger = yes }
+        scope:employee = { has_character_flag = tca_military_appointment_allowed }
+    }
+    valid_character = { scope:employee = {
+        tca_court_person_assignment_validity_trigger = { OWNER = scope:liege POSITION = tca_court_failure_test_position SKILL = martial ROUTE = tca_court_military_route_trigger }
+    } }
+    on_court_position_received = {
+        scope:employee = {
+            add_character_flag = tca_court_failure_test_received
+            # 必须在真实目标宫廷、真实持职、源内阁已离开且正式快照存在时记录证据。
+            if = { limit = {
+                is_courtier_of = scope:liege
+                has_court_position = tca_court_failure_test_position
+                is_councillor = no
+                var:tca_court_old_council ?= flag:councillor_chancellor
+                has_character_flag = tca_military_appointment_allowed
+                has_character_flag = tca_court_unlinked_council_transfer
+                # 原生职位回调不继承fill调用者的临时saved scopes，来源和目标由本例私有角色引用传入。
+                has_variable = tca_court_failure_test_source
+                has_variable = tca_court_failure_test_target
+                var:tca_court_failure_test_target = scope:liege
+                NOT = { var:tca_court_failure_test_source = scope:liege }
+                var:tca_court_failure_test_source = { NOT = { cp:councillor_chancellor ?= scope:employee } }
+            } add_character_flag = tca_court_failure_test_received_valid }
+        }
+        scope:liege = {
+            # 本测试对象撤职费为零，无需修改主君免费撤职flag。
+            revoke_court_position = { recipient = scope:employee court_position = tca_court_failure_test_position }
+        }
+    }
+    on_court_position_revoked = { scope:employee = { add_character_flag = tca_court_failure_test_revoked } }
+    salary = { gold = 0 }
+    received_salary = { gold = 0 }
+    revoke_cost = { influence = 0 }
+    ai_position_score = { value = -1000 }
+    ai_candidate_score = { value = -1000 }
+}

@@ -1,0 +1,325 @@
+﻿# 原版军务荐举事件的必要单对象覆盖；局部候选规则、骑士任命及后续链保持原版。
+# 无地通判等仍是统治者：只更正访客迁入、接受荐举迁入及廷臣选项的三处保护。
+# 追加on_action不能介入事件内部选人与迁廷；不改全局骑士资格，避免扩大影响。
+# 输入与原版相同：root为领主，scope:councillor_liege与councillor由军务派发提供；
+# 输出为原版advocate_of_nepotism、beneficiary_of_nepotism及原版冷却/骑士/好感状态。
+namespace = marshal_task
+
+marshal_task.0304 = {
+	id_override_priority = 1
+	type = character_event
+	title = marshal_task.0304.t
+	desc = marshal_task.0304.desc
+	theme = martial
+	left_portrait = {
+		character = scope:beneficiary_of_nepotism
+		animation = marshal_random_weapon
+	}
+	right_portrait = {
+		character = scope:councillor
+		animation = interested_left
+	}
+	lower_left_portrait = scope:advocate_of_nepotism
+
+	trigger = {
+		NOT = {
+			has_variable = had_new_commander_event
+		}
+
+		OR = {
+			AND = {
+				government_has_flag = government_is_clan
+				house ?= {
+					OR = {
+						has_house_unity_stage = friendly
+						has_house_unity_stage = harmonious
+					}
+					any_house_member = {
+						tca_marshal_task_0304_is_corrupt_parent_of_weak_child = yes
+					}
+				}
+			}
+			any_vassal = {
+				tca_marshal_task_0304_is_corrupt_parent_of_weak_child = yes
+			}
+		}
+		max_number_of_knights >= 1
+	}
+
+	weight_multiplier = {
+		base = 1
+		modifier = {
+			add = 0.5
+			OR = {
+				AND = {
+					house ?= {
+						any_house_member = {
+							tca_marshal_task_0304_is_corrupt_parent_of_weak_child = yes
+							has_trait = ambitious
+						}
+					}
+				}
+				any_vassal = {
+					tca_marshal_task_0304_is_corrupt_parent_of_weak_child = yes
+					has_trait = ambitious
+				}
+			}
+		}
+	}
+
+	immediate = {
+		set_variable = {
+			name = had_new_commander_event
+			days = 730
+		}
+
+		if = {
+			limit = {
+				exists = house
+				government_has_flag = government_is_clan
+				house = {
+					OR = {
+						has_house_unity_stage = friendly
+						has_house_unity_stage = harmonious
+					}
+					any_house_member = {
+						tca_marshal_task_0304_is_corrupt_parent_of_weak_child = yes
+					}
+				}
+			}
+			house = {
+				random_house_member = {
+					limit = {
+						tca_marshal_task_0304_is_corrupt_parent_of_weak_child = yes
+					}
+					weight = {
+						base = 1
+						modifier = {
+							add = 0.5
+							has_trait = ambitious
+						}
+
+						modifier = {
+							add = 0.5
+							is_female = yes
+						}
+					}
+					save_scope_as = advocate_of_nepotism
+					random_child = {
+						limit = {
+							tca_marshal_task_0304_is_valid_beneficiary_of_nepotism = yes
+						}
+						save_scope_as = beneficiary_of_nepotism
+						get_quirk_character_effect = yes
+					}
+				}
+			}
+		}
+		else = {
+			random_vassal = {
+				limit = {
+					tca_marshal_task_0304_is_corrupt_parent_of_weak_child = yes
+				}
+				weight = {
+					base = 1
+					modifier = {
+						add = 0.5
+						has_trait = ambitious
+					}
+
+					modifier = {
+						add = 0.5
+						is_female = yes
+					}
+				}
+				save_scope_as = advocate_of_nepotism
+				random_child = {
+					limit = {
+						tca_marshal_task_0304_is_valid_beneficiary_of_nepotism = yes
+					}
+					save_scope_as = beneficiary_of_nepotism
+					get_quirk_character_effect = yes
+				}
+			}
+		}
+
+		if = {
+			limit = {
+				scope:beneficiary_of_nepotism = {
+					NOR = {
+						is_courtier_of = root
+						location = root.capital_province
+						is_ruler = yes
+					}
+				}
+			}
+			add_visiting_courtier = scope:beneficiary_of_nepotism
+		}
+	}
+
+	option = {
+		name = {
+			trigger = { house = scope:beneficiary_of_nepotism.house }
+			text = marshal_task.0304.a_clan
+		}
+		name = {
+			trigger = { house != scope:beneficiary_of_nepotism.house }
+			text = marshal_task.0304.a_neutral
+		}
+		if = {
+			limit = {
+				scope:beneficiary_of_nepotism = {
+					is_ruler = no
+					NOT = { is_courtier_of = root }
+				}
+			}
+			add_courtier = scope:beneficiary_of_nepotism
+		}
+		scope:beneficiary_of_nepotism = {
+			hidden_effect = { set_knight_status = force }
+			add_character_flag = {
+				flag = marshal_task_0304_forced_knighthood
+				years = 20
+			}
+		}
+		custom_description_no_bullet = {
+			text = marshal_task_0304_a_tt
+			subject = scope:advocate_of_nepotism
+			object = scope:beneficiary_of_nepotism
+		}
+		reverse_add_opinion = {
+			target = scope:advocate_of_nepotism
+			modifier = marshal_task_train_commanders_supported_my_child_opinion
+		}
+
+		if = {
+			limit = { is_ai = no }
+			trigger_event = {
+				id = marshal_task.0305
+				days = 14
+			}
+		}
+		if = {
+			limit = {
+				government_has_flag = government_is_clan
+
+				house = scope:advocate_of_nepotism.house
+			}
+			add_clan_unity_interaction_effect = {
+				CHARACTER = scope:councillor_liege
+				TARGET = scope:advocate_of_nepotism
+				VALUE = minor_unity_gain
+				DESC = clan_unity_yes_to_nepotism.desc
+				REVERSE_NON_HOUSE_TARGET = no
+			}
+		}
+		ai_chance = {
+			base = 50
+			ai_value_modifier = {
+				ai_honor = -0.25
+			}
+		}
+		stress_and_fulfillment_impact = {
+			arrogant = minor_stress_impact_gain
+			paranoid = minor_stress_impact_gain
+		}
+	}
+
+	option = {
+		name = marshal_task.0304.b
+		trigger = {
+			scope:beneficiary_of_nepotism = {
+				NOR = {
+					is_courtier_of = scope:councillor_liege
+					is_ruler = yes
+				}
+			}
+		}
+		duel = {
+			skill = diplomacy
+			target = scope:advocate_of_nepotism
+			6 = {
+				compare_modifier = {
+					value = scope:duel_value
+					multiplier = 0.5
+					min = -5
+				}
+				desc = marshal_task.0304.b.success
+				send_interface_toast = {
+					type = event_toast_effect_good
+					title = marshal_task.0304.b.success
+					left_icon = scope:advocate_of_nepotism
+					right_icon = scope:beneficiary_of_nepotism
+                    # 可见事件可能等待玩家选择；受任成统治者后不得沿旧选项迁廷。
+                    if = {
+                        limit = { scope:beneficiary_of_nepotism = { is_ruler = no NOT = { is_courtier_of = root } } }
+                        add_courtier = scope:beneficiary_of_nepotism
+                    }
+				}
+			}
+			4 = {
+				compare_modifier = {
+					value = scope:duel_value
+					multiplier = -0.5
+					min = -5
+				}
+				desc = marshal_task.0304.b.failure
+				send_interface_toast = {
+					type = event_toast_effect_bad
+					title = marshal_task.0304.b.failure
+					left_icon = scope:advocate_of_nepotism
+					reverse_add_opinion = {
+						target = scope:advocate_of_nepotism
+						modifier = marshal_task_train_commanders_rebuffed_my_child_opinion
+						opinion = -20
+					}
+					if = {
+						limit = {
+							government_has_flag = government_is_clan
+							house = scope:advocate_of_nepotism.house
+						}
+						add_clan_unity_interaction_effect = {
+							CHARACTER = scope:councillor_liege
+							TARGET = scope:advocate_of_nepotism
+							VALUE = minor_unity_loss
+							DESC = clan_unity_refused_nepotism.desc
+							REVERSE_NON_HOUSE_TARGET = no
+						}
+					}
+				}
+			}
+		}
+		ai_chance = {
+			base = 10
+			compare_modifier = {
+				value = diplomacy
+				offset = scope:advocate_of_nepotism.diplomacy
+				multiplier = 2.5
+			}
+		}
+	}
+
+	option = {
+		name = marshal_task.0304.c
+		ai_chance = {
+			base = 10
+		}
+		reverse_add_opinion = {
+			target = scope:advocate_of_nepotism
+			modifier = marshal_task_train_commanders_rebuffed_my_child_opinion
+		}
+		if = {
+			limit = {
+				government_has_flag = government_is_clan
+				house = scope:advocate_of_nepotism.house
+			}
+			add_clan_unity_interaction_effect = {
+				CHARACTER = scope:councillor_liege
+				TARGET = scope:advocate_of_nepotism
+				VALUE = minor_unity_loss
+				DESC = clan_unity_refused_nepotism.desc
+				REVERSE_NON_HOUSE_TARGET = no
+			}
+		}
+	}
+}

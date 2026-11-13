@@ -284,8 +284,15 @@ tca_test_military_council_cleanup_effect = {
             NOT = { scope:tca_mcp_office = { holder = scope:tca_mcp_old_office_holder var:tca_circuit_kind = var:tca_mcp_original_kind } }
             NOT = { scope:tca_mcp_county = { holder = scope:tca_mcp_old_holder } }
             any_in_list = { variable = tca_mcp_baronies NOT = { holder = var:tca_mcp_saved_baron } }
-            NOT = { var:tca_mcp_military_count = var:tca_mcp_military_before }
-            NOT = { var:tca_mcp_cap_count = var:tca_mcp_cap_before }
+            # 默认核对准备时的全朝计数；显式跨日自然用例在全部私有对象销毁后另行审计。
+            # 只延后这两个全局计数，原人物/头衔/男爵领/契约/领属的精确恢复仍即时断言。
+            AND = {
+                NOT = { has_character_flag = tca_mcp_defer_quota_audit }
+                OR = {
+                    NOT = { var:tca_mcp_military_count = var:tca_mcp_military_before }
+                    NOT = { var:tca_mcp_cap_count = var:tca_mcp_cap_before }
+                }
+            }
             any_in_list = { variable = tca_mcp_original_vassals OR = {
                 is_alive = no NOT = { liege = var:tca_mcp_saved_vassal_liege }
                 NOT = { appointment_timeout_days = { value = var:tca_mcp_vassal_timeout subtract = root.var:tca_mcp_elapsed min = 0 } }

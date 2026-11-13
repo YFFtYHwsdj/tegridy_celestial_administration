@@ -1,0 +1,18 @@
+﻿# 仅独立debug测试阶段接管私有官署；真实身份由原生事件确认，GUI不写测试结果。
+widget = {
+ name = "tca_court_session_play"
+ size = { 1 1 } alwaystransparent = yes alpha = 0 visible_at_creation = no
+ datacontext = "[GetTitleByKey('h_china')]"
+ visible = "[And(InDebugMode, And(IsInGame, EqualTo_CFixedPoint(Title.MakeScope.Var('tca_court_session_phase').GetValue, '(CFixedPoint)1')))]"
+ state = { name = _show on_start = "[SetGameSpeed('(int32)1')]" duration = 1 next = tca_court_session_claim }
+ state = { name = tca_court_session_claim on_start = "[ExecuteConsoleCommand(Select_CString(GetVariableSystem.HasValue('tca_court_session_claimed', 'yes'), '', Concatenate('play ', UIntToString(Title.MakeScope.Var('tca_court_session_actor').Char.GetID))))]" on_start = "[GetVariableSystem.Set('tca_court_session_claimed', 'yes')]" duration = 1 next = tca_court_session_request }
+ state = { name = tca_court_session_request on_start = "[ExecuteConsoleCommand('effect title:h_china = { if = { limit = { var:tca_court_session_phase = 1 } set_variable = { name = tca_court_session_request value = 1 } } }')]" }
+}
+widget = {
+ name = "tca_court_session_observe"
+ size = { 1 1 } alwaystransparent = yes alpha = 0 visible_at_creation = no
+ datacontext = "[GetTitleByKey('h_china')]"
+ visible = "[And(InDebugMode, And(IsInGame, EqualTo_CFixedPoint(Title.MakeScope.Var('tca_court_session_phase').GetValue, '(CFixedPoint)3')))]"
+ state = { name = _show on_start = "[ExecuteConsoleCommand('observe')]" duration = 1 next = tca_court_session_resume }
+ state = { name = tca_court_session_resume on_start = "[SetGameSpeed('(int32)4')]" }
+}

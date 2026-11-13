@@ -21,6 +21,29 @@ tca_army_civil_office_valid_trigger = {
     tca_is_landed_celestial_governor_trigger = yes highest_held_title_tier = tier_county
     vassal_contract_has_flag = celestial_province_military
 }
+# 人物作用域；真实内阁雇主须为AI天朝，不以最高领主或人物继承政体代替。
+# 原生可撤换检查保留外部保护；玩家仿真标记沿用现有测试夹具边界。
+tca_court_ai_council_releasable_trigger = {
+    exists = liege_or_court_owner
+    is_councillor_of = liege_or_court_owner
+    liege_or_court_owner = {
+        is_ai = yes government_has_flag = government_is_celestial
+        NOT = { has_character_flag = tca_test_force_player_governor }
+    }
+    can_be_fired_from_council_trigger = { COURT_OWNER = liege_or_court_owner }
+}
+# 普通内阁只按待阙者参选；已有差遣仍必须匹配既有兼任关系。
+tca_court_unlinked_council_candidate_trigger = {
+    tca_court_holds_position_trigger = no
+    tca_court_ai_council_releasable_trigger = yes
+}
+# 同署授职时原内阁尚未撤销，短暂许可仅限集中选官的本次授职链。
+# 就任回调先撤旧席并清除此标记；不允许它放宽常态兼任。
+tca_court_unlinked_council_transition_trigger = {
+    has_character_flag = tca_military_appointment_allowed
+    has_character_flag = tca_court_unlinked_council_transfer
+    tca_court_ai_council_releasable_trigger = yes
+}
 tca_court_person_eligible_trigger = {
     is_alive = yes is_adult = yes is_ruler = no merit_level >= 1
     government_has_flag = government_is_celestial
@@ -31,6 +54,8 @@ tca_court_person_eligible_trigger = {
     OR = {
         is_councillor = no
         tca_court_matches_linked_council_trigger = yes
+        tca_court_unlinked_council_candidate_trigger = yes
+        tca_court_unlinked_council_transition_trigger = yes
     }
 }
 # 人物作用域；不要求已在目标宫廷，可用于迁廷前候选复验。

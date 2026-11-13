@@ -1,0 +1,149 @@
+﻿# 原版军务事件迁廷回归；自建荐举父子及无地官署，借用一县并精确归还；仅供独立可丢弃测试局。
+# 自备唯一荐举父子；原生可见事件由AI选择选项，延迟两天检查真实执行与统治者身份。
+namespace = tca_marshal_nepotism_test
+
+tca_marshal_nepotism_test.1 = {
+ type = character_event hidden = yes
+ immediate = {
+  debug_log = "TCA_TEST BEGIN tca_marshal_nepotism_test.1 tca_test_marshal_landless_nepotism"
+  remove_character_flag = tca_test_tca_military_court_positions_test_case_failed
+  # 可见原生事件须由真实有地官署接收；借用夹具实县，私有父子与上层头衔仍自建。
+  tca_test_military_council_prepare_county_effect = { MILITARY_ONLY = no }
+  if = { limit = { scope:tca_mcp_borrow_ready = 1 exists = scope:tca_mcp_governor }
+  scope:tca_mcp_governor = { save_scope_as = tca_marshal_nepotism_test_liege }
+  create_dynamic_title = { tier = kingdom name = tca_test_arrest_office_name }
+  scope:new_title = { save_scope_as = tca_marshal_nepotism_test_liege_title set_capital_county = scope:tca_mcp_county set_landless_title = yes }
+  create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_marshal_nepotism_test_grant }
+  scope:tca_marshal_nepotism_test_liege_title = { change_title_holder = { holder = scope:tca_marshal_nepotism_test_liege change = scope:tca_marshal_nepotism_test_grant } }
+  resolve_title_and_vassal_change = scope:tca_marshal_nepotism_test_grant
+  scope:tca_marshal_nepotism_test_liege = { change_government = feudal_government tca_test_protect_character_effect = yes }
+  set_variable = { name = tca_marshal_nepotism_test_county value = scope:tca_mcp_county }
+  set_variable = { name = tca_marshal_nepotism_test_liege value = scope:tca_marshal_nepotism_test_liege }
+  create_character = { age = 45 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_marshal_nepotism_test_parent }
+  create_dynamic_title = { tier = duchy name = tca_test_arrest_office_name }
+  scope:new_title = { save_scope_as = tca_marshal_nepotism_test_parent_title set_capital_county = title:c_vestisland set_landless_title = yes }
+  create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_marshal_nepotism_test_grant }
+  scope:tca_marshal_nepotism_test_parent_title = { change_title_holder = { holder = scope:tca_marshal_nepotism_test_parent change = scope:tca_marshal_nepotism_test_grant } }
+  resolve_title_and_vassal_change = scope:tca_marshal_nepotism_test_grant
+  scope:tca_marshal_nepotism_test_parent = { change_government = celestial_government tca_test_protect_character_effect = yes }
+  set_variable = { name = tca_marshal_nepotism_test_parent value = scope:tca_marshal_nepotism_test_parent }
+  create_character = { age = 20 martial = { 1 1 } prowess = { 1 1 } gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_marshal_nepotism_test_child }
+  title:c_tca_marshal_nepotism_test = { save_scope_as = tca_marshal_nepotism_test_child_title set_capital_county = title:c_vestisland set_landless_title = yes }
+  create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_marshal_nepotism_test_grant }
+  scope:tca_marshal_nepotism_test_child_title = { change_title_holder = { holder = scope:tca_marshal_nepotism_test_child change = scope:tca_marshal_nepotism_test_grant } }
+  resolve_title_and_vassal_change = scope:tca_marshal_nepotism_test_grant
+  scope:tca_marshal_nepotism_test_child = { change_government = celestial_government tca_test_protect_character_effect = yes }
+  set_variable = { name = tca_marshal_nepotism_test_child value = scope:tca_marshal_nepotism_test_child }
+  scope:tca_marshal_nepotism_test_parent = { add_trait = arbitrary add_trait = deceitful }
+  scope:tca_marshal_nepotism_test_child = { set_father = scope:tca_marshal_nepotism_test_parent set_house = scope:tca_marshal_nepotism_test_parent.house }
+  create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_marshal_nepotism_test_fealty }
+  scope:tca_marshal_nepotism_test_parent = { change_liege = { liege = scope:tca_marshal_nepotism_test_liege change = scope:tca_marshal_nepotism_test_fealty } }
+  scope:tca_marshal_nepotism_test_child = { change_liege = { liege = scope:tca_marshal_nepotism_test_parent change = scope:tca_marshal_nepotism_test_fealty } }
+  resolve_title_and_vassal_change = scope:tca_marshal_nepotism_test_fealty
+  scope:tca_marshal_nepotism_test_liege = {
+   save_scope_as = councillor_liege
+   scope:tca_marshal_nepotism_test_parent = { save_scope_as = councillor }
+   save_scope_value_as = { name = tca_marshal_nepotism_test_distant_before value = 0 }
+   if = { limit = { scope:tca_marshal_nepotism_test_child = { NOT = { location = scope:councillor_liege.capital_province } } }
+    save_scope_value_as = { name = tca_marshal_nepotism_test_distant_before value = 1 }
+   }
+   trigger_event = marshal_task.0304
+  }
+  trigger_event = { id = tca_marshal_nepotism_test.2 days = 2 }
+  }
+  else = {
+   debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_marshal_landless_nepotism"
+   if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+   tca_test_military_council_cleanup_effect = yes
+   tca_test_lane_end_effect = { GROUP = tca_military_court_positions_test }
+  }
+ }
+}
+tca_marshal_nepotism_test.2 = {
+ type = character_event hidden = yes
+ immediate = {
+  var:tca_marshal_nepotism_test_liege = { save_scope_as = tca_marshal_nepotism_test_liege }
+  var:tca_marshal_nepotism_test_parent = { save_scope_as = tca_marshal_nepotism_test_parent }
+  var:tca_marshal_nepotism_test_child = { save_scope_as = tca_marshal_nepotism_test_child }
+  if = { limit = { scope:tca_marshal_nepotism_test_liege = { has_variable = had_new_commander_event }
+   scope:tca_marshal_nepotism_test_distant_before = 1
+   scope:tca_marshal_nepotism_test_parent = { OR = {
+    has_opinion_modifier = { target = scope:tca_marshal_nepotism_test_liege modifier = marshal_task_train_commanders_supported_my_child_opinion }
+    has_opinion_modifier = { target = scope:tca_marshal_nepotism_test_liege modifier = marshal_task_train_commanders_rebuffed_my_child_opinion }
+   } }
+  }
+   debug_log = "TCA_TEST CHECK_PASS tca_test_marshal_landless_nepotism 1"
+  }
+  else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_marshal_landless_nepotism 1" }
+  if = { limit = { scope:tca_marshal_nepotism_test_child = { is_ruler = yes is_landed = no liege = scope:tca_marshal_nepotism_test_parent NOT = { is_courtier_of = scope:tca_marshal_nepotism_test_liege } } }
+   debug_log = "TCA_TEST CHECK_PASS tca_test_marshal_landless_nepotism 2"
+  }
+  else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_marshal_landless_nepotism 2" }
+  # 同一个人物卸去独立头衔后恢复普通无地身份，再走原版访客迁入正例。
+  scope:tca_marshal_nepotism_test_child = {
+   every_held_title = { save_scope_as = tca_marshal_nepotism_test_destroy holder = { destroy_title = scope:tca_marshal_nepotism_test_destroy } }
+   remove_character_flag = marshal_task_0304_forced_knighthood
+  }
+  scope:tca_marshal_nepotism_test_parent = { add_courtier = scope:tca_marshal_nepotism_test_child }
+  if = { limit = { scope:tca_marshal_nepotism_test_child = { is_ruler = no NOT = { location = scope:tca_marshal_nepotism_test_liege.capital_province } } }
+   debug_log = "TCA_TEST CHECK_PASS tca_test_marshal_landless_nepotism 3"
+  }
+  else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_marshal_landless_nepotism 3" }
+  scope:tca_marshal_nepotism_test_liege = {
+   remove_variable = had_new_commander_event
+   save_scope_as = councillor_liege
+   scope:tca_marshal_nepotism_test_parent = { save_scope_as = councillor }
+   trigger_event = marshal_task.0304
+  }
+  trigger_event = { id = tca_marshal_nepotism_test.3 days = 2 }
+ }
+}
+tca_marshal_nepotism_test.3 = {
+ type = character_event hidden = yes
+ immediate = {
+  var:tca_marshal_nepotism_test_liege = { save_scope_as = tca_marshal_nepotism_test_liege }
+  var:tca_marshal_nepotism_test_parent = { save_scope_as = tca_marshal_nepotism_test_parent }
+  var:tca_marshal_nepotism_test_child = { save_scope_as = tca_marshal_nepotism_test_child }
+  if = { limit = {
+   scope:tca_marshal_nepotism_test_liege = { has_variable = had_new_commander_event }
+   scope:tca_marshal_nepotism_test_child = { is_ruler = no location = scope:tca_marshal_nepotism_test_liege.capital_province }
+  } debug_log = "TCA_TEST CHECK_PASS tca_test_marshal_landless_nepotism 4" }
+  else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_marshal_landless_nepotism 4" }
+  scope:tca_marshal_nepotism_test_child = {
+   remove_trait = tca_test_death_protection
+   death = { death_reason = death_natural_causes }
+  }
+  remove_variable = tca_marshal_nepotism_test_child
+  scope:tca_marshal_nepotism_test_parent = {
+   every_held_title = { save_scope_as = tca_marshal_nepotism_test_destroy holder = { destroy_title = scope:tca_marshal_nepotism_test_destroy } }
+   remove_trait = tca_test_death_protection
+   death = { death_reason = death_natural_causes }
+  }
+  remove_variable = tca_marshal_nepotism_test_parent
+  var:tca_marshal_nepotism_test_county = { save_scope_as = tca_mcp_county }
+  # 实县及其县治男爵领交还共享夹具处理，只销毁自建的非地产上层头衔。
+  scope:tca_marshal_nepotism_test_liege = {
+   every_held_title = { limit = { tier > tier_barony this != scope:tca_mcp_county } save_scope_as = tca_marshal_nepotism_test_destroy holder = { destroy_title = scope:tca_marshal_nepotism_test_destroy } }
+  }
+  tca_test_military_council_cleanup_effect = yes
+  scope:tca_mcp_officer = { death = { death_reason = death_natural_causes } }
+  scope:tca_mcp_backup = { death = { death_reason = death_natural_causes } }
+  scope:tca_marshal_nepotism_test_liege = { death = { death_reason = death_natural_causes } }
+  if = { limit = {
+   scope:tca_mcp_county = { holder = scope:tca_mcp_old_holder }
+   scope:tca_mcp_office = { holder = scope:tca_mcp_old_office_holder }
+   NOT = { exists = title:c_tca_marshal_nepotism_test.holder }
+   NOT = { has_character_flag = tca_test_tca_military_court_positions_test_case_failed }
+  } debug_log = "TCA_TEST CHECK_PASS tca_test_marshal_landless_nepotism 5" }
+  else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_marshal_landless_nepotism 5" }
+  remove_variable = tca_marshal_nepotism_test_liege
+  remove_variable = tca_marshal_nepotism_test_county
+  if = { limit = { has_character_flag = tca_test_tca_military_court_positions_test_case_failed }
+   debug_log = "TCA_TEST FAIL tca_test_marshal_landless_nepotism"
+   if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+  }
+  else = { debug_log = "TCA_TEST PASS tca_test_marshal_landless_nepotism" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+  remove_character_flag = tca_test_tca_military_court_positions_test_case_failed
+  tca_test_lane_end_effect = { GROUP = tca_military_court_positions_test }
+ }
+}

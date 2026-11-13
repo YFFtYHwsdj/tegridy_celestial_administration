@@ -1,0 +1,49 @@
+﻿# 只记录独立测试局的真实回调证据；不派发生产季度入口，不改候选或任职结果。
+quarterly_playable_pulse = { on_actions = { tca_test_court_natural_pulse_observer } }
+tca_test_court_natural_pulse_observer = {
+    trigger = { debug_only = yes has_variable = tca_court_natural_pulses }
+    effect = {
+        change_variable = { name = tca_court_natural_pulses add = 1 }
+        debug_log = "TCA_COURT_NATURAL native quarterly pulse observed"
+        if = { limit = { has_character_flag = tca_court_batch_active } debug_log = "TCA_COURT_NATURAL batch_active yes" }
+        var:tca_court_natural_actor = {
+            debug_log = "TCA_COURT_NATURAL actor id=[THIS.Char.GetID]"
+            if = { limit = { tca_court_person_eligible_trigger = yes } debug_log = "TCA_COURT_NATURAL eligible yes" } else = { debug_log = "TCA_COURT_NATURAL eligible no" }
+            if = { limit = { tca_court_unlinked_council_candidate_trigger = yes } debug_log = "TCA_COURT_NATURAL ordinary yes" } else = { debug_log = "TCA_COURT_NATURAL ordinary no" }
+            if = { limit = { has_character_flag = tca_military_appointment_cooldown } debug_log = "TCA_COURT_NATURAL cooldown yes" }
+            if = { limit = { is_ruler = yes } debug_log = "TCA_COURT_NATURAL ruler yes" }
+            if = { limit = { tca_court_holds_position_trigger = yes } debug_log = "TCA_COURT_NATURAL commission yes" }
+            var:tca_court_natural_source = {
+                debug_log = "TCA_COURT_NATURAL source id=[THIS.Char.GetID]"
+                if = { limit = { top_liege = root } debug_log = "TCA_COURT_NATURAL source in test realm yes" } else = { debug_log = "TCA_COURT_NATURAL source in test realm no" }
+                if = { limit = { is_landed = yes } debug_log = "TCA_COURT_NATURAL source landed yes" } else = { debug_log = "TCA_COURT_NATURAL source landed no" }
+                if = { limit = { is_independent_ruler = yes } debug_log = "TCA_COURT_NATURAL source independent yes" }
+                if = { limit = { tca_military_supervisor_office_valid_trigger = yes } debug_log = "TCA_COURT_NATURAL supervisor office yes" } else = { debug_log = "TCA_COURT_NATURAL supervisor office no" }
+                if = { limit = { tca_military_linked_council_available_trigger = { KEEP_CURRENT = tca_military_marshal_higher_than_supervisor_trigger } } debug_log = "TCA_COURT_NATURAL supervisor seat yes" } else = { debug_log = "TCA_COURT_NATURAL supervisor seat no" }
+                if = { limit = { employs_court_position = tca_military_supervisor_court_position } debug_log = "TCA_COURT_NATURAL supervisor occupied yes" }
+            }
+        }
+    }
+}
+# 原生on_councillor_left的root为离廷内阁成员；old_employer为真实旧雇主。
+on_councillor_left = { on_actions = { tca_test_court_natural_departure_observer } }
+tca_test_court_natural_departure_observer = {
+    trigger = { debug_only = yes has_variable = tca_court_natural_reporter var:tca_court_natural_source ?= scope:old_employer }
+    effect = {
+        if = { limit = { OR = { has_character_flag = tca_military_appointment_allowed tca_court_holds_position_trigger = yes } }
+            set_variable = { name = tca_court_natural_departure value = 1 }
+            debug_log = "TCA_COURT_NATURAL native councillor left during commission transfer"
+        }
+    }
+}
+# 同署转任在新差遣就任回调内撤普通内阁；原生root为旧内阁雇主。
+on_fired_from_council = { on_actions = { tca_test_court_natural_fired_observer } }
+tca_test_court_natural_fired_observer = {
+    trigger = { debug_only = yes scope:councillor ?= { has_variable = tca_court_natural_reporter var:tca_court_natural_source ?= root } }
+    effect = { scope:councillor = {
+        if = { limit = { tca_court_holds_position_trigger = yes }
+            set_variable = { name = tca_court_natural_departure value = 1 }
+            debug_log = "TCA_COURT_NATURAL native councillor fired after commission received"
+        }
+    } }
+}

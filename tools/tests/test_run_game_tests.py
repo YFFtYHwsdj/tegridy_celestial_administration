@@ -11,7 +11,7 @@ from types import SimpleNamespace
 from run_game_tests import (ROOT, LogTailReader, RunLogMonitor, game_command, descriptor, isolated_settings,
                             outcome, prepare_run, progress, reload_request, stop_owned_process,
                             terminal_condition, timeout_warning)
-from check_upstream_overrides import definitions
+from check_upstream_overrides import definitions, tokens
 
 
 class GameRunnerTests(unittest.TestCase):
@@ -134,6 +134,108 @@ class GameRunnerTests(unittest.TestCase):
         self.assertTrue(human_phase_issues('console_success: Going to observe mode\n'+log))
         self.assertTrue(human_phase_issues(log.replace('console_success: Going to observe mode', '')))
 
+    def test_court_human_checkpoint_is_authorized_by_frozen_selection(self):
+        from run_game_tests import checkpoint_request
+        with tempfile.TemporaryDirectory() as temp:
+            run = Path(temp)
+            (run/'save games').mkdir()
+            (run/'save games/tca_cli_court_human_session.ck3').write_bytes(b'SAV' + b'x'*100)
+            (run/'selection.json').write_text(json.dumps({'cases': [{'event': 'tca_court_session.1'}]}))
+            log = 'console_success: Game saved to tca_cli_court_human_session\nTCA_CLI HUMAN_SAVE tca_cli_court_human_session'
+            self.assertEqual(checkpoint_request(log, run, set()), ('human', 'tca_cli_court_human_session'))
+
+    def test_court_human_phase_requires_real_governor_and_final_observer(self):
+        from run_game_tests import human_phase_issues
+        log = '\n'.join(['TCA_RETIREMENT_HUMAN INITIAL_PLAYER_CONFIRMED',
+            'TCA_TEST BEGIN tca_court_session.1 tca_test_court_player_session',
+            'TCA_COURT_SESSION PLAYER_CONFIRMED',
+            'TCA_TEST CHECK_PASS tca_test_court_player_session 5',
+            'console_success: Going to observe mode',
+            'TCA_TEST CHECK_PASS tca_test_court_player_session 6'])
+        self.assertEqual(human_phase_issues(log), [])
+        self.assertTrue(human_phase_issues(log.replace('TCA_COURT_SESSION PLAYER_CONFIRMED', '')))
+        self.assertTrue(human_phase_issues(log.replace('console_success: Going to observe mode', '')))
+        retirement = '\n'.join([
+            'TCA_TEST BEGIN tca_retirement_session.1 tca_test_retirement_player_session',
+            'TCA_RETIREMENT_SESSION PLAYER_CONFIRMED',
+            'TCA_TEST CHECK_PASS tca_test_retirement_player_session 4',
+            'console_success: Going to observe mode',
+            'TCA_TEST CHECK_PASS tca_test_retirement_player_session 5'])
+        self.assertTrue(human_phase_issues(log + '\n' + retirement))
+        self.assertTrue(human_phase_issues(log, 'tca_retirement_session.1'))
+        self.assertEqual(human_phase_issues(log, 'tca_court_session.1'), [])
+        self.assertTrue(human_phase_issues('console_success: Going to observe mode\n' + log))
+
+    def test_human_cases_use_fixed_checkpoint_names_and_fresh_native_boot(self):
+        events = definitions((ROOT/'tools/cli_adapter/events/tca_cli_events.txt').read_text(encoding='utf-8-sig'))
+        boot = ' '.join(events['tca_cli.2'])
+        gui = (ROOT/'tools/cli_adapter/gui/tca_cli_human_checkpoint.gui').read_text(encoding='utf-8-sig')
+        self.assertIn('tca_cli_court_human_session', gui)
+        self.assertIn('save tca_cli_human_session', gui)
+        self.assertIn('tca_cli_court_human_started', gui)
+        self.assertIn('tca_cli_human_started', gui)
+        self.assertNotIn('tca_cli_human_next_claim', gui)
+        self.assertNotIn('tca_cli_human_resume_request', gui)
+        self.assertNotIn('tca_cli.3', events)
+        self.assertNotIn('var:tca_cli_human_phase ?= 4', boot)
+        self.assertIn('is_ai = no', boot)
+
+    def test_each_selected_human_case_can_restart_once_but_business_cannot_follow(self):
+        from run_game_tests import checkpoint_request
+        with tempfile.TemporaryDirectory() as temp:
+            run = Path(temp)
+            (run/'save games').mkdir()
+            names = ('probe', 'tca_cli_court_human_session', 'tca_cli_human_session')
+            for name in names:
+                (run/'save games'/f'{name}.ck3').write_bytes(b'SAV' + b'x'*100)
+            (run/'selection.json').write_text(json.dumps({'cases': [
+                {'event': 'tca_court_session.1'}, {'event': 'tca_retirement_session.1'}]}))
+            def record(name, marker='HUMAN_SAVE'):
+                return f'console_success: Game saved to {name}\nTCA_CLI {marker} {name}'
+            used = {'reload', 'human:tca_cli_court_human_session'}
+            self.assertEqual(checkpoint_request(record(names[2]), run, used), ('human', names[2]))
+            with self.assertRaises(ValueError):
+                checkpoint_request(record(names[1]), run, used)
+            with self.assertRaises(ValueError):
+                checkpoint_request(record(names[0], 'RELOAD_SAVE'), run, {'human:' + names[1]})
+            (run/'selection.json').write_text(json.dumps({'cases': [{'event': 'tca_court_session.1'}]}))
+            with self.assertRaises(ValueError):
+                checkpoint_request(record(names[2]), run, set())
+            with self.assertRaises(ValueError):
+                checkpoint_request(record('unregistered_human'), run, set())
+
+    def test_fresh_gui_uses_direct_event_command_with_actual_emperor_id(self):
+        gui = (ROOT/'tools/cli_adapter/gui/tca_cli_human_checkpoint.gui').read_text(encoding='utf-8-sig')
+        self.assertEqual(gui.count("Concatenate('event tca_cli.2 ', UIntToString(Title.GetHolder.GetID))"), 2)
+        self.assertNotIn('trigger_event = tca_cli.2', gui)
+        events = definitions((ROOT/'tools/cli_adapter/events/tca_cli_events.txt').read_text(encoding='utf-8-sig'))
+        native = ' '.join(events['tca_cli.2'])
+        self.assertIn('is_ai = no', native)
+        self.assertIn('title:h_china.holder = root', native)
+        self.assertIn('var:tca_cli_human_phase ?= 2', native)
+        self.assertNotIn('TCA_TEST CHECK_PASS', native)
+        self.assertNotIn('TCA_TEST PASS', native)
+
+    def test_human_business_dispatch_is_direct_authorized_and_duplicate_guarded(self):
+        gui = (ROOT/'tools/cli_adapter/gui/tca_cli_human_checkpoint.gui').read_text(encoding='utf-8-sig')
+        self.assertIn('tca_cli_human_business_dispatch', gui)
+        self.assertIn("Var('tca_court_human_run')", gui)
+        self.assertIn("Var('tca_retirement_human_run')", gui)
+        self.assertIn('event tca_court_session.1 ', gui)
+        self.assertIn('event tca_retirement_session.1 ', gui)
+        self.assertIn('UIntToString(Title.GetHolder.GetID)', gui)
+        self.assertIn('tca_cli_human_business_dispatched', gui)
+        boot = ' '.join(definitions((ROOT/'tools/cli_adapter/events/tca_cli_events.txt').read_text(encoding='utf-8-sig'))['tca_cli.2'])
+        self.assertNotIn('trigger_event = tca_court_session.1', boot)
+        self.assertNotIn('trigger_event = tca_retirement_session.1', boot)
+        for stem, group in [('court', 'tca_military_court_positions_test'), ('retirement', 'tca_retirement_session')]:
+            events = definitions((ROOT/f'events/tests/tca_{stem}_session_test_events.txt').read_text(encoding='utf-8-sig'))
+            first = ' '.join(events[f'tca_{stem}_session.1'])
+            self.assertIn(f'tca_{stem}_human_business_started', first)
+            self.assertIn(f'has_character_flag = tca_test_lane_{group}_active', first)
+            self.assertLess(first.index(f'tca_{stem}_human_business_started'), first.index(f'TCA_TEST BEGIN tca_{stem}_session.1'))
+            self.assertIn('is_ai = no', first)
+
     def test_cli_human_stage_is_wired_without_an_early_observe_or_suite_redispatch(self):
         # 冻结适配器只在原生确认人类身份后续接被认领的同一个用例。
         events = definitions((ROOT/'tools/cli_adapter/events/tca_cli_events.txt').read_text(encoding='utf-8-sig'))
@@ -141,7 +243,7 @@ class GameRunnerTests(unittest.TestCase):
         self.assertIn('orphan = yes', boot)
         self.assertIn('is_ai = no', boot)
         self.assertIn('INITIAL_PLAYER_CONFIRMED', boot)
-        self.assertIn('trigger_event = tca_retirement_session.1', boot)
+        self.assertIn('TCA_CLI HUMAN_CASE_READY retirement', boot)
         self.assertNotIn('tca_run_observer_tests_effect', boot)
         gui = (ROOT/'tools/cli_adapter/gui/tca_cli_widgets.gui').read_text(encoding='utf-8-sig')
         self.assertIn("Var('tca_cli_human_phase')", gui)
@@ -187,7 +289,7 @@ class GameRunnerTests(unittest.TestCase):
             self.assertIn(call, native)
             self.assertLess(native.index('is_ai = no'), native.index(call))
             self.assertLess(native.index('name = tca_cli_human_phase value = 3'), native.index(call))
-            self.assertLess(native.index(call), native.index('trigger_event = tca_retirement_session.1'))
+            self.assertLess(native.index(call), native.index('TCA_CLI HUMAN_CASE_READY retirement'))
 
     def test_human_checkpoint_widget_survives_prepare_and_cannot_restart_after_load(self):
         # 此处检查GUI生命周期接线；原生保存与实际续局仍必须由引擎验收。
@@ -205,12 +307,26 @@ class GameRunnerTests(unittest.TestCase):
     def test_native_load_human_boot_uses_fresh_gui_and_confirms_before_phase_three(self):
         # -loadsave不依赖退出新开局大厅的回调；新进程UI不带首进程started标记。
         gui = (ROOT/'tools/cli_adapter/gui/tca_cli_human_checkpoint.gui').read_text(encoding='utf-8-sig')
-        boot = gui.split('name = "tca_cli_human_load_boot"', 1)[1]
+        # 按结构括号截取单个widget，不能把后面的只读业务分发控件也视为boot。
+        marker = gui.index('name = "tca_cli_human_load_boot"')
+        seq = tokens(gui[gui.rfind('widget = {', 0, marker):])
+        depth, end = 0, None
+        for index in range(2, len(seq)):
+            depth += (seq[index] == '{') - (seq[index] == '}')
+            if depth == 0:
+                end = index + 1
+                break
+        self.assertIsNotNone(end)
+        boot = ' '.join(seq[2:end])
         self.assertIn("EqualTo_CFixedPoint(Title.MakeScope.Var('tca_cli_human_phase').GetValue, '(CFixedPoint)2')", boot)
         self.assertIn("Not(GetVariableSystem.HasValue('tca_cli_human_started', 'yes'))", boot)
         self.assertIn("Not(GetVariableSystem.HasValue('tca_cli_human_booted', 'yes'))", boot)
-        self.assertIn('trigger_event = tca_cli.2', boot)
+        self.assertIn("Concatenate('event tca_cli.2 ', UIntToString(Title.GetHolder.GetID))", boot)
+        self.assertNotIn('trigger_event = tca_cli.2', boot)
         self.assertNotIn('tca_retirement_human_run', boot)
+        # 全文件允许读取原生授权，但任何控件都不能自行写入人类授权或身份确认阶段。
+        self.assertNotRegex(gui, r'set_variable\s*=\s*\{[^}]*\bname\s*=\s*tca_(?:retirement|court)_human_run\b')
+        self.assertNotIn('name = tca_cli_human_phase value = 3', gui)
         self.assertNotIn('name = tca_cli_human_phase value = 3', boot)
         events = definitions((ROOT/'tools/cli_adapter/events/tca_cli_events.txt').read_text(encoding='utf-8-sig'))
         native = ' '.join(events['tca_cli.2'])
@@ -315,6 +431,60 @@ time.sleep(20)
             self.assertEqual(json.loads((run/'terminal.json').read_text())['phases'], 2)
             evidence = json.loads((run/'reload_evidence.json').read_text())
             self.assertEqual(len(evidence['raw_logs']), 4)
+
+    def test_four_processes_keep_separate_selected_human_checkpoints(self):
+        """只验证保存请求、进程封存与冻结选择协议，不以日志夹具代替游戏业务验收。"""
+        from run_game_tests import run_game
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root/'binaries').mkdir()
+            emitter = root/'emit.py'
+            emitter.write_text("""from pathlib import Path
+import sys, time
+run = Path(sys.argv[1])
+phase = sys.argv[2]
+(run/'logs').mkdir(exist_ok=True)
+(run/'save games').mkdir(exist_ok=True)
+court = 'tca_test_court_player_session'
+retirement = 'tca_test_retirement_player_session'
+def save(name, marker):
+    (run/'save games'/f'{name}.ck3').write_bytes(b'SAV' + b'x'*100)
+    return [f'console_success: Game saved to {name}', f'TCA_CLI {marker} {name}']
+if phase == 'start':
+    lines = ['TCA_TEST SUITE_DISPATCH', 'console_success: Going to observe mode'] + save('probe', 'RELOAD_SAVE')
+elif phase == 'probe':
+    lines = ['console_success: Going to observe mode'] + save('tca_cli_court_human_session', 'HUMAN_SAVE')
+elif phase == 'tca_cli_court_human_session':
+    lines = ['TCA_RETIREMENT_HUMAN INITIAL_PLAYER_CONFIRMED',
+             'TCA_TEST BEGIN tca_court_session.1 ' + court, 'TCA_COURT_SESSION PLAYER_CONFIRMED']
+    lines += [f'TCA_TEST CHECK_PASS {court} {i}' for i in range(1, 6)]
+    lines += ['console_success: Going to observe mode', f'TCA_TEST CHECK_PASS {court} 6', f'TCA_TEST PASS {court}']
+    lines += save('tca_cli_human_session', 'HUMAN_SAVE')
+else:
+    lines = ['TCA_RETIREMENT_HUMAN INITIAL_PLAYER_CONFIRMED',
+             'TCA_TEST BEGIN tca_retirement_session.1 ' + retirement, 'TCA_RETIREMENT_SESSION PLAYER_CONFIRMED']
+    lines += [f'TCA_TEST CHECK_PASS {retirement} {i}' for i in range(1, 5)]
+    lines += ['console_success: Going to observe mode', f'TCA_TEST CHECK_PASS {retirement} 5',
+              f'TCA_TEST PASS {retirement}', 'TCA_TEST SUITE_ALL_PASSED']
+(run/'logs/debug.log').write_text('\\n'.join(lines) + '\\n')
+(run/'logs/error.log').write_text('')
+time.sleep(20)
+""", encoding='utf-8')
+            run = prepare_run(ROOT, root/'runs', root/'absent',
+                              cases=['tca_court_session.1', 'tca_retirement_session.1'])
+            args = SimpleNamespace(game_dir=root, seed=None, timeout=40, strict_title_heir=False)
+            def command(_args, target, save_name=None):
+                return [sys.executable, str(emitter), str(target), save_name or 'start']
+            with patch('run_game_tests.game_command', side_effect=command):
+                self.assertEqual(run_game(args, run), 0)
+            terminal = json.loads((run/'terminal.json').read_text())
+            self.assertEqual(terminal['phase_modes'], ['observer', 'observer', 'human', 'human'])
+            self.assertEqual(terminal['human_phases'], [3, 4])
+            self.assertEqual(terminal['snapshot_issues'], [])
+            for phase in (3, 4):
+                process = json.loads((run/'phases'/str(phase)/'process.json').read_text())
+                self.assertEqual(process['checkpoint_kind'], 'human')
+            self.assertEqual(len(json.loads((run/'reload_evidence.json').read_text())['raw_logs']), 8)
 
     def test_three_processes_keep_both_checkpoint_tokens_and_native_human_evidence(self):
         self._check_human_process_protocol(False)
