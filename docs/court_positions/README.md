@@ -11,6 +11,16 @@
 - [官职任命](../appointment/README.md)：入品、功绩晋升与正式官署头衔任命；本模块不另建入品或正式头衔继承体系。
 - [官制与名称](../court/README.md)：州、府、监、军的分类与官名。
 
+## 原版家用职位的付款边界
+
+乳母属于家用雇佣。非独立天朝雇主使用个人金币支付乳母薪资，包括地方官、中央官、非独立家主及奉祠／致仕者，不依赖具体官职、官品或在任标记。无国库雇主继续使用金币；独立天朝君主及其他政体沿用原版付款来源。个人资金不足不改由官库承担。薪资金额、乳母实收、威望收支、职位效果、聘任资格与 AI 评分保持原版。
+
+付款判断由 `common/scripted_triggers/tca_wet_nurse_payment_triggers.txt` 的 `tca_wet_nurse_uses_personal_gold_trigger` 维护，在薪资的雇主 `scope:liege` 内调用。`common/court_positions/types/zz_tca_wet_nurse_override.txt` 仅改变薪资的金币／国库选择；原生职位没有独立薪资追加入口，因此覆盖单个顶层职位，不能仅追加一个薪资片段。覆盖理由与已审阅原版基线统一登记在 `tools/upstream_overrides.json`；其他模组修改同名职位时需要合并。
+
+原生边界用例 `tca_wet_nurse_test.1` 登记于 `court` 模块，读取地方官、中央官、皇帝、无国库及非天朝国库角色并调用正式 trigger，不修改人物资金或职位。它只验证身份选择，不证明月度实际扣款。定向入口为 `python3 tools/run_game_tests.py --case tca_wet_nurse_test.1 --parallel 4 --timeout 180`。当前引擎复测未完成：独立测试进程在观察者确认和用例派发前退出，不能记为通过或用例断言失败。
+
+实际月度扣款、乳母实收、非独立家主及退休身份、个人贫困时的自然 AI 聘任／解雇、界面收支与保存重载仍待专用测试局验收。分别为官员与皇帝聘任乳母，核对连续月结的金币、国库和实收明细；其他收支应隔离或单独核算，不能把 trigger 通过当作扣款验收。
+
 ## 状态与维护边界
 
 七个文武职位与十八项任务的透明 PNG 原图保存在 [图标原图目录](../assets/court_position_icons/README.md)，按原生的 `court_position_types`／`court_position_task_types` 分目录。文件名与职位或任务标识一致；游戏 DDS 使用同名路径，分别为70×70和140×140的RGBA图像。职位采用独立器物构图，任务采用原版式彩色圆环与事务主体；共用任务只维护一张图。知贡举图标由科举模块独立维护。

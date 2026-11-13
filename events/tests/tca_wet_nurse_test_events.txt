@@ -1,0 +1,48 @@
+﻿# 乳母付款边界：只读检查现有雇主身份，不任免职位或修改资金。
+namespace = tca_wet_nurse_test
+
+tca_wet_nurse_test.1 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_wet_nurse_test.1 tca_test_wet_nurse_payment"
+        remove_character_flag = tca_test_tca_wet_nurse_test_case_failed
+        if = {
+            limit = {
+                title:h_china.holder = { government_has_flag = government_is_celestial is_independent_ruler = yes has_treasury = yes }
+                title:e_minister_chancellor.holder = { government_has_flag = government_is_celestial is_independent_ruler = no has_treasury = yes }
+                title:h_china.holder = { any_vassal_or_below = { government_has_flag = government_is_celestial is_landed = yes has_treasury = yes } }
+                title:k_england.holder = { has_treasury = no }
+                title:e_byzantium.holder = { NOT = { government_has_flag = government_is_celestial } has_treasury = yes }
+            }
+            if = {
+                limit = {
+                    title:h_china.holder = { tca_wet_nurse_uses_personal_gold_trigger = no }
+                    title:e_minister_chancellor.holder = { tca_wet_nurse_uses_personal_gold_trigger = yes }
+                    title:h_china.holder = { any_vassal_or_below = { government_has_flag = government_is_celestial is_landed = yes has_treasury = yes tca_wet_nurse_uses_personal_gold_trigger = yes } }
+                    title:k_england.holder = { tca_wet_nurse_uses_personal_gold_trigger = yes }
+                    title:e_byzantium.holder = { tca_wet_nurse_uses_personal_gold_trigger = no }
+                }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_wet_nurse_payment 1"
+            }
+            else = {
+                add_character_flag = tca_test_tca_wet_nurse_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_wet_nurse_payment 1"
+            }
+            if = {
+                limit = { has_character_flag = tca_test_tca_wet_nurse_test_case_failed }
+                debug_log = "TCA_TEST FAIL tca_test_wet_nurse_payment"
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+            }
+            else = {
+                debug_log = "TCA_TEST PASS tca_test_wet_nurse_payment"
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } }
+            }
+        }
+        else = {
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_wet_nurse_payment"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+        }
+        remove_character_flag = tca_test_tca_wet_nurse_test_case_failed
+    }
+}

@@ -1,0 +1,397 @@
+﻿# 仅调整乳母薪资的付款来源；金额、实收、资格与 AI 评分保留原版。
+# salary 在雇主 scope:liege 内调用付款 trigger；金币与国库分支互补，防止重复支付或漏付。
+wet_nurse_court_position = { # BP2
+	sort_order = 285
+	max_available_positions = 1
+	skill = learning
+
+	court_position_asset = {
+		animation = newborn
+		background = "gfx/interface/illustrations/event_scenes/bp2_nursery.dds"
+	}
+
+	opinion = {
+		value = regular_court_position_opinion
+	}
+
+	# 五档称职度的阈值。
+	aptitude_level_breakpoints = { 20 40 60 80 }
+
+	# 计算任职者称职度；root 为职位持有人。
+	aptitude = {
+		value = 25
+		if = {
+			limit = { health >= 5 }
+			add = {
+				value = health
+				multiply = 5
+				add = 10
+				desc = court_position_skill_health_good
+			}
+		}
+		else_if = {
+			limit = { health < 3 }
+			add = {
+				value = health
+				multiply = 10
+				add = -30
+				desc = court_position_skill_health_low
+			}
+		}
+		else = {
+			add = {
+				value = health
+				multiply = 2
+				desc = court_position_skill_health
+			}
+		}
+		if = {
+			limit = {
+				any_child = { }
+			}
+			add = {
+				value = 15
+				desc = court_position_has_child
+			}
+		}
+		if = {
+			limit = {
+				has_trait = strong
+			}
+			add = {
+				value = 15
+				desc = court_position_strong_trait
+			}
+		}
+		if = {
+			limit = {
+				has_trait = physique_good_3
+			}
+			add = {
+				value = 20
+				desc = court_position_physique_good_3_trait
+			}
+		}
+		if = {
+			limit = {
+				has_trait = physique_good_2
+			}
+			add = {
+				value = 15
+				desc = court_position_physique_good_2_trait
+			}
+		}
+		if = {
+			limit = {
+				has_trait = physique_good_1
+			}
+			add = {
+				value = 10
+				desc = court_position_physique_good_1_trait
+			}
+		}
+		if = {
+			limit = {
+				has_trait = loyal
+			}
+			add = {
+				value = 10
+				desc = court_position_loyal_trait
+			}
+		}
+
+		if = {
+			limit = { exists = liege.domicile }
+			if = {
+				limit = {
+					liege.domicile ?= { has_domicile_parameter = domicile_increased_wet_nurse_aptitude_6 }
+				}
+				add = {
+					value = domicile_increased_wet_nurse_aptitude_6_value
+					desc = estate_tutor_building
+				}
+			}
+			else_if = {
+				limit = {
+					liege.domicile ?= { has_domicile_parameter = domicile_increased_wet_nurse_aptitude_5 }
+				}
+				add = {
+					value = domicile_increased_wet_nurse_aptitude_5_value
+					desc = estate_tutor_building
+				}
+			}
+			else_if = {
+				limit = {
+					liege.domicile ?= { has_domicile_parameter = domicile_increased_wet_nurse_aptitude_4 }
+				}
+				add = {
+					value = domicile_increased_wet_nurse_aptitude_4_value
+					desc = estate_tutor_building
+				}
+			}
+			else_if = {
+				limit = {
+					liege.domicile ?= { has_domicile_parameter = domicile_increased_wet_nurse_aptitude_3 }
+				}
+				add = {
+					value = domicile_increased_wet_nurse_aptitude_3_value
+					desc = estate_tutor_building
+				}
+			}
+			else_if = {
+				limit = {
+					liege.domicile ?= { has_domicile_parameter = domicile_increased_wet_nurse_aptitude_2 }
+				}
+				add = {
+					value = domicile_increased_wet_nurse_aptitude_2_value
+					desc = estate_tutor_building
+				}
+			}
+			else_if = {
+				limit = {
+					liege.domicile ?= { has_domicile_parameter = domicile_increased_wet_nurse_aptitude_1 }
+				}
+				add = {
+					value = domicile_increased_wet_nurse_aptitude_1_value
+					desc = estate_tutor_building
+				}
+			}
+		}
+
+		# 来自 court.8311 事件的称职度奖励。
+		if = {
+			limit = { var:bonus_aptitude_role ?= flag:wet_nurse }
+			add = {
+				value = cp_bonus_aptitude_value
+				desc = cp_bonus_aptitude
+			}
+		}
+
+		add = court_position_aptitude_high_penalty_value
+		add = general_aptitude_bonus
+	}
+
+	is_shown = {
+		OR = {
+			is_landed_or_landless_administrative_or_theocratic = yes
+			domicile ?= {
+				has_domicile_parameter = nomad_unlock_wet_nurse
+			}
+		}
+		wet_nurse_court_position_unlocked_trigger = yes
+		trigger_if = {
+			limit = {
+				is_ai = yes
+				highest_held_title_tier <= tier_county
+			}
+			always = no
+		}
+	}
+
+	valid_position = {
+		trigger_if = {
+			limit = {
+				government_has_flag = government_is_nomadic
+			}
+			custom_tooltip = {
+				text = has_wet_nurse_domicile_building
+				domicile ?= {
+					has_domicile_parameter = nomad_unlock_wet_nurse
+				}
+			}
+		}
+		trigger_else = {
+			is_landed_or_landless_administrative_or_theocratic = yes
+		}
+	}
+
+	is_shown_character = {
+		scope:employee = {
+			court_position_employee_shown_trigger = yes
+		}
+	}
+
+	valid_character = {
+		scope:employee = {
+			wet_nurse_validity_trigger = { EMPLOYER = scope:liege }
+		}
+	}
+
+	revoke_cost = { # root 为雇主；此处不提供其他作用域。
+		prestige =  {
+			value = minor_court_position_prestige_revoke_cost
+			if = {
+				limit = { free_court_position_revoke_trigger = { POS = wet_nurse } }
+				multiply = 0
+			}
+		}
+	}
+
+	salary = {
+		gold = {
+			value = 0
+			if = {
+				limit = {
+					scope:liege = {
+						tca_wet_nurse_uses_personal_gold_trigger = yes
+					}
+				}
+				add = wet_nurse_total_salary_value
+			}
+		}
+		treasury = {
+			value = 0
+			if = {
+				limit = {
+					scope:liege = {
+						tca_wet_nurse_uses_personal_gold_trigger = no
+					}
+				}
+				add = wet_nurse_total_salary_value
+			}
+		}
+		prestige = wet_nurse_prestige_salary_value
+		round = no
+	}
+
+	received_salary = {
+		gold = {
+			value = wet_nurse_total_salary_value
+		}
+		prestige = {
+			value = wet_nurse_prestige_salary_value
+		}
+		round = no
+	}
+
+	custom_employer_modifier_description = wet_nurse_employer_custom_effect_description
+
+	modifier = {
+		diplomacy = 1
+		child_opinion = 15
+	}
+
+	on_court_position_received = {
+		wet_nurse_title_accepted_effect = yes
+	}
+	on_court_position_revoked = {
+		wet_nurse_title_revoked_effect = yes
+	}
+	on_court_position_invalidated = {
+		wet_nurse_title_invalidated_effect = yes
+	}
+	on_court_position_vacated = {
+		court_position_vacated_event_effect = {
+			COURT_POSITION_TYPE = wet_nurse_court_position
+		}
+	}
+
+	# AI 聘任／解雇评分：大于0考虑聘任，小于-50考虑解雇；接口见 _court_positions.info。
+	ai_position_score = {
+		value = 50
+		add = court_position_debt_considerations_value
+	}
+	ai_candidate_score = {
+		value = 50
+		add = scope:base_value
+		add = court_position_candidate_score_base_value
+		add = court_position_candidate_aptitude_value
+		scope:liege = {
+			# 好感影响受聘倾向。
+			if = {
+				limit = {
+					has_relation_lover = scope:employee
+				}
+				add = 100
+			}
+			else_if = {
+				limit = {
+					has_relation_friend = scope:employee
+				}
+				add = 75
+			}
+			else_if = {
+				limit = {
+					opinion = {
+						target = scope:employee
+						value >= high_positive_opinion
+					}
+				}
+				add = 50
+			}
+			else_if = {
+				limit = {
+					opinion = {
+						target = scope:employee
+						value >= medium_positive_opinion
+					}
+				}
+				add = 25
+			}
+			if = {
+				limit = {
+					has_relation_nemesis = scope:employee
+				}
+				add = -100
+			}
+			else_if = {
+				limit = {
+					has_relation_rival = scope:employee
+				}
+				add = -75
+			}
+			else_if = {
+				limit = {
+					opinion = {
+						target = scope:employee
+						value >= high_negative_opinion
+					}
+				}
+				add = -50
+			}
+			else_if = {
+				limit = {
+					opinion = {
+						target = scope:employee
+						value >= medium_negative_opinion
+					}
+				}
+				add = -25
+			}
+			if = {
+				limit = {
+					NOT = { scope:liege.culture ?= scope:employee.culture }
+				}
+				add = -25
+			}
+			if = {
+				limit = {
+					scope:liege.faith != scope:employee.faith
+				}
+				add = -25
+			}
+			if = {
+				limit = {
+					OR = {
+						primary_heir ?= {
+							is_adult = no
+							is_courtier_of = scope:liege
+						}
+						any_child = {
+							count >= 3
+							is_adult = no
+							is_courtier_of = scope:liege
+						}
+					}
+				}
+				add = 20
+			}
+		}
+		if = { # 避免请任成功后立即被 AI 解雇。
+			limit = {
+				court_position_petition_ai_weight_trigger = { ROLE = wet_nurse }
+			}
+			add = 1000
+		}
+	}
+}
