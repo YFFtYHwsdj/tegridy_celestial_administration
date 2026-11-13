@@ -56,6 +56,8 @@ tca_test_visit_case_effect = { EVENT = tca_x_test.1 CASE = tca_test_x_demo DELAY
 
 `EXCLUSIVE = yes`的用例在派发时要求当前活跃数为0，且在其结束前不再认领任何其它延迟用例，因此独占期间整轮延迟链串行。静态检查对共享作用域（`title:h_china`、`title:h_china.holder`、全局变量；含夹具间接写入）上的变量与角色flag做写-写冲突检测：只有两个及以上不同GROUP的“延迟且非独占”用例写同一个状态键时才报违规；同GROUP的延迟用例串行、独占用例与其它延迟用例互斥、即时用例在同步阶段先于延迟阶段执行，因此都不参与冲突集合。检查器不跟踪读取与原生法则状态，读-写耦合仍须人工判断并以K>1引擎对照验证。当前独占清单如下，新增同类场景必须设置独占并更新本节：
 
+- 北疆P0原型`tca_test_frontier_protected_county`与`tca_test_frontier_title_troops`：借用真实宋夏地方官及上级开启战争、保存重载并观察原生动员，不能与其他借还或战争测试并发。
+
 - 保存重载探针`tca_test_merit_saveload_contract`：保存、重载及续局阶段不能被其它用例的世界写入干扰；与州郡兼领法同属`tca_local_domain_realm`。
 - 玩家会话`tca_test_retirement_player_session`：等待人工接管玩家，结束时间不受框架控制。
 - 州郡兼领法开局快照的延迟用例`tca_test_local_domain_immediate`与`tca_test_local_domain_native`：必须早于其它用例对历史人物的改制／返境操作，保持串行时的开局快照语义。

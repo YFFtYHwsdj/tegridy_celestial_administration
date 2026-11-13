@@ -1,0 +1,93 @@
+﻿# 北疆P0军队观察：使用已有头衔兵士的宋方县级主官及上级，不生成或转移兵士。
+# 借用真实人物开战并保存军队现场，独占；保存用于读取原生regiments→army_regiments→armies链。
+namespace = tca_frontier_troops_test
+
+tca_frontier_troops_test.1 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_frontier_troops_test.1 tca_test_frontier_title_troops"
+        remove_character_flag = tca_test_tca_frontier_troops_test_case_failed
+        clear_saved_scope = tca_frontier_troops_defender
+        clear_saved_scope = tca_frontier_troops_actor
+        random_vassal_or_below = {
+            limit = {
+                is_alive = yes is_landed = yes is_at_war = no
+                highest_held_title_tier = tier_county
+                government_has_flag = government_is_celestial
+                any_maa_regiment = { exists = regiment_owning_title }
+                liege = { is_alive = yes is_at_war = no any_maa_regiment = { exists = regiment_owning_title } }
+            }
+            save_scope_as = tca_frontier_troops_defender
+            primary_title = { save_scope_as = tca_frontier_troops_defender_title }
+            liege = { save_scope_as = tca_frontier_troops_upper primary_title = { save_scope_as = tca_frontier_troops_upper_title } }
+        }
+        title:k_xia.holder ?= { random_vassal_or_below = {
+            limit = { is_alive = yes is_landed = yes is_at_war = no highest_held_title_tier = tier_county NOT = { has_variable = tca_frontier_probe_target } }
+            save_scope_as = tca_frontier_troops_actor
+        } }
+        if = { limit = { exists = scope:tca_frontier_troops_defender exists = scope:tca_frontier_troops_actor }
+            scope:tca_frontier_troops_actor = { tca_test_protect_character_effect = yes set_variable = { name = tca_frontier_probe_target value = scope:tca_frontier_troops_defender } save_scope_as = actor }
+            scope:tca_frontier_troops_defender = { tca_test_protect_character_effect = yes save_scope_as = recipient }
+            scope:tca_frontier_troops_upper = { tca_test_protect_character_effect = yes }
+            # 当前军团与所有权原样记录；实际是否上阵以保存现场的军队引用链交叉核对。
+            scope:tca_frontier_troops_defender = { every_maa_regiment = { debug_log = "TCA_FRONTIER_TROOPS DEFENDER_REGIMENT_BEFORE" debug_log_scopes = yes } }
+            scope:tca_frontier_troops_upper = { every_maa_regiment = { debug_log = "TCA_FRONTIER_TROOPS UPPER_REGIMENT_BEFORE" debug_log_scopes = yes } }
+            run_interaction = { interaction = tca_frontier_probe_war_interaction actor = scope:actor recipient = scope:recipient redirect = no send_threshold = accept }
+            trigger_event = { id = tca_frontier_troops_test.2 days = 60 }
+        }
+        else = {
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_frontier_title_troops"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+            tca_test_lane_end_effect = { GROUP = tca_frontier_troops_test }
+        }
+    }
+}
+
+tca_frontier_troops_test.2 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            clear_saved_scope = tca_frontier_troops_war
+            scope:tca_frontier_troops_actor = { every_character_war = { limit = { using_cb = tca_frontier_probe_county_cb primary_defender = scope:tca_frontier_troops_defender } save_scope_as = tca_frontier_troops_war } }
+            if = { limit = { exists = scope:tca_frontier_troops_war scope:tca_frontier_troops_war = { primary_attacker = scope:tca_frontier_troops_actor primary_defender = scope:tca_frontier_troops_defender any_war_defender = { this = scope:tca_frontier_troops_upper } } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_title_troops 1"
+            }
+            else = { add_character_flag = tca_test_tca_frontier_troops_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_title_troops 1" }
+            if = { limit = { scope:tca_frontier_troops_defender = { has_raised_armies = yes } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_title_troops 2"
+            }
+            else = { add_character_flag = tca_test_tca_frontier_troops_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_title_troops 2" }
+            if = { limit = { scope:tca_frontier_troops_upper = { has_raised_armies = yes } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_title_troops 3"
+            }
+            else = { add_character_flag = tca_test_tca_frontier_troops_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_title_troops 3" }
+            scope:tca_frontier_troops_defender = { every_maa_regiment = { debug_log = "TCA_FRONTIER_TROOPS DEFENDER_REGIMENT_AFTER" debug_log_scopes = yes } }
+            scope:tca_frontier_troops_upper = { every_maa_regiment = { debug_log = "TCA_FRONTIER_TROOPS UPPER_REGIMENT_AFTER" debug_log_scopes = yes } }
+            # 保存时战争仍在进行。GUI只调整观察速度和保存，不生成军队或改变兵力。
+            title:h_china = { set_variable = { name = tca_frontier_troops_capture_phase value = 1 } }
+            trigger_event = { id = tca_frontier_troops_test.3 days = 20 }
+        }
+    }
+}
+
+tca_frontier_troops_test.3 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            scope:tca_frontier_troops_war ?= { end_war = white_peace }
+            scope:tca_frontier_troops_actor = { remove_variable = tca_frontier_probe_target remove_variable = tca_frontier_probe_pending tca_test_restore_character_effect = yes }
+            scope:tca_frontier_troops_defender = { tca_test_restore_character_effect = yes }
+            scope:tca_frontier_troops_upper = { tca_test_restore_character_effect = yes }
+            title:h_china = { remove_variable = tca_frontier_troops_capture_phase }
+            if = { limit = { has_character_flag = tca_test_tca_frontier_troops_test_case_failed }
+                debug_log = "TCA_TEST FAIL tca_test_frontier_title_troops"
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+            }
+            else = { debug_log = "TCA_TEST PASS tca_test_frontier_title_troops" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            remove_character_flag = tca_test_tca_frontier_troops_test_case_failed
+            tca_test_lane_end_effect = { GROUP = tca_frontier_troops_test }
+        }
+    }
+}

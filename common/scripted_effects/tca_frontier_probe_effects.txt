@@ -1,0 +1,53 @@
+﻿# 北疆P0正式原型入口；互动与原生测试共用actor、recipient人物作用域。
+# 输入：actor上显式准备的tca_frontier_probe_target；目标取recipient当前首府伯爵领。
+# 输出：实际战争保存到scope:tca_frontier_probe_war；不存在则不登记待介入状态。
+# 副作用：发动一场原生战争、在actor标记唯一待介入战争、30日后执行一次支援核验。
+# 不改最高领主法律、封臣可攻击状态、军队或资金；原型无费用，不代替P3完整合法性。
+tca_frontier_probe_start_effect = {
+    if = { limit = { tca_frontier_probe_ready_trigger = yes }
+        scope:recipient.capital_county = { save_scope_as = tca_frontier_probe_goal }
+        scope:recipient.liege = { save_scope_as = tca_frontier_probe_upper }
+        clear_saved_scope = tca_frontier_probe_war
+        scope:actor = {
+            start_war = { cb = tca_frontier_probe_county_cb target = scope:recipient target_title = scope:tca_frontier_probe_goal }
+            every_character_war = {
+                limit = { using_cb = tca_frontier_probe_county_cb primary_attacker = scope:actor primary_defender = scope:recipient }
+                save_scope_as = tca_frontier_probe_war
+            }
+        }
+        if = { limit = { exists = scope:tca_frontier_probe_war }
+            scope:tca_frontier_probe_war = {
+                set_variable = { name = tca_frontier_probe_upper value = scope:tca_frontier_probe_upper }
+                set_variable = { name = tca_frontier_probe_defender value = scope:recipient }
+            }
+            scope:actor = {
+                set_variable = { name = tca_frontier_probe_pending value = scope:tca_frontier_probe_war }
+                trigger_event = { id = tca_frontier_probe.1 days = 30 }
+            }
+            debug_log = "TCA_FRONTIER_PROBE LOCAL_WAR_CREATED"
+        }
+        else = { debug_log = "TCA_FRONTIER_PROBE LOCAL_WAR_NOT_CREATED" }
+    }
+}
+
+# actor人物作用域的延迟续接；同一actor最多一项待介入，完整战争引用随事件上下文保存。
+# 战争结束后不访问旧战争内部变量；只从actor现有战争集合确认其仍然有效。
+# 上级死亡、改隶或已参战时取消；结束唯一待介入标记，不新建战争或生成军队。
+tca_frontier_probe_resolve_support_effect = {
+    if = { limit = { exists = scope:tca_frontier_probe_war any_character_war = { this = scope:tca_frontier_probe_war } }
+        scope:tca_frontier_probe_war = {
+            if = { limit = {
+                exists = var:tca_frontier_probe_upper
+                exists = var:tca_frontier_probe_defender
+                var:tca_frontier_probe_upper = { is_alive = yes is_liege_or_above_of = scope:recipient NOT = { is_at_war_with = scope:recipient } }
+                primary_defender = var:tca_frontier_probe_defender
+                NOT = { any_war_defender = { this = scope:tca_frontier_probe_upper } }
+            }
+                add_defender = scope:tca_frontier_probe_upper
+                debug_log = "TCA_FRONTIER_PROBE UPPER_JOINED"
+            }
+        }
+    }
+    else = { debug_log = "TCA_FRONTIER_PROBE SUPPORT_CANCELLED_WAR_ENDED" }
+    remove_variable = tca_frontier_probe_pending
+}

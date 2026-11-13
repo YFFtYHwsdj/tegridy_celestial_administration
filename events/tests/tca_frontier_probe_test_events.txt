@@ -1,0 +1,138 @@
+﻿# 北疆P0真实人物原型：借宋县级军官、夏县级主官及其真实直属上级。
+# 不改法律、军队、资金或土地；跨日只维护私有原型标记并结束本例战争，故独占。
+namespace = tca_frontier_probe_test
+
+tca_frontier_probe_test.1 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_frontier_probe_test.1 tca_test_frontier_protected_county"
+        remove_character_flag = tca_test_tca_frontier_probe_test_case_failed
+        clear_saved_scope = tca_frontier_probe_test_actor
+        clear_saved_scope = tca_frontier_probe_test_defender
+        random_vassal_or_below = {
+            limit = { is_alive = yes is_landed = yes highest_held_title_tier = tier_county is_at_war = no government_has_flag = government_is_celestial vassal_contract_has_flag = celestial_province_military NOT = { has_variable = tca_frontier_probe_target } }
+            save_scope_as = tca_frontier_probe_test_actor
+        }
+        title:k_xia.holder ?= {
+            random_vassal_or_below = {
+                limit = { is_alive = yes is_landed = yes highest_held_title_tier = tier_county is_at_war = no exists = liege liege = { is_at_war = no can_vassals_be_attacked = no } top_liege = { can_vassals_be_attacked = no } }
+                save_scope_as = tca_frontier_probe_test_defender
+                liege = { save_scope_as = tca_frontier_probe_test_upper }
+                capital_county = { save_scope_as = tca_frontier_probe_test_target }
+            }
+        }
+        if = { limit = { exists = scope:tca_frontier_probe_test_actor exists = scope:tca_frontier_probe_test_defender exists = scope:tca_frontier_probe_test_target }
+            scope:tca_frontier_probe_test_actor = { tca_test_protect_character_effect = yes set_variable = { name = tca_frontier_probe_target value = scope:tca_frontier_probe_test_defender } save_scope_as = actor }
+            scope:tca_frontier_probe_test_defender = { tca_test_protect_character_effect = yes save_scope_as = recipient }
+            scope:tca_frontier_probe_test_upper = { tca_test_protect_character_effect = yes }
+            if = { limit = { scope:tca_frontier_probe_test_defender.top_liege = { can_vassals_be_attacked = no has_realm_law = top_liege_redirected_to_border_wars_law } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_protected_county 1"
+            }
+            else = { add_character_flag = tca_test_tca_frontier_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_protected_county 1" }
+            run_interaction = { interaction = tca_frontier_probe_war_interaction actor = scope:actor recipient = scope:recipient redirect = no send_threshold = accept }
+            trigger_event = { id = tca_frontier_probe_test.2 days = 1 }
+        }
+        else = {
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_frontier_protected_county"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+            tca_test_lane_end_effect = { GROUP = tca_frontier_probe_test }
+        }
+    }
+}
+
+tca_frontier_probe_test.2 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            clear_saved_scope = tca_frontier_probe_test_war
+            scope:tca_frontier_probe_test_actor = { every_character_war = {
+                limit = { using_cb = tca_frontier_probe_county_cb }
+                save_scope_as = tca_frontier_probe_test_war
+            } }
+            if = { limit = { exists = scope:tca_frontier_probe_test_war scope:tca_frontier_probe_test_war = { primary_attacker = scope:tca_frontier_probe_test_actor primary_defender = scope:tca_frontier_probe_test_defender casus_belli = { any_target_title = { this = scope:tca_frontier_probe_test_target count = 1 } } NOT = { any_war_defender = { this = scope:tca_frontier_probe_test_upper } } } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_protected_county 2"
+            }
+            else = { add_character_flag = tca_test_tca_frontier_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_protected_county 2" }
+            # 保存在上级尚未加入时，实际重载后再等待正式事件，不重建战争或补派支援。
+            title:h_china = { set_variable = { name = tca_frontier_probe_checkpoint_phase value = 1 } }
+            debug_log = "TCA_TEST WAIT tca_test_frontier_protected_county 45 days"
+            trigger_event = { id = tca_frontier_probe_test.3 days = 45 }
+        }
+    }
+}
+
+tca_frontier_probe_test.3 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { exists = scope:tca_frontier_probe_test_war scope:tca_frontier_probe_test_war = { any_war_defender = { this = scope:tca_frontier_probe_test_upper } } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_protected_county 3"
+            }
+            else = { add_character_flag = tca_test_tca_frontier_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_protected_county 3" }
+            if = { limit = { scope:tca_frontier_probe_test_defender.top_liege = { can_vassals_be_attacked = no has_realm_law = top_liege_redirected_to_border_wars_law } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_protected_county 4"
+            }
+            else = { add_character_flag = tca_test_tca_frontier_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_protected_county 4" }
+            if = { limit = { title:h_china = { var:tca_frontier_probe_checkpoint_phase = 3 } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_protected_county 8"
+            }
+            else = { add_character_flag = tca_test_tca_frontier_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_protected_county 8" }
+            title:h_china = { remove_variable = tca_frontier_probe_checkpoint_phase }
+            # 只记录军队可观察状态；未动员不得据参战名单宣称头衔兵士已验收。
+            scope:tca_frontier_probe_test_defender = { if = { limit = { any_maa_regiment = { exists = regiment_owning_title } } debug_log = "TCA_FRONTIER_PROBE DEFENDER_TITLE_MAA_PRESENT" } if = { limit = { has_raised_armies = yes } debug_log = "TCA_FRONTIER_PROBE DEFENDER_ARMIES_RAISED" } }
+            scope:tca_frontier_probe_test_upper = { if = { limit = { any_maa_regiment = { exists = regiment_owning_title } } debug_log = "TCA_FRONTIER_PROBE UPPER_TITLE_MAA_PRESENT" } if = { limit = { has_raised_armies = yes } debug_log = "TCA_FRONTIER_PROBE UPPER_ARMIES_RAISED" } }
+            scope:tca_frontier_probe_test_war ?= { end_war = white_peace }
+            trigger_event = { id = tca_frontier_probe_test.4 days = 1 }
+        }
+    }
+}
+
+tca_frontier_probe_test.4 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_frontier_probe_test_actor = { NOT = { any_character_war = { using_cb = tca_frontier_probe_county_cb } } } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_protected_county 5"
+            }
+            else = { add_character_flag = tca_test_tca_frontier_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_protected_county 5" }
+            # 第二场只验证提前结束；仍调用同一开战入口，随后白和平，不清除原生停战状态。
+            scope:tca_frontier_probe_test_actor = { save_scope_as = actor }
+            scope:tca_frontier_probe_test_defender = { save_scope_as = recipient }
+            tca_frontier_probe_start_effect = yes
+            clear_saved_scope = tca_frontier_probe_test_early_war
+            scope:tca_frontier_probe_test_actor = { every_character_war = { limit = { using_cb = tca_frontier_probe_county_cb } save_scope_as = tca_frontier_probe_test_early_war } }
+            if = { limit = { exists = scope:tca_frontier_probe_test_early_war }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_protected_county 6"
+                scope:tca_frontier_probe_test_early_war = { end_war = white_peace }
+            }
+            else = { add_character_flag = tca_test_tca_frontier_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_protected_county 6" }
+            trigger_event = { id = tca_frontier_probe_test.5 days = 45 }
+        }
+    }
+}
+
+tca_frontier_probe_test.5 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { scope:tca_frontier_probe_test_actor = { NOT = { any_character_war = { using_cb = tca_frontier_probe_county_cb } } NOT = { has_variable = tca_frontier_probe_pending } } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_protected_county 7"
+            }
+            else = { add_character_flag = tca_test_tca_frontier_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_protected_county 7" }
+            scope:tca_frontier_probe_test_actor = { every_character_war = { limit = { using_cb = tca_frontier_probe_county_cb } end_war = white_peace } remove_variable = tca_frontier_probe_target remove_variable = tca_frontier_probe_pending tca_test_restore_character_effect = yes }
+            scope:tca_frontier_probe_test_defender = { tca_test_restore_character_effect = yes }
+            scope:tca_frontier_probe_test_upper = { tca_test_restore_character_effect = yes }
+            if = { limit = { has_character_flag = tca_test_tca_frontier_probe_test_case_failed }
+                debug_log = "TCA_TEST FAIL tca_test_frontier_protected_county"
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+            }
+            else = { debug_log = "TCA_TEST PASS tca_test_frontier_protected_county" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            remove_character_flag = tca_test_tca_frontier_probe_test_case_failed
+            tca_test_lane_end_effect = { GROUP = tca_frontier_probe_test }
+        }
+    }
+}

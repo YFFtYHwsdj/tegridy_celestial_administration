@@ -1,0 +1,41 @@
+﻿# 北疆P0伯爵目标战争；只验证脚本开战、防守者与支援，不承诺正式平衡。
+# target_top_liege_if_outside_realm只用于脚本；普通宣战UI不承担本原型入口。
+tca_frontier_probe_county_cb = {
+    icon = county_conquest_cb
+    group = tca_frontier_probe
+    target_titles = all
+    target_title_tier = county
+    target_top_liege_if_outside_realm = no
+    combine_into_one = yes
+    mutually_exclusive_titles = { always = yes }
+    allowed_for_character = { debug_only = yes has_variable = tca_frontier_probe_target }
+    allowed_against_character = { this = scope:attacker.var:tca_frontier_probe_target }
+    valid_to_start = { scope:target = { holder = scope:defender } }
+    should_invalidate = { NOT = { any_in_list = { list = target_titles holder = scope:defender } } }
+    on_primary_attacker_death = invalidate
+    on_primary_defender_death = invalidate
+    # 零停战只用于可丢弃探针反复验证，正式战争在P3另定。
+    truce_days = 0
+    cost = { prestige = 0 }
+    attacker_ticking_warscore_delay = { months = 1 }
+    defender_ticking_warscore_delay = { months = 1 }
+    attacker_ticking_warscore = 0.1
+    defender_ticking_warscore = 0.1
+    max_attacker_score_from_battles = 20
+    max_defender_score_from_battles = 20
+    on_declaration = { }
+    on_victory_desc = tca_frontier_probe_cb_victory
+    on_victory = {
+        create_title_and_vassal_change = { type = conquest save_scope_as = tca_frontier_probe_change add_claim_on_loss = yes }
+        every_in_list = { list = target_titles change_title_holder = { holder = scope:attacker change = scope:tca_frontier_probe_change } }
+        resolve_title_and_vassal_change = scope:tca_frontier_probe_change
+    }
+    on_white_peace_desc = tca_frontier_probe_cb_white_peace
+    on_white_peace = { }
+    on_defeat_desc = tca_frontier_probe_cb_defeat
+    on_defeat = { }
+    on_invalidated_desc = tca_frontier_probe_cb_invalidated
+    on_invalidated = { }
+    war_name = tca_frontier_probe_war_name
+    cb_name = tca_frontier_probe_county_cb
+}
