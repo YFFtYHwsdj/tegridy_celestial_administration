@@ -10,7 +10,7 @@ tca_military_court_position_on_received_effect = {
     scope:liege = { tca_military_sync_local_marshal_effect = yes }
 }
 
-# 主君作用域；同署可能同时雇用三种差遣，唯一军事内阁按都虞候、都监、监押排序。
+# 主君作用域；每署仅一种合法军事差遣；旧档清理期间仍按都虞候、都监、监押顺序防御性选席。
 # 只访问本署已有职位；本入口创建并清理tca_military_council_liege与tca_military_selected_marshal。
 # 可选输入scope:tca_military_departing_officer由离任回调建立并清理，用于排除正在离任的旧官。
 # 只有实际兼任者获得模块锁，既有原生保护不改写；无法合法替换外部受保护司马时不强制执行。
@@ -18,18 +18,18 @@ tca_military_sync_local_marshal_effect = {
     tca_court_sync_linked_council_effect = { COUNCIL = councillor_marshal SELECT = tca_military_select_local_marshal_effect CAPTURE = tca_military_capture_marshal_task_effect RESTORE = tca_military_restore_marshal_task_effect FALLBACK = tca_military_player_fallback_marshal_effect }
 }
 
-# 主君作用域；选席顺序不变，输出由共用同步入口消费。
+# 主君作用域；只从本署当前允许的职位选席，避免旧档失格低职在清理期间接任。
 tca_military_select_local_marshal_effect = {
-    tca_military_select_marshal_from_position_effect = { POSITION = tca_corps_inspector_court_position }
-    tca_military_select_marshal_from_position_effect = { POSITION = tca_military_inspector_court_position }
-    tca_military_select_marshal_from_position_effect = { POSITION = tca_military_supervisor_court_position }
+    tca_military_select_marshal_from_position_effect = { POSITION = tca_corps_inspector_court_position OFFICE = tca_corps_inspector_office_valid_trigger }
+    tca_military_select_marshal_from_position_effect = { POSITION = tca_military_inspector_court_position OFFICE = tca_military_inspector_office_valid_trigger }
+    tca_military_select_marshal_from_position_effect = { POSITION = tca_military_supervisor_court_position OFFICE = tca_military_supervisor_office_valid_trigger }
 }
 
-# 主君作用域；参数POSITION为静态职位ID，必需scope:tca_military_council_liege由选席入口提供。
+# 主君作用域；参数POSITION为静态职位ID、OFFICE为对应官署资格；必需scope:tca_military_council_liege由选席入口提供。
 # 仅在尚无高职候选时输出scope:tca_military_selected_marshal，交由调用者消费并清理。
 tca_military_select_marshal_from_position_effect = {
     if = {
-        limit = { NOT = { exists = scope:tca_military_selected_marshal } employs_court_position = $POSITION$ }
+        limit = { $OFFICE$ = yes NOT = { exists = scope:tca_military_selected_marshal } employs_court_position = $POSITION$ }
         court_position:$POSITION$ = {
             if = {
                 limit = {
@@ -86,7 +86,7 @@ tca_military_collect_officer_effect = { tca_court_collect_officer_effect = yes }
 # 独立天朝最高领主作用域；保留原on_action调用名，所有铨选在共用框架执行。
 tca_military_quarterly_fill_vacancies_effect = { tca_court_quarterly_fill_effect = yes }
 
-# 官署领主作用域；供改制和主君死亡后的真实雇主重绑调用，只检查自己的三种差遣。
+# 官署领主作用域；供开局／季度补缺前、改制和主君死亡后的真实雇主重绑调用，只检查自己的三种差遣。
 # 改制回归曾在两日观察窗口内见到原生未清理，因此此入口显式验证官署与人物资格。
 # 非地方官署还会清理本模块任务快照；不据此推断原生所有失效检查的周期。
 tca_military_validate_office_after_government_change_effect = {
