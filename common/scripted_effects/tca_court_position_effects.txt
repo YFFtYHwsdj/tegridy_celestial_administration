@@ -215,7 +215,7 @@ tca_court_dispatch_position_effect = {
 tca_court_quarterly_fill_effect = {
     if = { limit = { NOT = { has_character_flag = tca_court_batch_active } }
         add_character_flag = tca_court_batch_active
-        # 皇帝本廷也有神机提督；与封臣官署共用同轮冻结和排序。
+        # 皇帝本廷也有将作大匠与神机提督；与封臣官署共用同轮冻结和排序。
         tca_court_visit_positions_effect = { VISITOR = tca_court_snapshot_position_effect }
         if = { limit = { tca_court_next_vacancy_value > 0 } add_to_list = tca_court_vacant_offices }
         every_vassal_or_below = {
@@ -273,4 +273,13 @@ tca_court_lifecycle_position_effect = {
     save_scope_value_as = { name = tca_court_restore_mode value = $RESTORE$ }
     if = { limit = { scope:tca_court_restore_mode = 0 } tca_court_revoke_previous_effect = { POSITION = $POSITION$ } }
     else = { tca_court_restore_previous_effect = { POSITION = $POSITION$ OFFICE = $OFFICE$ } }
+}
+
+# 原生职位回调作用域；只清理本模组接管过的将作任职。
+# 来源标记允许雇主改制后的离任清理，不触碰其他政体原有兼职的差遣状态。
+tca_royal_architect_on_departure_effect = {
+    if = { limit = { scope:employee = { has_character_flag = tca_royal_architect_commission } }
+        tca_court_on_departure_effect = yes
+        scope:employee = { remove_character_flag = tca_royal_architect_commission }
+    }
 }

@@ -1,0 +1,304 @@
+﻿# 古物职位的最小顶层覆盖：仅增加地方／家门掌藏名称分支，其余原生任职、薪俸、任务与AI保持原样。
+# 原版court_position_asset首个匹配项决定名称；没有独立asset追加入口，直接覆盖天朝本地化会连皇帝一起改名。
+# 同名顶层定义不能用于合并asset，故保留单对象覆盖及已审阅基线；不替换原版整文件。
+antiquarian_court_position = {
+	sort_order = 350
+	max_available_positions = 1
+	skill = learning
+
+    # 优先匹配地方官署（含提刑、通判）及纯世族家门；皇帝和中央部院沿用原版名称。
+    # 只按实际雇主选择展示，不按员工身份或玩家当前控制人物判断。
+    court_position_asset = {
+        trigger = {
+            government_has_flag = government_is_celestial
+            OR = {
+                tca_is_celestial_governor_trigger = yes
+                AND = {
+                    any_held_title = { is_noble_family_title = yes }
+                    NOT = { any_held_title = { is_noble_family_title = no } }
+                }
+            }
+        }
+        animation = throne_room_one_handed_passive_3
+        background = "gfx/interface/illustrations/event_scenes/tgp_courtyard_asia.dds"
+        localization_key = tca_antiquarian_local
+    }
+
+	court_position_asset = {
+		trigger = {
+			government_has_flag = government_is_celestial
+		}
+		animation = throne_room_one_handed_passive_3
+		background = "gfx/interface/illustrations/event_scenes/tgp_courtyard_asia.dds"
+		localization_key = antiquarian_celestial
+	}
+
+	court_position_asset = {
+		animation = throne_room_one_handed_passive_3
+		background = "gfx/interface/illustrations/event_scenes/armory.dds"
+	}
+
+	opinion = {
+		value = regular_court_position_opinion
+	}
+
+	aptitude_level_breakpoints = { 20 40 60 80 }
+
+	aptitude = {
+		value = 1
+		add = {
+			value = learning
+			multiply = 2.5
+			max = 60
+			desc = court_position_skill_learning
+		}
+		if = {
+			limit = {
+				has_completed_inspiration = yes
+			}
+			add = {
+				value = 30
+				desc = court_position_completed_inspiration
+			}
+		}
+		if = {
+			limit = {
+				has_trait = shy
+			}
+			add = {
+				value = 15
+				desc = court_position_shy_trait
+			}
+		}
+		if = {
+			limit = {
+				has_trait = diligent
+			}
+			add = {
+				value = 15
+				desc = court_position_diligent_trait
+			}
+		}
+		if = {
+			limit = {
+				has_trait = administrator
+			}
+			add = {
+				value = 15
+				desc = court_position_administrator_trait
+			}
+		}
+		if = {
+			limit = { has_trait = overseer }
+			add = {
+				value = 15
+				desc = court_position_overseer_trait
+			}
+		}
+		if = {
+			limit = {
+				liege ?= {
+					domicile ?= { has_domicile_parameter = estate_increase_antiquarian_aptitude }
+				}
+			}
+			add = {
+				value = estate_increase_antiquarian_aptitude_value
+				desc = estate_increase_antiquarian_aptitude_desc
+			}
+		}
+
+		if = {
+			limit = { var:bonus_aptitude_role ?= flag:antiquarian }
+			add = {
+				value = cp_bonus_aptitude_value
+				desc = cp_bonus_aptitude
+			}
+		}
+		add = court_position_aptitude_low_penalty_value
+		add = general_aptitude_bonus
+	}
+
+	is_shown = {
+		OR = {
+			is_landed_or_landless_administrative_or_theocratic = yes
+			government_has_flag = government_is_nomadic
+		}
+		trigger_if = {
+			limit = {
+				is_ai = yes
+				highest_held_title_tier <= tier_county
+			}
+			always = no
+		}
+	}
+
+	valid_position = {
+		OR = {
+			is_landed_or_landless_administrative_or_theocratic = yes
+			government_has_flag = government_is_nomadic
+		}
+		trigger_if = {
+			limit = {
+				is_ai = yes
+			}
+			has_any_artifact = yes
+		}
+	}
+
+	is_shown_character = {
+		scope:employee = {
+			court_position_employee_shown_trigger = yes
+		}
+	}
+
+	valid_character = {
+		scope:employee = {
+			antiquarian_validity_trigger = { EMPLOYER = scope:liege }
+		}
+	}
+
+	revoke_cost = {
+		prestige =  {
+			value = major_court_position_prestige_revoke_cost
+			if = {
+				limit = { free_court_position_revoke_trigger = { POS = antiquarian } }
+				multiply = 0
+			}
+			if = {
+				limit = {
+					exists = this
+					government_has_flag = government_is_landless_adventurer
+				}
+				value = minor_court_position_prestige_revoke_cost
+			}
+		}
+	}
+
+	salary = {
+		gold = {
+			value = 0
+			if = {
+				limit = {
+					scope:liege = {
+						has_treasury = no
+					}
+				}
+				add = antiquarian_total_salary_value
+			}
+		}
+		treasury = {
+			value = 0
+			if = {
+				limit = {
+					scope:liege = {
+						has_treasury = yes
+					}
+				}
+				add = antiquarian_total_salary_value
+			}
+		}
+		round = no
+	}
+
+	received_salary = {
+		gold = {
+			value = antiquarian_total_salary_value
+		}
+		round = no
+	}
+
+	scaling_employer_modifiers = {
+		terrible = {
+			artifact_decay_reduction_mult = -0.07
+		}
+		poor = {
+			artifact_decay_reduction_mult = -0.11
+		}
+		average = {
+			artifact_decay_reduction_mult = -0.17
+		}
+		good = {
+			artifact_decay_reduction_mult = -0.25
+		}
+		excellent = {
+			artifact_decay_reduction_mult = -0.35
+		}
+	}
+
+	custom_employer_modifier_description = antiquarian_employer_custom_effect_description
+
+	modifier = {
+		stewardship = 2
+		artifact_decay_reduction_mult = -0.2
+	}
+
+	on_court_position_received = {
+		antiquarian_title_accepted_effect = yes
+	}
+	on_court_position_revoked = {
+		antiquarian_title_revoked_effect = yes
+	}
+	on_court_position_invalidated = {
+		antiquarian_title_invalidated_effect = yes
+	}
+	on_court_position_vacated = {
+		court_position_vacated_event_effect = {
+			COURT_POSITION_TYPE = antiquarian_court_position
+		}
+	}
+
+	ai_position_score = {
+		value = 50
+		if = {
+			limit = {
+				scope:liege = {
+					government_has_mechanic = administrative
+				}
+			}
+			add = 150
+		}
+		if = {
+			limit = {
+				scope:liege = {
+					highest_held_title_tier >= tier_duchy
+				}
+			}
+			add = 50
+		}
+		if = {
+			limit = {
+				scope:liege = {
+					highest_held_title_tier >= tier_kingdom
+				}
+			}
+			add = 50
+		}
+		add = court_position_debt_considerations_value
+	}
+	ai_candidate_score = {
+		value = 50
+		add = scope:base_value
+		add = court_position_candidate_score_base_value
+		add = court_position_candidate_aptitude_value
+        if = {
+            limit = {
+                exists = scope:firing_court_position
+            }
+            add = 100
+            scope:employee = {
+                if = {
+                    limit = {
+                        scope:highest_available_aptitude > scope:employee_aptitude
+                    }
+                    add = -75
+                }
+            }
+        }
+        if = {
+			limit = {
+				court_position_petition_ai_weight_trigger = { ROLE = antiquarian }
+			}
+			add = 1000
+		}
+	}
+}
