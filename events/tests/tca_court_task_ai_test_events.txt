@@ -1,0 +1,109 @@
+﻿# 差遣任务AI：调用正式评分，自备人物并沿共用夹具借还县，不冒充自然任务选择或实际扣款。
+# 同步执行，按军事差遣GROUP隔离共享夹具；先还控制度再还县，不增加跨日独占。
+namespace = tca_military_court_positions_test
+
+tca_military_court_positions_test.19 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_military_court_positions_test.19 tca_test_court_task_ai_needs_and_budget"
+        remove_character_flag = tca_test_tca_military_court_positions_test_case_failed
+        create_character = {
+            age = 35 gender_female_chance = 0 random_traits = no dynasty = none
+            culture = root.culture faith = root.faith employer = root
+            save_scope_as = tca_military_court_positions_test_task_poor
+        }
+        scope:tca_military_court_positions_test_task_poor = {
+            save_scope_as = liege
+            # 所有入口都拒绝无领地、无军队、无其他职位的空对象；性格与免费规则不能救活无收益任务。
+            if = { limit = {
+                tca_court_encourage_farming_ai_score <= -10
+                tca_court_register_recruits_ai_score <= -10
+                tca_court_relieve_households_ai_score <= -10
+                tca_court_explain_statutes_ai_score <= -10
+                tca_court_review_sentences_ai_score <= -10
+                tca_court_review_documents_ai_score <= -10
+                tca_court_organize_office_ai_score <= -10
+                tca_court_supervise_building_ai_score <= -10
+                tca_court_audit_military_supplies_ai_score <= -10
+                tca_military_supervisor_drill_levies_ai_score <= -10
+                tca_military_supervisor_order_barracks_ai_score <= -10
+                tca_military_supervisor_inspect_defenses_ai_score <= -10
+                tca_military_inspector_maintain_gear_ai_score <= -10
+                tca_military_inspector_drill_troops_ai_score <= -10
+                tca_military_inspector_inspect_troops_ai_score <= -10
+                tca_corps_inspector_encourage_officers_ai_score <= -10
+                tca_corps_inspector_enforce_discipline_ai_score <= -10
+                tca_corps_inspector_marshal_ranks_ai_score <= -10
+            } root = { debug_log = "TCA_TEST CHECK_PASS tca_test_court_task_ai_needs_and_budget 1" } }
+            else = { root = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_task_ai_needs_and_budget 1" } }
+            # 无收入储备；困难AI原版月费为0时，不得施加虚构的费用压力。
+            if = { limit = { OR = {
+                AND = { monthly_court_position_task_cost > 0 tca_court_task_ai_budget_penalty <= -1000 }
+                AND = { monthly_court_position_task_cost = 0 tca_court_task_ai_budget_penalty = 0 }
+            } } root = { debug_log = "TCA_TEST CHECK_PASS tca_test_court_task_ai_needs_and_budget 2" } }
+            else = { root = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_task_ai_needs_and_budget 2" } }
+        }
+        scope:tca_military_court_positions_test_task_poor = { death = { death_reason = death_natural_causes } }
+        clear_saved_scope = liege
+        tca_test_military_council_prepare_county_effect = { MILITARY_ONLY = no }
+        if = { limit = { scope:tca_mcp_borrow_ready = 1 exists = scope:tca_mcp_county exists = scope:tca_mcp_officer }
+            scope:tca_mcp_governor = { save_scope_as = liege }
+            scope:tca_mcp_officer = { save_scope_as = employee remove_variable = tca_court_paid_task_active }
+            scope:tca_mcp_governor = { set_variable = { name = tca_military_court_positions_test_task_expected_balance value = { value = tca_court_task_ai_projected_balance add = monthly_court_position_task_cost } } }
+            scope:tca_mcp_officer = { set_variable = tca_court_paid_task_active }
+            scope:tca_mcp_governor = {
+                if = { limit = { tca_court_task_ai_projected_balance = var:tca_military_court_positions_test_task_expected_balance }
+                    root = { debug_log = "TCA_TEST CHECK_PASS tca_test_court_task_ai_needs_and_budget 6" }
+                }
+                else = { root = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_task_ai_needs_and_budget 6" } }
+            }
+            scope:tca_mcp_officer = { remove_variable = tca_court_paid_task_active }
+            clear_saved_scope = employee
+            set_variable = { name = tca_military_court_positions_test_task_old_control value = scope:tca_mcp_county.county_control }
+            scope:tca_mcp_county = { change_county_control = 100 }
+            # 原生县列表包含家族头衔，满实县控制度必须仍被判为没有治理收益。
+            scope:tca_mcp_governor = {
+                set_variable = { name = tca_military_court_positions_test_task_full_benefit value = { value = tca_court_review_documents_ai_score subtract = tca_court_task_ai_budget_penalty } }
+            }
+            if = { limit = {
+                scope:tca_mcp_county = { county_control = 100 }
+                scope:tca_mcp_governor = { var:tca_military_court_positions_test_task_full_benefit <= -10 }
+            } debug_log = "TCA_TEST CHECK_PASS tca_test_court_task_ai_needs_and_budget 3" }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_task_ai_needs_and_budget 3" }
+            scope:tca_mcp_county = { change_county_control = -50 }
+            scope:tca_mcp_governor = {
+                set_variable = { name = tca_military_court_positions_test_task_low_benefit value = { value = tca_court_review_documents_ai_score subtract = tca_court_task_ai_budget_penalty } }
+            }
+            if = { limit = {
+                scope:tca_mcp_county = { county_control < 80 }
+                scope:tca_mcp_governor = { var:tca_military_court_positions_test_task_low_benefit > 0 var:tca_military_court_positions_test_task_low_benefit > var:tca_military_court_positions_test_task_full_benefit }
+            } debug_log = "TCA_TEST CHECK_PASS tca_test_court_task_ai_needs_and_budget 4" }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_task_ai_needs_and_budget 4" }
+            if = { limit = { scope:tca_mcp_governor = { tca_military_is_military_province_trigger = no tca_court_task_ai_civil_province_trigger = yes } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_court_task_ai_needs_and_budget 5"
+            }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_task_ai_needs_and_budget 5" }
+            # 控制度是本例自己的快照，共用借还清理不拥有它。
+            scope:tca_mcp_county = { change_county_control = { value = root.var:tca_military_court_positions_test_task_old_control subtract = county_control } }
+            remove_variable = tca_military_court_positions_test_task_old_control
+            tca_test_military_council_cleanup_effect = yes
+            if = { limit = { has_character_flag = tca_test_tca_military_court_positions_test_case_failed }
+                debug_log = "TCA_TEST FAIL tca_test_court_task_ai_needs_and_budget"
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+            }
+            else = {
+                debug_log = "TCA_TEST PASS tca_test_court_task_ai_needs_and_budget"
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } }
+            }
+        }
+        else = {
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_court_task_ai_needs_and_budget"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+        }
+        tca_test_military_council_cleanup_effect = yes
+        scope:tca_mcp_officer ?= { death = { death_reason = death_natural_causes } }
+        scope:tca_mcp_backup ?= { death = { death_reason = death_natural_causes } }
+        scope:tca_mcp_governor ?= { death = { death_reason = death_natural_causes } }
+        remove_character_flag = tca_test_tca_military_court_positions_test_case_failed
+    }
+}
