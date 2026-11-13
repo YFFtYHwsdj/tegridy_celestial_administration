@@ -1,0 +1,157 @@
+﻿# 双区域原生局势探针；只在独立测试局创建，保存重载占用全局检查点，故独占。
+# 通过正式生命周期和指定区域催化入口验证，不使用change_phase或直接写进度。
+namespace = tca_frontier_situation_test
+
+tca_frontier_situation_test.1 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_frontier_situation_test.1 tca_test_frontier_situation"
+        remove_character_flag = tca_test_tca_frontier_situation_test_case_failed
+        if = { limit = { NOT = { exists = situation:tca_northern_frontier } }
+            tca_frontier_situation_start_effect = yes
+            if = { limit = { exists = situation:tca_northern_frontier situation:tca_northern_frontier.situation_sub_region:tca_frontier_north = { sub_region_current_phase = tca_frontier_amity  } situation:tca_northern_frontier.situation_sub_region:tca_frontier_west = { sub_region_current_phase = tca_frontier_warfare  } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_situation 1"
+            }
+            else = { add_character_flag = tca_test_tca_frontier_situation_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_situation 1" }
+            situation:tca_northern_frontier = { save_scope_as = tca_frontier_situation_test_original }
+            # 重复创建须保留同一对象及已有进度；先推北境25点，西陲仍为零。
+            tca_frontier_situation_catalyst_effect = { REGION = tca_frontier_north CATALYST = tca_frontier_to_tension }
+            tca_frontier_situation_start_effect = yes
+            if = { limit = { situation:tca_northern_frontier = { this = scope:tca_frontier_situation_test_original } situation:tca_northern_frontier.situation_sub_region:tca_frontier_north = { sub_region_current_phase = tca_frontier_amity phase_takeover_points:tca_frontier_tension = 25 } situation:tca_northern_frontier.situation_sub_region:tca_frontier_west = { sub_region_current_phase = tca_frontier_warfare phase_takeover_points:tca_frontier_tension = 0 } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_situation 2"
+            }
+            else = { add_character_flag = tca_test_tca_frontier_situation_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_situation 2" }
+            if = { limit = { situation:tca_northern_frontier.situation_sub_region:tca_frontier_north = { any_situation_sub_region_county = { this = title:c_henan } NOT = { any_situation_sub_region_county = { this = title:c_lingzhou } } } situation:tca_northern_frontier.situation_sub_region:tca_frontier_west = { any_situation_sub_region_county = { this = title:c_lingzhou } NOT = { any_situation_sub_region_county = { this = title:c_henan } } } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_situation 3"
+            }
+            else = { add_character_flag = tca_test_tca_frontier_situation_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_situation 3" }
+            tca_frontier_situation_catalyst_effect = { REGION = tca_frontier_north CATALYST = tca_frontier_to_tension }
+            tca_frontier_situation_catalyst_effect = { REGION = tca_frontier_north CATALYST = tca_frontier_to_tension }
+            tca_frontier_situation_catalyst_effect = { REGION = tca_frontier_north CATALYST = tca_frontier_to_tension }
+            trigger_event = { id = tca_frontier_situation_test.2 days = 2 }
+        }
+        else = {
+            # 不结束玩家或其他探针已有的局势；本例仅拥有自己新建的对象。
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_frontier_situation"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+            tca_test_lane_end_effect = { GROUP = tca_frontier_situation_test }
+        }
+    }
+}
+
+tca_frontier_situation_test.2 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { situation:tca_northern_frontier.situation_sub_region:tca_frontier_north = { sub_region_current_phase = tca_frontier_tension  } situation:tca_northern_frontier.situation_sub_region:tca_frontier_west = { sub_region_current_phase = tca_frontier_warfare  } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_situation 4"
+            }
+            else = { add_character_flag = tca_test_tca_frontier_situation_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_situation 4" }
+            tca_frontier_situation_catalyst_effect = { REGION = tca_frontier_north CATALYST = tca_frontier_to_warfare }
+            tca_frontier_situation_catalyst_effect = { REGION = tca_frontier_north CATALYST = tca_frontier_to_warfare }
+            tca_frontier_situation_catalyst_effect = { REGION = tca_frontier_west CATALYST = tca_frontier_to_amity }
+            # 两区处于不同阶段，并各有非零未完成进度；原生保存后直接续跑本事件链。
+            title:h_china = { set_variable = { name = tca_frontier_situation_checkpoint_phase value = 1 } }
+            debug_log = "TCA_TEST WAIT tca_test_frontier_situation 45 days"
+            trigger_event = { id = tca_frontier_situation_test.3 days = 45 }
+        }
+    }
+}
+
+tca_frontier_situation_test.3 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { title:h_china = { var:tca_frontier_situation_checkpoint_phase = 3 } situation:tca_northern_frontier = { this = scope:tca_frontier_situation_test_original } situation:tca_northern_frontier.situation_sub_region:tca_frontier_north = { sub_region_current_phase = tca_frontier_tension phase_takeover_points:tca_frontier_warfare = 50 } situation:tca_northern_frontier.situation_sub_region:tca_frontier_west = { sub_region_current_phase = tca_frontier_warfare phase_takeover_points:tca_frontier_amity = 25 } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_situation 5"
+            }
+            else = { add_character_flag = tca_test_tca_frontier_situation_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_situation 5" }
+            tca_frontier_situation_catalyst_effect = { REGION = tca_frontier_north CATALYST = tca_frontier_to_warfare }
+            tca_frontier_situation_catalyst_effect = { REGION = tca_frontier_north CATALYST = tca_frontier_to_warfare }
+            tca_frontier_situation_catalyst_effect = { REGION = tca_frontier_west CATALYST = tca_frontier_to_amity }
+            tca_frontier_situation_catalyst_effect = { REGION = tca_frontier_west CATALYST = tca_frontier_to_amity }
+            tca_frontier_situation_catalyst_effect = { REGION = tca_frontier_west CATALYST = tca_frontier_to_amity }
+            trigger_event = { id = tca_frontier_situation_test.4 days = 2 }
+        }
+    }
+}
+
+tca_frontier_situation_test.4 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { situation:tca_northern_frontier.situation_sub_region:tca_frontier_north = { sub_region_current_phase = tca_frontier_warfare  } situation:tca_northern_frontier.situation_sub_region:tca_frontier_west = { sub_region_current_phase = tca_frontier_amity  } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_situation 6"
+            }
+            else = { add_character_flag = tca_test_tca_frontier_situation_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_situation 6" }
+            # 补齐反向及跨级转换：兵争→边衅、通好→兵争，两区同时推进。
+            tca_frontier_situation_catalyst_effect = { REGION = tca_frontier_north CATALYST = tca_frontier_to_tension }
+            tca_frontier_situation_catalyst_effect = { REGION = tca_frontier_north CATALYST = tca_frontier_to_tension }
+            tca_frontier_situation_catalyst_effect = { REGION = tca_frontier_north CATALYST = tca_frontier_to_tension }
+            tca_frontier_situation_catalyst_effect = { REGION = tca_frontier_north CATALYST = tca_frontier_to_tension }
+            tca_frontier_situation_catalyst_effect = { REGION = tca_frontier_west CATALYST = tca_frontier_to_warfare }
+            tca_frontier_situation_catalyst_effect = { REGION = tca_frontier_west CATALYST = tca_frontier_to_warfare }
+            tca_frontier_situation_catalyst_effect = { REGION = tca_frontier_west CATALYST = tca_frontier_to_warfare }
+            tca_frontier_situation_catalyst_effect = { REGION = tca_frontier_west CATALYST = tca_frontier_to_warfare }
+            trigger_event = { id = tca_frontier_situation_test.5 days = 2 }
+        }
+    }
+}
+
+tca_frontier_situation_test.5 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { situation:tca_northern_frontier.situation_sub_region:tca_frontier_north = { sub_region_current_phase = tca_frontier_tension } situation:tca_northern_frontier.situation_sub_region:tca_frontier_west = { sub_region_current_phase = tca_frontier_warfare } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_situation 7"
+            }
+            else = { add_character_flag = tca_test_tca_frontier_situation_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_situation 7" }
+            # 最后一条为边衅→通好；西陲兵争须保持不变。
+            tca_frontier_situation_catalyst_effect = { REGION = tca_frontier_north CATALYST = tca_frontier_to_amity }
+            tca_frontier_situation_catalyst_effect = { REGION = tca_frontier_north CATALYST = tca_frontier_to_amity }
+            tca_frontier_situation_catalyst_effect = { REGION = tca_frontier_north CATALYST = tca_frontier_to_amity }
+            tca_frontier_situation_catalyst_effect = { REGION = tca_frontier_north CATALYST = tca_frontier_to_amity }
+            trigger_event = { id = tca_frontier_situation_test.6 days = 2 }
+        }
+    }
+}
+
+tca_frontier_situation_test.6 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = { limit = { situation:tca_northern_frontier.situation_sub_region:tca_frontier_north = { sub_region_current_phase = tca_frontier_amity } situation:tca_northern_frontier.situation_sub_region:tca_frontier_west = { sub_region_current_phase = tca_frontier_warfare } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_situation 8"
+            }
+            else = { add_character_flag = tca_test_tca_frontier_situation_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_situation 8" }
+            tca_frontier_situation_end_effect = yes
+            if = { limit = { NOT = { exists = situation:tca_northern_frontier } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_situation 9"
+            }
+            else = { add_character_flag = tca_test_tca_frontier_situation_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_situation 9" }
+            tca_frontier_situation_end_effect = yes
+            tca_frontier_situation_start_effect = yes
+            if = { limit = { situation:tca_northern_frontier.situation_sub_region:tca_frontier_north = { sub_region_current_phase = tca_frontier_amity phase_takeover_points:tca_frontier_tension = 0 } situation:tca_northern_frontier.situation_sub_region:tca_frontier_west = { sub_region_current_phase = tca_frontier_warfare phase_takeover_points:tca_frontier_amity = 0 } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_situation 10"
+            }
+            else = { add_character_flag = tca_test_tca_frontier_situation_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_situation 10" }
+            tca_frontier_situation_end_effect = yes
+            title:h_china = { remove_variable = tca_frontier_situation_checkpoint_phase }
+            if = { limit = { has_character_flag = tca_test_tca_frontier_situation_test_case_failed }
+                debug_log = "TCA_TEST FAIL tca_test_frontier_situation"
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+            }
+            else = {
+                debug_log = "TCA_TEST PASS tca_test_frontier_situation"
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } }
+            }
+            remove_character_flag = tca_test_tca_frontier_situation_test_case_failed
+            tca_test_lane_end_effect = { GROUP = tca_frontier_situation_test }
+        }
+    }
+}

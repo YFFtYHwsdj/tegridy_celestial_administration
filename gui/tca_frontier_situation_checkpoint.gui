@@ -1,0 +1,49 @@
+﻿# 北疆双区域P0专用保存重载探针；仅CLI就绪且原生用例显式设置阶段1/2时创建。
+# 阶段1只由测试事件写入，首次显示转2后保存；存档中的阶段2在新进程转3。
+# 不以UI会话变量识别恢复，不覆盖正式窗口，不改变框架计数或运行标记。
+widget = {
+    name = "tca_frontier_situation_checkpoint"
+    size = { 1 1 }
+    alwaystransparent = yes
+    alpha = 0
+    visible_at_creation = no
+    datacontext = "[GetTitleByKey('h_china')]"
+    visible = "[And(InDebugMode, And(IsInGame, And(GreaterThan_CFixedPoint(Title.MakeScope.Var('tca_cli_ready').GetValue, '(CFixedPoint)0'), And(GreaterThanOrEqualTo_CFixedPoint(Title.MakeScope.Var('tca_frontier_situation_checkpoint_phase').GetValue, '(CFixedPoint)1'), LessThanOrEqualTo_CFixedPoint(Title.MakeScope.Var('tca_frontier_situation_checkpoint_phase').GetValue, '(CFixedPoint)2')))))]"
+    state = {
+        name = _show
+        on_start = "[SetGameSpeed('(int32)0')]"
+        on_start = "[ExecuteConsoleCommand(Select_CString(EqualTo_CFixedPoint(Title.MakeScope.Var('tca_frontier_situation_checkpoint_phase').GetValue, '(CFixedPoint)2'), 'effect title:h_china = { set_variable = { name = tca_frontier_situation_checkpoint_phase value = 3 } }', 'effect title:h_china = { if = { limit = { var:tca_frontier_situation_checkpoint_phase = 1 } set_variable = { name = tca_frontier_situation_checkpoint_phase value = 2 } } }'))]"
+        # 等待原生阶段状态稳定进入存档快照；此等待不等于保存成功。
+        duration = 6
+        next = "tca_frontier_situation_checkpoint_save"
+    }
+    state = {
+        name = "tca_frontier_situation_checkpoint_save"
+        on_start = "[ExecuteConsoleCommand(Select_CString(EqualTo_CFixedPoint(Title.MakeScope.Var('tca_frontier_situation_checkpoint_phase').GetValue, '(CFixedPoint)2'), 'save tca_frontier_situation_probe', ''))]"
+        duration = 8
+        next = "tca_frontier_situation_checkpoint_request"
+    }
+    state = {
+        name = "tca_frontier_situation_checkpoint_request"
+        # 运行器核对存档落盘后退出自己拥有的进程，再以-loadsave原生续局。
+        on_start = "[ExecuteConsoleCommand('effect title:h_china = { if = { limit = { var:tca_frontier_situation_checkpoint_phase = 2 } debug_log = \"TCA_CLI RELOAD_SAVE tca_frontier_situation_probe\" } }')]"
+    }
+}
+
+# 检查点恢复后显式重建观察者席位与速度。
+# 原CLI观察者控件在本原型续局中未重新发出observe，不能沿用首进程的确认。
+# 只读恢复阶段3，不重派测试、不重建局势，也不设置虚假的观察者确认标记。
+widget = {
+    name = "tca_frontier_situation_checkpoint_resume"
+    size = { 1 1 }
+    alwaystransparent = yes
+    alpha = 0
+    visible_at_creation = no
+    datacontext = "[GetTitleByKey('h_china')]"
+    visible = "[And(InDebugMode, And(IsInGame, And(GreaterThan_CFixedPoint(Title.MakeScope.Var('tca_cli_ready').GetValue, '(CFixedPoint)0'), EqualTo_CFixedPoint(Title.MakeScope.Var('tca_frontier_situation_checkpoint_phase').GetValue, '(CFixedPoint)3'))))]"
+    state = {
+        name = _show
+        on_start = "[ExecuteConsoleCommand('observe')]"
+        on_start = "[SetGameSpeed('(int32)4')]"
+    }
+}
