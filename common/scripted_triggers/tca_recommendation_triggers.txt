@@ -1,0 +1,69 @@
+﻿# 荐举资格。人物作用域；OWNER为实际任用者，不接受最高领主替代实际雇主。
+# 只读现职与已有经验，无saved scope、状态写入或路线切换。
+tca_recommendation_actor_trigger = {
+    is_alive = yes is_adult = yes is_imprisoned = no
+    NOT = { has_trait = incapable }
+    tca_is_celestial_governor_trigger = yes
+    highest_held_title_tier >= tier_county
+    government_has_flag = government_has_merit
+}
+tca_recommendation_clerical_source_trigger = {
+    tca_experience_clerical_eligible_trigger = { OWNER = $OWNER$ }
+    has_trait_xp = { trait = tca_clerical_experience value >= 50 }
+}
+tca_recommendation_military_source_trigger = {
+    tca_experience_military_eligible_trigger = { OWNER = $OWNER$ }
+    has_trait_xp = { trait = tca_military_experience value >= 50 }
+}
+tca_recommendation_recipient_trigger = {
+    $OWNER$ = { tca_recommendation_actor_trigger = yes }
+    this != $OWNER$
+    is_alive = yes is_adult = yes is_imprisoned = no merit_level = 0
+    government_has_flag = government_is_celestial
+    top_liege = $OWNER$.top_liege
+    NOT = { any_held_title = { is_noble_family_title = no } }
+    NOR = {
+        has_trait = incapable
+        has_trait = devoted
+        has_trait = order_member
+        is_clergy = yes
+        has_trait = tca_clerical_origin
+        has_trait = tca_military_origin
+        has_character_flag = tca_merit_retired
+        has_character_flag = tca_merit_refused
+        has_variable = tca_merit_grant_phase
+        tca_retirement_excludes_appointment_trigger = yes
+    }
+    OR = { tca_court_civil_route_trigger = yes tca_court_military_route_trigger = yes }
+    # 沿用原版仕途互动的性别法律边界，不以经验豁免。
+    trigger_if = {
+        limit = { is_female = yes }
+        top_liege = { NOR = { has_realm_law = male_only_law has_realm_law = male_preference_law } }
+    }
+    trigger_else = { top_liege = { NOR = { has_realm_law = female_only_law has_realm_law = female_preference_law } } }
+    OR = {
+        tca_recommendation_clerical_source_trigger = { OWNER = $OWNER$ }
+        tca_recommendation_military_source_trigger = { OWNER = $OWNER$ }
+    }
+}
+
+# 原生互动上下文，要求scope:actor／recipient；仅AI使用，不反向约束玩家。
+# 双来源极端情况按唯一当前路线归类，与发送效果采用同一判定。
+tca_recommendation_uses_clerical_source_trigger = {
+    scope:recipient = {
+        tca_recommendation_clerical_source_trigger = { OWNER = scope:actor }
+        OR = {
+            tca_court_civil_route_trigger = yes
+            NOT = { tca_recommendation_military_source_trigger = { OWNER = scope:actor } }
+        }
+    }
+}
+tca_recommendation_ai_ready_trigger = {
+    scope:actor = { influence >= 250 opinion = { target = scope:recipient value > 0 } }
+    scope:recipient = { tca_recommendation_recipient_trigger = { OWNER = scope:actor } }
+    trigger_if = {
+        limit = { tca_recommendation_uses_clerical_source_trigger = yes }
+        scope:recipient = { OR = { stewardship >= 6 learning >= 6 } }
+    }
+    trigger_else = { scope:recipient = { martial >= 6 } }
+}

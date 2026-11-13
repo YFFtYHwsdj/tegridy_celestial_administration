@@ -1,0 +1,42 @@
+﻿# 单一荐举入品互动；按实际任事自动确定进身特质，不提供文武路径选项。
+# 真实效果走on_send，on_accept仅为确认页提示；原生cost一次扣费，无额外冷却。
+tca_recommend_entry_interaction = {
+    category = interaction_category_succession
+    icon = support_candidacy
+    common_interaction = yes
+    interface_priority = 105
+    use_diplomatic_range = no
+    desc = tca_recommend_entry_interaction_desc
+    send_name = tca_recommend_entry_send
+    auto_accept = yes
+    is_shown = {
+        scope:actor = { tca_recommendation_actor_trigger = yes }
+        scope:recipient = {
+            is_adult = yes merit_level = 0
+            OR = { is_courtier_of = scope:actor is_councillor_of = scope:actor }
+        }
+    }
+    is_valid_showing_failures_only = {
+        custom_tooltip = {
+            text = tca_recommend_entry_eligible_tt
+            scope:recipient = { tca_recommendation_recipient_trigger = { OWNER = scope:actor } }
+        }
+    }
+    can_send = { scope:recipient = { tca_recommendation_recipient_trigger = { OWNER = scope:actor } } }
+    cost = { influence = 100 }
+    on_send = { tca_recommendation_send_effect = yes }
+    on_accept = {
+        custom_tooltip = tca_recommend_entry_result_tt
+        if = { limit = { tca_recommendation_uses_clerical_source_trigger = yes } custom_tooltip = tca_recommend_entry_clerical_tt }
+        else = { custom_tooltip = tca_recommend_entry_military_tt }
+    }
+    ai_targets = { ai_recipients = courtiers }
+    ai_targets = { ai_recipients = vassals }
+    ai_frequency = 12
+    ai_will_do = {
+        base = -30
+        # 基础值统一在script value维护；本处加回抵消字面基础，最终保持同一公式。
+        modifier = { add = { value = tca_recommendation_ai_score_value subtract = tca_recommendation_ai_base_value } }
+        modifier = { factor = 0 NOT = { tca_recommendation_ai_ready_trigger = yes } }
+    }
+}

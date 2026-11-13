@@ -1,0 +1,245 @@
+﻿# 荐举原生回归；自备人物、真实内阁和互动，借县后精确归还。
+# 共用军事夹具GROUP；私有断言状态均属于本命名空间。
+namespace = tca_recommendation_test
+
+tca_recommendation_test.1 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_recommendation_test.1 tca_test_recommendation_eligibility"
+        remove_character_flag = tca_test_tca_recommendation_test_case_failed
+        tca_test_military_council_prepare_county_effect = { MILITARY_ONLY = no }
+        if = { limit = { scope:tca_mcp_borrow_ready = 1 }
+            scope:tca_mcp_officer = { tca_merit_leave_celestial_effect = yes change_merit_no_experience = { value = 0 subtract = merit } set_merit_level = 0 remove_trait = education_martial_3 add_trait = education_stewardship_3 add_trait = tca_clerical_experience add_trait_xp = { trait = tca_clerical_experience value = 49 } }
+            scope:tca_mcp_governor = { assign_councillor_type = { type = councillor_steward target = scope:tca_mcp_officer fire_on_actions = yes } }
+            trigger_event = { id = tca_recommendation_test.101 days = 1 }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_recommendation_eligibility" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_lane_end_effect = { GROUP = tca_military_court_positions_test } }
+    }
+}
+tca_recommendation_test.101 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { scope:tca_mcp_officer = { merit_level = 0 tca_recommendation_recipient_trigger = { OWNER = scope:tca_mcp_governor } } } debug_log = "TCA_TEST CHECK_FAIL tca_test_recommendation_eligibility 1" add_character_flag = tca_test_tca_recommendation_test_case_failed }
+        else_if = { limit = { scope:tca_mcp_officer = { merit_level = 0 has_trait_xp = { trait = tca_clerical_experience value = 49 } } } debug_log = "TCA_TEST CHECK_PASS tca_test_recommendation_eligibility 1" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_recommendation_eligibility 1" add_character_flag = tca_test_tca_recommendation_test_case_failed }
+        scope:tca_mcp_officer = { add_trait_xp = { trait = tca_clerical_experience value = 1 } }
+        if = { limit = { scope:tca_mcp_officer = { tca_recommendation_recipient_trigger = { OWNER = scope:tca_mcp_governor } } } debug_log = "TCA_TEST CHECK_PASS tca_test_recommendation_eligibility 2" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_recommendation_eligibility 2" add_character_flag = tca_test_tca_recommendation_test_case_failed }
+        if = { limit = { scope:tca_mcp_officer = { tca_recommendation_recipient_trigger = { OWNER = root } } } debug_log = "TCA_TEST CHECK_FAIL tca_test_recommendation_eligibility 3" add_character_flag = tca_test_tca_recommendation_test_case_failed }
+        else = { debug_log = "TCA_TEST CHECK_PASS tca_test_recommendation_eligibility 3" }
+        scope:tca_mcp_governor = { fire_councillor = scope:tca_mcp_officer }
+        if = { limit = { scope:tca_mcp_officer = { tca_recommendation_recipient_trigger = { OWNER = scope:tca_mcp_governor } } } debug_log = "TCA_TEST CHECK_FAIL tca_test_recommendation_eligibility 4" add_character_flag = tca_test_tca_recommendation_test_case_failed }
+        else = { debug_log = "TCA_TEST CHECK_PASS tca_test_recommendation_eligibility 4" }
+        scope:tca_mcp_officer = { remove_trait = tca_clerical_experience add_trait = tca_clerical_experience add_trait_xp = { trait = tca_clerical_experience value = 25 } add_trait = tca_military_experience add_trait_xp = { trait = tca_military_experience value = 25 } }
+        scope:tca_mcp_governor = { assign_councillor_type = { type = councillor_marshal target = scope:tca_mcp_officer fire_on_actions = yes } }
+        if = { limit = { scope:tca_mcp_officer = { tca_recommendation_recipient_trigger = { OWNER = scope:tca_mcp_governor } } } debug_log = "TCA_TEST CHECK_FAIL tca_test_recommendation_eligibility 5" add_character_flag = tca_test_tca_recommendation_test_case_failed }
+        else = { debug_log = "TCA_TEST CHECK_PASS tca_test_recommendation_eligibility 5" }
+        scope:tca_mcp_officer = { add_trait_xp = { trait = tca_military_experience value = 25 } }
+        if = { limit = { scope:tca_mcp_officer = { tca_recommendation_recipient_trigger = { OWNER = scope:tca_mcp_governor } } } debug_log = "TCA_TEST CHECK_PASS tca_test_recommendation_eligibility 6" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_recommendation_eligibility 6" add_character_flag = tca_test_tca_recommendation_test_case_failed }
+        # 保留事件报告者，原生互动actor别名用于AI求值后恢复，不能让夹具误用地方主官作root。
+        save_scope_as = tca_recommendation_test_reporter
+        # AI硬门槛独立于玩家资格；好感先精确调整为0，再提高到1。
+        scope:tca_mcp_governor = { save_scope_as = actor change_influence = { value = 250 subtract = influence } }
+        scope:tca_mcp_officer = { save_scope_as = recipient remove_trait = education_stewardship_3 set_variable = { name = appointment_trait_override value = trait:education_martial_1 } add_martial_skill = { value = 5 subtract = martial } }
+        scope:actor = { add_opinion = { target = scope:recipient modifier = pleased_opinion opinion = { value = 0 subtract = "opinion(scope:recipient)" } } }
+        # 技能读取有缓存；跨日后才验证精确5／6边界，避免同段即时修改污染断言。
+        scope:tca_recommendation_test_reporter = { save_scope_as = actor }
+        trigger_event = { id = tca_recommendation_test.102 days = 1 }
+    }
+}
+tca_recommendation_test.102 = {
+    type = character_event hidden = yes
+    immediate = {
+        scope:tca_mcp_governor = { save_scope_as = actor }
+        scope:tca_mcp_officer = { save_scope_as = recipient }
+        if = { limit = { tca_recommendation_ai_ready_trigger = yes } debug_log = "TCA_TEST CHECK_FAIL tca_test_recommendation_eligibility 7" add_character_flag = tca_test_tca_recommendation_test_case_failed }
+        else = { debug_log = "TCA_TEST CHECK_PASS tca_test_recommendation_eligibility 7" }
+        # 前一日变更经验特质会改变技能；待其生效后按实际值校准为5，再跨日断言。
+        scope:recipient = { add_martial_skill = { value = 5 subtract = martial } }
+        scope:actor = { add_opinion = { target = scope:recipient modifier = grateful_opinion opinion = 1 } }
+        scope:tca_recommendation_test_reporter = { save_scope_as = actor }
+        trigger_event = { id = tca_recommendation_test.103 days = 1 }
+    }
+}
+tca_recommendation_test.103 = {
+    type = character_event hidden = yes
+    immediate = {
+        scope:tca_mcp_governor = { save_scope_as = actor }
+        scope:tca_mcp_officer = { save_scope_as = recipient }
+        if = { limit = { tca_recommendation_ai_ready_trigger = yes } debug_log = "TCA_TEST CHECK_FAIL tca_test_recommendation_eligibility 8" add_character_flag = tca_test_tca_recommendation_test_case_failed }
+        else = { debug_log = "TCA_TEST CHECK_PASS tca_test_recommendation_eligibility 8" }
+        scope:recipient = { add_martial_skill = 1 }
+        scope:tca_recommendation_test_reporter = { save_scope_as = actor }
+        trigger_event = { id = tca_recommendation_test.104 days = 1 }
+    }
+}
+tca_recommendation_test.104 = {
+    type = character_event hidden = yes
+    immediate = {
+        scope:tca_mcp_governor = { save_scope_as = actor }
+        scope:tca_mcp_officer = { save_scope_as = recipient }
+        if = { limit = { tca_recommendation_ai_ready_trigger = yes scope:recipient = { martial = 6 } scope:actor = { tca_recommendation_ai_score_value < 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_recommendation_eligibility 9" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_recommendation_eligibility 9" add_character_flag = tca_test_tca_recommendation_test_case_failed }
+        scope:actor = { add_opinion = { target = scope:recipient modifier = grateful_opinion opinion = 80 } }
+        scope:recipient = { add_trait = diligent }
+        if = { limit = { scope:actor = { tca_recommendation_ai_score_value > 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_recommendation_eligibility 10" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_recommendation_eligibility 10" add_character_flag = tca_test_tca_recommendation_test_case_failed }
+        scope:tca_recommendation_test_reporter = { save_scope_as = actor }
+        scope:tca_mcp_governor = { fire_councillor = scope:tca_mcp_officer }
+        tca_test_experience_cleanup_effect = yes
+        if = { limit = { scope:tca_mcp_restore_exact = 1 } debug_log = "TCA_TEST CHECK_PASS tca_test_recommendation_eligibility 11" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_recommendation_eligibility 11" add_character_flag = tca_test_tca_recommendation_test_case_failed }
+        if = { limit = { has_character_flag = tca_test_tca_recommendation_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_recommendation_eligibility" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+        else = { debug_log = "TCA_TEST PASS tca_test_recommendation_eligibility" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        remove_character_flag = tca_test_tca_recommendation_test_case_failed
+        tca_test_lane_end_effect = { GROUP = tca_military_court_positions_test }
+    }
+}
+
+tca_recommendation_test.2 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_recommendation_test.2 tca_test_recommendation_interaction"
+        remove_character_flag = tca_test_tca_recommendation_test_case_failed
+        tca_test_military_council_prepare_county_effect = { MILITARY_ONLY = no }
+        if = { limit = { scope:tca_mcp_borrow_ready = 1 }
+            scope:tca_mcp_officer = { tca_merit_leave_celestial_effect = yes change_merit_no_experience = { value = 0 subtract = merit } set_merit_level = 0 remove_trait = education_martial_3 add_trait = education_stewardship_3 add_trait = tca_clerical_experience add_trait_xp = { trait = tca_clerical_experience value = 50 } }
+            scope:tca_mcp_backup = { tca_merit_leave_celestial_effect = yes change_merit_no_experience = { value = 0 subtract = merit } set_merit_level = 0 add_trait = tca_military_experience add_trait_xp = { trait = tca_military_experience value = 50 } }
+            scope:tca_mcp_governor = { change_influence = { value = 500 subtract = influence } assign_councillor_type = { type = councillor_steward target = scope:tca_mcp_officer fire_on_actions = yes } assign_councillor_type = { type = councillor_marshal target = scope:tca_mcp_backup fire_on_actions = yes } }
+            trigger_event = { id = tca_recommendation_test.201 days = 1 }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_recommendation_interaction" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_lane_end_effect = { GROUP = tca_military_court_positions_test } }
+    }
+}
+tca_recommendation_test.201 = {
+    type = character_event hidden = yes
+    immediate = {
+        scope:tca_mcp_governor = { set_variable = { name = tca_recommendation_test_before_fee value = influence } }
+        run_interaction = { interaction = tca_recommend_entry_interaction actor = scope:tca_mcp_governor recipient = scope:tca_mcp_officer redirect = no send_threshold = decline }
+        run_interaction = { interaction = tca_recommend_entry_interaction actor = scope:tca_mcp_governor recipient = scope:tca_mcp_backup redirect = no send_threshold = decline }
+        scope:tca_mcp_governor = { set_variable = { name = tca_recommendation_test_after_fee value = influence } set_variable = { name = tca_recommendation_test_expected_fee value = { value = var:tca_recommendation_test_before_fee subtract = 200 } } }
+        # 两次真实发送核对逐人费用；重复者由正式资格拒绝，不强行发送无效互动制造引擎错误。
+        if = { limit = { scope:tca_mcp_officer = { NOT = { tca_recommendation_recipient_trigger = { OWNER = scope:tca_mcp_governor } } } scope:tca_mcp_governor = { influence = var:tca_recommendation_test_after_fee var:tca_recommendation_test_after_fee = var:tca_recommendation_test_expected_fee } } debug_log = "TCA_TEST CHECK_PASS tca_test_recommendation_interaction 1" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_recommendation_interaction 1" add_character_flag = tca_test_tca_recommendation_test_case_failed }
+        trigger_event = { id = tca_recommendation_test.202 days = 1 }
+    }
+}
+tca_recommendation_test.202 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { scope:tca_mcp_officer = { merit_level = 1 has_trait = tca_clerical_origin NOT = { has_trait = tca_military_origin } has_trait_xp = { trait = tca_clerical_experience value = 50 } is_civilian_candidate_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_recommendation_interaction 2" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_recommendation_interaction 2" add_character_flag = tca_test_tca_recommendation_test_case_failed }
+        if = { limit = { scope:tca_mcp_backup = { merit_level = 1 has_trait = tca_military_origin NOT = { has_trait = tca_clerical_origin } has_trait_xp = { trait = tca_military_experience value = 50 } is_military_candidate_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_recommendation_interaction 3" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_recommendation_interaction 3" add_character_flag = tca_test_tca_recommendation_test_case_failed }
+        # 正式评分读取同一候选加特质前后，非重建生产公式；两种特质异常共存也只扣一份。
+        scope:tca_mcp_officer = {
+            save_scope_as = tca_recommendation_test_candidate
+            remove_trait = tca_clerical_origin
+            set_variable = { name = tca_recommendation_test_title_score value = { value = "appointment_candidate_score(scope:tca_mcp_county)" subtract = 5 } }
+            save_scope_value_as = { name = tca_court_bias value = 1 }
+            set_variable = { name = tca_recommendation_test_court_score value = { value = tca_court_personal_selection_value subtract = 5 } }
+            add_trait = tca_clerical_origin
+        }
+        if = { limit = { scope:tca_mcp_officer = { "appointment_candidate_score(scope:tca_mcp_county)" = var:tca_recommendation_test_title_score tca_court_personal_selection_value = var:tca_recommendation_test_court_score } } debug_log = "TCA_TEST CHECK_PASS tca_test_recommendation_interaction 4" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_recommendation_interaction 4" add_character_flag = tca_test_tca_recommendation_test_case_failed }
+        scope:tca_mcp_officer = { add_trait = tca_military_origin }
+        if = { limit = { scope:tca_mcp_officer = { tca_origin_selection_penalty_value = -5 tca_court_personal_selection_value = var:tca_recommendation_test_court_score } } debug_log = "TCA_TEST CHECK_PASS tca_test_recommendation_interaction 5" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_recommendation_interaction 5" add_character_flag = tca_test_tca_recommendation_test_case_failed }
+        scope:tca_mcp_officer = { add_character_modifier = { modifier = tgp_passed_provincial_exam_modifier } }
+        if = { limit = { scope:tca_mcp_officer = { has_trait = tca_clerical_origin tca_origin_selection_penalty_value = -5 } } debug_log = "TCA_TEST CHECK_PASS tca_test_recommendation_interaction 6" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_recommendation_interaction 6" add_character_flag = tca_test_tca_recommendation_test_case_failed }
+        scope:tca_mcp_governor = { fire_councillor = scope:tca_mcp_officer fire_councillor = scope:tca_mcp_backup }
+        tca_test_experience_cleanup_effect = yes
+        if = { limit = { scope:tca_mcp_restore_exact = 1 } debug_log = "TCA_TEST CHECK_PASS tca_test_recommendation_interaction 7" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_recommendation_interaction 7" add_character_flag = tca_test_tca_recommendation_test_case_failed }
+        if = { limit = { has_character_flag = tca_test_tca_recommendation_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_recommendation_interaction" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+        else = { debug_log = "TCA_TEST PASS tca_test_recommendation_interaction" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        remove_character_flag = tca_test_tca_recommendation_test_case_failed
+        tca_test_lane_end_effect = { GROUP = tca_military_court_positions_test }
+    }
+}
+
+# 自建无地官署及无品属员，不借用正式官员或世界头衔。
+# 标记依次验证普通无地、提刑、通判身份；实际季度结算及互动均调用正式入口。
+tca_recommendation_test.3 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_recommendation_test.3 tca_test_recommendation_landless"
+        remove_character_flag = tca_test_tca_recommendation_test_case_failed
+        create_character = { age = 40 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_recommendation_test_owner }
+        scope:tca_recommendation_test_owner = { create_dynamic_title = { tier = duchy name = tca_judicial_retirement_name } }
+        scope:new_title = { save_scope_as = tca_recommendation_test_office set_capital_county = root.capital_county set_landless_title = yes set_delete_on_destroy = yes set_no_automatic_claims = yes }
+        create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_recommendation_test_change }
+        scope:tca_recommendation_test_office = { change_title_holder = { holder = scope:tca_recommendation_test_owner change = scope:tca_recommendation_test_change } }
+        resolve_title_and_vassal_change = scope:tca_recommendation_test_change
+        scope:tca_recommendation_test_owner = {
+            change_government = celestial_government
+            create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_recommendation_test_change }
+            change_liege = { liege = root change = scope:tca_recommendation_test_change }
+            resolve_title_and_vassal_change = scope:tca_recommendation_test_change
+            tca_test_protect_character_effect = yes
+            change_influence = { value = 500 subtract = influence }
+            create_character = { age = 30 gender_female_chance = 0 random_traits = no dynasty = none employer = this culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_recommendation_test_staff }
+        }
+        scope:tca_recommendation_test_staff = {
+            tca_test_protect_character_effect = yes
+            tca_merit_leave_celestial_effect = yes
+            change_merit_no_experience = { value = 0 subtract = merit }
+            set_merit_level = 0
+            add_trait = education_stewardship_3
+        }
+        scope:tca_recommendation_test_owner = { assign_councillor_type = { type = councillor_steward target = scope:tca_recommendation_test_staff fire_on_actions = yes } }
+        trigger_event = { id = tca_recommendation_test.301 days = 1 }
+    }
+}
+tca_recommendation_test.301 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = {
+            scope:tca_recommendation_test_owner = { is_landless_ruler = yes tca_recommendation_actor_trigger = no tca_is_landed_celestial_governor_trigger = no }
+            scope:tca_recommendation_test_staff = { is_councillor_of = scope:tca_recommendation_test_owner NOT = { tca_experience_council_eligible_trigger = { OWNER = scope:tca_recommendation_test_owner } } }
+        } debug_log = "TCA_TEST CHECK_PASS tca_test_recommendation_landless 1" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_recommendation_landless 1" add_character_flag = tca_test_tca_recommendation_test_case_failed }
+        scope:tca_recommendation_test_office = { set_variable = { name = tca_judicial_title value = yes } }
+        scope:tca_recommendation_test_owner = { tca_experience_quarterly_effect = yes }
+        if = { limit = {
+            scope:tca_recommendation_test_owner = { tca_is_judicial_official_trigger = yes tca_recommendation_actor_trigger = yes tca_is_landed_celestial_governor_trigger = no tca_military_supervisor_office_valid_trigger = no tca_civil_office_valid_trigger = no }
+            scope:tca_recommendation_test_staff = { has_trait_xp = { trait = tca_clerical_experience value = 1.5 } }
+        } debug_log = "TCA_TEST CHECK_PASS tca_test_recommendation_landless 2" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_recommendation_landless 2" add_character_flag = tca_test_tca_recommendation_test_case_failed }
+        scope:tca_recommendation_test_owner = { fire_councillor = scope:tca_recommendation_test_staff assign_councillor_type = { type = councillor_marshal target = scope:tca_recommendation_test_staff fire_on_actions = yes } tca_experience_quarterly_effect = yes }
+        if = { limit = { scope:tca_recommendation_test_staff = { has_trait_xp = { trait = tca_military_experience value = 1.5 } } } debug_log = "TCA_TEST CHECK_PASS tca_test_recommendation_landless 3" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_recommendation_landless 3" add_character_flag = tca_test_tca_recommendation_test_case_failed }
+        scope:tca_recommendation_test_office = { remove_variable = tca_judicial_title set_variable = { name = tca_tongpan_title value = yes } }
+        scope:tca_recommendation_test_owner = { tca_experience_quarterly_effect = yes }
+        if = { limit = { scope:tca_recommendation_test_owner = { tca_is_tongpan_official_trigger = yes tca_recommendation_actor_trigger = yes tca_is_landed_celestial_governor_trigger = no } scope:tca_recommendation_test_staff = { has_trait_xp = { trait = tca_military_experience value = 3 } } } debug_log = "TCA_TEST CHECK_PASS tca_test_recommendation_landless 4" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_recommendation_landless 4" add_character_flag = tca_test_tca_recommendation_test_case_failed }
+        scope:tca_recommendation_test_office = { remove_variable = tca_tongpan_title set_variable = { name = tca_judicial_title value = yes } }
+        scope:tca_recommendation_test_owner = { fire_councillor = scope:tca_recommendation_test_staff assign_councillor_type = { type = councillor_chancellor target = scope:tca_recommendation_test_staff fire_on_actions = yes } tca_experience_quarterly_effect = yes }
+        if = { limit = { scope:tca_recommendation_test_staff = { has_trait_xp = { trait = tca_clerical_experience value = 3 } } } debug_log = "TCA_TEST CHECK_PASS tca_test_recommendation_landless 5" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_recommendation_landless 5" add_character_flag = tca_test_tca_recommendation_test_case_failed }
+        scope:tca_recommendation_test_staff = { remove_trait = tca_clerical_experience add_trait = tca_clerical_experience add_trait_xp = { trait = tca_clerical_experience value = 50 } }
+        # 修复前资格不成立时不强发无效互动；断言仍必须失败，避免预期失败制造引擎错误。
+        if = { limit = { scope:tca_recommendation_test_staff = { tca_recommendation_recipient_trigger = { OWNER = scope:tca_recommendation_test_owner } } }
+            run_interaction = { interaction = tca_recommend_entry_interaction actor = scope:tca_recommendation_test_owner recipient = scope:tca_recommendation_test_staff redirect = no send_threshold = decline }
+        }
+        trigger_event = { id = tca_recommendation_test.302 days = 1 }
+    }
+}
+tca_recommendation_test.302 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { scope:tca_recommendation_test_staff = { merit_level = 1 has_trait = tca_clerical_origin } scope:tca_recommendation_test_owner = { influence < 401 } } debug_log = "TCA_TEST CHECK_PASS tca_test_recommendation_landless 6" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_recommendation_landless 6" add_character_flag = tca_test_tca_recommendation_test_case_failed }
+        scope:tca_recommendation_test_owner = { fire_councillor = scope:tca_recommendation_test_staff }
+        scope:tca_recommendation_test_office = { remove_variable = tca_judicial_title }
+        scope:tca_recommendation_test_owner = { destroy_title = scope:tca_recommendation_test_office }
+        scope:tca_recommendation_test_staff = { death = { death_reason = death_vanished } }
+        scope:tca_recommendation_test_owner = { death = { death_reason = death_vanished } }
+        if = { limit = { has_character_flag = tca_test_tca_recommendation_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_recommendation_landless" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+        else = { debug_log = "TCA_TEST PASS tca_test_recommendation_landless" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        remove_character_flag = tca_test_tca_recommendation_test_case_failed
+        tca_test_lane_end_effect = { GROUP = tca_military_court_positions_test }
+    }
+}

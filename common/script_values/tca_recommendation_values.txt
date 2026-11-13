@@ -1,0 +1,35 @@
+﻿# 进身候选扣分；人物作用域，无scope输出，不修改资格或称职度。
+# 正式任命与宫廷差遣共用，异常双特质只扣一次；非天朝环境返回0。
+tca_origin_selection_penalty_value = {
+    value = 0
+    if = {
+        limit = {
+            exists = top_liege
+            top_liege = { government_has_flag = government_is_celestial }
+            OR = { has_trait = tca_clerical_origin has_trait = tca_military_origin }
+        }
+        add = { value = -5 desc = tca_origin_selection_penalty_desc }
+    }
+}
+
+# 原生互动scope:actor／recipient；以当前来源选取对应能力，不改变文武路线。
+tca_recommendation_relevant_skill_value = {
+    value = scope:recipient.martial
+    if = {
+        limit = { tca_recommendation_uses_clerical_source_trigger = yes }
+        value = scope:recipient.stewardship
+        min = scope:recipient.learning
+    }
+}
+tca_recommendation_ai_base_value = -30
+# 荐举人作用域；要求互动actor／recipient，不创建临时别名。
+# 负基础避免达标即人人提携，硬门槛由独立trigger提供，调用者不可只看分数。
+tca_recommendation_ai_score_value = {
+    value = tca_recommendation_ai_base_value
+    add = { value = "opinion(scope:recipient)" multiply = 0.5 }
+    add = { value = tca_recommendation_relevant_skill_value subtract = 6 min = 0 multiply = 2 max = 20 }
+    if = { limit = { scope:recipient = { has_trait = diligent } } add = 10 }
+    if = { limit = { scope:recipient = { has_trait = lazy } } add = -10 }
+    if = { limit = { has_trait = generous } add = 10 }
+    if = { limit = { has_trait = diligent } add = 5 }
+}

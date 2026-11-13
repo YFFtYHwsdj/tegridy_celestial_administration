@@ -14,6 +14,7 @@ tca_experience_central_eligible_trigger = {
     tgp_is_any_minister = yes
 }
 
+# 本入口是牧守经验资格，不是通用地方主官身份；独立有地范围仅适用于经验规则。
 # 有地天朝人物只排除真正独立的帝国君主；无地帝国级尚书不因头衔等级被误认为皇帝。
 # 转运使是现有有地地方官名，随有地分支纳入；提刑和通判复用实际在任身份。
 tca_experience_governor_eligible_trigger = {
@@ -29,11 +30,19 @@ tca_experience_governor_eligible_trigger = {
     }
 }
 
+# 地方主官（含提刑、通判）的普通内阁按实际雇主结算；不要求雇主持有实土。
 # 普通廷臣须有真实廷臣关系；持家门者可为封臣，但所有持有头衔都必须是家门。
 # 不允许退休公国、无地官署或任何实土头衔通过 is_landed = no 绕过限制。
 tca_experience_council_eligible_trigger = {
     is_alive = yes
-    $OWNER$ = { tca_experience_governor_eligible_trigger = yes is_landed = yes }
+    $OWNER$ = {
+        is_alive = yes
+        OR = {
+            tca_is_celestial_governor_trigger = yes
+            # 保留原有有地经验范围，包括独立且低于帝国级者；此项不授予地方主官身份。
+            AND = { tca_experience_governor_eligible_trigger = yes is_landed = yes }
+        }
+    }
     is_councillor_of = $OWNER$
     NOT = { any_held_title = { is_noble_family_title = no } }
     OR = {

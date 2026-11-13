@@ -1,0 +1,19 @@
+﻿# 真实互动发送入口；需要原生scope:actor／recipient，费用仅由互动cost扣一次。
+# 只调用已保护的九品奖励链，不强设官品、不改文武路线、不赠考试资格。
+# 无延迟、无新增状态；发送前与入口复验，确认页不调用此效果。
+tca_recommendation_send_effect = {
+    if = {
+        limit = { scope:recipient = { tca_recommendation_recipient_trigger = { OWNER = scope:actor } } }
+        if = {
+            limit = { tca_recommendation_uses_clerical_source_trigger = yes }
+            scope:recipient = { add_trait = tca_clerical_origin }
+        }
+        else = { scope:recipient = { add_trait = tca_military_origin } }
+        scope:recipient = {
+            tca_merit_before_reward_effect = yes
+            # 只补足原生首级所需余额，已有更高余额保留；准备的九品cap防止越级。
+            change_merit = { value = merit_level_1_value subtract = merit min = 0 }
+            tca_merit_after_reward_effect = yes
+        }
+    }
+}
