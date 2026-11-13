@@ -17,6 +17,7 @@
 - `.2`：在真实已核定的九品下剥离共用辅助分，检查每级Merit资序项为10；不直接写入更高品级绕过既有上限。
 - `.6`、`.7`：区分本模块来源锁和外部锁，使用仍合法的全职宫廷教师检查排他，避免以已禁用的地方总管作为前置。
 - `.16`：自备县级文官署，检查文武准入、最高分、等重要度阻断、升任、署务加成和来源人物兼职医师；借真实军事路验证军判官。文职联动断言包括签判外交5／6边界且无管理底线、司户与军判财政兼任、财政转外交、离任锁清理、外部保护阻挡、财政省份任务和外交一般任务交接。
+- `.16` 的全职排他补充：同一人物获任前可任宫廷教师，实际就任不绑定内阁的司法参军后被原版共用入口及教师资格拒绝，司法参军自身与医师资格仍成立，撤职后恢复教师资格。复用原有登记与夹具，不新增独占；`.7` 同时覆盖原版教师阻止获任差遣及军事内阁持续兼任。新增拒任断言已在修复前定向引擎运行失败；修复后 `.7`、`.16` 与 `tca_exam_test.1` 在1066独立观察者局以K=4同局通过，已核对终态、冻结计划、断言与错误日志，未检测到相关模组引擎错误。知贡举任职入口不增加全职检查，现有 `tca_exam_test.1` 可复核其正式任用资格；实际知贡举与其他职位双向聘任及界面提示仍待人工验收。
 - `.17`：自备两署，检查监押实际同职调任、来源内阁锁迁移及向下阻断，以及普通内阁跨署获任与旧席清理。
 - `.18`：检查AI天朝普通内阁参选、待阙重要度、玩家仿真保护、其他政体排除、外部保护及同署转任文武差遣。恢复探针先真实迁廷并返回原宫廷，再调用正式恢复入口，覆盖玩家接管后不恢复、原席被补位不抢占、空缺时恢复。上述断言已通过定向引擎运行；恢复入口探针不等于真实任命失败整链，玩家仿真不等于真实人类席位验收。
 - `.12`：通过主官真实死亡，检查文武同时在署时监押与司户的旧锁释放，以及按实际新雇主保留或撤销职位。
@@ -35,6 +36,8 @@
 ```sh
 python3 tools/run_game_tests.py --suite military_court_positions --suite military_council --parallel 4 --timeout 900
 python3 tools/run_game_tests.py --case tca_military_court_positions_test.16 --case tca_military_court_positions_test.12 --parallel 4 --timeout 600
+# 全职排他、文武内阁兼任与知贡举正式任用资格
+python3 tools/run_game_tests.py --case tca_military_court_positions_test.7 --case tca_military_court_positions_test.16 --case tca_exam_test.1 --parallel 4 --timeout 300
 # 普通内阁、同职跨署、故障整链、军务保护与自然季度同局
 python3 tools/run_game_tests.py --case tca_military_court_positions_test.18 --case tca_military_court_positions_test.17 --case tca_court_failure_test.1 --case tca_marshal_nepotism_test.1 --case tca_court_natural_test.1 --parallel 4 --timeout 600
 # 两个真实玩家会话分别保存重启，沿同一冻结计划续接

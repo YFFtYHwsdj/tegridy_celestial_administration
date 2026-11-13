@@ -309,6 +309,32 @@ tca_military_court_positions_test.16 = {
                 debug_log = "TCA_TEST CHECK_PASS tca_test_court_positions_civil_flow 12"
             }
             else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_positions_civil_flow 12" }
+            # 无内阁的司法参军必须单独挡住原版全职职位，避免is_councillor掩盖遗漏。
+            # 前后用同一人物核对教师资格，排除年龄、婚姻或其他原生条件造成的假阳性。
+            if = { limit = { scope:tca_mcp_officer = { is_councillor = no court_position_does_not_already_have_a_job_trigger = yes court_tutor_validity_trigger = { EMPLOYER = scope:tca_mcp_governor } } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_court_positions_civil_flow 16"
+            }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_positions_civil_flow 16" }
+            scope:tca_mcp_officer = { add_character_flag = tca_military_appointment_allowed }
+            scope:tca_mcp_governor = { appoint_court_position = { recipient = scope:tca_mcp_officer court_position = tca_judicial_advisor_court_position } }
+            scope:tca_mcp_officer = { remove_character_flag = tca_military_appointment_allowed }
+            if = { limit = { scope:tca_mcp_officer = { has_court_position = tca_judicial_advisor_court_position is_councillor = no court_position_does_not_already_have_a_job_trigger = no NOT = { court_tutor_validity_trigger = { EMPLOYER = scope:tca_mcp_governor } } } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_court_positions_civil_flow 17"
+            }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_positions_civil_flow 17" }
+            if = { limit = { scope:tca_mcp_officer = { tca_judicial_advisor_validity_trigger = yes court_physician_validity_trigger = { EMPLOYER = scope:tca_mcp_governor } } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_court_positions_civil_flow 18"
+            }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_positions_civil_flow 18" }
+            scope:tca_mcp_governor = {
+                add_character_flag = free_revoke_cost
+                revoke_court_position = { recipient = scope:tca_mcp_officer court_position = tca_judicial_advisor_court_position }
+                remove_character_flag = free_revoke_cost
+            }
+            if = { limit = { scope:tca_mcp_officer = { tca_court_holds_position_trigger = no court_position_does_not_already_have_a_job_trigger = yes court_tutor_validity_trigger = { EMPLOYER = scope:tca_mcp_governor } } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_court_positions_civil_flow 19"
+            }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_positions_civil_flow 19" }
             # 两个自备边界人物：外交6、管理不足仍可签判；外交5、高管理学识仍须排除。
             scope:tca_mcp_governor = {
                 create_character = { age = 30 gender_female_chance = 0 random_traits = no dynasty = none employer = this culture = this.culture faith = this.faith rite = this.rite diplomacy = { 6 6 } stewardship = { 0 0 } learning = { 20 20 } save_scope_as = tca_military_court_positions_test_diplomat }
