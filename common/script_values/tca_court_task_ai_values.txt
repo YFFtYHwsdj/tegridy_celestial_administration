@@ -1,64 +1,25 @@
-﻿# 十八项文武差遣任务的AI评分；与任务定义、原生回归共用，不写人物或领地状态。
-# 当前作用域与scope:liege均为雇主；原生另提供scope:employee，测试无雇员时称职度倍率默认为1。
-# 收益基础分在各任务入口维护，最后统一乘称职度倍率、加费用压力；性格只在有受益对象时加分。
-# 无收益基础分-100；按最差称职度乘0.4后仍低于原版停任务阈值-10，不会被免费难度救活。
-
-# 原版月费只读适配；必须提供scope:liege。保留原版头衔、时代与困难AI免费规则。
+﻿# 文武任务AI只读雇主与scope:employee；按需求、称职度、性格和实际付款资源统一评估。
+# 无对象先返回-100；付不起返回-1000；正收益不足以负担工作机会成本时映射-100，越过原生停止线。
+# 任务状态均由原生员工回调维护；同一员工只持一项差遣，不把其他员工任务费加回。
 tca_court_task_ai_six_month_cost = { value = monthly_court_position_task_cost multiply = 6 }
-
-# 费用压力：只查实际付款资源。收入不足两倍单项月费，或当月费也付不起时拒绝。
-# 预计执行后的净亏且储备不足六个月同样拒绝；已执行者先加回本项费用，统一开始和保持条件。
-# 国库净结余使用monthly_character_treasury_balance，不拿个人金钱补充国库支付能力。
-# -1000足以压过所有收益与性格加分；原版费用为0时直接返回0。
-tca_court_task_ai_budget_penalty = {
-    value = 0
-    if = {
-        limit = { monthly_court_position_task_cost > 0 }
-        if = {
-            limit = {
-                has_treasury = yes
-                OR = {
-                    monthly_character_treasury_income < monthly_court_position_task_cost_double
-                    treasury < monthly_court_position_task_cost
-                    AND = {
-                        tca_court_task_ai_projected_balance < 0
-                        treasury < tca_court_task_ai_six_month_cost
-                    }
-                }
-            }
-            value = -1000
-        }
-        else_if = {
-            limit = {
-                has_treasury = no
-                OR = {
-                    monthly_character_income < monthly_court_position_task_cost_double
-                    gold < monthly_court_position_task_cost
-                    AND = {
-                        tca_court_task_ai_projected_balance < 0
-                        gold < tca_court_task_ai_six_month_cost
-                    }
-                }
-            }
-            value = -1000
-        }
-    }
-}
-
-# 当前付款资源的预计月净结余；状态只由原生任务回调写在当前员工，读其他人的标记没有效力。
-# 活跃任务的月费已含在真实支出中，先加回再扣候选费用；未开任务直接扣，避免启停改变判断基准。
 tca_court_task_ai_projected_balance = {
     value = monthly_character_balance
     if = { limit = { has_treasury = yes } value = monthly_character_treasury_balance }
-    if = {
-        limit = { exists = scope:employee scope:employee = { has_variable = tca_court_paid_task_active } }
-        add = monthly_court_position_task_cost
-    }
+    if = { limit = { scope:employee ?= { has_variable = tca_court_paid_task_active } } add = monthly_court_position_task_cost }
     subtract = monthly_court_position_task_cost
 }
-
-# 原生aptitude是0至4的档位；倍率0.4／0.55／0.7／0.85／1，费用不随称职度打折。
-# 本体系同人只能持一项差遣，因此只读实际持有职位，避免为每个任务复制倍率。
+# 费用压力：无费用不处罚；不能支付一个月或净亏且不足六个月储备时拒绝，净亏有储备则扣40。
+tca_court_task_ai_budget_penalty = {
+    value = 0
+    if = { limit = { monthly_court_position_task_cost > 0 }
+        if = { limit = { OR = {
+            AND = { has_treasury = yes OR = { treasury < monthly_court_position_task_cost AND = { tca_court_task_ai_projected_balance < 0 treasury < tca_court_task_ai_six_month_cost } } }
+            AND = { has_treasury = no OR = { gold < monthly_court_position_task_cost AND = { tca_court_task_ai_projected_balance < 0 gold < tca_court_task_ai_six_month_cost } } }
+        } } value = -1000 }
+        else_if = { limit = { tca_court_task_ai_projected_balance < 0 } value = -40 }
+    }
+}
+# 原生aptitude档位0至4；无员工的纯需求测试使用1，真实任务始终有员工。
 tca_court_task_ai_aptitude_factor = {
     value = 1
     if = {
@@ -76,268 +37,272 @@ tca_court_task_ai_aptitude_factor = {
         add = 0.4
     }
 }
+# 只减本项当前已执行的临时好感，其他任务与常驻收益保留，防止自身收益导致循环。
+tca_court_relieve_households_active_bonus = {
+    value = 0
+    if = { limit = { court_position:tca_household_registrar_court_position ?= { has_variable = tca_court_relieving_households } }
+        value = court_position:tca_household_registrar_court_position.aptitude:tca_household_registrar_court_position
+        add = 1 multiply = 3
+    }
+}
+tca_court_explain_statutes_active_bonus = {
+    value = 0
+    if = { limit = { court_position:tca_judicial_advisor_court_position ?= { has_variable = tca_court_hearing_petitions } }
+        value = court_position:tca_judicial_advisor_court_position.aptitude:tca_judicial_advisor_court_position
+        add = 1 multiply = 2
+    }
+}
+tca_court_encourage_farming_demand = {
+    value = 0
+    if = { limit = { exists = capital_county capital_county = { is_landless_type_title = no is_noble_family_title = no development_level < 100 } } value = 80 }
+    if = { limit = { exists = capital_county capital_county = { is_landless_type_title = no is_noble_family_title = no development_level < 100 } is_at_war = yes } value = 50 }
+}
+tca_court_relieve_households_demand = {
+    value = 0
+    if = { limit = { any_held_county = { is_landless_type_title = no is_noble_family_title = no county_opinion < { value = -25 add = scope:liege.tca_court_relieve_households_active_bonus } } } value = 180 }
+    else_if = { limit = { any_held_county = { is_landless_type_title = no is_noble_family_title = no county_opinion < { value = 0 add = scope:liege.tca_court_relieve_households_active_bonus } } } value = 120 }
+    else_if = { limit = { any_held_county = { is_landless_type_title = no is_noble_family_title = no county_opinion < { value = 15 add = scope:liege.tca_court_relieve_households_active_bonus } } } value = 50 }
 
+}
+tca_court_explain_statutes_demand = {
+    value = 0
+    if = { limit = { any_held_county = { is_landless_type_title = no is_noble_family_title = no county_opinion < { value = -25 add = scope:liege.tca_court_explain_statutes_active_bonus } } } value = 180 }
+    else_if = { limit = { any_held_county = { is_landless_type_title = no is_noble_family_title = no county_opinion < { value = 0 add = scope:liege.tca_court_explain_statutes_active_bonus } } } value = 120 }
+    else_if = { limit = { any_held_county = { is_landless_type_title = no is_noble_family_title = no county_opinion < { value = 15 add = scope:liege.tca_court_explain_statutes_active_bonus } } } value = 50 }
+
+}
+tca_court_review_sentences_demand = {
+    value = 0
+    if = { limit = { any_held_county = { is_landless_type_title = no is_noble_family_title = no county_control < 60 } } value = 180 }
+    else_if = { limit = { any_held_county = { is_landless_type_title = no is_noble_family_title = no county_control < 85 } } value = 120 }
+    else_if = { limit = { scope:employee ?= { has_variable = tca_court_restoring_control } any_held_county = { is_landless_type_title = no is_noble_family_title = no county_control < 95 } } value = 70 }
+
+}
+tca_court_organize_office_demand = {
+    value = 0
+    if = { limit = { tca_court_organize_beneficiary_count > 0 }
+        value = 50 add = { value = tca_court_organize_beneficiary_count multiply = 10 max = 40 }
+    }
+}
+tca_court_supervise_building_demand = {
+    value = 0
+    if = { limit = { tca_court_task_has_beneficiary_holding_trigger = yes OR = { AND = { has_treasury = yes treasury >= 300 } AND = { has_treasury = no gold >= 300 } } } value = 130 }
+    else_if = { limit = { tca_court_task_has_beneficiary_holding_trigger = yes OR = { AND = { has_treasury = yes treasury >= 100 } AND = { has_treasury = no gold >= 100 } } } value = 70 }
+
+}
+# 无独立征召兵现有／满额脚本读数：先以直辖实县建筑征召兵筛选可能受益者，再用总兵力比率保守近似。
+# 总兵力可能由兵士缺员拉低，不能当作精确征召兵缺额；降低需求档为130／90／50，保留自然整补能力。
+tca_military_supervisor_drill_levies_demand = {
+    value = 0
+    if = { limit = {
+        max_military_strength > 0
+        any_held_county = { is_landless_type_title = no is_noble_family_title = no building_levies > 0 }
+    }
+        value = current_military_strength divide = max_military_strength
+        save_temporary_value_as = tca_court_task_ai_strength_ratio
+        value = tca_court_task_ai_replenishment_ratio_demand
+    }
+}
+# 无副作用数值入口；输入scope:tca_court_task_ai_strength_ratio、可选员工的原生整补任务状态。
+# 真实任务仅在上述实际受益前置满足后调用；比率等于60%／85%／95%分别进入下一档。
+tca_court_task_ai_replenishment_ratio_demand = {
+    value = 0
+    if = { limit = { scope:tca_court_task_ai_strength_ratio < 0.6 } value = 130 }
+    else_if = { limit = { scope:tca_court_task_ai_strength_ratio < 0.85 } value = 90 }
+    else_if = { limit = { scope:employee ?= { has_variable = tca_court_replenishing_levies } scope:tca_court_task_ai_strength_ratio < 0.95 } value = 50 }
+}
+tca_military_supervisor_inspect_defenses_demand = {
+    value = 0
+    if = { limit = { tca_court_task_has_beneficiary_holding_trigger = yes }
+        value = 20
+        if = { limit = { any_held_county = { is_landless_type_title = no is_noble_family_title = no any_neighboring_county = { exists = holder NOT = { holder.top_liege = scope:liege.top_liege } } } } value = 55 }
+        if = { limit = { is_at_war = yes } value = 100 }
+        if = { limit = { any_character_war = { is_defender = scope:liege } } value = 150 }
+        # 只读取雇主亲持地产，与本轮雇主地产修正的保守受益范围一致；不扫描封臣地产。
+        if = { limit = { any_held_title = { tier = tier_barony exists = title_province title_province = { has_holding = yes any_army_in_location = { is_army_in_siege = yes army_owner = { is_at_war_with = scope:liege } } } } } value = 220 }
+    }
+}
+tca_military_inspector_drill_troops_demand = {
+    value = 0
+    if = { limit = { current_military_strength > 0 }
+        value = 35
+        if = { limit = { is_at_war = yes } value = 120 }
+        if = { limit = { tca_court_task_has_controlled_maa_trigger = yes } add = 15 }
+    }
+}
+tca_corps_inspector_encourage_officers_demand = {
+    value = 0
+    if = { limit = { current_military_strength > 0 }
+        value = 25
+        if = { limit = { is_at_war = yes } value = 120 }
+        if = { limit = { any_character_war = { is_attacker = scope:liege } } value = 160 }
+    }
+}
+tca_corps_inspector_marshal_ranks_demand = {
+    value = 0
+    if = { limit = { current_military_strength > 0 is_at_war = yes }
+        value = 110
+        if = { limit = { any_character_war = { is_defender = scope:liege } } value = 150 }
+        if = { limit = { current_military_strength < { value = max_military_strength multiply = 0.6 } } add = 40 }
+    }
+}
+tca_court_encourage_farming_raw_score = {
+    value = tca_court_encourage_farming_demand
+    multiply = tca_court_task_ai_aptitude_factor
+    if = { limit = { has_trait = diligent } add = 5 }
+    if = { limit = { has_trait = lazy } subtract = 5 }
+    subtract = 20 add = tca_court_task_ai_budget_penalty
+}
 tca_court_encourage_farming_ai_score = {
     value = -100
-    if = {
-        limit = { any_held_county = { is_landless_type_title = no is_noble_family_title = no development_level < 100 } }
-        value = 70
-        if = { limit = { any_held_county = { is_landless_type_title = no is_noble_family_title = no development_level < 30 } } add = 20 }
-        if = { limit = { has_trait = diligent } add = 10 }
+    if = { limit = { tca_court_encourage_farming_demand > 0 }
+        if = { limit = { tca_court_task_ai_budget_penalty <= -1000 } value = -1000 }
+        else_if = { limit = { tca_court_encourage_farming_raw_score > 0 } value = tca_court_encourage_farming_raw_score }
     }
-    multiply = tca_court_task_ai_aptitude_factor
-    add = tca_court_task_ai_budget_penalty
 }
-
-# 总兵力缺额是补员需求近似值，包含军士；不宣称已读取征召兵独立缺额。
-tca_court_register_recruits_ai_score = {
-    value = -100
-    if = {
-        limit = { max_military_strength > 0 current_military_strength < { value = max_military_strength multiply = 0.9 } }
-        value = 130
-        if = { limit = { is_at_war = yes } add = 30 }
-    }
+tca_court_relieve_households_raw_score = {
+    value = tca_court_relieve_households_demand
     multiply = tca_court_task_ai_aptitude_factor
-    add = tca_court_task_ai_budget_penalty
+    if = { limit = { has_trait = compassionate } add = 5 }
+    if = { limit = { has_trait = callous } subtract = 5 }
+    subtract = 20 add = tca_court_task_ai_budget_penalty
 }
-
-# 好感类效果在无民怨时仍有预防收益，保留低分；只扫描雇主直辖实县，不扫全帝国。
-# any_held_county也包含伯爵级家族头衔，所有县收益判断均须排除无地与家族头衔。
 tca_court_relieve_households_ai_score = {
     value = -100
-    if = {
-        limit = { any_held_county = { is_landless_type_title = no is_noble_family_title = no always = yes } }
-        value = 25
-        if = { limit = { any_held_county = { is_landless_type_title = no is_noble_family_title = no county_opinion < 0 } } add = 85 }
-        if = { limit = { any_held_county = { is_landless_type_title = no is_noble_family_title = no county_opinion < -25 } } add = 40 }
-        if = { limit = { has_trait = compassionate } add = 10 }
+    if = { limit = { tca_court_relieve_households_demand > 0 }
+        if = { limit = { tca_court_task_ai_budget_penalty <= -1000 } value = -1000 }
+        else_if = { limit = { tca_court_relieve_households_raw_score > 0 } value = tca_court_relieve_households_raw_score }
     }
-    multiply = tca_court_task_ai_aptitude_factor
-    add = tca_court_task_ai_budget_penalty
 }
-
+tca_court_explain_statutes_raw_score = {
+    value = tca_court_explain_statutes_demand
+    multiply = tca_court_task_ai_aptitude_factor
+    if = { limit = { has_trait = just } add = 5 }
+    if = { limit = { has_trait = arbitrary } subtract = 5 }
+    subtract = 20 add = tca_court_task_ai_budget_penalty
+}
 tca_court_explain_statutes_ai_score = {
     value = -100
-    if = {
-        limit = { any_held_county = { is_landless_type_title = no is_noble_family_title = no always = yes } }
-        value = 35
-        if = { limit = { any_held_county = { is_landless_type_title = no is_noble_family_title = no county_opinion < 0 } } add = 85 }
-        if = { limit = { has_trait = just } add = 10 }
+    if = { limit = { tca_court_explain_statutes_demand > 0 }
+        if = { limit = { tca_court_task_ai_budget_penalty <= -1000 } value = -1000 }
+        else_if = { limit = { tca_court_explain_statutes_raw_score > 0 } value = tca_court_explain_statutes_raw_score }
     }
-    multiply = tca_court_task_ai_aptitude_factor
-    add = tca_court_task_ai_budget_penalty
 }
-
-# 效果降低未来暴政获取，不消除既有暴政；因此不按现有tyranny反推“疗效”。
+tca_court_review_sentences_raw_score = {
+    value = tca_court_review_sentences_demand
+    multiply = tca_court_task_ai_aptitude_factor
+    if = { limit = { has_trait = just } add = 5 }
+    if = { limit = { has_trait = arbitrary } subtract = 5 }
+    subtract = 20 add = tca_court_task_ai_budget_penalty
+}
 tca_court_review_sentences_ai_score = {
     value = -100
-    if = {
-        limit = { any_vassal = { always = yes } }
-        value = 20
-        if = { limit = { ai_vengefulness >= 25 } add = 30 }
-        if = { limit = { ai_honor <= -25 } add = 30 }
-        if = { limit = { has_trait = arbitrary } add = 10 }
+    if = { limit = { tca_court_review_sentences_demand > 0 }
+        if = { limit = { tca_court_task_ai_budget_penalty <= -1000 } value = -1000 }
+        else_if = { limit = { tca_court_review_sentences_raw_score > 0 } value = tca_court_review_sentences_raw_score }
     }
-    multiply = tca_court_task_ai_aptitude_factor
-    add = tca_court_task_ai_budget_penalty
 }
-
-# 按职位数量而非人物数量排除本差遣；来源人物兼任的医师等其他职位仍能受益。
+tca_court_organize_office_raw_score = {
+    value = tca_court_organize_office_demand
+    multiply = tca_court_task_ai_aptitude_factor
+    if = { limit = { has_trait = diligent } add = 5 }
+    if = { limit = { has_trait = lazy } subtract = 5 }
+    subtract = 20 add = tca_court_task_ai_budget_penalty
+}
 tca_court_organize_office_ai_score = {
     value = -100
-    if = {
-        limit = { court_positions_currently_filled > 1 }
-        value = 60
-        add = { value = court_positions_currently_filled subtract = 1 multiply = 10 max = 60 }
-        if = { limit = { has_trait = diligent } add = 10 }
+    if = { limit = { tca_court_organize_office_demand > 0 }
+        if = { limit = { tca_court_task_ai_budget_penalty <= -1000 } value = -1000 }
+        else_if = { limit = { tca_court_organize_office_raw_score > 0 } value = tca_court_organize_office_raw_score }
     }
-    multiply = tca_court_task_ai_aptitude_factor
-    add = tca_court_task_ai_budget_penalty
 }
-
-tca_court_review_documents_ai_score = {
-    value = -100
-    if = {
-        limit = { any_held_county = { is_landless_type_title = no is_noble_family_title = no county_control < 100 } }
-        value = 90
-        if = { limit = { any_held_county = { is_landless_type_title = no is_noble_family_title = no county_control < 80 } } add = 60 }
-        if = { limit = { has_trait = diligent } add = 10 }
-    }
+tca_court_supervise_building_raw_score = {
+    value = tca_court_supervise_building_demand
     multiply = tca_court_task_ai_aptitude_factor
-    add = tca_court_task_ai_budget_penalty
+    if = { limit = { has_trait = diligent } add = 5 }
+    if = { limit = { has_trait = lazy } subtract = 5 }
+    subtract = 20 add = tca_court_task_ai_budget_penalty
 }
-
-# 营造费用在开工时支付，不能用“正在建造”冒充尚可节省的支出。
-# 以直辖县和可用建造资金>=100估计后续投资意愿；不是逐座建筑的精确回报计算。
 tca_court_supervise_building_ai_score = {
     value = -100
-    if = {
-        limit = {
-            any_held_county = { is_landless_type_title = no is_noble_family_title = no always = yes }
-            OR = { AND = { has_treasury = yes treasury >= 100 } AND = { has_treasury = no gold >= 100 } }
-        }
-        value = 70
-        if = { limit = { has_trait = diligent } add = 10 }
-        if = { limit = { ai_greed >= 25 } add = 10 }
+    if = { limit = { tca_court_supervise_building_demand > 0 }
+        if = { limit = { tca_court_task_ai_budget_penalty <= -1000 } value = -1000 }
+        else_if = { limit = { tca_court_supervise_building_raw_score > 0 } value = tca_court_supervise_building_raw_score }
     }
-    multiply = tca_court_task_ai_aptitude_factor
-    add = tca_court_task_ai_budget_penalty
 }
-
-# 只在拥有军士时考虑；军团数量和战时状态仅估计减费价值，不是实际军费节省额。
-tca_court_audit_military_supplies_ai_score = {
-    value = -100
-    if = {
-        limit = { maa_regiments_count > 0 }
-        value = 50
-        add = { value = maa_regiments_count multiply = 10 max = 50 }
-        if = { limit = { is_at_war = yes } add = 30 }
-        if = { limit = { ai_greed >= 25 } add = 10 }
-    }
+tca_military_supervisor_drill_levies_raw_score = {
+    value = tca_military_supervisor_drill_levies_demand
     multiply = tca_court_task_ai_aptitude_factor
-    add = tca_court_task_ai_budget_penalty
+    if = { limit = { has_trait = diligent } add = 5 }
+    if = { limit = { has_trait = lazy } subtract = 5 }
+    subtract = 20 add = tca_court_task_ai_budget_penalty
 }
-
 tca_military_supervisor_drill_levies_ai_score = {
     value = -100
-    if = {
-        limit = {
-            max_military_strength > 0
-            OR = {
-                current_military_strength < { value = max_military_strength multiply = 0.9 }
-                # 最差称职度只有补员效果；其他档位还有常驻坚韧收益。
-                scope:employee ?= { aptitude = { court_position = tca_military_supervisor_court_position value >= 1 } }
-            }
-        }
-        value = 50
-        if = { limit = { current_military_strength < { value = max_military_strength multiply = 0.9 } } add = 80 }
-        if = { limit = { is_at_war = yes } add = 20 }
-        if = { limit = { ai_energy >= 25 } add = 10 }
-        if = { limit = { has_trait = brave } add = 5 }
+    if = { limit = { tca_military_supervisor_drill_levies_demand > 0 }
+        if = { limit = { tca_court_task_ai_budget_penalty <= -1000 } value = -1000 }
+        else_if = { limit = { tca_military_supervisor_drill_levies_raw_score > 0 } value = tca_military_supervisor_drill_levies_raw_score }
     }
-    multiply = tca_court_task_ai_aptitude_factor
-    add = tca_court_task_ai_budget_penalty
 }
-
-tca_military_supervisor_order_barracks_ai_score = {
-    value = -100
-    if = {
-        limit = {
-            max_military_strength > 0
-            OR = {
-                is_at_war = yes
-                scope:employee ?= { aptitude = { court_position = tca_military_supervisor_court_position value >= 1 } }
-            }
-        }
-        value = 45
-        if = { limit = { is_at_war = yes } add = 60 }
-        if = { limit = { ai_rationality >= 25 } add = 10 }
-        if = { limit = { has_trait = diligent } add = 5 }
-    }
+tca_military_supervisor_inspect_defenses_raw_score = {
+    value = tca_military_supervisor_inspect_defenses_demand
     multiply = tca_court_task_ai_aptitude_factor
-    add = tca_court_task_ai_budget_penalty
+    if = { limit = { has_trait = paranoid } add = 5 }
+    subtract = 20 add = tca_court_task_ai_budget_penalty
 }
-
 tca_military_supervisor_inspect_defenses_ai_score = {
     value = -100
-    if = {
-        limit = { any_held_county = { is_landless_type_title = no is_noble_family_title = no always = yes } }
-        value = 45
-        if = { limit = { is_at_war = yes } add = 75 }
-        if = { limit = { ai_boldness <= -25 } add = 10 }
-        if = { limit = { has_trait = paranoid } add = 5 }
+    if = { limit = { tca_military_supervisor_inspect_defenses_demand > 0 }
+        if = { limit = { tca_court_task_ai_budget_penalty <= -1000 } value = -1000 }
+        else_if = { limit = { tca_military_supervisor_inspect_defenses_raw_score > 0 } value = tca_military_supervisor_inspect_defenses_raw_score }
     }
-    multiply = tca_court_task_ai_aptitude_factor
-    add = tca_court_task_ai_budget_penalty
 }
-
-tca_military_inspector_maintain_gear_ai_score = {
-    value = -100
-    if = {
-        limit = {
-            tca_military_maintain_gear_visible_trigger = yes
-            max_military_strength > 0
-            OR = {
-                maa_regiments_count > 0
-                is_at_war = yes
-                scope:employee ?= { aptitude = { court_position = tca_military_inspector_court_position value >= 1 } }
-            }
-        }
-        value = 70
-        add = { value = maa_regiments_count multiply = 10 max = 40 }
-        if = { limit = { is_at_war = yes } add = 30 }
-        if = { limit = { ai_greed >= 25 } add = 10 }
-        if = { limit = { has_trait = temperate } add = 5 }
-    }
+tca_military_inspector_drill_troops_raw_score = {
+    value = tca_military_inspector_drill_troops_demand
     multiply = tca_court_task_ai_aptitude_factor
-    add = tca_court_task_ai_budget_penalty
+    if = { limit = { has_trait = diligent } add = 5 }
+    if = { limit = { has_trait = lazy } subtract = 5 }
+    subtract = 20 add = tca_court_task_ai_budget_penalty
 }
-
 tca_military_inspector_drill_troops_ai_score = {
     value = -100
-    if = {
-        limit = { max_military_strength > 0 }
-        value = 80
-        if = { limit = { is_at_war = yes } add = 60 }
-        if = { limit = { ai_boldness >= 25 } add = 10 }
-        if = { limit = { has_trait = ambitious } add = 5 }
+    if = { limit = { tca_military_inspector_drill_troops_demand > 0 }
+        if = { limit = { tca_court_task_ai_budget_penalty <= -1000 } value = -1000 }
+        else_if = { limit = { tca_military_inspector_drill_troops_raw_score > 0 } value = tca_military_inspector_drill_troops_raw_score }
     }
-    multiply = tca_court_task_ai_aptitude_factor
-    add = tca_court_task_ai_budget_penalty
 }
-
-tca_military_inspector_inspect_troops_ai_score = {
-    value = -100
-    if = {
-        limit = {
-            max_military_strength > 0
-            OR = { is_at_war = yes current_military_strength < { value = max_military_strength multiply = 0.9 } }
-        }
-        value = 30
-        if = { limit = { current_military_strength < { value = max_military_strength multiply = 0.9 } } add = 100 }
-        if = { limit = { is_at_war = yes } add = 30 }
-        if = { limit = { tca_court_task_ai_civil_province_trigger = yes } add = 20 }
-        if = { limit = { ai_rationality >= 25 } add = 5 }
-    }
+tca_corps_inspector_encourage_officers_raw_score = {
+    value = tca_corps_inspector_encourage_officers_demand
     multiply = tca_court_task_ai_aptitude_factor
-    add = tca_court_task_ai_budget_penalty
+    if = { limit = { has_trait = brave } add = 5 }
+    if = { limit = { has_trait = craven } subtract = 5 }
+    subtract = 20 add = tca_court_task_ai_budget_penalty
 }
-
 tca_corps_inspector_encourage_officers_ai_score = {
     value = -100
-    if = {
-        limit = { number_of_knights > 0 }
-        value = 50
-        add = { value = number_of_knights multiply = 10 max = 60 }
-        if = { limit = { is_at_war = yes } add = 30 }
-        if = { limit = { ai_boldness >= 25 } add = 10 }
-        if = { limit = { has_trait = brave } add = 5 }
+    if = { limit = { tca_corps_inspector_encourage_officers_demand > 0 }
+        if = { limit = { tca_court_task_ai_budget_penalty <= -1000 } value = -1000 }
+        else_if = { limit = { tca_corps_inspector_encourage_officers_raw_score > 0 } value = tca_corps_inspector_encourage_officers_raw_score }
     }
-    multiply = tca_court_task_ai_aptitude_factor
-    add = tca_court_task_ai_budget_penalty
 }
-
-tca_corps_inspector_enforce_discipline_ai_score = {
-    value = -100
-    if = {
-        limit = { max_military_strength > 0 }
-        value = 75
-        if = { limit = { is_at_war = yes } add = 60 }
-        if = { limit = { ai_honor >= 25 } add = 10 }
-        if = { limit = { has_trait = just } add = 5 }
-    }
+tca_corps_inspector_marshal_ranks_raw_score = {
+    value = tca_corps_inspector_marshal_ranks_demand
     multiply = tca_court_task_ai_aptitude_factor
-    add = tca_court_task_ai_budget_penalty
+    if = { limit = { has_trait = calm } add = 5 }
+    subtract = 20 add = tca_court_task_ai_budget_penalty
 }
-
 tca_corps_inspector_marshal_ranks_ai_score = {
     value = -100
-    if = {
-        limit = { max_military_strength > 0 is_at_war = yes }
-        value = 120
-        if = { limit = { ai_energy >= 25 } add = 10 }
-        if = { limit = { has_trait = ambitious } add = 5 }
+    if = { limit = { tca_corps_inspector_marshal_ranks_demand > 0 }
+        if = { limit = { tca_court_task_ai_budget_penalty <= -1000 } value = -1000 }
+        else_if = { limit = { tca_corps_inspector_marshal_ranks_raw_score > 0 } value = tca_corps_inspector_marshal_ranks_raw_score }
     }
-    multiply = tca_court_task_ai_aptitude_factor
-    add = tca_court_task_ai_budget_penalty
 }
+# 停用任务评分保留可调用的拒绝值，与隐藏兼容壳一致，不再提供新的执行意愿。
+tca_court_register_recruits_ai_score = { value = -100 }
+tca_court_review_documents_ai_score = { value = -100 }
+tca_court_audit_military_supplies_ai_score = { value = -100 }
+tca_military_supervisor_order_barracks_ai_score = { value = -100 }
+tca_military_inspector_maintain_gear_ai_score = { value = -100 }
+tca_military_inspector_inspect_troops_ai_score = { value = -100 }
+tca_corps_inspector_enforce_discipline_ai_score = { value = -100 }
