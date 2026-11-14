@@ -1,16 +1,25 @@
-﻿# 人物作用域；综合属职自身调用排除其他职位的原生入口，避免递归。
-# 来源的任务标记由原生on_start/on_end维护，离任清理同样移除。
-# 不按人物排除来源：其兼职医师等其他职位仍应受益；综合属职自身的aptitude不调用本入口。
+﻿# 任职者人物作用域；按其当前雇主读取综合属职常驻，再按任务标记追加同量加成。
+# 来源职位自身调用原生exclude_other_court_position入口，避免自身及互相递归；其兼职职位仍可受益。
 tca_court_organize_bonus = {
+    value = tca_court_organize_passive_bonus
+    add = tca_court_organize_task_bonus
+}
+tca_court_organize_passive_bonus = {
     value = 0
-    if = { limit = { exists = liege_or_court_owner.court_position:tca_civil_adjutant_court_position
-        liege_or_court_owner.court_position:tca_civil_adjutant_court_position = { has_variable = tca_court_organizing_office }
+    if = { limit = { exists = liege_or_court_owner.court_position:tca_civil_adjutant_court_position }
+        add = { value = liege_or_court_owner.court_position:tca_civil_adjutant_court_position.aptitude:tca_civil_adjutant_court_position add = 1 }
     }
-        add = { value = liege_or_court_owner.court_position:tca_civil_adjutant_court_position.aptitude:tca_civil_adjutant_court_position multiply = 2 add = 2 }
+    if = { limit = { exists = liege_or_court_owner.court_position:tca_army_judge_court_position }
+        add = { value = liege_or_court_owner.court_position:tca_army_judge_court_position.aptitude:tca_army_judge_court_position add = 1 }
     }
-    if = { limit = { exists = liege_or_court_owner.court_position:tca_army_judge_court_position
-        liege_or_court_owner.court_position:tca_army_judge_court_position = { has_variable = tca_court_organizing_office }
+}
+# 只返回当前已执行署务的额外部分；AI可由原生原始称职分减去此值，保留常驻和其他来源。
+tca_court_organize_task_bonus = {
+    value = 0
+    if = { limit = { liege_or_court_owner.court_position:tca_civil_adjutant_court_position ?= { has_variable = tca_court_organizing_office } }
+        add = { value = liege_or_court_owner.court_position:tca_civil_adjutant_court_position.aptitude:tca_civil_adjutant_court_position add = 1 }
     }
-        add = { value = liege_or_court_owner.court_position:tca_army_judge_court_position.aptitude:tca_army_judge_court_position multiply = 2 add = 2 }
+    if = { limit = { liege_or_court_owner.court_position:tca_army_judge_court_position ?= { has_variable = tca_court_organizing_office } }
+        add = { value = liege_or_court_owner.court_position:tca_army_judge_court_position.aptitude:tca_army_judge_court_position add = 1 }
     }
 }

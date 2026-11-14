@@ -139,8 +139,9 @@ class ExamContractTests(unittest.TestCase):
         self.assertNotIn('is_courtier', body)
         self.assertIn('treasury = { value = major_court_position_salary }', body)
         self.assertIn('prestige = { value = major_court_position_prestige_salary }', body)
-        self.assertIn('monthly_influence = 0.2', body)
-        self.assertIn('monthly_influence = 0.3', body)
+        self.assertIn('monthly_learning_lifestyle_xp_gain_mult = 0.05', body)
+        self.assertNotIn('monthly_influence', body)
+        self.assertIn('monthly_learning_lifestyle_xp_gain_mult = 0.01', body)
         self.assertNotIn('monthly_prestige', body)
 
     def test_candidate_trigger_matches_design(self):

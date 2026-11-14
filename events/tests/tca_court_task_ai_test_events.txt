@@ -43,6 +43,20 @@ tca_military_court_positions_test.19 = {
             } } root = { debug_log = "TCA_TEST CHECK_PASS tca_test_court_task_ai_needs_and_budget 2" } }
             else = { root = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_task_ai_needs_and_budget 2" } }
         }
+        # 没有月收入但有足够储备时只扣财政压力，不再使用“两倍收入”硬门槛。
+        scope:tca_military_court_positions_test_task_poor = {
+            add_gold = 10000
+            if = { limit = { OR = {
+                AND = { monthly_court_position_task_cost > 0 tca_court_task_ai_budget_penalty = -40 }
+                AND = { monthly_court_position_task_cost = 0 tca_court_task_ai_budget_penalty = 0 }
+            } } root = { debug_log = "TCA_TEST CHECK_PASS tca_test_court_task_ai_needs_and_budget 8" } }
+            else = { root = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_task_ai_needs_and_budget 8" } }
+            # 无受益对象的拒绝分不受财政或免费难度改写。
+            if = { limit = { tca_court_relieve_households_ai_score = -100 tca_court_organize_office_ai_score = -100 }
+                root = { debug_log = "TCA_TEST CHECK_PASS tca_test_court_task_ai_needs_and_budget 9" }
+            }
+            else = { root = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_task_ai_needs_and_budget 9" } }
+        }
         scope:tca_military_court_positions_test_task_poor = { death = { death_reason = death_natural_causes } }
         clear_saved_scope = liege
         tca_test_military_council_prepare_county_effect = { MILITARY_ONLY = no }
@@ -63,26 +77,83 @@ tca_military_court_positions_test.19 = {
             scope:tca_mcp_county = { change_county_control = 100 }
             # 原生县列表包含家族头衔，满实县控制度必须仍被判为没有治理收益。
             scope:tca_mcp_governor = {
-                set_variable = { name = tca_military_court_positions_test_task_full_benefit value = { value = tca_court_review_documents_ai_score subtract = tca_court_task_ai_budget_penalty } }
+                set_variable = { name = tca_military_court_positions_test_task_full_benefit value = tca_court_review_sentences_demand }
             }
             if = { limit = {
                 scope:tca_mcp_county = { county_control = 100 }
-                scope:tca_mcp_governor = { var:tca_military_court_positions_test_task_full_benefit <= -10 }
+                scope:tca_mcp_governor = { var:tca_military_court_positions_test_task_full_benefit = 0 }
             } debug_log = "TCA_TEST CHECK_PASS tca_test_court_task_ai_needs_and_budget 3" }
             else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_task_ai_needs_and_budget 3" }
             scope:tca_mcp_county = { change_county_control = -50 }
             scope:tca_mcp_governor = {
-                set_variable = { name = tca_military_court_positions_test_task_low_benefit value = { value = tca_court_review_documents_ai_score subtract = tca_court_task_ai_budget_penalty } }
+                set_variable = { name = tca_military_court_positions_test_task_low_benefit value = tca_court_review_sentences_demand }
             }
             if = { limit = {
                 scope:tca_mcp_county = { county_control < 80 }
                 scope:tca_mcp_governor = { var:tca_military_court_positions_test_task_low_benefit > 0 var:tca_military_court_positions_test_task_low_benefit > var:tca_military_court_positions_test_task_full_benefit }
             } debug_log = "TCA_TEST CHECK_PASS tca_test_court_task_ai_needs_and_budget 4" }
             else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_task_ai_needs_and_budget 4" }
+            # 控制力85且未执行时不启动；同下方已执行保持70形成真实滞回正反。
+            scope:tca_mcp_county = { change_county_control = { value = 85 subtract = county_control } }
+            if = { limit = { scope:tca_mcp_county = { county_control = 85 } scope:tca_mcp_governor = { tca_court_review_sentences_demand = 0 tca_court_review_sentences_ai_score = -100 } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_court_task_ai_needs_and_budget 7"
+            }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_task_ai_needs_and_budget 7" }
             if = { limit = { scope:tca_mcp_governor = { tca_military_is_military_province_trigger = no tca_court_task_ai_civil_province_trigger = yes } }
                 debug_log = "TCA_TEST CHECK_PASS tca_test_court_task_ai_needs_and_budget 5"
             }
             else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_task_ai_needs_and_budget 5" }
+            # 开始和保持双门槛直接调用正式入口；边界在同一自备实县中按序构造。
+            scope:tca_mcp_officer = { save_scope_as = employee set_variable = tca_court_restoring_control }
+            if = { limit = { scope:tca_mcp_governor = { tca_court_review_sentences_demand = 70 } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_court_task_ai_needs_and_budget 10"
+            }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_task_ai_needs_and_budget 10" }
+            scope:tca_mcp_county = { change_county_control = 10 }
+            if = { limit = { scope:tca_mcp_county = { county_control = 95 } scope:tca_mcp_governor = { tca_court_review_sentences_demand = 0 tca_court_review_sentences_ai_score = -100 } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_court_task_ai_needs_and_budget 11"
+            }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_task_ai_needs_and_budget 11" }
+            scope:tca_mcp_officer = { remove_variable = tca_court_restoring_control }
+            scope:tca_mcp_county = { change_county_control = -35 }
+            if = { limit = { scope:tca_mcp_county = { county_control = 60 } scope:tca_mcp_governor = { tca_court_review_sentences_demand = 120 } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_court_task_ai_needs_and_budget 12"
+            }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_task_ai_needs_and_budget 12" }
+            scope:tca_mcp_county = { change_county_control = -1 }
+            if = { limit = { scope:tca_mcp_county = { county_control = 59 } scope:tca_mcp_governor = { tca_court_review_sentences_demand = 180 } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_court_task_ai_needs_and_budget 13"
+            }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_task_ai_needs_and_budget 13" }
+            # 与正式整补共用纯比率入口；这里只验证近似档位，不伪称能读取独立征召兵缺额。
+            save_scope_value_as = { name = tca_court_task_ai_strength_ratio value = 0.6 }
+            if = { limit = { tca_court_task_ai_replenishment_ratio_demand = 90 }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_court_task_ai_needs_and_budget 14"
+            }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_task_ai_needs_and_budget 14" }
+            save_scope_value_as = { name = tca_court_task_ai_strength_ratio value = 0.85 }
+            if = { limit = { tca_court_task_ai_replenishment_ratio_demand = 0 }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_court_task_ai_needs_and_budget 15"
+            }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_task_ai_needs_and_budget 15" }
+            scope:tca_mcp_officer = { set_variable = tca_court_replenishing_levies }
+            if = { limit = { tca_court_task_ai_replenishment_ratio_demand = 50 }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_court_task_ai_needs_and_budget 16"
+            }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_task_ai_needs_and_budget 16" }
+            save_scope_value_as = { name = tca_court_task_ai_strength_ratio value = 0.95 }
+            if = { limit = { tca_court_task_ai_replenishment_ratio_demand = 0 }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_court_task_ai_needs_and_budget 17"
+            }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_task_ai_needs_and_budget 17" }
+            save_scope_value_as = { name = tca_court_task_ai_strength_ratio value = 0.599 }
+            if = { limit = { tca_court_task_ai_replenishment_ratio_demand = 130 }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_court_task_ai_needs_and_budget 18"
+            }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_task_ai_needs_and_budget 18" }
+            scope:tca_mcp_officer = { remove_variable = tca_court_replenishing_levies }
+            clear_saved_scope = tca_court_task_ai_strength_ratio
+            clear_saved_scope = employee
             # 控制度是本例自己的快照，共用借还清理不拥有它。
             scope:tca_mcp_county = { change_county_control = { value = root.var:tca_military_court_positions_test_task_old_control subtract = county_control } }
             remove_variable = tca_military_court_positions_test_task_old_control

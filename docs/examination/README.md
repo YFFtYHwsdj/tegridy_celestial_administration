@@ -4,6 +4,8 @@
 
 设计目标与取舍见 [知贡举与自动会试／殿试设计](design.md)。本文维护当前行为和实现入口；不追加逐轮修复流水。
 
+知贡举常驻改为雇主学识生活方式经验加成，各档数值见[宫廷差遣效果与任务 AI](../court_positions/effects.md#知贡举实际办科举)。两项开科任务、考试流程及事件奖励保持原规则。
+
 ## 当前行为
 
 - 只有持有 `title:h_china` 的玩家天朝皇帝会进入自动链；AI 皇帝继续使用原版 `activity_imperial_examination`，不会收到 `tca_exam` 事件。
@@ -21,7 +23,7 @@
 
 ## 实现入口
 
-- `common/court_positions/types/tca_exam_court_positions.txt`：职位定义、资格、适配度、薪资、影响力效果与生命周期。
+- `common/court_positions/types/tca_exam_court_positions.txt`：职位定义、资格、适配度、薪资、学识生活方式经验效果与生命周期。
 - `common/court_positions/tasks/tca_exam_tasks.txt`：自动／常规任务变量、启用时的首次请开科与 AI 权重。自动任务直接以 `title:h_china.holder` 为目标，不依赖无地知贡举的 `scope:liege`。
 - `common/on_action/tca_exam_on_actions.txt`：皇帝年度脉冲，复用 `tca_exam_can_prompt_trigger` 执行自动开科检查。
 - `common/customizable_localization/tca_exam_custom_loc.txt`：读取本届侧重，供选项与结果 Tooltip 显示学识／军事／管理名称；不选择或修改侧重。

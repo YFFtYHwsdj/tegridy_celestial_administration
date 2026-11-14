@@ -293,12 +293,25 @@ tca_military_court_positions_test.16 = {
                 debug_log = "TCA_TEST CHECK_PASS tca_test_court_positions_civil_flow 11"
             }
             else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_positions_civil_flow 11" }
+            # 未开任务时也有常驻署务；本署其他职位得5分，来源自身的原生档位保持不变。
+            if = { limit = { scope:tca_mcp_backup = { tca_court_organize_bonus = 5 } scope:tca_mcp_officer = { aptitude:tca_civil_adjutant_court_position = 4 } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_court_positions_civil_flow 20"
+            }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_positions_civil_flow 20" }
+            # 原生原始分读取，不复制各职位公式；为已接入通用入口的原版职位保存关闭任务后的基准。
+            scope:tca_mcp_backup = { set_variable = { name = tca_military_court_positions_test_physician_raw value = aptitude_score:court_physician_court_position } }
+            scope:tca_mcp_officer = { set_variable = { name = tca_military_court_positions_test_source_raw value = aptitude_score:tca_civil_adjutant_court_position } }
             # 最高档综合属职的署务加成：本署其他廷臣得10分，自身不递归受益。
             scope:tca_mcp_officer = { set_variable = tca_court_organizing_office }
             if = { limit = { scope:tca_mcp_backup = { tca_court_organize_bonus = 10 } scope:tca_mcp_officer = { aptitude:tca_civil_adjutant_court_position = 4 } }
                 debug_log = "TCA_TEST CHECK_PASS tca_test_court_positions_civil_flow 7"
             }
             else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_positions_civil_flow 7" }
+            # 原版职位原始分随任务增加5，来源原始分不变，防止优秀档掩盖递归或错误排除。
+            if = { limit = { scope:tca_mcp_backup = { aptitude_score:court_physician_court_position >= { value = var:tca_military_court_positions_test_physician_raw add = 5 } aptitude_score:court_physician_court_position <= { value = var:tca_military_court_positions_test_physician_raw add = 5 } } scope:tca_mcp_officer = { aptitude_score:tca_civil_adjutant_court_position >= var:tca_military_court_positions_test_source_raw aptitude_score:tca_civil_adjutant_court_position <= var:tca_military_court_positions_test_source_raw } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_court_positions_civil_flow 21"
+            }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_positions_civil_flow 21" }
             # 兼职医师应受其他职位加成；不能按人物身份把其所有职位一并排除。
             scope:tca_mcp_governor = { appoint_court_position = { recipient = scope:tca_mcp_officer court_position = court_physician_court_position } }
             if = { limit = { scope:tca_mcp_officer = { has_court_position = court_physician_court_position tca_court_organize_bonus = 10 aptitude:tca_civil_adjutant_court_position = 4 } }
