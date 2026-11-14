@@ -1,0 +1,90 @@
+﻿# 窗口事务自动用例：直接调用正式开窗、选择、取消和确认effect，不代表GUI点击。
+# 借用真实人物并建立原生战争，须独占；不接管玩家、不暂停等待人工操作。
+namespace = tca_frontier_window_test
+
+tca_frontier_window_test.1 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_frontier_window_test.1 tca_test_frontier_window_transactions"
+        remove_character_flag = tca_test_tca_frontier_window_test_case_failed
+        random_vassal_or_below = { limit = { is_alive = yes is_adult = yes is_landed = yes is_at_war = no highest_held_title_tier = tier_county NOT = { has_variable = tca_frontier_probe_target } } save_scope_as = tca_frontier_window_test_actor }
+        title:k_xia.holder ?= { random_vassal_or_below = { limit = { is_alive = yes is_landed = yes is_at_war = no highest_held_title_tier = tier_county any_held_title = { tier = tier_county count >= 2 } } save_scope_as = tca_frontier_window_test_defender } }
+        if = { limit = { exists = scope:tca_frontier_window_test_actor exists = scope:tca_frontier_window_test_defender }
+            scope:tca_frontier_window_test_actor = { tca_test_protect_character_effect = yes set_variable = { name = tca_frontier_probe_target value = scope:tca_frontier_window_test_defender } }
+            scope:tca_frontier_window_test_defender = { tca_test_protect_character_effect = yes }
+            # 打开互动只创建预览；随后直接验证共享窗口事务，真实按钮由人工另验。
+            run_interaction = { interaction = tca_frontier_window_interaction actor = scope:tca_frontier_window_test_actor recipient = scope:tca_frontier_window_test_defender redirect = no send_threshold = accept }
+        if = { limit = { scope:tca_frontier_window_test_actor = { var:tca_frontier_window_open = 1 NOT = { has_variable = tca_frontier_window_goal } } } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_window_transactions 1" }
+        else = { add_character_flag = tca_test_tca_frontier_window_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_window_transactions 1" }
+            scope:tca_frontier_window_test_actor = { tca_frontier_window_select_effect = { SLOT = 1 } tca_frontier_window_clear_effect = yes }
+        if = { limit = { scope:tca_frontier_window_test_actor = { NOT = { has_variable = tca_frontier_window_open } NOT = { has_variable = tca_frontier_window_goal } NOT = { any_character_war = { using_cb = tca_frontier_probe_county_cb } } } } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_window_transactions 2" }
+        else = { add_character_flag = tca_test_tca_frontier_window_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_window_transactions 2" }
+            scope:tca_frontier_window_test_actor = {
+                tca_frontier_window_open_effect = yes
+                tca_frontier_window_select_effect = { SLOT = 2 }
+                var:tca_frontier_window_goal = { save_scope_as = tca_frontier_window_test_goal }
+                # 预览后收件人发生改变，正式确认必须拒绝，不建立战争。
+                set_variable = { name = tca_frontier_probe_target value = root }
+                tca_frontier_window_confirm_effect = yes
+            }
+        if = { limit = { scope:tca_frontier_window_test_actor = { var:tca_frontier_window_result = -1 has_variable = tca_frontier_window_open NOT = { any_character_war = { using_cb = tca_frontier_probe_county_cb } } } } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_window_transactions 3" }
+        else = { add_character_flag = tca_test_tca_frontier_window_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_window_transactions 3" }
+            scope:tca_frontier_window_test_actor = {
+                set_variable = { name = tca_frontier_probe_target value = scope:tca_frontier_window_test_defender }
+                tca_frontier_window_select_effect = { SLOT = 1 }
+                tca_frontier_window_select_effect = { SLOT = 2 }
+                tca_frontier_window_confirm_effect = yes
+            }
+            trigger_event = { id = tca_frontier_window_test.2 days = 1 }
+        }
+        else = {
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_frontier_window_transactions"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+            tca_test_lane_end_effect = { GROUP = tca_frontier_window_test }
+        }
+    }
+}
+
+tca_frontier_window_test.2 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+        if = { limit = { scope:tca_frontier_window_test_actor = { var:tca_frontier_window_result = 1 NOT = { has_variable = tca_frontier_window_open } any_character_war = { using_cb = tca_frontier_probe_county_cb primary_attacker = scope:tca_frontier_window_test_actor primary_defender = scope:tca_frontier_window_test_defender casus_belli = { any_target_title = { this = scope:tca_frontier_window_test_goal count = 1 } } } } } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_window_transactions 4" }
+        else = { add_character_flag = tca_test_tca_frontier_window_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_window_transactions 4" }
+        if = { limit = { scope:tca_frontier_window_test_actor = { NOT = { has_variable = tca_frontier_window_recipient } NOT = { has_variable = tca_frontier_window_goal_1 } NOT = { has_variable = tca_frontier_window_goal_2 } NOT = { has_variable = tca_frontier_window_goal } } } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_window_transactions 5" }
+        else = { add_character_flag = tca_test_tca_frontier_window_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_window_transactions 5" }
+            scope:tca_frontier_window_test_actor = {
+                # 二次确认应被拒绝，现有战争数量不增加。
+                tca_frontier_window_confirm_effect = yes
+            }
+        if = { limit = { scope:tca_frontier_window_test_actor = { var:tca_frontier_window_result = -1 any_character_war = { using_cb = tca_frontier_probe_county_cb count = 1 } } } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_window_transactions 6" }
+        else = { add_character_flag = tca_test_tca_frontier_window_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_window_transactions 6" }
+            scope:tca_frontier_window_test_actor = { every_character_war = { limit = { using_cb = tca_frontier_probe_county_cb primary_attacker = scope:tca_frontier_window_test_actor primary_defender = scope:tca_frontier_window_test_defender } end_war = white_peace } }
+            trigger_event = { id = tca_frontier_window_test.3 days = 35 }
+        }
+    }
+}
+
+tca_frontier_window_test.3 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+        if = { limit = { scope:tca_frontier_window_test_actor = { NOT = { has_variable = tca_frontier_probe_pending } NOT = { any_character_war = { using_cb = tca_frontier_probe_county_cb } } } } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_window_transactions 7" }
+        else = { add_character_flag = tca_test_tca_frontier_window_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_window_transactions 7" }
+            scope:tca_frontier_window_test_actor = { tca_frontier_window_clear_effect = yes remove_variable = tca_frontier_window_result remove_variable = tca_frontier_probe_target tca_test_restore_character_effect = yes }
+            scope:tca_frontier_window_test_defender = { tca_test_restore_character_effect = yes }
+            if = { limit = { has_character_flag = tca_test_tca_frontier_window_test_case_failed }
+                debug_log = "TCA_TEST FAIL tca_test_frontier_window_transactions"
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+            }
+            else = {
+                debug_log = "TCA_TEST PASS tca_test_frontier_window_transactions"
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } }
+            }
+            remove_character_flag = tca_test_tca_frontier_window_test_case_failed
+            tca_test_lane_end_effect = { GROUP = tca_frontier_window_test }
+        }
+    }
+}

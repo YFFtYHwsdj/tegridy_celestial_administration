@@ -1,0 +1,60 @@
+﻿# 以下入口根作用域均为进攻者。窗口状态仅存于该人物，不以全局变量存玩家选择。
+# 清理预览，不影响已建立战争及既有延迟支援；保留结果变量供调用方反馈和测试。
+tca_frontier_window_clear_effect = {
+    remove_variable = tca_frontier_window_open
+    remove_variable = tca_frontier_window_recipient
+    remove_variable = tca_frontier_window_goal_1
+    remove_variable = tca_frontier_window_goal_2
+    remove_variable = tca_frontier_window_goal
+}
+
+# 由已准备的调试目标收集两个实际伯爵领；不生成、不转移土地，无默认选中项。
+# 开窗值必须是数值1；GUI的GetValue不将布尔yes投影为正数，布尔标记会导致窗口始终隐藏。
+tca_frontier_window_open_effect = {
+    tca_frontier_window_clear_effect = yes
+    remove_variable = tca_frontier_window_result
+    save_scope_as = actor
+    var:tca_frontier_probe_target ?= { save_scope_as = recipient }
+    if = { limit = { exists = scope:recipient tca_frontier_probe_ready_trigger = yes }
+        set_variable = { name = tca_frontier_window_recipient value = scope:recipient }
+        scope:recipient = {
+            random_held_title = { limit = { tier = tier_county }
+                save_scope_as = tca_frontier_window_first
+                scope:actor = { set_variable = { name = tca_frontier_window_goal_1 value = scope:tca_frontier_window_first } }
+            }
+            random_held_title = { limit = { tier = tier_county NOT = { this = scope:tca_frontier_window_first } }
+                save_scope_as = tca_frontier_window_second
+                scope:actor = { set_variable = { name = tca_frontier_window_goal_2 value = scope:tca_frontier_window_second } }
+            }
+        }
+        if = { limit = { has_variable = tca_frontier_window_goal_1 has_variable = tca_frontier_window_goal_2 }
+            set_variable = { name = tca_frontier_window_open value = 1 }
+        }
+        else = { tca_frontier_window_clear_effect = yes }
+    }
+}
+
+# SLOT只接受本模块固定的1或2；不接受任意外部头衔作为目标。
+tca_frontier_window_select_effect = {
+    if = { limit = { has_variable = tca_frontier_window_open exists = var:tca_frontier_window_goal_$SLOT$ }
+        set_variable = { name = tca_frontier_window_goal value = var:tca_frontier_window_goal_$SLOT$ }
+    }
+}
+
+# 最终事务入口：失败保留窗口，成功清理预览；重复确认不会再次发动战争。
+tca_frontier_window_confirm_effect = {
+    save_scope_as = actor
+    if = { limit = { tca_frontier_window_can_confirm_trigger = { OWNER = scope:actor } }
+        save_scope_as = actor
+        var:tca_frontier_window_recipient = { save_scope_as = recipient }
+        var:tca_frontier_window_goal = { save_scope_as = tca_frontier_probe_goal }
+        clear_saved_scope = tca_frontier_probe_war
+        tca_frontier_probe_execute_goal_effect = yes
+        if = { limit = { exists = scope:tca_frontier_probe_war }
+            set_variable = { name = tca_frontier_window_result value = 1 }
+            tca_frontier_window_clear_effect = yes
+        }
+        else = { set_variable = { name = tca_frontier_window_result value = -1 } }
+    }
+    else = { set_variable = { name = tca_frontier_window_result value = -1 } }
+}

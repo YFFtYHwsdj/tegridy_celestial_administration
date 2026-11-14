@@ -1,0 +1,38 @@
+﻿# 人工GUI验收入口：仅debug且本地玩家和平时提供，不自动启动测试或切换玩家。
+# 使用真实西夏县级领主，至少持有两县；不改土地、法律、资金或军队。
+tca_frontier_window_prepare_decision = {
+    decision_group_type = debug
+    desc = tca_frontier_window_prepare_decision_desc
+    selection_tooltip = tca_frontier_window_prepare_decision_desc
+    confirm_text = tca_frontier_window_prepare_decision_confirm
+    picture = { reference = "gfx/interface/illustrations/terrain_types/mpo_season_abudant_grazing.dds" }
+    is_shown = { debug_only = yes }
+    is_valid = {
+        custom_tooltip = { text = tca_frontier_window_prepare_actor_tt
+            is_alive = yes is_landed = yes is_at_war = no
+            NOT = { has_variable = tca_frontier_probe_pending }
+        }
+        custom_tooltip = { text = tca_frontier_window_prepare_foreign_tt
+            top_liege != title:k_xia.holder.top_liege
+        }
+        custom_tooltip = { text = tca_frontier_window_prepare_candidate_tt
+            title:k_xia.holder = { any_vassal_or_below = { is_alive = yes is_landed = yes is_at_war = no highest_held_title_tier = tier_county any_held_title = { tier = tier_county count >= 2 } } }
+        }
+    }
+    effect = {
+        if = { limit = { debug_only = yes is_alive = yes is_landed = yes is_at_war = no NOT = { has_variable = tca_frontier_probe_pending } }
+            save_scope_as = tca_frontier_window_manual_actor
+            clear_saved_scope = tca_frontier_window_manual_recipient
+            title:k_xia.holder ?= { random_vassal_or_below = {
+                limit = { is_alive = yes is_landed = yes is_at_war = no highest_held_title_tier = tier_county any_held_title = { tier = tier_county count >= 2 } top_liege != scope:tca_frontier_window_manual_actor.top_liege }
+                save_scope_as = tca_frontier_window_manual_recipient
+            } }
+            if = { limit = { exists = scope:tca_frontier_window_manual_recipient }
+                set_variable = { name = tca_frontier_probe_target value = scope:tca_frontier_window_manual_recipient }
+                tca_frontier_window_open_effect = yes
+            }
+        }
+    }
+    ai_check_interval = 0
+    ai_potential = { always = no }
+}

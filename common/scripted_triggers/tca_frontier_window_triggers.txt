@@ -1,0 +1,24 @@
+﻿# 根为预览所属人物，OWNER为调用方显式传入的本地玩家／进攻者；无副作用。最终确认同时重查双方、候选清单和实时领土归属。
+tca_frontier_window_can_confirm_trigger = {
+    debug_only = yes
+    this = $OWNER$
+    has_variable = tca_frontier_window_open
+    exists = var:tca_frontier_window_recipient
+    exists = var:tca_frontier_window_goal
+    # 不创建临时actor／recipient作用域，避免查询污染其他GUI。
+    is_alive = yes is_landed = yes is_at_war = no
+    NOT = { has_variable = tca_frontier_probe_pending }
+    var:tca_frontier_probe_target = var:tca_frontier_window_recipient
+    var:tca_frontier_window_recipient = {
+        is_alive = yes is_landed = yes is_at_war = no highest_held_title_tier = tier_county
+        is_independent_ruler = no
+        top_liege != $OWNER$.top_liege
+        capital_county = { holder = $OWNER$.var:tca_frontier_window_recipient }
+        liege = { is_alive = yes }
+    }
+    var:tca_frontier_window_goal = {
+        tier = tier_county
+        holder = $OWNER$.var:tca_frontier_window_recipient
+        OR = { this = $OWNER$.var:tca_frontier_window_goal_1 this = $OWNER$.var:tca_frontier_window_goal_2 }
+    }
+}
