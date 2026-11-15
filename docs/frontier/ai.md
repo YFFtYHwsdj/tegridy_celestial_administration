@@ -116,8 +116,22 @@
 
 ### 当前催化判定入口
 
-- `tca_frontier_title_in_scope_trigger`在头衔作用域判断：伯爵领的`title_province`位于`tca_frontier_region`，或其`any_de_jure_county`中至少一个县位于该范围。`tca_frontier_war_in_scope_trigger`只检查战争`target_titles`列表，不因任一参战国有北疆土地就把其南方战争纳入。
+- `tca_frontier_title_in_scope_trigger`在头衔作用域判断：先核验地图省份存在，排除无地官署和销毁中的动态县级头衔；伯爵领的`title_province`位于`tca_frontier_region`，或其`any_de_jure_county`中至少一个县位于该范围。`tca_frontier_war_in_scope_trigger`只检查战争`target_titles`列表，不因任一参战国有北疆土地就把其南方战争纳入。
 - 宣战由`on_war_started`承接：局势存在、战争存在、主攻守双方`top_liege`不同、目标合格且该战争尚无`tca_frontier_declaration_counted`，才计一次。胜利使用互斥的`on_war_won_attacker`／`on_war_won_defender`，以目标及战前国家快照防止完全吞并后误当内战；白和平没有计分回调。
 - `tca_frontier_person_action_valid_trigger = { ACTOR = ... }`在受影响人物作用域检查：本人先通过`tca_frontier_important_person_trigger`，发出者本人通过`tca_frontier_is_participant_trigger`，双方`top_liege`不同。重要性入口要求本人先是参与者，再满足独立君主、边疆组资格、或`this = top_liege.primary_heir`之一；普通境内官员及相关部职不自动重要。
 - 囚禁使用`on_imprison`的囚犯root与`scope:imprisoner`，通过上述条件后记录本次羁押的国家、关押国与重要身份。死亡使用`on_death`的受害者与`scope:killer`；责任人必须仍有参与资格，受害者符合当前条件或有效羁押记录中的异国重要身份。处决与杀害由次日实际死因互斥分类，不从人物关系猜幕后凶手。
 - 释放与赎回共用`tca_frontier_captive_action_valid_trigger = { ACTOR = ... }`：受影响者符合当前异国重要人物条件，或羁押快照仍标记重要、被俘前国家不同且记录的关押国等于当前关押者国家。实际羁押关系由各交易prepare入口另行核验；原始接入时序见上节。
+
+### 自动生命周期入口
+
+[生命周期条件](../../common/scripted_triggers/tca_frontier_lifecycle_triggers.txt)和[维护效果](../../common/scripted_effects/tca_frontier_lifecycle_effects.txt)只为1066新局初始化，不承担旧存档迁移。`tca_frontier_initialized`、`tca_frontier_resting`与`tca_frontier_unified_title`为全局变量，分别表示已经初始化、统一后休止、原国家代表头衔，不依附已结束的Situation。启动共用`tca_frontier_situation_start_effect`，只在真正创建新对象时清除休止记录；决议改用`tca_frontier_enter_rest_effect`先记录统一国家再清理对象。
+
+`on_game_start_after_lobby`追加独立二级回调，延后两日首次检查；相关`on_title_gain`、`on_vassal_change`与`on_title_destroyed`合并次日检查，`yearly_global_pulse`为已初始化但无局势的状态补漏。原版明确`on_vassal_change`也用于独立，头衔销毁上下文为`scope:landed_title`。排队使用原生延后on_action，以固定`h_china`头衔对象承载，不依赖在位皇帝存活，也不改变该头衔；三日全局锁合并重复请求，worker先清锁再重查当前世界。
+
+自动授权入口`tca_frontier_automatic_lifecycle_allowed_trigger`在主模组为`yes`；CLI适配以`zz_`文件名确保其定义晚于主文件加载，只覆盖本模组自有trigger，默认`no`，不新增原版覆盖。`configure_selection`根据单个WORLD在封存前重写适配入口，仅`tca_frontier_lifecycle_test`、`tca_frontier_lifecycle_unified_test`、`tca_frontier_lifecycle_annual_test`和`tca_frontier_lifecycle_succession_test`为`yes`。混合总计划、普通共享局和其余独立探针均为`no`，克隆时重新计算，不继承父任务授权；读档沿用同一冻结适配，不靠运行中flag或开局回调顺序切换。
+
+
+年度补漏WORLD在加载前另将`tca_frontier_change_notifications_allowed_trigger`设为`no`，仅屏蔽头衔、改隶和销毁三类变动通知，保留正式开局与`yearly_global_pulse`。该入口在正式游戏为`yes`，不改变重启资格或年度时间；其余自动WORLD重新开启通知，克隆为普通局或手动探针时两项授权均关闭。测试事件不临时改生产锁、不直接调用年度on_action或维护worker，以年底仍休止、真实跨年后才重启证明年度补漏路径。
+
+
+适配文件须保持`zz_tca_cli_frontier_lifecycle_triggers.txt`名称：引擎的实际数据库冲突日志曾显示不带`zz_`时主文件反而覆盖适配，单看启用模组顺序和冻结文件内容不能证明关闭已生效。独立关闭用例同时读取实际解析的两个入口，并等待开局窗口结束，确认没有Situation、初始化、休止或排队标记；旧手动探针先创建对象，不能单独证明默认关闭。

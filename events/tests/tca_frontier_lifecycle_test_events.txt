@@ -1,0 +1,473 @@
+﻿# 自动生命周期专用WORLD；不调用正式启动／检查worker冒充自然开局。
+# 用例先等开局回调，完成统一后通过真实决议、土地和爵位变化观察自动重启。
+namespace = tca_frontier_lifecycle_test
+
+tca_frontier_lifecycle_test.1 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_frontier_lifecycle_test.1 tca_test_frontier_automatic_lifecycle"
+        remove_character_flag = tca_test_tca_frontier_lifecycle_test_case_failed
+        trigger_event = { id = tca_frontier_lifecycle_test.2 days = 4 }
+    }
+}
+
+tca_frontier_lifecycle_test.2 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { exists = situation:tca_northern_frontier }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_automatic_lifecycle 1"
+            if = { limit = { situation:tca_northern_frontier.situation_sub_region:tca_frontier_all = { sub_region_current_phase = tca_frontier_tension phase_takeover_points:tca_frontier_amity = 0 phase_takeover_points:tca_frontier_warfare = 0 } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_automatic_lifecycle 2"
+            }
+            else = { add_character_flag = tca_test_tca_frontier_lifecycle_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_automatic_lifecycle 2" }
+            situation:tca_northern_frontier = { save_scope_as = tca_frontier_lifecycle_test_original }
+            tca_frontier_emit_catalyst_effect = { CATALYST = tca_frontier_to_amity }
+            # 国内授地触发真实title回调，不得重建已有局势或重置点数。
+            title:h_china.holder = { create_title_and_vassal_change = { type = granted save_scope_as = tca_frontier_lifecycle_test_change } }
+            title:c_hangzhou = { change_title_holder = { holder = root change = scope:tca_frontier_lifecycle_test_change } }
+            resolve_title_and_vassal_change = scope:tca_frontier_lifecycle_test_change
+            trigger_event = { id = tca_frontier_lifecycle_test.3 days = 3 }
+        }
+        else = {
+            add_character_flag = tca_test_tca_frontier_lifecycle_test_case_failed
+            debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_automatic_lifecycle 1"
+            trigger_event = tca_frontier_lifecycle_test.90
+        }
+    }
+}
+
+tca_frontier_lifecycle_test.3 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { situation:tca_northern_frontier = scope:tca_frontier_lifecycle_test_original situation:tca_northern_frontier.situation_sub_region:tca_frontier_all = { phase_takeover_points:tca_frontier_amity = 25 } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_automatic_lifecycle 3"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_lifecycle_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_automatic_lifecycle 3" }
+        tca_frontier_lifecycle_test_unify_effect = yes
+        trigger_event = { id = tca_frontier_lifecycle_test.4 days = 3 }
+    }
+}
+
+tca_frontier_lifecycle_test.4 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { exists = situation:tca_northern_frontier tca_frontier_unification_land_trigger = yes can_execute_decision = tca_frontier_unification_decision }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_automatic_lifecycle 4"
+            execute_decision = tca_frontier_unification_decision
+            trigger_event = { id = tca_frontier_lifecycle_test.5 days = 3 }
+        }
+        else = {
+            add_character_flag = tca_test_tca_frontier_lifecycle_test_case_failed
+            debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_automatic_lifecycle 4"
+            trigger_event = tca_frontier_lifecycle_test.90
+        }
+    }
+}
+
+tca_frontier_lifecycle_test.5 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { NOT = { exists = situation:tca_northern_frontier } has_global_variable = tca_frontier_resting exists = global_var:tca_frontier_unified_title global_var:tca_frontier_unified_title = root.primary_title }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_automatic_lifecycle 5"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_lifecycle_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_automatic_lifecycle 5" }
+        # 复用正式独立保存控件，仅用其阶段变量与原生载入证据，不重派本用例。
+        title:h_china = { set_variable = { name = tca_frontier_situation_checkpoint_phase value = 1 } }
+        trigger_event = { id = tca_frontier_lifecycle_test.6 days = 45 }
+    }
+}
+
+tca_frontier_lifecycle_test.6 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { title:h_china = { var:tca_frontier_situation_checkpoint_phase = 3 } NOT = { exists = situation:tca_northern_frontier } has_global_variable = tca_frontier_resting global_var:tca_frontier_unified_title = root.primary_title }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_automatic_lifecycle 6"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_lifecycle_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_automatic_lifecycle 6" }
+        title:h_china = { remove_variable = tca_frontier_situation_checkpoint_phase }
+        create_character = { age = 35 gender = male location = root.capital_province culture = root.culture faith = root.faith save_scope_as = tca_frontier_lifecycle_test_challenger }
+        scope:tca_frontier_lifecycle_test_challenger = { tca_test_protect_character_effect = yes create_title_and_vassal_change = { type = conquest save_scope_as = tca_frontier_lifecycle_test_split } }
+        title:c_lingzhou = { change_title_holder = { holder = scope:tca_frontier_lifecycle_test_challenger change = scope:tca_frontier_lifecycle_test_split } }
+        title:c_lingzhou.duchy = { change_title_holder = { holder = scope:tca_frontier_lifecycle_test_challenger change = scope:tca_frontier_lifecycle_test_split } }
+        resolve_title_and_vassal_change = scope:tca_frontier_lifecycle_test_split
+        scope:tca_frontier_lifecycle_test_challenger = {
+            change_government = feudal_government
+            # 授出原属皇帝的头衔可能保留领主关系；夹具必须先真实独立，再检验公爵门槛。
+            if = { limit = { is_independent_ruler = no }
+                create_title_and_vassal_change = { type = independency save_scope_as = tca_frontier_lifecycle_test_independence }
+                becomes_independent = { change = scope:tca_frontier_lifecycle_test_independence }
+                resolve_title_and_vassal_change = scope:tca_frontier_lifecycle_test_independence
+            }
+        }
+        trigger_event = { id = tca_frontier_lifecycle_test.7 days = 3 }
+    }
+}
+
+tca_frontier_lifecycle_test.7 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { scope:tca_frontier_lifecycle_test_challenger = { is_independent_ruler = yes highest_held_title_tier = tier_duchy } NOT = { exists = situation:tca_northern_frontier } has_global_variable = tca_frontier_resting }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_automatic_lifecycle 7"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_lifecycle_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_automatic_lifecycle 7" }
+        scope:tca_frontier_lifecycle_test_challenger = { create_title_and_vassal_change = { type = conquest save_scope_as = tca_frontier_lifecycle_test_crown } }
+        title:k_xia = { change_title_holder = { holder = scope:tca_frontier_lifecycle_test_challenger change = scope:tca_frontier_lifecycle_test_crown } }
+        resolve_title_and_vassal_change = scope:tca_frontier_lifecycle_test_crown
+        trigger_event = { id = tca_frontier_lifecycle_test.8 days = 3 }
+    }
+}
+
+tca_frontier_lifecycle_test.8 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { exists = situation:tca_northern_frontier NOT = { has_global_variable = tca_frontier_resting } situation:tca_northern_frontier.situation_sub_region:tca_frontier_all = { sub_region_current_phase = tca_frontier_tension phase_takeover_points:tca_frontier_amity = 0 phase_takeover_points:tca_frontier_warfare = 0 } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_automatic_lifecycle 8"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_lifecycle_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_automatic_lifecycle 8" }
+        # 再次统一后，让区外既有帝国取得一县，不能只识别新建王国或独立事件。
+        tca_frontier_lifecycle_test_unify_effect = yes
+        trigger_event = { id = tca_frontier_lifecycle_test.9 days = 3 }
+    }
+}
+
+tca_frontier_lifecycle_test.9 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { can_execute_decision = tca_frontier_unification_decision }
+            execute_decision = tca_frontier_unification_decision
+            title:e_byzantium.holder = { save_scope_as = tca_frontier_lifecycle_test_outsider create_title_and_vassal_change = { type = conquest save_scope_as = tca_frontier_lifecycle_test_external } }
+            title:c_lingzhou = { change_title_holder = { holder = scope:tca_frontier_lifecycle_test_outsider change = scope:tca_frontier_lifecycle_test_external } }
+            resolve_title_and_vassal_change = scope:tca_frontier_lifecycle_test_external
+            trigger_event = { id = tca_frontier_lifecycle_test.10 days = 3 }
+        }
+        else = {
+            add_character_flag = tca_test_tca_frontier_lifecycle_test_case_failed
+            debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_automatic_lifecycle 9"
+            trigger_event = tca_frontier_lifecycle_test.90
+        }
+    }
+}
+
+tca_frontier_lifecycle_test.10 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { title:c_lingzhou.holder.top_liege = scope:tca_frontier_lifecycle_test_outsider exists = situation:tca_northern_frontier situation:tca_northern_frontier.situation_sub_region:tca_frontier_all = { sub_region_current_phase = tca_frontier_tension phase_takeover_points:tca_frontier_amity = 0 phase_takeover_points:tca_frontier_warfare = 0 } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_automatic_lifecycle 9"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_lifecycle_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_automatic_lifecycle 9" }
+        trigger_event = tca_frontier_lifecycle_test.90
+    }
+}
+
+tca_frontier_lifecycle_test.90 = {
+    type = character_event hidden = yes
+    immediate = {
+        title:h_china = { remove_variable = tca_frontier_situation_checkpoint_phase }
+        if = { limit = { has_character_flag = tca_test_tca_frontier_lifecycle_test_case_failed }
+            debug_log = "TCA_TEST FAIL tca_test_frontier_automatic_lifecycle"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+        }
+        else = { debug_log = "TCA_TEST PASS tca_test_frontier_automatic_lifecycle" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        tca_test_lane_end_effect = { GROUP = tca_frontier_lifecycle_test }
+    }
+}
+
+# 已统一开局：在首次延后检查前布置全境同国，不手动创建或结束局势。
+tca_frontier_lifecycle_test.20 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_frontier_lifecycle_test.20 tca_test_frontier_initially_unified"
+        remove_character_flag = tca_test_tca_frontier_lifecycle_test_case_failed
+        tca_frontier_lifecycle_test_unify_effect = yes
+        trigger_event = { id = tca_frontier_lifecycle_test.21 days = 4 }
+    }
+}
+
+tca_frontier_lifecycle_test.21 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { tca_frontier_unification_land_trigger = yes NOT = { exists = situation:tca_northern_frontier } has_global_variable = tca_frontier_initialized has_global_variable = tca_frontier_resting global_var:tca_frontier_unified_title = root.primary_title }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_initially_unified 1"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_lifecycle_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_initially_unified 1" }
+        # 区外帝国即使拥有很高头衔，只要未取得北疆土地就不能重启。
+        title:e_byzantium.holder = { create_title_and_vassal_change = { type = granted save_scope_as = tca_frontier_lifecycle_test_outside } }
+        title:c_hangzhou = { change_title_holder = { holder = title:e_byzantium.holder change = scope:tca_frontier_lifecycle_test_outside } }
+        resolve_title_and_vassal_change = scope:tca_frontier_lifecycle_test_outside
+        trigger_event = { id = tca_frontier_lifecycle_test.22 days = 3 }
+    }
+}
+
+tca_frontier_lifecycle_test.22 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { NOT = { exists = situation:tca_northern_frontier } has_global_variable = tca_frontier_resting }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_initially_unified 2"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_lifecycle_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_initially_unified 2" }
+        if = { limit = { has_character_flag = tca_test_tca_frontier_lifecycle_test_case_failed }
+            debug_log = "TCA_TEST FAIL tca_test_frontier_initially_unified"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+        }
+        else = { debug_log = "TCA_TEST PASS tca_test_frontier_initially_unified" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        tca_test_lane_end_effect = { GROUP = tca_frontier_lifecycle_test }
+    }
+}
+
+# 年度补漏专用WORLD：加载前仅关闭变动通知，年度和开局入口照常执行。
+# 不调用年度on_action或worker；年底前保持休止，跨到次年才允许由真实年度回调重启。
+tca_frontier_lifecycle_test.30 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_frontier_lifecycle_test.30 tca_test_frontier_annual_recovery"
+        remove_character_flag = tca_test_tca_frontier_lifecycle_test_case_failed
+        tca_frontier_lifecycle_test_unify_effect = yes
+        trigger_event = { id = tca_frontier_lifecycle_test.31 days = 4 }
+    }
+}
+
+tca_frontier_lifecycle_test.31 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { has_global_variable = tca_frontier_resting NOT = { exists = situation:tca_northern_frontier } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_annual_recovery 1"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_lifecycle_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_annual_recovery 1" }
+        create_character = { age = 35 gender = male location = root.capital_province culture = root.culture faith = root.faith save_scope_as = tca_frontier_lifecycle_test_annual_king }
+        scope:tca_frontier_lifecycle_test_annual_king = {
+            tca_test_protect_character_effect = yes
+            create_title_and_vassal_change = { type = conquest save_scope_as = tca_frontier_lifecycle_test_annual_split }
+        }
+        title:c_lingzhou = { change_title_holder = { holder = scope:tca_frontier_lifecycle_test_annual_king change = scope:tca_frontier_lifecycle_test_annual_split } }
+        title:k_xia = { change_title_holder = { holder = scope:tca_frontier_lifecycle_test_annual_king change = scope:tca_frontier_lifecycle_test_annual_split } }
+        resolve_title_and_vassal_change = scope:tca_frontier_lifecycle_test_annual_split
+        scope:tca_frontier_lifecycle_test_annual_king = {
+            change_government = feudal_government
+            if = { limit = { is_independent_ruler = no }
+                create_title_and_vassal_change = { type = independency save_scope_as = tca_frontier_lifecycle_test_annual_independence }
+                becomes_independent = { change = scope:tca_frontier_lifecycle_test_annual_independence }
+                resolve_title_and_vassal_change = scope:tca_frontier_lifecycle_test_annual_independence
+            }
+        }
+        trigger_event = { id = tca_frontier_lifecycle_test.32 days = 3 }
+    }
+}
+
+tca_frontier_lifecycle_test.32 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = {
+            scope:tca_frontier_lifecycle_test_annual_king = { tca_frontier_restart_challenger_trigger = yes }
+            NOT = { exists = situation:tca_northern_frontier }
+            has_global_variable = tca_frontier_resting
+            NOT = { has_global_variable = tca_frontier_lifecycle_pending }
+        }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_annual_recovery 2"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_lifecycle_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_annual_recovery 2" }
+        # 长等待后只在年底短暂逐日对齐，不修改日期或手工触发任何年度入口。
+        trigger_event = { id = tca_frontier_lifecycle_test.33 days = 90 }
+    }
+}
+
+tca_frontier_lifecycle_test.33 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { current_date < 1066.12.31 }
+            trigger_event = { id = tca_frontier_lifecycle_test.33 days = 1 }
+        }
+        else = {
+            if = { limit = {
+                current_date = 1066.12.31
+                NOT = { exists = situation:tca_northern_frontier }
+                has_global_variable = tca_frontier_resting
+                NOT = { has_global_variable = tca_frontier_lifecycle_pending }
+                scope:tca_frontier_lifecycle_test_annual_king = { tca_frontier_restart_challenger_trigger = yes }
+            }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_annual_recovery 3"
+            }
+            else = { add_character_flag = tca_test_tca_frontier_lifecycle_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_annual_recovery 3" }
+            trigger_event = { id = tca_frontier_lifecycle_test.34 days = 4 }
+        }
+    }
+}
+
+tca_frontier_lifecycle_test.34 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = {
+            current_date = 1067.1.4
+            exists = situation:tca_northern_frontier
+            NOT = { has_global_variable = tca_frontier_resting }
+            NOT = { has_global_variable = tca_frontier_lifecycle_pending }
+            situation:tca_northern_frontier.situation_sub_region:tca_frontier_all = {
+                sub_region_current_phase = tca_frontier_tension
+                phase_takeover_points:tca_frontier_amity = 0
+                phase_takeover_points:tca_frontier_warfare = 0
+            }
+        }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_annual_recovery 4"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_lifecycle_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_annual_recovery 4" }
+        if = { limit = { has_character_flag = tca_test_tca_frontier_lifecycle_test_case_failed }
+            debug_log = "TCA_TEST FAIL tca_test_frontier_annual_recovery"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+        }
+        else = { debug_log = "TCA_TEST PASS tca_test_frontier_annual_recovery" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        tca_test_lane_end_effect = { GROUP = tca_frontier_lifecycle_test }
+    }
+}
+
+# 普通继位专用WORLD：测试报告者保持为中国君主，借用既有独立君主，不让报告者死亡。
+# 统一国家的普通死亡和头衔继承走原生流程；不手工授予继承结果、不调用生命周期维护。
+tca_frontier_lifecycle_test.40 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_frontier_lifecycle_test.40 tca_test_frontier_rest_succession"
+        remove_character_flag = tca_test_tca_frontier_lifecycle_test_case_failed
+        # 借用既有独立君主，保留原生国家及人物初始化，继承人由引擎在布置完成后计算。
+        title:k_xia.holder = { save_scope_as = tca_frontier_lifecycle_test_parent tca_test_protect_character_effect = yes }
+        # 北疆存在帝国级官署，承接国家须足够高阶，避免造出等阶或更高阶封臣。
+        # 借用静态霸权头衔，先固定政府，再收齐土地；不是手工指定继承结果。
+        scope:tca_frontier_lifecycle_test_parent = { create_title_and_vassal_change = { type = conquest save_scope_as = tca_frontier_lifecycle_test_parent_grant } }
+        title:h_india = { change_title_holder = { holder = scope:tca_frontier_lifecycle_test_parent change = scope:tca_frontier_lifecycle_test_parent_grant } }
+        resolve_title_and_vassal_change = scope:tca_frontier_lifecycle_test_parent_grant
+        scope:tca_frontier_lifecycle_test_parent = {
+            change_government = celestial_government
+            if = { limit = { is_independent_ruler = no }
+                create_title_and_vassal_change = { type = independency save_scope_as = tca_frontier_lifecycle_test_parent_independence }
+                becomes_independent = { change = scope:tca_frontier_lifecycle_test_parent_independence }
+                resolve_title_and_vassal_change = scope:tca_frontier_lifecycle_test_parent_independence
+            }
+            # 通判、提刑制度保持启用；不屏蔽任何继位或局势回调。
+            if = { limit = { NOT = { has_realm_law = tca_tongpan_enabled_law } } add_realm_law_skip_effects = tca_tongpan_enabled_law }
+            if = { limit = { NOT = { has_realm_law = tca_judicial_institutions_enabled_law } } add_realm_law_skip_effects = tca_judicial_institutions_enabled_law }
+            if = { limit = { NOT = { has_realm_law = single_heir_succession_law } } add_realm_law_skip_effects = single_heir_succession_law }
+            create_title_and_vassal_change = { type = conquest save_scope_as = tca_frontier_lifecycle_test_parent_unify }
+        }
+        # 保留现任地方持有人，只把其国家接到待继位君主之下，避免把所有官署县改成君主直辖。
+        # 报告者若直辖北疆县，只转移该县；绝不把同为霸权的报告者降为同阶封臣。
+        every_county_in_region = {
+            region = tca_frontier_region
+            save_scope_as = tca_frontier_lifecycle_test_succession_county
+            if = { limit = { holder = root }
+                change_title_holder = { holder = scope:tca_frontier_lifecycle_test_parent change = scope:tca_frontier_lifecycle_test_parent_unify }
+            }
+        }
+        resolve_title_and_vassal_change = scope:tca_frontier_lifecycle_test_parent_unify
+        every_county_in_region = {
+            region = tca_frontier_region
+            holder = {
+                if = { limit = { NOT = { top_liege = scope:tca_frontier_lifecycle_test_parent } }
+                    create_title_and_vassal_change = { type = swear_fealty save_scope_as = tca_frontier_lifecycle_test_parent_vassalize }
+                    change_liege = { liege = scope:tca_frontier_lifecycle_test_parent change = scope:tca_frontier_lifecycle_test_parent_vassalize }
+                    resolve_title_and_vassal_change = scope:tca_frontier_lifecycle_test_parent_vassalize
+                }
+            }
+        }
+        trigger_event = { id = tca_frontier_lifecycle_test.41 days = 4 }
+    }
+}
+
+tca_frontier_lifecycle_test.41 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = {
+            scope:tca_frontier_lifecycle_test_parent = { is_alive = yes is_independent_ruler = yes primary_title = title:h_india exists = primary_heir primary_heir = { is_alive = yes NOT = { this = root } } tca_frontier_unification_land_trigger = yes }
+            global_var:tca_frontier_unified_title = title:h_india
+            has_global_variable = tca_frontier_resting
+            NOT = { exists = situation:tca_northern_frontier }
+        }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_rest_succession 1"
+            scope:tca_frontier_lifecycle_test_parent.primary_heir = { save_scope_as = tca_frontier_lifecycle_test_heir tca_test_protect_character_effect = yes }
+            scope:tca_frontier_lifecycle_test_parent = { tca_test_restore_character_effect = yes death = { death_reason = death_natural_causes } }
+            trigger_event = { id = tca_frontier_lifecycle_test.42 days = 3 }
+        }
+        else = {
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_frontier_rest_succession"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+            tca_test_lane_end_effect = { GROUP = tca_frontier_lifecycle_test }
+        }
+    }
+}
+
+tca_frontier_lifecycle_test.42 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = {
+            scope:tca_frontier_lifecycle_test_parent = { is_alive = no }
+            title:h_india.holder = scope:tca_frontier_lifecycle_test_heir
+            scope:tca_frontier_lifecycle_test_heir = { is_independent_ruler = yes tca_frontier_unification_land_trigger = yes }
+        }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_rest_succession 2"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_lifecycle_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_rest_succession 2" }
+        if = { limit = {
+            global_var:tca_frontier_unified_title = title:h_india
+            scope:tca_frontier_lifecycle_test_heir = { NOT = { tca_frontier_restart_challenger_trigger = yes } }
+            has_global_variable = tca_frontier_resting
+            NOT = { exists = situation:tca_northern_frontier }
+        }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_rest_succession 3"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_lifecycle_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_rest_succession 3" }
+        trigger_event = { id = tca_frontier_lifecycle_test.43 days = 7 }
+    }
+}
+
+tca_frontier_lifecycle_test.43 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = {
+            NOT = { exists = situation:tca_northern_frontier }
+            has_global_variable = tca_frontier_resting
+            global_var:tca_frontier_unified_title = title:h_india
+            title:h_india.holder = scope:tca_frontier_lifecycle_test_heir
+        }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_rest_succession 4"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_lifecycle_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_rest_succession 4" }
+        if = { limit = { has_character_flag = tca_test_tca_frontier_lifecycle_test_case_failed }
+            debug_log = "TCA_TEST FAIL tca_test_frontier_rest_succession"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+        }
+        else = { debug_log = "TCA_TEST PASS tca_test_frontier_rest_succession" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        tca_test_lane_end_effect = { GROUP = tca_frontier_lifecycle_test }
+    }
+}
+
+
+# 使用与默认全量相同的关闭适配，显式独立派发；不混入普通测试目录。
+tca_frontier_lifecycle_test.50 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_frontier_lifecycle_test.50 tca_test_frontier_default_disabled"
+        remove_character_flag = tca_test_tca_frontier_lifecycle_test_case_failed
+        if = { limit = { NOT = { tca_frontier_automatic_lifecycle_allowed_trigger = yes } NOT = { tca_frontier_change_notifications_allowed_trigger = yes } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_default_disabled 1"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_lifecycle_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_default_disabled 1" }
+        trigger_event = { id = tca_frontier_lifecycle_test.51 days = 5 }
+    }
+}
+
+tca_frontier_lifecycle_test.51 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = {
+            NOT = { exists = situation:tca_northern_frontier }
+            NOT = { has_global_variable = tca_frontier_initialized }
+            NOT = { has_global_variable = tca_frontier_resting }
+            NOT = { has_global_variable = tca_frontier_lifecycle_pending }
+        }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_default_disabled 2"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_lifecycle_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_default_disabled 2" }
+        if = { limit = { has_character_flag = tca_test_tca_frontier_lifecycle_test_case_failed }
+            debug_log = "TCA_TEST FAIL tca_test_frontier_default_disabled"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+        }
+        else = { debug_log = "TCA_TEST PASS tca_test_frontier_default_disabled" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        tca_test_lane_end_effect = { GROUP = tca_frontier_lifecycle_test }
+    }
+}

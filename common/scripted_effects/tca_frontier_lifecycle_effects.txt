@@ -1,0 +1,56 @@
+﻿# 统一者人物作用域；无参数。记录独立于Situation的休止状态与国家代表头衔，然后清理局势。
+# 开局已统一及正式统一决议共用；建筑、原版战争、停战和关系不变。
+tca_frontier_enter_rest_effect = {
+    set_global_variable = { name = tca_frontier_initialized value = yes }
+    set_global_variable = { name = tca_frontier_resting value = yes }
+    set_global_variable = { name = tca_frontier_unified_title value = primary_title }
+    tca_frontier_situation_end_effect = yes
+}
+
+# 任意作用域；DAYS为真实延后天数（开局2，其余1）。只排一个全局检查，三日锁自动过期。
+# 延后on_action挂在固定头衔对象而非君主人物，避免君主死亡吞掉待检查；不修改该头衔。
+tca_frontier_queue_lifecycle_effect = {
+    if = { limit = {
+        tca_frontier_automatic_lifecycle_allowed_trigger = yes
+        game_start_date = 1066.9.15
+        NOT = { has_global_variable = tca_frontier_lifecycle_pending }
+    }
+        set_global_variable = { name = tca_frontier_lifecycle_pending value = yes days = 3 }
+        title:h_china = { trigger_event = { on_action = tca_frontier_lifecycle_worker days = $DAYS$ } }
+    }
+}
+
+# 任意作用域；无参数。初始化只检查一次；已存在局势保留对象和全部进度。
+# 暂只自动支持1066。年度调用仅在已初始化后补漏，不为旧局补建或迁移双区域对象。
+tca_frontier_lifecycle_check_effect = {
+    if = { limit = { tca_frontier_automatic_lifecycle_allowed_trigger = yes game_start_date = 1066.9.15 }
+        if = { limit = { exists = situation:tca_northern_frontier }
+            set_global_variable = { name = tca_frontier_initialized value = yes }
+        }
+        else = {
+            # 保存一个实际国家作全境同国比较，空地理或无持有人时不创建虚假局势。
+            random_county_in_region = { region = tca_frontier_region limit = { exists = holder } holder.top_liege = { save_scope_as = tca_frontier_lifecycle_first_ruler } }
+            if = { limit = { exists = scope:tca_frontier_lifecycle_first_ruler }
+                if = { limit = { NOT = { has_global_variable = tca_frontier_initialized } }
+                    set_global_variable = { name = tca_frontier_initialized value = yes }
+                    if = { limit = { scope:tca_frontier_lifecycle_first_ruler = { tca_frontier_unification_land_trigger = yes } }
+                        scope:tca_frontier_lifecycle_first_ruler = { tca_frontier_enter_rest_effect = yes }
+                    }
+                    else = { tca_frontier_situation_start_effect = yes }
+                }
+                else_if = { limit = {
+                    has_global_variable = tca_frontier_resting
+                    scope:tca_frontier_lifecycle_first_ruler = { NOT = { tca_frontier_unification_land_trigger = yes } }
+                    any_county_in_region = {
+                        region = tca_frontier_region
+                        exists = holder
+                        holder.top_liege = { tca_frontier_restart_challenger_trigger = yes }
+                    }
+                }
+                    # 从边衅零点重新创建，先刷新所有权基线；休止期间变化不补记催化。
+                    tca_frontier_situation_start_effect = yes
+                }
+            }
+        }
+    }
+}

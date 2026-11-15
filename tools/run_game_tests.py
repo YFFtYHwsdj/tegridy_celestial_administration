@@ -160,6 +160,18 @@ def configure_selection(run, rows, selected, parallel=1):
     from testing.catalog import world_metadata
     worlds = world_metadata(run / 'mod/tca_main')
     selected_worlds = {worlds[row['name']] for row in rows}
+    # 自然生命周期在加载前授权，避免开局回调早于观察者选择标记；克隆时逐局重写。
+    auto_worlds = {'tca_frontier_lifecycle_test', 'tca_frontier_lifecycle_unified_test',
+                   'tca_frontier_lifecycle_annual_test', 'tca_frontier_lifecycle_succession_test'}
+    automatic_frontier = len(selected_worlds) == 1 and selected_worlds <= auto_worlds
+    frontier_notifications = automatic_frontier and 'tca_frontier_lifecycle_annual_test' not in selected_worlds
+    guard = run / 'mod/tca_cli_adapter/common/scripted_triggers/zz_tca_cli_frontier_lifecycle_triggers.txt'
+    guard.parent.mkdir(parents=True, exist_ok=True)
+    guard.write_text('\ufeff# CLI独立WORLD加载前授权，普通全量与手动探针关闭。\n'
+                     'tca_frontier_automatic_lifecycle_allowed_trigger = { always = '
+                     + ('yes' if automatic_frontier else 'no') + ' }\n'
+                     'tca_frontier_change_notifications_allowed_trigger = { always = '
+                     + ('yes' if frontier_notifications else 'no') + ' }\n', encoding='utf-8')
     marker = 'tca_run_observer_tests_effect = yes'
     if text.count(marker) != 1:
         raise ValueError('CLI observer entry must occur exactly once')

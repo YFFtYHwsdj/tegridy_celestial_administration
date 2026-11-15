@@ -746,6 +746,35 @@ time.sleep(20)
                 with self.assertRaisesRegex(ValueError, 'Source changed'):
                     prepare_run(repo, Path(temp)/'runs', Path(temp)/'absent')
 
+    def test_frontier_automatic_lifecycle_authorization_is_world_local(self):
+        from run_game_tests import clone_run, verify_snapshot
+        from testing.catalog import select_cases
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            base = prepare_run(ROOT, root, root/'absent', suites=['frontier'])
+            guard = Path('mod/tca_cli_adapter/common/scripted_triggers/zz_tca_cli_frontier_lifecycle_triggers.txt')
+            self.assertGreater(guard.name, 'tca_frontier_lifecycle_triggers.txt')
+            self.assertFalse((base/guard.with_name('tca_cli_frontier_lifecycle_triggers.txt')).exists())
+            self.assertEqual(definitions((base/guard).read_text(encoding='utf-8-sig'))[
+                'tca_frontier_automatic_lifecycle_allowed_trigger'], ['{', 'always', '=', 'no', '}'])
+            auto = clone_run(base, root, select_cases(base/'mod/tca_main', cases=['tca_frontier_lifecycle_test.1']))
+            self.assertEqual(definitions((auto/guard).read_text(encoding='utf-8-sig'))[
+                'tca_frontier_automatic_lifecycle_allowed_trigger'], ['{', 'always', '=', 'yes', '}'])
+            annual = clone_run(auto, root, select_cases(auto/'mod/tca_main', cases=['tca_frontier_lifecycle_test.30']))
+            defs = definitions((annual/guard).read_text(encoding='utf-8-sig'))
+            self.assertEqual(defs['tca_frontier_automatic_lifecycle_allowed_trigger'], ['{', 'always', '=', 'yes', '}'])
+            self.assertEqual(defs['tca_frontier_change_notifications_allowed_trigger'], ['{', 'always', '=', 'no', '}'])
+            succession = clone_run(annual, root, select_cases(annual/'mod/tca_main', cases=['tca_frontier_lifecycle_test.40']))
+            defs = definitions((succession/guard).read_text(encoding='utf-8-sig'))
+            self.assertEqual(defs['tca_frontier_automatic_lifecycle_allowed_trigger'], ['{', 'always', '=', 'yes', '}'])
+            self.assertEqual(defs['tca_frontier_change_notifications_allowed_trigger'], ['{', 'always', '=', 'yes', '}'])
+            auto = succession
+            for event in ['tca_exam_test.1', 'tca_frontier_situation_test.1']:
+                child = clone_run(auto, root, select_cases(auto/'mod/tca_main', cases=[event]))
+                self.assertEqual(definitions((child/guard).read_text(encoding='utf-8-sig'))[
+                    'tca_frontier_automatic_lifecycle_allowed_trigger'], ['{', 'always', '=', 'no', '}'])
+                self.assertEqual(verify_snapshot(child), [])
+
     def test_independent_child_authorization_is_not_inherited_by_shared_child(self):
         from run_game_tests import clone_run, verify_snapshot, run_game
         from testing.catalog import select_cases
