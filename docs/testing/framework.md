@@ -30,6 +30,20 @@ effect tca_run_observer_tests_effect = yes
 
 原生回归源：`events/tests/tca_test_entry_test_events.txt`，单项`tca_test_entry_test.1`。用例自行创建无地AI调用角色，直接检查正式host trigger和resolver：有效皇帝为正例、无地AI为反例、过时保存作用域被重新解析、调用角色不获得框架运行标记。用例不递归启动全组、不改写框架统计或运行标记来准备场景。
 
+## 独立测试局
+
+`EXCLUSIVE`仅约束同一局内的并发，不隔离前后用例遗留的世界。会大幅改造真实领土、创建长期全局局势或无法精确归还状态的用例，可登记独立测试局；该属性独立于即时／延迟、GROUP和EXCLUSIVE。
+
+```paradox
+tca_test_visit_independent_case_effect = { EVENT = tca_x_test.1 CASE = tca_test_x_demo DELAYED = yes GROUP = tca_x_test EXCLUSIVE = yes WORLD = tca_x_world }
+```
+
+`WORLD`使用`[a-z0-9_]`且不得为保留值`shared`。不同WORLD必须分别新建完整可丢弃局；相同WORLD只用于已确认能共局的一组用例，原生顺序与lane约束仍有效。普通登记入口不写WORLD，按shared共享局处理；独立入口必须显式写WORLD，不能把普通入口加上WORLD冒充隔离。
+
+默认CLI全量和游戏内全组入口只运行普通登记。独立项须通过CLI显式选择模块／用例，或使用`--include-independent`纳入统一任务；CLI按冻结登记自动拆局，`--isolate none`也不能跨过此边界，`--isolate suite`只会进一步按模块拆分。混合总计划只作任务清单，不能直接启动；每个子局单独封存、核对与汇总，缺局或失败使任务不通过。
+
+独立原生登记包装器只有在CLI授予匹配的`tca_test_world_<WORLD>`变量后才派发，普通游戏内全组不授予该变量。运行结束统一清理授权；克隆子局时撤掉上个世界的选择与授权，再按新范围安装。不要手工写授权来绕过新局要求；人工验收须自行开专用可丢弃局，直接用例调用不作为自动分局证据。
+
 ## 并发 lane 与用例隔离
 
 `--parallel K`（默认1，合法范围1至32）允许同一进程、同一世界的多条延迟用例链并发执行，以减少等待游戏日相加的墙钟；K是同时运行的延迟用例上限，不是用例数或线程数。并发单元是模块：一个测试文件的事件命名空间（如`tca_retirement_state`）通常即一个GROUP，一个GROUP的延迟用例构成一条lane，同一GROUP同时最多运行1个延迟用例，不同GROUP之间可并发。即时用例仍在同步阶段一次派发，不占lane，也不受K限制。

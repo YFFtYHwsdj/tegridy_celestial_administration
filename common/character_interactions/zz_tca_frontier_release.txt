@@ -1,0 +1,2472 @@
+﻿# 必要单对象覆盖：原版流程保留，仅增加北疆成功交易钩子。
+# 原版审阅基线与不可替代理由见tools/upstream_overrides.json；同名修改须合并。
+release_from_prison_interaction = {
+	interface_priority = 30
+	common_interaction = yes
+	category = interaction_category_prison
+	special_interaction = release_from_prison_interaction
+	icon = prison
+
+	desc = release_from_prison_interaction_desc
+
+	notification_text = {
+		first_valid = {
+			triggered_desc = {
+				trigger = {
+					scope:demand_conversion = no
+					scope:renounce_claims = no
+					scope:banish = no
+					scope:take_vows = no
+					scope:recruit = no
+					scope:disfigure = no
+					scope:blind = no
+					scope:castrate = no
+					scope:demand_admin = no
+					scope:gain_hook = no
+					scope:become_executioner = no
+					scope:change_prison = no
+					scope:make_puppet = no
+				}
+				desc = RELEASE_PRISONER_OFFER
+			}
+			desc = RELEASE_PRISONER_OFFER_CONDITIONAL
+		}
+	}
+
+	is_shown = {
+		exists = scope:puppet_or_actor
+		scope:puppet_or_actor ?= {
+			trigger_if = {
+				limit = {
+					is_ai = yes
+					NOT = { puppeteer ?= { is_ai = no } }
+				}
+				has_prisoners = yes
+			}
+		}
+		scope:recipient = {
+			is_imprisoned_by = scope:puppet_or_actor
+		}
+	}
+
+	is_valid_showing_failures_only = {
+		scope:recipient = {
+			custom_description = {
+				text = "currently_being_tortured"
+				NOT = { has_character_flag = is_being_tortured }
+			}
+		}
+		cannot_release_former_regent_whilst_old_regent_holds_power_trigger = {
+			PRISONER = scope:recipient
+			REGENT = scope:recipient.var:imprisoned_by_diarch
+		}
+		custom_tooltip = {
+			text = is_currently_being_purged_tt
+			scope:recipient = {
+				NOT = {
+					has_character_flag = is_currently_being_purged
+				}
+			}
+		}
+	}
+
+	on_accept = {
+		if = {
+			limit = { scope:recipient = { has_character_modifier = allowed_to_go_outside } }
+			scope:recipient = { remove_character_modifier = allowed_to_go_outside }
+		}
+		if = {
+			limit = { scope:recipient = { has_character_modifier = moldy_gruel_diet } }
+			scope:recipient = { remove_character_modifier = moldy_gruel_diet }
+		}
+		if = {
+			limit = { scope:recipient = { is_imprisoned_by = scope:puppet_or_actor } }
+			# 在释放清理前保存关押者、异国独立君主与参与资格。
+			hidden_effect = { tca_frontier_prepare_release_effect = yes }
+
+			scope:recipient = {
+				if = {
+					limit = {
+						is_imprisoned = yes
+
+						scope:disfigure = no
+						scope:blind = no
+						scope:castrate = no
+					}
+					release_from_prison = yes
+				}
+
+				if = {
+					limit = { scope:demand_conversion = yes }
+					demand_conversion_interaction_effect = yes
+					add_opinion = {
+						modifier = demanded_my_conversion_opinion
+						target = scope:puppet_or_actor
+					}
+
+					if = {
+						limit = {
+							scope:puppet_or_actor = {
+								any_character_struggle = {
+									involvement = involved
+									activate_struggle_catalyst_secondary_character_involvement_involved_trigger = {
+										CATALYST = catalyst_demanding_important_conversion
+										CHAR = scope:recipient
+									}
+								}
+							}
+						}
+						scope:puppet_or_actor = {
+							every_character_struggle = {
+								involvement = involved
+								limit = {
+									activate_struggle_catalyst_secondary_character_involvement_involved_trigger = {
+										CATALYST = catalyst_demanding_important_conversion
+										CHAR = scope:recipient
+									}
+								}
+								activate_struggle_catalyst = {
+									catalyst = catalyst_demanding_important_conversion
+									character = scope:puppet_or_actor
+								}
+							}
+						}
+					}
+				}
+
+				if = {
+					limit = {
+						scope:banish = yes
+						scope:recipient = { is_landed_or_landless_administrative_or_theocratic = yes }
+					}
+					banish_effect = { BANISHER = scope:puppet_or_actor }
+					if = {
+						limit = {
+							NOT = {
+								scope:puppet_or_actor = {
+									has_banish_reason = scope:recipient
+								}
+							}
+						}
+						scope:puppet_or_actor = { add_tyranny = banishment_tyranny_gain }
+					}
+					add_opinion = {
+						modifier = banished_me
+						target = scope:puppet_or_actor
+					}
+				}
+
+				else_if = {
+					limit = {
+						AND = {
+							scope:banish = yes
+							scope:recipient = {
+								is_landless_adventurer = no
+								is_pool_character = no
+							}
+						}
+					}
+					if = {
+						limit = {
+							this.gold > 0
+							has_none_of_variables = {
+								name = realm_priest
+								name = was_bookmaker
+							}
+						}
+						pay_short_term_gold = { target = scope:puppet_or_actor gold = this.gold }
+					}
+					if = {
+						limit = {
+							has_any_artifact = yes
+						}
+						every_character_artifact = {
+							limit = { NOT = { has_variable = artifact_prevent_transfer } }
+							set_owner = {
+								target = scope:puppet_or_actor
+								history = {
+									location = scope:recipient.location
+									actor = scope:recipient
+									recipient = scope:puppet_or_actor
+									type = stolen
+								}
+							}
+							scope:puppet_or_actor = {
+								if = {
+									limit = {
+										NOT = { has_variable = stolen_artifact }
+									}
+									set_variable = {
+										name = stolen_artifact
+										value = 1
+									}
+								}
+								else = {
+									change_variable = {
+										name = stolen_artifact
+										add = 1
+									}
+								}
+							}
+						}
+					}
+					banish = yes
+					add_opinion = {
+						modifier = banished_me
+						target = scope:puppet_or_actor
+					}
+				}
+
+				else_if = {
+					limit = {
+						AND = {
+							scope:banish = yes
+							scope:recipient = {
+								is_playable_character = no
+								is_pool_character = yes
+							}
+						}
+					}
+					if = {
+						limit = {
+							this.gold > 0
+						}
+						pay_short_term_gold = { target = scope:puppet_or_actor gold = this.gold }
+					}
+					add_opinion = {
+						modifier = banished_me
+						target = scope:puppet_or_actor
+					}
+				}
+
+				if = {
+					limit = { scope:recruit = yes }
+					if = {
+						limit = {
+							scope:puppet_or_actor = {
+								culture = {
+									has_cultural_parameter = can_recruit_prisoners_easily
+								}
+							}
+						}
+						add_opinion = {
+							modifier = loyal_servant
+							target = scope:puppet_or_actor
+						}
+						scope:puppet_or_actor = {
+							if = {
+								limit = {
+									can_add_hook = {
+										target = scope:recipient
+										type = loyalty_hook
+									}
+								}
+								add_hook = {
+									type = loyalty_hook
+									target = scope:recipient
+								}
+							}
+						}
+					}
+					else = {
+						add_opinion = {
+							modifier = demanded_recruitment
+							target = scope:puppet_or_actor
+						}
+					}
+					scope:puppet_or_actor = {
+						if = {
+							limit = {
+								AND = {
+									scope:puppet_or_actor.rite = {
+										rite_has_tenet = tenet_communal_possessions
+									}
+									scope:recipient = {
+										has_trait = peasant_leader
+									}
+								}
+							}
+							scope:puppet_or_actor = {
+								add_piety = medium_piety_gain
+							}
+						}
+					}
+					scope:puppet_or_actor = {
+						add_courtier = scope:recipient
+					}
+				}
+
+				if = {
+					limit = { scope:renounce_claims = yes }
+					add_opinion = {
+						modifier = demanded_claim_renouncement
+						target = scope:puppet_or_actor
+					}
+					scope:recipient = {
+						every_claim = {
+							explicit = yes
+							limit = {
+								save_temporary_scope_as = temp_claim
+								OR = {
+									holder = scope:puppet_or_actor
+									AND = {
+										exists = holder
+										NOT = { prev = { target_is_liege_or_above = scope:puppet_or_actor } }
+										holder = { target_is_liege_or_above = scope:puppet_or_actor }
+									}
+									scope:puppet_or_actor = {
+										any_held_title = {
+											is_de_jure_liege_or_above_target = scope:temp_claim
+										}
+									}
+								}
+							}
+							scope:recipient = { remove_claim = prev }
+						}
+					}
+				}
+
+				if = {
+					limit = { scope:gain_hook = yes }
+					add_opinion = {
+						modifier = demanded_hook
+						target = scope:puppet_or_actor
+					}
+					scope:puppet_or_actor = {
+						add_hook = {
+							target = scope:recipient
+							type = favor_hook
+						}
+					}
+				}
+
+				if = {
+					limit = { scope:make_puppet = yes }
+					play_sound_effect = "event:/DLC/CE3/SFX/UIX/ce3_make_character_puppet"
+					scope:puppet_or_actor = {
+						if = {
+							limit = {
+								has_puppet_type = external_theological_agent_puppet
+								scope:recipient = {
+									is_clergy = yes
+									religion = scope:puppet_or_actor.religion
+								}
+							}
+							set_puppet = {
+								target = scope:recipient
+								type = external_theological_agent_puppet
+							}
+						}
+						else = {
+							set_puppet = {
+								target = scope:recipient
+								type = external_ruler_puppet
+							}
+						}
+					}
+				}
+				if = {
+					limit = { scope:change_prison = yes }
+					scope:puppet_or_actor = {
+						imprison_character_effect = {
+							TARGET = scope:recipient
+							IMPRISONER = scope:actor
+						}
+					}
+				}
+
+				if = {
+					limit = { scope:take_vows = yes }
+					scope:puppet_or_actor = {
+
+						if = {
+							limit = {
+								has_legitimacy = yes
+								scope:recipient = { is_primary_heir_of = scope:puppet_or_actor }
+							}
+							if = {
+								limit = {
+									hyperdulia_take_the_vows_trigger = yes
+								}
+								add_legitimacy = {
+									value = miniscule_legitimacy_gain
+									multiply = scope:puppet_or_actor.primary_title.tier
+								}
+							}
+							else = {
+								add_legitimacy = {
+									value = minor_legitimacy_loss
+									multiply = scope:puppet_or_actor.primary_title.tier
+								}
+							}
+						}
+						else_if = {
+							limit = {
+								has_legitimacy = yes
+								scope:recipient = { is_heir_of = scope:puppet_or_actor }
+							}
+							if = {
+								limit = {
+									hyperdulia_take_the_vows_trigger = yes
+								}
+								add_legitimacy = {
+									value = minor_legitimacy_gain
+									multiply = scope:puppet_or_actor.primary_title.tier
+								}
+							}
+							else = {
+								add_legitimacy = {
+									value = miniscule_legitimacy_loss
+									multiply = scope:puppet_or_actor.primary_title.tier
+								}
+							}
+						}
+						else_if = {
+							limit = {
+								has_legitimacy = yes
+								hyperdulia_take_the_vows_trigger = yes
+							}
+							add_legitimacy = {
+								value = medium_legitimacy_gain
+								multiply = scope:puppet_or_actor.primary_title.tier
+							}
+						}
+					}
+
+					scope:recipient = {
+						if = {
+							limit = {
+								OR = {
+									any_claim = {
+										holder = scope:puppet_or_actor
+									}
+									is_heir_of = scope:puppet_or_actor
+								}
+								NOR = {
+									has_trait = forgiving
+									has_trait = zealous
+									has_trait = craven
+									has_trait = content
+									has_trait = humble
+									has_trait = bastard
+								}
+							}
+							progress_towards_rival_effect = {
+								CHARACTER = scope:puppet_or_actor
+								REASON = rival_forced_to_take_vows
+								OPINION = 0
+							}
+						}
+					}
+
+					if = {
+						limit = {
+							scope:puppet_or_actor.faith = {
+								any_faith_holy_order = {
+									take_the_vows_valid_monastic_order_trigger = { CHARACTER = scope:puppet_or_actor }
+								}
+							}
+						}
+
+						save_most_suitable_monastic_leader_effect = yes
+
+						scope:puppet_or_actor = {
+							send_child_to_monastic_order_effect = yes
+							reverse_add_opinion = {
+                                target = scope:archabbot
+                                modifier = pleased_opinion
+                                opinion = 15
+                            }
+                            scope:recipient = {
+                                if = {
+									limit = {
+										OR = {
+											is_heir_of = scope:puppet_or_actor
+											any_claim = {
+												exists = this
+											}
+										}
+									}
+									add_opinion = {
+										modifier = forced_taking_vows
+										target = scope:puppet_or_actor
+									}
+								}
+								else = {
+									add_opinion = {
+										modifier = demanded_taking_vows
+										target = scope:puppet_or_actor
+									}
+								}
+							}
+						}
+					}
+
+					else = {
+						send_child_to_clergy_effect = yes
+						scope:puppet_or_actor.top_liege = {
+							random_vassal_or_below = {
+								limit = {
+									government_has_flag = government_is_theocracy
+									primary_title.tier > tier_barony
+									faith = scope:puppet_or_actor.faith
+								}
+								save_scope_as = theocratic_travel_target
+							}
+						}
+						if = {
+						    limit = { exists = scope:theocratic_travel_target }
+						    scope:theocratic_travel_target = {
+								add_courtier = scope:recipient
+							}
+						}
+						else_if = {
+							limit = {
+								exists = scope:puppet_or_actor.capital_province
+							}
+							move_to_pool_at = scope:puppet_or_actor.capital_province
+						}
+					}
+
+					if = {
+						limit = {
+							scope:puppet_or_actor = {
+								is_ai = yes
+								culture = { has_cultural_pillar = heritage_byzantine }
+							}
+						}
+						debug_log = debug_ai_byzan_forced_vows_on_prison_release
+						debug_log_scopes = yes
+					}
+
+					else_if = {
+						limit = {
+							scope:puppet_or_actor = { is_ai = yes }
+						}
+						debug_log = debug_ai_forced_vows_on_prison_release
+						debug_log_scopes = yes
+					}
+				}
+
+				if = {
+					limit = { scope:become_executioner = yes }
+					release_as_executioner_effect = yes
+				}
+
+				if = {
+					limit = { scope:disfigure = yes }
+
+					scope:recipient = {
+						add_character_flag = {
+							flag = is_being_tortured
+							months = 6
+						}
+					}
+
+					blind_castrate_and_disfigure_effect = yes
+
+					show_as_tooltip = {
+						scope:recipient = {
+							add_trait = disfigured
+						}
+					}
+
+					torture_blind_castrate_disfigure_opinion_effect = { VERB = disfigured }
+
+					scope:puppet_or_actor = {
+						trigger_event = {
+							id = prison.1030
+							days = 1
+						}
+					}
+				}
+
+				if = {
+					limit = { scope:blind = yes }
+					scope:recipient = {
+						add_character_flag = {
+							flag = is_being_tortured
+							months = 6
+						}
+					}
+
+					blind_castrate_and_disfigure_effect = yes
+
+					show_as_tooltip = {
+						scope:recipient = {
+							add_trait = blind
+						}
+					}
+
+					scope:puppet_or_actor = {
+						if = {
+							limit = {
+								culture = { has_cultural_parameter = merciful_blinding }
+								OR = {
+									has_execute_reason = scope:recipient
+									has_banish_reason = scope:recipient
+								}
+							}
+							add_piety = medium_piety_gain
+						}
+					}
+
+					torture_blind_castrate_disfigure_opinion_effect = { VERB = blinded }
+
+					scope:puppet_or_actor = {
+						trigger_event = {
+							id = prison.1020
+							days = 1
+						}
+					}
+
+					if = {
+						limit = { scope:puppet_or_actor.culture = { has_cultural_parameter = merciful_blinding } }
+						add_clan_unity_interaction_effect = {
+							CHARACTER = scope:puppet_or_actor
+							TARGET = scope:recipient
+							VALUE = minor_unity_loss
+							DESC = clan_unity_blinding.desc
+							REVERSE_NON_HOUSE_TARGET = no
+						}
+					}
+					else = {
+						add_clan_unity_interaction_effect = {
+							CHARACTER = scope:puppet_or_actor
+							TARGET = scope:recipient
+							VALUE = medium_unity_loss
+							DESC = clan_unity_blinding.desc
+							REVERSE_NON_HOUSE_TARGET = no
+						}
+					}
+				}
+
+				if = {
+					limit = { scope:castrate = yes }
+					scope:recipient = {
+						add_character_flag = {
+							flag = is_being_tortured
+							months = 6
+						}
+					}
+
+					blind_castrate_and_disfigure_effect = yes
+
+					show_as_tooltip = {
+						scope:recipient = {
+							if = {
+								limit = {
+									age < 12
+								}
+								ep3_child_castration_effect = yes
+							}
+							else = {
+								ep3_youth_castration_effect = yes
+							}
+						}
+					}
+
+					torture_blind_castrate_disfigure_opinion_effect = { VERB = castrated }
+
+					scope:puppet_or_actor = {
+						trigger_event = {
+							id = prison.1025
+							days = 1
+						}
+					}
+
+					add_clan_unity_interaction_effect = {
+						CHARACTER = scope:puppet_or_actor
+						TARGET = scope:recipient
+						VALUE = major_unity_loss
+						DESC = clan_unity_abelarding.desc
+						REVERSE_NON_HOUSE_TARGET = no
+					}
+				}
+
+				if = {
+					limit = { scope:demand_admin = yes }
+					scope:recipient = {
+						scope:puppet_or_actor = { save_scope_as = new_liege }
+						change_to_administrative_effect = yes
+					}
+				}
+
+				if = {
+					limit = {
+						OR = {
+							scope:disfigure = yes
+							scope:blind = yes
+							scope:castrate = yes
+						}
+					}
+					scope:recipient.house ?= {
+						change_house_relation_effect = {
+							HOUSE = scope:puppet_or_actor.house
+							VALUE = house_relation_damage_medium_value
+							REASON = torture
+							CHAR = scope:puppet_or_actor
+							TARGET_CHAR = scope:recipient
+							TITLE = scope:dummy_gender
+						}
+					}
+				}
+
+				if = {
+					limit = {
+						scope:demand_conversion = no
+						scope:renounce_claims = no
+						scope:banish = no
+						scope:gain_hook = no
+						scope:take_vows = no
+						scope:become_executioner = no
+						scope:recruit = no
+						scope:disfigure = no
+						scope:blind = no
+						scope:castrate = no
+						scope:demand_admin = no
+						scope:change_prison = no
+						scope:make_puppet = no
+					}
+					# 仅原版无要求分支且实际获释成功时计分；附条件释放不进入。
+					hidden_effect = { tca_frontier_release_succeeded_effect = yes }
+
+					scope:puppet_or_actor = {
+						send_interface_toast = {
+							type = event_toast_effect_neutral
+							title = recipient_released_from_prison
+							left_icon = scope:recipient
+							scope:recipient = {
+								add_opinion = {
+									modifier = released_from_prison
+									target = scope:puppet_or_actor
+								}
+							}
+							hidden_effect = {
+								random = {
+									chance = 2
+									modifier = {
+										factor = accolade_progress
+									}
+									modifier = {
+										NOT = {
+											any_knight = {
+												can_unlock_accolade_attribute_trigger = {
+													ATTRIBUTE = idealist
+												}
+											}
+										}
+										factor = 0
+									}
+									set_variable = {
+										name = accolade_progress
+										value = 0
+									}
+									random_knight = {
+										limit = {
+											can_unlock_accolade_attribute_trigger = {
+												ATTRIBUTE = idealist
+											}
+										}
+										weight = {
+											base = 1
+											modifier = {
+												add = 50
+												is_acclaimed = yes
+											}
+											modifier = {
+												add = 50
+												has_trait = compassionate
+											}
+											modifier = {
+												add = 30
+												has_trait = just
+											}
+											modifier = {
+												add = 30
+												has_trait = zealous
+											}
+										}
+										save_scope_as = idealist
+									}
+									send_interface_message = {
+										type = msg_accolade_eligibility
+										title = accolade_idealist_unlock.t
+										left_icon = scope:idealist
+										right_icon = scope:recipient
+										custom_tooltip = accolade_idealist_unlock.tt
+										scope:idealist = {
+											set_variable = {
+												name = idealist_attribute_unlock
+												value = yes
+											}
+										}
+									}
+								}
+							}
+						}
+						house ?= {
+							change_house_relation_effect = {
+								HOUSE = scope:recipient.house
+								VALUE = house_relation_improve_medium_value
+								REASON = prison_released
+								CHAR = scope:puppet_or_actor
+								TARGET_CHAR = scope:recipient
+								TITLE = scope:dummy_gender
+							}
+						}
+						add_dread = minor_dread_loss
+						stress_and_fulfillment_impact = {
+							sadistic = medium_stress_impact_gain
+							callous = minor_stress_impact_gain
+						}
+
+						if = {
+							limit = {
+								any_character_struggle = {
+									involvement = involved
+									OR = {
+										has_struggle_phase_parameter = release_prisoner_diff_culture_gives_prestige
+										has_struggle_phase_parameter = release_prisoner_diff_faith_gives_prestige
+									}
+								}
+								is_diff_faith_or_culture_trigger = {
+									CHAR = scope:recipient
+									STATUS = involved
+								}
+							}
+							add_prestige = medium_prestige_gain
+						}
+
+						if = {
+							limit = {
+								any_character_struggle = {
+									involvement = involved
+									activate_struggle_catalyst_secondary_character_involvement_involved_trigger = {
+										CATALYST = catalyst_release_important
+										CHAR = scope:recipient
+									}
+								}
+							}
+							every_character_struggle = {
+								involvement = involved
+								limit = {
+									activate_struggle_catalyst_secondary_character_involvement_involved_trigger = {
+										CATALYST = catalyst_release_important
+										CHAR = scope:recipient
+									}
+								}
+								activate_struggle_catalyst = {
+									catalyst = catalyst_release_important
+									character = scope:puppet_or_actor
+								}
+							}
+						}
+						if = {
+							limit = {
+								fp3_struggle_involves_one_supporter_and_one_detractor = {
+									FIRST = scope:puppet_or_actor
+									SECOND = scope:recipient
+								}
+								any_character_struggle = {
+									activate_struggle_catalyst_secondary_character_involvement_either_trigger = {
+										CATALYST = catalyst_release_supporter_detractor
+										CHAR = scope:recipient
+									}
+								}
+							}
+							every_character_struggle = {
+								limit = {
+									activate_struggle_catalyst_secondary_character_involvement_either_trigger = {
+										CATALYST = catalyst_release_supporter_detractor
+										CHAR = scope:recipient
+									}
+								}
+								activate_struggle_catalyst = {
+									catalyst = catalyst_release_supporter_detractor
+									character = scope:puppet_or_actor
+								}
+								log_debug_variable_for_persian_struggle_effect = { VAR = concession_catalyst_release_supporter_detractor }
+							}
+						}
+					}
+					if = {
+						limit = {
+							scope:is_puppet_action ?= yes
+							scope:actor != scope:recipient
+						}
+						scope:actor = {
+							send_interface_toast = {
+								type = event_toast_effect_neutral
+								title = recipient_released_from_prison_puppeteer
+								left_icon = scope:puppet_or_actor
+								right_icon = scope:recipient
+							}
+						}
+					}
+
+					add_clan_unity_interaction_effect = {
+						CHARACTER = scope:puppet_or_actor
+						TARGET = scope:recipient
+						VALUE = minor_unity_gain
+						DESC = clan_unity_released_from_own_prison.desc
+						REVERSE_NON_HOUSE_TARGET = no
+					}
+
+					if = {
+						limit = {
+							exists = scope:recipient.primary_title
+							scope:recipient.primary_title.tier >= tier_duchy
+						}
+
+						save_scope_value_as = {
+							name = title_tier_minus_2
+							value = {
+								value = scope:recipient.primary_title.tier
+								subtract = 2
+							}
+						}
+						scope:puppet_or_actor = {
+							send_interface_toast = {
+								type = msg_legitimacy_gain
+								title = legitimacy_gain_toast
+								left_icon = scope:puppet_or_actor
+								right_icon = scope:recipient
+								add_legitimacy = {
+									value = {
+										value = miniscule_legitimacy_gain
+										multiply = scope:title_tier_minus_2
+									}
+								}
+							}
+						}
+						if = {
+							limit = {
+								scope:is_puppet_action ?= yes
+								scope:actor != scope:recipient
+							}
+							scope:actor = {
+								send_interface_toast = {
+									type = msg_legitimacy_gain
+									title = legitimacy_gain_toast_puppeteer
+									left_icon = scope:puppet_or_actor
+									right_icon = scope:recipient
+								}
+							}
+						}
+					}
+				}
+				else_if = {
+					limit = {
+						scope:disfigure = no
+						scope:blind = no
+						scope:castrate = no
+					}
+					scope:puppet_or_actor = {
+						trigger_event = char_interaction.0160
+					}
+				}
+				else = {
+				}
+
+				if = {
+					limit = {
+						exists = var:marked_for_revenge_in_event_yearly_4021
+					}
+					add_opinion = {
+						modifier = abandoned_me_opinion
+						target = var:marked_for_revenge_in_event_yearly_4021
+					}
+					if = {
+						limit = {
+							var:marked_for_revenge_in_event_yearly_4021 = {
+								is_alive = yes
+								is_ai = no
+							}
+						}
+						save_scope_as = child
+						if = {
+							limit = {
+								NOT = { has_trait = sadistic }
+								number_of_personality_traits < personality_trait_limit
+							}
+							add_trait = sadistic
+						}
+						var:marked_for_revenge_in_event_yearly_4021 = {
+							add_character_flag = {
+								flag = block_for_prison_release_notification
+								days = 10
+							}
+							trigger_event = yearly.4022
+						}
+						remove_variable = marked_for_revenge_in_event_yearly_4021
+					}
+				}
+			}
+
+			scope:puppet_or_actor = {
+				if = {
+					limit = {
+						exists = scope:recipient.house
+						any_character_war = {
+							using_cb = fp3_free_house_member_cb
+							is_defender = scope:puppet_or_actor
+							primary_attacker.house = scope:recipient.house
+						}
+					}
+					random_character_war = {
+						limit = {
+							using_cb = fp3_free_house_member_cb
+							is_defender = scope:puppet_or_actor
+							primary_attacker.house = scope:recipient.house
+						}
+						primary_attacker = {
+							hidden_effect = {
+								send_interface_message = {
+									type = event_war_good
+									title = lesson_war_final_notes_victory_step_1
+									left_icon = scope:recipient
+									right_icon = scope:puppet_or_actor
+
+									show_as_tooltip = {
+										scope:recipient = { release_from_prison = yes }
+										add_prestige = major_prestige_gain
+										prev.primary_defender = { add_prestige = major_prestige_loss }
+									}
+								}
+							}
+							add_prestige = major_prestige_gain
+							prev.primary_defender = { add_prestige = major_prestige_loss }
+						}
+					}
+				}
+			}
+
+			tenet_benevolent_governance_clemency_effect = yes
+		}
+	}
+
+	on_decline = {
+		scope:puppet_or_actor = {
+			trigger_event = char_interaction.0161
+		}
+	}
+
+	send_option = {
+		flag = demand_conversion
+		localization = "RELEASE_DEMAND_CONVERSION"
+		is_shown = {
+			scope:recipient.faith != scope:puppet_or_actor.faith
+		}
+		is_valid = {
+			trigger_if = {
+				limit = {
+					scope:actor = { is_ai = yes }
+				}
+				scope:recipient = {
+					OR = {
+						is_close_or_extended_family_of = scope:puppet_or_actor
+						is_vassal_of = scope:puppet_or_actor
+					}
+					NOT = { has_character_flag = ai_will_not_convert }
+				}
+			}
+
+			custom_description = {
+				text = cannot_demand_unsubordinate_landed_ruler_conversion
+				scope:recipient = {
+					trigger_if = {
+						limit = {
+							is_playable_character = yes
+						}
+						is_vassal_or_below_of = scope:puppet_or_actor
+					}
+				}
+			}
+
+			custom_description = {
+				text = cannot_demand_religious_head_conversion
+				NAND = {
+					exists = scope:recipient.faith.religious_head
+					scope:recipient.faith.religious_head = scope:recipient
+				}
+			}
+
+			custom_description = {
+				text = cannot_demand_holy_order_master_conversion
+				NAND = {
+					exists = scope:recipient.faith
+					scope:recipient.faith = {
+						any_faith_holy_order = { leader = scope:recipient }
+					}
+				}
+			}
+
+			custom_description = {
+				text = cannot_demand_steadfast_character_conversion
+				scope:recipient = {
+					NOT = { has_character_flag = ai_will_not_convert }
+				}
+			}
+		}
+	}
+
+	send_option = {
+		flag = renounce_claims
+		localization = RELEASE_RENOUNCE_CLAIMS
+		is_shown = {
+			custom_description = {
+				text = "release_renounce_claims"
+				subject = scope:recipient
+				scope:recipient = {
+					any_claim = {
+						explicit = yes
+						save_temporary_scope_as = temp_claim
+						OR = {
+							holder = scope:puppet_or_actor
+							AND = {
+								NOT = { prev = { target_is_liege_or_above = scope:puppet_or_actor } }
+								trigger_if = {
+									limit = {
+										exists = holder
+									}
+									holder = { target_is_liege_or_above = scope:puppet_or_actor }
+								}
+							}
+							scope:puppet_or_actor = {
+								any_held_title = {
+									is_de_jure_liege_or_above_target = scope:temp_claim
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		current_description = {
+			desc = RELEASE_RENOUNCE_CLAIMS_DESC
+		}
+	}
+
+	send_option = {
+		flag = banish
+		localization = "RELEASE_BANISH"
+		is_shown = {
+			trigger_if = {
+				limit = {
+					scope:actor = { is_ai = yes }
+				}
+				scope:recipient = {
+					OR = {
+						AND = {
+							is_playable_character = no
+							is_ruler = no
+							gold > scope:puppet_or_actor.gold
+							gold > scope:puppet_or_actor.medium_gold_value
+							scope:puppet_or_actor.ai_greed > low_negative_ai_value
+						}
+						AND = {
+							is_playable_character = no
+							is_ruler = no
+							gold > 0
+							scope:puppet_or_actor = {
+								has_banish_reason = scope:recipient
+							}
+						}
+						AND = {
+							is_playable_character = no
+							is_ruler = no
+							gold > 100
+							scope:puppet_or_actor.ai_greed >= high_positive_ai_value
+						}
+						AND = {
+							scope:puppet_or_actor = {
+								has_banish_reason = scope:recipient
+							}
+							scope:puppet_or_actor = {
+								opinion = {
+									target = scope:recipient
+									value <= medium_negative_opinion
+								}
+							}
+						}
+					}
+				}
+			}
+			trigger_if = {
+				limit = {
+					scope:recipient = {
+						is_playable_character = yes
+					}
+				}
+				scope:recipient = {
+					is_vassal_of = scope:puppet_or_actor
+				}
+			}
+			trigger_else = {
+				scope:recipient = {
+					is_courtier_of = scope:puppet_or_actor
+				}
+			}
+			custom_description = {
+				text = "release_banish_invalid_take_vows"
+				object = scope:recipient
+				scope:take_vows = no
+			}
+			scope:recruit = no
+			NOT = {
+				scope:recipient = {
+					is_spouse_of = scope:puppet_or_actor
+				}
+			}
+		}
+	}
+
+	send_option = {
+		flag = gain_hook
+		localization = "RELEASE_GAIN_HOOK"
+		is_shown = {
+			trigger_if = {
+				limit = {
+					scope:actor = { is_ai = yes }
+				}
+				scope:recipient = {
+					OR = {
+						is_vassal_of = scope:puppet_or_actor
+						liege ?= scope:puppet_or_actor
+					}
+				}
+			}
+		}
+		is_valid = {
+			scope:puppet_or_actor = {
+				can_add_hook = {
+					type = favor_hook
+					target = scope:recipient
+				}
+			}
+		}
+	}
+
+	send_option = {
+		flag = take_vows
+		localization = "RELEASE_TAKE_VOWS"
+		is_shown = {
+			scope:puppet_or_actor = { take_vows_available_trigger = yes }
+		}
+		is_valid = {
+
+			trigger_if = {
+				limit = {
+					scope:actor = { is_ai = yes }
+				}
+
+				trigger_if = {
+					limit = {
+						scope:puppet_or_actor = {
+							culture = { has_cultural_pillar = heritage_byzantine }
+						}
+					}
+					scope:recipient = {
+						is_ai = yes
+						OR = {
+							is_close_or_extended_family_of = scope:puppet_or_actor
+							is_vassal_or_below_of = scope:puppet_or_actor
+							has_relation_rival = scope:puppet_or_actor
+							is_courtier_of = scope:puppet_or_actor
+						}
+						NOT = {
+							is_heir_of = scope:puppet_or_actor
+						}
+					}
+
+					trigger_if = {
+						limit = {
+							scope:recipient = { has_relation_rival = scope:puppet_or_actor }
+						}
+						always = yes
+					}
+
+					trigger_else = {
+						scope:puppet_or_actor = {
+							opinion = {
+								target = scope:recipient
+								value <= medium_negative_opinion
+							}
+						}
+					}
+				}
+
+				trigger_else = {
+					scope:recipient = {
+						is_ai = yes
+						is_close_or_extended_family_of = scope:puppet_or_actor
+						NOT = {
+							is_heir_of = scope:puppet_or_actor
+						}
+					}
+					scope:puppet_or_actor = {
+						opinion = {
+							target = scope:recipient
+							value <= medium_negative_opinion
+						}
+					}
+					custom_description = {
+						text = "release_vows_invalid_not_your_court"
+						object = scope:recipient
+						subject = scope:puppet_or_actor
+						OR = {
+							scope:recipient = { is_courtier_of = scope:puppet_or_actor }
+							scope:recruit = yes
+						}
+					}
+				}
+			}
+
+			trigger_else_if = {
+				limit = {
+					scope:puppet_or_actor = {
+						culture = { has_cultural_pillar = heritage_byzantine }
+					}
+				}
+				scope:recipient = {
+					is_ai = yes
+					custom_description = {
+						text = "release_byz_vows_invalid"
+						object = scope:recipient
+						subject = scope:puppet_or_actor
+						OR = {
+							is_close_or_extended_family_of = scope:puppet_or_actor
+							is_vassal_or_below_of = scope:puppet_or_actor
+							has_relation_rival = scope:puppet_or_actor
+							is_courtier_of = scope:puppet_or_actor
+						}
+					}
+				}
+			}
+
+			trigger_else = {
+				scope:recipient = {
+					is_ai = yes
+				}
+				scope:puppet_or_actor = { is_close_or_extended_family_of = scope:recipient }
+				custom_description = {
+					text = "release_vows_invalid_not_your_court"
+					object = scope:recipient
+					subject = scope:puppet_or_actor
+					OR = {
+						scope:recipient = { is_courtier_of = scope:puppet_or_actor }
+						scope:recruit = yes
+					}
+				}
+
+			}
+			custom_description = {
+				text = "release_vows_invalid_not_your_faith"
+				object = scope:recipient
+				subject = scope:puppet_or_actor
+				trigger_if = {
+					limit = {
+						scope:recipient.faith != scope:puppet_or_actor.faith
+					}
+					scope:demand_conversion = yes
+				}
+			}
+			custom_description = {
+				text = "release_executioner_invalid_take_vows_condition"
+				object = scope:recipient
+				scope:become_executioner = no
+			}
+			custom_description = {
+				text = "release_banish_invalid_take_vows"
+				object = scope:recipient
+				scope:banish = no
+			}
+			scope:recipient = {
+				age >= 10
+				NOR = {
+					has_trait = excommunicated
+					has_trait = devoted
+					has_trait = incapable
+				}
+
+				NOR = {
+					custom_description = {
+						text = is_married_matrilineally
+						subject = scope:recipient
+						any_spouse = {
+							is_female = yes
+							matrilinear_marriage = yes
+						}
+					}
+					custom_description = {
+						text = is_married_patrilineally
+						subject = scope:recipient
+						any_spouse = {
+							is_male = yes
+							patrilinear_marriage = yes
+						}
+					}
+					custom_description = {
+						text = matrilinear_betrothal
+						subject = scope:recipient
+						betrothed ?= {
+							is_female = yes
+							matrilinear_betrothal = yes
+						}
+					}
+					custom_description = {
+						text = patrilinear_betrothal
+						subject = scope:recipient
+						betrothed ?= {
+							is_male = yes
+							patrilinear_betrothal = yes
+						}
+					}
+				}
+			}
+		}
+	}
+
+	send_option = {
+		flag = change_prison
+		localization = "RELEASE_CHANGE_PRISON"
+		is_shown = {
+			scope:recipient = {
+				NOT = {
+					is_imprisoned_by = scope:actor
+				}
+			}
+		}
+	}
+
+	send_option = {
+		flag = make_puppet
+		localization = "RELEASE_MAKE_PUPPET"
+		is_shown = {
+			scope:puppet_or_actor = {
+				scope:actor = { is_ai = no }
+				OR = {
+					has_puppet_type = external_theological_agent_puppet
+					has_puppet_type = external_ruler_puppet
+				}
+			}
+			scope:recipient = {
+				is_ai = yes
+			}
+		}
+		is_valid = {
+			scope:recipient = {
+				custom_tooltip = {
+					text = pam_recipient_already_puppet_tt
+					NOT = { exists = puppeteer }
+				}
+			}
+
+			scope:puppet_or_actor = {
+				trigger_if = {
+					limit = {
+						has_puppet_type = external_theological_agent_puppet
+						scope:recipient = {
+							is_clergy = yes
+							religion = scope:puppet_or_actor.religion
+						}
+					}
+					custom_tooltip = {
+						text = pam_already_have_external_clerical_puppet_tt
+						NOT = { exists = puppet:external_theological_agent_puppet }
+					}
+				}
+				trigger_else_if = {
+					limit = { has_puppet_type = external_ruler_puppet }
+					scope:recipient = {
+						is_landed = yes
+						is_ruler = yes
+						is_adult = yes
+						is_clergy = no
+					}
+					custom_tooltip = {
+						text = pam_already_have_external_ruler_puppet_tt
+						NOT = { exists = puppet:external_ruler_puppet }
+					}
+					can_send_make_external_ruler_puppet_trigger = {
+						ACTOR = scope:puppet_or_actor
+						RECIPIENT = scope:recipient
+					}
+				}
+				trigger_else = {
+					scope:recipient = {
+						is_clergy = yes
+						religion = scope:puppet_or_actor.religion
+					}
+				}
+			}
+		}
+	}
+
+	send_option = {
+		flag = become_executioner
+		localization = "RELEASE_AS_EXECUTIONER"
+		is_shown = {
+			has_ep1_court_positions_dlc_trigger = yes
+			scope:puppet_or_actor = {
+				has_royal_court = yes
+			}
+			scope:recipient = {
+				is_adult = yes
+			}
+		}
+		is_valid = {
+			scope:puppet_or_actor = {
+				can_employ_court_position_type = executioner_court_position
+				NOT = { employs_court_position = executioner_court_position }
+			}
+			scope:recipient = {
+				trigger_if = {
+					limit = { scope:recruit = yes }
+					custom_description = {
+						text = "release_executioner_invalid_recruit"
+						object = scope:recipient
+						scope:recruit = yes
+					}
+				}
+				trigger_else = {
+					is_courtier_of = scope:puppet_or_actor
+				}
+
+				custom_description = {
+					text = "release_executioner_invalid_take_vows_condition"
+					object = scope:recipient
+					scope:take_vows = no
+				}
+				NOT = { is_spouse_of = scope:puppet_or_actor  }
+
+				can_be_combatant_based_on_gender_trigger = { ARMY_OWNER = scope:puppet_or_actor }
+			}
+		}
+	}
+
+	send_option = {
+		flag = recruit
+		localization = "RELEASE_RECRUIT"
+		is_shown = {
+			trigger_if = {
+				limit = {
+					scope:actor = { is_ai = yes }
+				}
+				scope:recipient = {
+					OR = {
+						has_relation_best_friend = scope:puppet_or_actor
+						has_relation_friend = scope:puppet_or_actor
+						has_relation_lover = scope:puppet_or_actor
+						has_relation_soulmate = scope:puppet_or_actor
+						has_secret_relation_lover = scope:puppet_or_actor
+						is_heir_of = scope:puppet_or_actor
+					}
+				}
+			}
+			scope:recipient = {
+				is_ruler = no
+				NOT = { is_courtier_of = scope:puppet_or_actor }
+				OR = {
+					is_adult = yes
+					AND = {
+						is_adult = no
+						OR = {
+							trigger_if = {
+								limit = { exists = liege }
+								NOT = { is_heir_of = liege }
+							}
+							NOT = { exists = liege }
+						}
+					}
+				}
+			}
+		}
+	}
+
+	send_option = {
+		flag = disfigure
+		localization = "RELEASE_DISFIGURE"
+		is_shown = {
+			scope:puppet_or_actor = {
+
+				culture = { has_cultural_tradition = tradition_ep3_palace_politics }
+
+				liege_should_systematically_maim_co_ruler_trigger = no
+			}
+			scope:recipient = {
+				is_adult = yes
+			}
+		}
+		is_valid = {
+			scope:recipient = {
+				NOT = { has_trait = disfigured }
+			}
+
+			trigger_if = {
+				limit = {
+					scope:puppet_or_actor = {
+						culture = { has_cultural_pillar = heritage_byzantine }
+					}
+				}
+				scope:recipient = {
+					custom_description = {
+						text = "release_byz_disfigure_invalid"
+						object = scope:recipient
+						subject = scope:puppet_or_actor
+						OR = {
+							is_close_or_extended_family_of = scope:puppet_or_actor
+							is_vassal_or_below_of = scope:puppet_or_actor
+							has_relation_rival = scope:puppet_or_actor
+							is_courtier_of = scope:puppet_or_actor
+						}
+					}
+				}
+			}
+			custom_description = {
+				text = "release_prisoner_disfigure_blind_castrate_condition"
+				object = scope:recipient
+				scope:blind = no
+				scope:castrate = no
+			}
+		}
+	}
+
+	send_option = {
+		flag = blind
+		localization = "RELEASE_BLIND"
+		is_shown = {
+			scope:puppet_or_actor = {
+				is_adult = yes
+				culture = { has_cultural_parameter = can_blind_prisoners }
+
+				liege_should_systematically_maim_co_ruler_trigger = no
+			}
+			scope:recipient = {
+				is_adult = yes
+			}
+		}
+		is_valid = {
+			scope:recipient = {
+				NOT = { has_trait = blind }
+			}
+			custom_description = {
+				text = "release_prisoner_disfigure_blind_castrate_condition"
+				object = scope:recipient
+				scope:disfigure = no
+				scope:castrate = no
+			}
+		}
+	}
+
+	send_option = {
+		flag = castrate
+		localization = "RELEASE_CASTRATE"
+		is_shown = {
+			scope:recipient = {
+				is_imprisoned_by = scope:puppet_or_actor
+				is_eunuch_trigger = no
+				is_male = yes
+			}
+			scope:puppet_or_actor = {
+				is_adult = yes
+				culture = {
+					has_cultural_parameter = can_castrate_prisoners
+				}
+
+				liege_should_systematically_maim_co_ruler_trigger = no
+			}
+		}
+		is_valid = {
+			scope:recipient = {
+				is_eunuch_trigger = no
+			}
+			custom_description = {
+				text = "release_prisoner_disfigure_blind_castrate_condition"
+				object = scope:recipient
+				scope:disfigure = no
+				scope:blind = no
+			}
+		}
+	}
+
+	send_option = {
+		flag = demand_admin
+		localization = "RELEASE_DEMAND_ADMIN"
+		is_shown = {
+			scope:puppet_or_actor = { government_has_mechanic = administrative }
+			scope:puppet_or_actor = scope:recipient.liege
+			scope:recipient = {
+				highest_held_title_tier >= tier_county
+				is_landed = yes
+				is_ruler = yes
+				NOT = { government_has_mechanic = administrative }
+				NOT = {
+					scope:recipient = { government_has_flag = government_is_tribal }
+				}
+				NOT = { scope:recipient ?= scope:recipient.faith.religious_head }
+				NOT = { scope:recipient ?= scope:puppet_or_actor.diarch }
+			}
+		}
+		is_valid = {
+			scope:recipient = {
+				NOT = { government_has_mechanic = administrative }
+			}
+		}
+	}
+
+	cost = {
+		prestige = {
+			value = 0
+			if = {
+				limit = {
+					scope:make_puppet = yes
+					scope:puppet_or_actor = { has_puppet_type = external_ruler_puppet }
+					scope:recipient = {
+						is_landed = yes
+						is_ruler = yes
+						is_clergy = no
+					}
+				}
+				add = {
+					value = minor_prestige_value
+					multiply = {
+						value = scope:recipient.highest_held_title_tier
+						subtract = 1
+					}
+					desc = PRESTIGE_INTERACTION_ACCEPTANCE_SEND_OPTION
+				}
+			}
+		}
+	}
+
+	send_options_exclusive = no
+
+	auto_accept = {
+		scope:demand_conversion = no
+		scope:renounce_claims = no
+		scope:banish = no
+		scope:gain_hook = no
+		scope:take_vows = no
+		scope:recruit = no
+		scope:disfigure = no
+		scope:blind = no
+		scope:castrate = no
+		scope:demand_admin = no
+		scope:become_executioner = no
+		scope:change_prison = no
+		scope:make_puppet = no
+	}
+
+	ai_accept = {
+		base = 0
+
+		celestial_hierarchy_acceptance_modifier = {
+			ACTOR = scope:puppet_or_actor
+			RECIPIENT = scope:recipient
+		}
+
+		modifier = {
+			add = 100
+			desc = "WANTS_FREEDOM_REASON"
+		}
+
+		modifier = {
+			trigger = {
+				has_trait = ambitious
+			}
+			add = -20
+			desc = "RECIPIENT_IS_AMBITIOUS"
+		}
+		modifier = {
+			trigger = {
+				scope:recipient = {
+					rite.head_of_rite ?= this
+				}
+			}
+			add = -120
+			desc = "RECIPIENT_IS_HEAD_OF_RITE_REASON"
+		}
+
+		modifier = {
+			trigger = {
+				scope:demand_conversion = yes
+				scope:recipient = {
+					has_character_flag = ai_will_not_convert
+				}
+			}
+			add = -1500
+			desc = "ASK_FOR_CONVERSION_RECIPIENT_WILL_NOT_ACCEPT"
+		}
+		modifier = {
+			trigger = {
+				scope:recipient = { ai_zeal <= 20 }
+				scope:demand_conversion = yes
+			}
+			add = -20
+			desc = "CONVERSION_NEGATIVE_REASON"
+		}
+		modifier = {
+			trigger = {
+				scope:recipient = { ai_zeal > 20 }
+				scope:demand_conversion = yes
+			}
+			add = {
+				value = ai_zeal
+				if = {
+					limit = {
+						scope:recipient.faith = {
+							faith_hostility_level = {
+								target = scope:puppet_or_actor.faith
+								value = faith_astray_level
+							}
+						}
+					}
+					multiply = -1
+				}
+				else = {
+					multiply = -2
+				}
+			}
+			desc = "CONVERSION_NEGATIVE_REASON"
+		}
+
+		modifier = {
+			add = -25
+			trigger = {
+				scope:renounce_claims = yes
+				ai_greed < 0
+			}
+			desc = "RENOUNCE_CLAIMS_REASON"
+		}
+		modifier = {
+			add = -50
+			trigger = {
+				scope:renounce_claims = yes
+				ai_greed >= 0
+				ai_greed < 26
+			}
+			desc = "RENOUNCE_CLAIMS_REASON"
+		}
+		modifier = {
+			add = -75
+			trigger = {
+				scope:renounce_claims = yes
+				ai_greed >= 26
+				ai_greed < 51
+			}
+			desc = "RENOUNCE_CLAIMS_REASON"
+		}
+		modifier = {
+			add = -95
+			trigger = {
+				scope:renounce_claims = yes
+				ai_greed >= 51
+			}
+			desc = "RENOUNCE_CLAIMS_REASON"
+		}
+
+		modifier = {
+			add = -50
+			trigger = {
+				scope:become_executioner = yes
+
+				NOR = {
+					has_trait = sadistic
+					has_trait = callous
+				}
+			}
+			desc = "BECOME_EXECUTIONER_REASON"
+		}
+
+		modifier = {
+			add = -50
+			trigger = {
+				scope:banish = yes
+			}
+			NOT = {
+				scope:puppet_or_actor = {
+					has_imprisonment_reason = scope:recipient
+					culture = { has_cultural_parameter = vassals_more_likely_accept_punishments }
+				}
+			}
+			desc = "BANISH_NEGATIVE_REASON"
+		}
+		modifier = {
+			add = legalistic_vassal_punishment_acceptance
+			trigger = {
+				scope:banish = yes
+			}
+			scope:puppet_or_actor = {
+				has_imprisonment_reason = scope:recipient
+				culture = { has_cultural_parameter = vassals_more_likely_accept_punishments }
+			}
+			desc = tradition_legalistic_name
+		}
+
+		modifier = {
+			add = {
+				value = -50
+				if = {
+					limit = {
+						scope:recipient = {
+							ai_vengefulness > 0
+						}
+					}
+					subtract = ai_vengefulness
+				}
+			}
+			trigger = {
+				scope:gain_hook = yes
+			}
+			desc = "GAIN_HOOK_NEGATIVE_REASON"
+		}
+
+		modifier = {
+			add = -30
+			trigger = {
+				scope:take_vows = yes
+			}
+			desc = "TAKE_VOWS_NEGATIVE_REASON"
+		}
+		modifier = {
+			add = -30
+			trigger = {
+				scope:take_vows = yes
+				has_trait = lustful
+			}
+			desc = "TAKE_VOWS_LUSTFUL_REASON"
+		}
+		modifier = {
+			add = -30
+			trigger = {
+				scope:take_vows = yes
+				has_trait = rakish
+			}
+			desc = "TAKE_VOWS_RAKISH_REASON"
+		}
+		modifier = {
+			add = -30
+			trigger = {
+				scope:take_vows = yes
+				has_trait = fornicator
+			}
+			desc = "TAKE_VOWS_FORNICATOR_REASON"
+		}
+		modifier = {
+			add = -30
+			trigger = {
+				scope:take_vows = yes
+				has_trait = seducer
+			}
+			desc = "TAKE_VOWS_SEDUCER_REASON"
+		}
+		modifier = {
+			add = -30
+			trigger = {
+				scope:take_vows = yes
+				has_trait = deviant
+			}
+			desc = "TAKE_VOWS_DEVIANT_REASON"
+		}
+		modifier = {
+			add = {
+				value = -15
+				multiply = num_sinful_traits
+			}
+			trigger = {
+				scope:take_vows = yes
+				num_sinful_traits > 1
+			}
+			desc = "TAKE_VOWS_SINS_REASON"
+		}
+		modifier = {
+			add = -30
+			trigger = {
+				scope:take_vows = yes
+				has_trait = cynical
+			}
+			desc = "TAKE_VOWS_CYNICAL_REASON"
+		}
+
+		modifier = {
+			add = -10
+			trigger = {
+				scope:recruit = yes
+				NOT = {
+					scope:puppet_or_actor = {
+						culture = {
+							has_cultural_parameter = can_recruit_prisoners_easily
+						}
+					}
+				}
+			}
+			desc = "RECRUITMET_NEGATIVE_REASON"
+		}
+
+		modifier = {
+			add = {
+				value = -100
+				if = {
+					limit = {
+						has_trait = beauty_good
+					}
+					multiply = 2
+				}
+			}
+			trigger = {
+				scope:disfigure = yes
+				OR = {
+					NOR = {
+						has_trait = maimed
+						has_trait = beauty_bad
+						ai_sociability < -75
+					}
+					has_trait = beauty_good
+				}
+			}
+			desc = "DISFIGURE_NEGATIVE_REASON"
+		}
+		modifier = {
+			add = -75
+			trigger = {
+				scope:disfigure = yes
+				OR = {
+					has_trait = maimed
+					has_trait = beauty_bad
+					ai_sociability < -75
+				}
+				NOT = { has_trait = beauty_good }
+			}
+			desc = "DISFIGURE_NEGATIVE_REASON"
+		}
+
+		modifier = {
+			add = -100
+			trigger = {
+				scope:blind = yes
+				NOR = {
+					has_trait = one_eyed
+					has_trait = infirm
+					has_trait = clouded_eyes
+				}
+			}
+			desc = "BLIND_NEGATIVE_REASON"
+		}
+		modifier = {
+			add = -75
+			trigger = {
+				scope:blind = yes
+				OR = {
+					has_trait = one_eyed
+					has_trait = infirm
+					has_trait = clouded_eyes
+				}
+			}
+			desc = "BLIND_NEGATIVE_REASON"
+		}
+
+		modifier = {
+			add = -75
+			trigger = {
+				scope:castrate = yes
+				any_child = { count > 0 }
+				ai_boldness < -50
+			}
+			desc = "CASTRATE_NEGATIVE_REASON"
+		}
+		modifier = {
+			add = -100
+			trigger = {
+				scope:castrate = yes
+				any_child = { count > 0 }
+				ai_boldness >= -50
+			}
+			desc = "CASTRATE_NEGATIVE_REASON"
+		}
+		modifier = {
+			add = -100
+			trigger = {
+				scope:castrate = yes
+				any_child = { count <= 0 }
+			}
+			desc = "CASTRATE_NO_CHILDREN_NEGATIVE_REASON"
+		}
+		modifier = {
+			add = -100
+			trigger = {
+				scope:castrate = yes
+				has_trait = lustful
+			}
+			desc = "TAKE_VOWS_LUSTFUL_REASON"
+		}
+
+		modifier = {
+			add = -20
+			trigger = {
+				scope:demand_admin = yes
+				OR = {
+					culture = {
+						OR = {
+
+							culture_is_historically_admin_trigger = yes
+
+							has_cultural_pillar = ethos_bureaucratic
+						}
+					}
+
+					government_has_mechanic = administrative
+				}
+			}
+			desc = "DEMAND_ADMIN_NEGATIVE_REASON"
+		}
+		modifier = {
+			add = -50
+			trigger = {
+				scope:demand_admin = yes
+				NOR = {
+					culture = {
+						OR = {
+
+							culture_is_historically_admin_trigger = yes
+
+							has_cultural_pillar = ethos_bureaucratic
+						}
+					}
+
+					government_has_mechanic = administrative
+				}
+				culture = {
+					NOR = {
+						has_cultural_tradition = tradition_hereditary_hierarchy
+						has_cultural_tradition = tradition_staunch_traditionalists
+					}
+				}
+			}
+			desc = "DEMAND_ADMIN_NEGATIVE_REASON"
+		}
+		modifier = {
+			add = -100
+			trigger = {
+				scope:demand_admin = yes
+				NOR = {
+					culture = {
+						OR = {
+
+							culture_is_historically_admin_trigger = yes
+
+							has_cultural_pillar = ethos_bureaucratic
+						}
+					}
+
+					government_has_mechanic = administrative
+				}
+				culture = {
+					OR = {
+						has_cultural_tradition = tradition_hereditary_hierarchy
+						has_cultural_tradition = tradition_staunch_traditionalists
+					}
+				}
+			}
+			desc = "DEMAND_ADMIN_NEGATIVE_REASON"
+		}
+
+		modifier = {
+			trigger = {
+				scope:demand_conversion = no
+				scope:renounce_claims = no
+				scope:banish = no
+				scope:gain_hook = no
+				scope:take_vows = no
+				scope:recruit = no
+			}
+			scope:recipient = {
+				any_character_struggle = {
+					involvement = involved
+				}
+			}
+			scope:puppet_or_actor = {
+				any_character_struggle = {
+					involvement = involved
+				}
+			}
+			add = {
+				value = 0
+				if = {
+					limit = {
+						scope:recipient = {
+							any_character_struggle = {
+								phase_has_catalyst = catalyst_release_important
+							}
+							has_character_flag = agenda_towards_escalation
+						}
+					}
+					add = -100
+				}
+				else_if = {
+					limit = {
+						scope:recipient = {
+							any_character_struggle = {
+								phase_has_catalyst = catalyst_release_important
+							}
+						}
+					}
+					add = 200
+				}
+			}
+		}
+	}
+
+	ai_targets = {
+		ai_recipients = prisoners
+	}
+	ai_frequency_by_tier = {
+		barony = 12
+		county = 1
+		duchy = 1
+		kingdom = 1
+		empire = 1
+		hegemony = 1
+	}
+
+	ai_will_do = {
+		base = 0
+
+		modifier = {
+			add = 20
+			scope:demand_conversion = yes
+		}
+		modifier = {
+			add = 100
+			scope:demand_conversion = yes
+			scope:recipient = {
+				is_vassal_of = scope:puppet_or_actor
+			}
+		}
+		modifier = {
+			add = 30
+			scope:renounce_claims = yes
+		}
+		modifier = {
+			add = 50
+			scope:banish = yes
+		}
+		modifier = {
+			add = 30
+			scope:take_vows = yes
+		}
+		modifier = {
+			add = 10
+			scope:recruit = yes
+		}
+		modifier = {
+			add = 30
+			scope:disfigure = yes
+		}
+		modifier = {
+			add = 20
+			scope:blind = yes
+		}
+		modifier = {
+			add = 50
+			scope:castrate = yes
+		}
+		modifier = {
+			add = -40
+			scope:puppet_or_actor = {
+				NOT = {
+					has_trait = forgiving
+				}
+			}
+			scope:recipient = {
+				OR = {
+					has_relation_rival = scope:puppet_or_actor
+					has_relation_nemesis = scope:puppet_or_actor
+					scope:recipient = {
+						is_spouse_of = scope:puppet_or_actor
+						exposed_cheating_on_spouse_trigger = { SPOUSE = scope:puppet_or_actor }
+					}
+				}
+			}
+		}
+		modifier = {
+			add = -100
+			scope:puppet_or_actor = {
+				NOT = {
+					has_trait = forgiving
+				}
+			}
+			scope:puppet_or_actor.ai_vengefulness >= very_high_positive_ai_value
+			scope:recipient = {
+				OR = {
+					has_relation_rival = scope:puppet_or_actor
+					has_relation_nemesis = scope:puppet_or_actor
+					scope:recipient = {
+						is_spouse_of = scope:puppet_or_actor
+						exposed_cheating_on_spouse_trigger = { SPOUSE = scope:puppet_or_actor }
+					}
+				}
+			}
+		}
+		modifier = {
+			add = 10
+			scope:puppet_or_actor = {
+				is_at_war = no
+				ai_compassion >= low_positive_ai_value
+			}
+			scope:recipient = {
+				is_adult = no
+				time_in_prison = { years > 1 }
+			}
+		}
+		modifier = {
+			add = 10
+			scope:puppet_or_actor = {
+				is_at_war = no
+				ai_compassion >= very_high_positive_ai_value
+			}
+			scope:recipient = {
+				time_in_prison = { years > 1 }
+			}
+		}
+		modifier = {
+			add = 10
+			scope:puppet_or_actor = {
+				is_at_war = no
+				ai_compassion >= medium_positive_ai_value
+			}
+			scope:recipient = {
+				is_playable_character = no
+				time_in_prison = { years > 3 }
+			}
+		}
+		modifier = {
+			add = 10
+			scope:puppet_or_actor = {
+				is_at_war = no
+				ai_compassion >= low_negative_ai_value
+			}
+			scope:recipient = {
+				is_playable_character = no
+				time_in_prison = { years > 5 }
+			}
+		}
+		modifier = {
+			add = 10
+			scope:puppet_or_actor = {
+				is_at_war = no
+				OR = {
+					ai_compassion >= very_high_positive_ai_value
+					AND = {
+						ai_compassion >= high_negative_ai_value
+						opinion = {
+							target = scope:recipient
+							value >= low_negative_opinion
+						}
+					}
+				}
+			}
+			scope:recipient = {
+				time_in_prison = { years > 1 }
+				is_playable_character = no
+				is_close_family_of = scope:puppet_or_actor
+			}
+		}
+		modifier = {
+			add = 40
+			scope:puppet_or_actor = {
+				is_at_war = no
+				ai_compassion >= very_high_negative_ai_value
+			}
+			scope:recipient = {
+				is_playable_character = no
+				is_child_of = scope:puppet_or_actor
+			}
+		}
+
+		modifier = {
+			trigger = {
+				scope:demand_conversion = no
+				scope:renounce_claims = no
+				scope:banish = no
+				scope:gain_hook = no
+				scope:take_vows = no
+				scope:recruit = no
+			}
+			scope:recipient = {
+				any_character_struggle = {
+					involvement = involved
+				}
+			}
+			scope:puppet_or_actor = {
+				any_character_struggle = {
+					involvement = involved
+				}
+			}
+			add = {
+				value = 0
+				if = {
+					limit = {
+						scope:puppet_or_actor = {
+							any_character_struggle = {
+								phase_has_catalyst = catalyst_release_important
+							}
+							has_character_flag = agenda_towards_escalation
+						}
+					}
+					add = -100
+				}
+				else_if = {
+					limit = {
+						scope:puppet_or_actor = {
+							any_character_struggle = {
+								phase_has_catalyst = catalyst_release_important
+							}
+							NOT = {
+								ai_greed >= 25
+							}
+							OR = {
+								ai_compassion > 50
+								AND  = {
+									ai_compassion > 0
+									scope:recipient = {
+										time_in_prison = { years > 1 }
+									}
+								}
+							}
+						}
+					}
+					add = 200
+				}
+			}
+		}
+		modifier = {
+			add = -50
+			scope:puppet_or_actor = {
+				house_has_feud_relation_with_trigger = { TARGET = scope:recipient }
+
+			}
+		}
+
+		modifier = {
+			add = -10
+			scope:take_vows = yes
+			scope:puppet_or_actor = {
+				culture = { has_cultural_pillar = heritage_byzantine }
+			}
+			scope:recipient = { is_vassal_or_below_of = scope:puppet_or_actor }
+		}
+
+		evaluate_action_increasing_house_unity = {
+			VALUE = 100
+		}
+
+		modifier = {
+			factor = 0
+			scope:recipient = {
+				has_character_flag = being_prisonbroken_by_laamp
+			}
+		}
+	}
+}

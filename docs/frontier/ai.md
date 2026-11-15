@@ -99,4 +99,25 @@
 
 参与条件中的`require_domain_in_sub_region`与`require_realm_in_sub_region`只分别要求区内存在直辖或领地，不能据此认定county_modifier会裁剪至区内。格式说明没有承诺地理裁剪；兼有区内外直辖时的实际范围仍待引擎验证。最小探针须区分参与者的区内直辖、区外直辖及其封臣土地，并核对阶段变化、改隶和退出后的清理。未验证前不能保证给普通区域或边疆组配置土地效果不会影响区外直辖。
 
-原生参与列表与阶段效果不等于已经支持每对国家独立的关系进度。双边关系采用何种载体、是否有独立点数以及怎样影响整体阶段均待定，不因双区域原型通过而推定可行。
+正式方案不另设双边阶段或点数，所有催化作用于同一整体阶段。原生无地自动候选以domicile为入口，无domicile中央部职参照原版`10_dlc_tgp_scripted_effects.txt`的`add_manual_participant`做手动补入。首次名单从北疆实际国家向下收集并去重，后续原生刷新仍重查身份。
+
+
+战争回调的root可能是短命Casus Belli。二级回调先转到`scope:attacker`／`scope:defender`的持久人物作用域承接，不把CB作为延迟事件载体。同一脚本里立即开战并结束可能在二级回调执行前销毁CB，此时人物作用域转移本身也会报错，普通root存在检查不能修复；测试夹具须真实跨日结束战争。此为已知原生时序限制，尚未证明所有瞬时脚本战争兼容。胜利原生回调互斥；白和平不注册计分子回调。土地变化延后一日合并，避免征服后分封把同一事实重复记分；快照同时记录代表头衔与最高领主人物，容忍普通继位和同一君主更换主头衔。
+
+### 交易成功接入
+
+原版`00_gift.txt`的`gift_interaction.on_accept`直接执行`pay_short_term_gold`，付款者是`scope:puppet_or_actor`，并非始终是操纵者`scope:actor`。本模块在实际付款后调用`tca_frontier_gift_succeeded_effect`，双方本人须为参与的独立君主；仅有缓和去向时计分。主头衔上的`tca_frontier_gift_partners`列表保存对方国家主头衔，原生期限三年、双向检查，普通继位沿用；局势结束按自身登记清理。当前不提供随任意主头衔更换或国家分裂迁移冷却的完整国家续接系统。
+
+原版`00_prison_interactions.txt`的`ransom_interaction`、`pay_ransom_interaction`和`ransom_me_interaction`均在接受后调用`00_prison_effects.txt`的`ransom_interaction_effect`。共用效果读取`prisoner`、`payer`、`imprisoner`，按选项支付金币、牵制、影响力或牧群，然后调用`release_from_prison`。北疆在效果开头重置并保存本次资格，实际释放后计分；资格要求付款者和关押者本人参与、仍由该关押者羁押，以及囚犯当前或本次羁押快照证明重要异国身份。通用释放可以清理快照，但不会抹掉本次交易已经核验的临时值；批量赎回每个囚犯重新初始化，避免串用。
+
+原版`release_from_prison_interaction.on_accept`先处理实际释放，再在“无要求”分支检查13个选项均为`no`：`demand_conversion`、`renounce_claims`、`banish`、`gain_hook`、`take_vows`、`become_executioner`、`recruit`、`disfigure`、`blind`、`castrate`、`demand_admin`、`change_prison`、`make_puppet`。北疆在仍被羁押时保存双方资格和主权身份，仅在此分支且受影响者实际获释时触发`tca_frontier_release_succeeded_effect`。不把越狱、普通脚本释放或其他附条件释放当作无条件释放。
+
+上述三个对象均无可追加的专用成功回调，互动及scripted effect也不能像on_action一样跨文件追加执行块。因此仅覆盖这三个必要对象，原版全部可执行内容保留，加入准备／成功钩子；不覆盖整份原版文件，不借宗教等无关辅助效果承接。基线、理由和冲突范围登记于`tools/upstream_overrides.json`；修改同名对象的其他模组须合并。原版`on_release_from_prison`仍仅负责清理，不能提供交易原因。
+
+### 当前催化判定入口
+
+- `tca_frontier_title_in_scope_trigger`在头衔作用域判断：伯爵领的`title_province`位于`tca_frontier_region`，或其`any_de_jure_county`中至少一个县位于该范围。`tca_frontier_war_in_scope_trigger`只检查战争`target_titles`列表，不因任一参战国有北疆土地就把其南方战争纳入。
+- 宣战由`on_war_started`承接：局势存在、战争存在、主攻守双方`top_liege`不同、目标合格且该战争尚无`tca_frontier_declaration_counted`，才计一次。胜利使用互斥的`on_war_won_attacker`／`on_war_won_defender`，以目标及战前国家快照防止完全吞并后误当内战；白和平没有计分回调。
+- `tca_frontier_person_action_valid_trigger = { ACTOR = ... }`在受影响人物作用域检查：本人先通过`tca_frontier_important_person_trigger`，发出者本人通过`tca_frontier_is_participant_trigger`，双方`top_liege`不同。重要性入口要求本人先是参与者，再满足独立君主、边疆组资格、或`this = top_liege.primary_heir`之一；普通境内官员及相关部职不自动重要。
+- 囚禁使用`on_imprison`的囚犯root与`scope:imprisoner`，通过上述条件后记录本次羁押的国家、关押国与重要身份。死亡使用`on_death`的受害者与`scope:killer`；责任人必须仍有参与资格，受害者符合当前条件或有效羁押记录中的异国重要身份。处决与杀害由次日实际死因互斥分类，不从人物关系猜幕后凶手。
+- 释放与赎回共用`tca_frontier_captive_action_valid_trigger = { ACTOR = ... }`：受影响者符合当前异国重要人物条件，或羁押快照仍标记重要、被俘前国家不同且记录的关押国等于当前关押者国家。实际羁押关系由各交易prepare入口另行核验；原始接入时序见上节。

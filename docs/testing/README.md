@@ -21,6 +21,21 @@ python3 tools/run_game_tests.py --parallel 4 --timeout 1800
 
 Windows使用 `python`，先按[Windows步骤](#windows)设置UTF-8。需要保留产物时显式指定[持久输出目录](../development/README.md#测试证据如何保存)；不会自动上传共享。
 
+### 必须完整独立开局的测试
+
+普通全量默认不包含独立WORLD登记，因此不会自动创建北疆探针局势。显式选择独立项时工具自动按WORLD分别建局，无须手动加`--isolate suite`。统一任务中每个子局必须分别通过；`EXCLUSIVE`仍只是局内互斥。登记方法见[独立测试局](framework.md#独立测试局)。
+
+```sh
+# 只查看普通全量；独立项不会列入
+python3 tools/run_game_tests.py --list
+# 北疆各WORLD自动分别开局
+python3 tools/run_game_tests.py --suite frontier --parallel 4 --timeout 600
+# 需要完整项目验收时显式纳入独立项，仍不会混入普通共享局
+python3 tools/run_game_tests.py --include-independent --parallel 4 --timeout 1800
+```
+
+`--list`显示每条用例所属世界；`--include-independent --list`可检查全部登记。使用模块／用例过滤时仍以显式选择为范围，纳入标志不会绕过过滤。`--prepare-only`可只封存分局任务，尚未启动不算引擎验收。
+
 ### 引擎错误中的纯注册帧
 
 检查器保留所有原始错误。只有指定源码及其同次冻结上游登记同时证明某个 `(父on_action, 模组路径, 行号)` 定义完整地仅含 `on_actions` 注册时，该父帧才单独标记为 `native-registration-frame`，不单凭它归因为模组执行错误。源码、登记、定义或行号不明确均维持阻断；报错源、实际模组子回调、effect、trigger、GUI及错误中的真实模组脚本标识仍阻断。人物展示名中带 Internal ID 的模组头衔不单独充当执行证据；支持引擎真实的有／无冒号及可选 Historical ID 后缀，新格式必须有指定源码与脚本栈。仅识别 `of <头衔> (Internal ID...)`，姓名、历史ID及其它正文中的真实模组标识仍保守阻断，不泛化为任何 `c_tca_` 文本均可放行。
@@ -29,7 +44,7 @@ Windows使用 `python`，先按[Windows步骤](#windows)设置UTF-8。需要保�
 
 ## 真实玩家会话末阶段
 
-默认全量和显式选择 `tca_court_session.1`／`tca_retirement_session.1` 都会执行对应的真实玩家会话。每项先认领独占lane，再从观察者状态保存本局专属检查点；CLI核对原生保存完成日志和本地存档后，只退出自己启动的进程，再用 `-loadsave` 与 `-play=h_china` 建立真实人类席位。续局不重新派发suite、不重置统计、不先进入观察者；读档入口由新进程GUI识别保存态启动，不依赖新开局大厅回调。重载界面以显式皇帝ID直接调用原生身份入口；原生 `is_ai = no` 确认皇帝为玩家后，只写人类阶段和对应授权。独立界面控件读取该授权，再以显式ID直接调用对应业务事件；业务入口再次检查原生身份与活动lane，并以持久标记拒绝重复BEGIN。界面不写人类授权或测试结果。控制台`effect`内的`trigger_event`及身份入口同步内投业务事件曾出现命令成功却未实际投递，不能以返回成功作为执行证据。
+默认普通全量和显式选择 `tca_court_session.1`／`tca_retirement_session.1` 都会执行对应的真实玩家会话。每项先认领独占lane，再从观察者状态保存本局专属检查点；CLI核对原生保存完成日志和本地存档后，只退出自己启动的进程，再用 `-loadsave` 与 `-play=h_china` 建立真实人类席位。续局不重新派发suite、不重置统计、不先进入观察者；读档入口由新进程GUI识别保存态启动，不依赖新开局大厅回调。重载界面以显式皇帝ID直接调用原生身份入口；原生 `is_ai = no` 确认皇帝为玩家后，只写人类阶段和对应授权。独立界面控件读取该授权，再以显式ID直接调用对应业务事件；业务入口再次检查原生身份与活动lane，并以持久标记拒绝重复BEGIN。界面不写人类授权或测试结果。控制台`effect`内的`trigger_event`及身份入口同步内投业务事件曾出现命令成功却未实际投递，不能以返回成功作为执行证据。
 
 宫廷会话随后真实接管自备地方官署，由原生事件确认玩家身份，检查普通内阁不入池、兼任差遣者的任期与正常升迁，并跨日复验实际职位资格，最后真实返回观察者。业务断言与边界见[宫廷差遣验收](../court_positions/verification.md#原生用例入口)。
 
@@ -54,7 +69,7 @@ python3 tools/run_game_tests.py --suite exam --suite confucian --parallel 4 --ti
 python3 tools/run_game_tests.py --suite exam --suite confucian_statistics --isolate suite --parallel 4 --timeout 600
 ```
 
-`--suite`与`--case`取并集并去重，按原生登记顺序执行。无选择才代表全组；未知模块、未知入口、仅续接事件直接报错。每轮`selection.json`列出实际入口、模块、日志名称、即时／延迟和断言数；验收按冻结计划检查遗漏、重复和额外执行。部分运行不能代表完整验收；隔离全组也不能冒充同局完整回归。
+`--suite`与`--case`取并集并去重，按原生登记顺序执行。无选择代表普通全组（不含独立WORLD）；未知模块、未知入口、仅续接事件直接报错。每轮`selection.json`列出实际入口、模块、日志名称、即时／延迟和断言数；验收按冻结计划检查遗漏、重复和额外执行。部分运行不能代表完整验收；隔离全组也不能冒充同局完整回归。
 
 当前目录：`events/tests/`保存原生事件，`common/scripted_effects/tests/framework/`保存框架效果，`modules/`保存登记，`fixtures/`保存场景准备。Python内部实现位于`tools/testing/`，回归位于`tools/tests/`；发现和封存都支持递归目录。
 

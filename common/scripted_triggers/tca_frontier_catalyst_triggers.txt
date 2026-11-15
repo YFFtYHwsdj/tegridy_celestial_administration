@@ -1,0 +1,35 @@
+﻿# 头衔作用域；只接受实土目标涉及固定北疆的对象，不以持有者身份扩大到区外。
+tca_frontier_title_in_scope_trigger = {
+    OR = {
+        AND = { tier = tier_county title_province = { geographical_region = tca_frontier_region } }
+        any_de_jure_county = { title_province = { geographical_region = tca_frontier_region } }
+    }
+}
+
+# 战争作用域；目标土地判定，无法识别实土目标的战争不猜测关联。
+tca_frontier_war_in_scope_trigger = {
+    any_in_list = { list = target_titles tca_frontier_title_in_scope_trigger = yes }
+}
+
+# 人物作用域；ACTOR为行为发出者，双方本人都须符合当前参与资格且属于不同国家。
+tca_frontier_person_action_valid_trigger = {
+    tca_frontier_important_person_trigger = yes
+    $ACTOR$ = { tca_frontier_is_participant_trigger = yes }
+    NOT = { top_liege = $ACTOR$.top_liege }
+}
+
+# 囚犯作用域；当前资格或本次羁押快照证明异国重要身份。
+# ACTOR为关押者；须仍由同一国家关押，避免旧记录被后续转监借用。
+tca_frontier_captive_action_valid_trigger = {
+    OR = {
+        tca_frontier_person_action_valid_trigger = { ACTOR = $ACTOR$ }
+        AND = {
+            has_variable = tca_frontier_captive_important
+            var:tca_frontier_captive_important = yes
+            exists = var:tca_frontier_captive_country
+            exists = var:tca_frontier_captive_keeper
+            var:tca_frontier_captive_country != $ACTOR$.top_liege.primary_title
+            var:tca_frontier_captive_keeper = $ACTOR$.top_liege.primary_title
+        }
+    }
+}

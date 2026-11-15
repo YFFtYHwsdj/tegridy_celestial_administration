@@ -43,11 +43,12 @@
 
 ## 测试与验证
 
+- 需要完整独立测试局的用例使用 `tca_test_visit_independent_case_effect` 登记，除普通元数据外显式填写 `WORLD`；不同 WORLD 由 CLI 强制新建不同可丢弃局，默认普通全量与游戏内全组入口不派发。显式 `--case`／`--suite` 或 `--include-independent` 才纳入；`EXCLUSIVE` 仅负责局内互斥，不能替代世界隔离。规则见[独立测试局](docs/testing/framework.md#独立测试局)。
 - 游戏行为直接维护 `events/tests/tca_*_test_events.txt`，调用正式trigger／effect；无生成器、中间测试源或Python业务规则副本。统一入口 `events/tests/tca_tests_events.txt`，模块登记位于 `common/scripted_effects/tests/modules/`。延迟用例按模块 lane 调度：登记行须带 `GROUP`（默认取事件命名空间）与 `EXCLUSIVE`；用例结束、前置失败或清理时调用 `tca_test_lane_end_effect = { GROUP = ... }`；用例私有状态与失败flag使用所属模块命名空间。详细契约见[原生框架](docs/testing/framework.md#并发-lane-与用例隔离)。
 - 新增行为／修复只补现有覆盖缺口，优先扩展已有用例，以最少用例覆盖有意义的正反与边界；不为实现细节、重复路径或低风险改动机械新增测试。尽量先构造暴露原问题的正确断言，确认修复前失败、修复后通过；未运行明确写“待引擎复现／复测”。纯文档、格式等低影响改动不机械新增业务测试。
 - 编写测试优先支持并行：每项自备最少必要状态，优先使用自建对象和模块私有状态，借用对象须精确归还，不依赖其他用例顺序或遗留状态；前置不满足是未执行。保留唯一日志名、连续断言及真实等待，不改写框架统计／运行标记、不删失败断言或无理由放宽预期换取通过。
 - 新增／修改用例在所属模块登记 `EVENT`、唯一 `CASE`、`DELAYED`、`GROUP`、`EXCLUSIVE`；仅新增模块时调整 `common/scripted_effects/tests/framework/tca_test_catalog_effects.txt` 顺序。不手填总数和全局阶段编号。K>1 只改变同局在途延迟用例数，不改变用例集合、等待天数和断言。
-- 引擎回归优先 `python3 tools/run_game_tests.py --parallel 4`，按任务显式选择最小必要的 `--case`／`--suite`；无选择参数会运行全组。工具默认独立1066中国观察者局，仅加载主模组及CLI适配。`--case`／`--suite`可重复，`--isolate suite`才分局；`--parallel N`（1至32）设置同局延迟 lane 并发上限；工具缺省仍为1，日常运行应显式传4，单例、独占或串行诊断除外。固定任务ID用于协作，不引用 `latest.json`。需要macOS／Windows图形会话与Steam，详见[运行说明](docs/testing/README.md)。
+- 引擎回归优先 `python3 tools/run_game_tests.py --parallel 4`，按任务显式选择最小必要的 `--case`／`--suite`；无选择参数会运行全组。工具默认独立1066中国观察者局，仅加载主模组及CLI适配。`--case`／`--suite`可重复，独立WORLD始终强制分局，`--isolate suite`进一步按模块分局；`--parallel N`（1至32）设置同局延迟 lane 并发上限；工具缺省仍为1，日常运行应显式传4，单例、独占或串行诊断除外。固定任务ID用于协作，不引用 `latest.json`。需要macOS／Windows图形会话与Steam，详见[运行说明](docs/testing/README.md)。
 - 核对同次 `terminal.json`、`result.txt`、`debug.log` 的 `TCA_TEST`、`error.log`及冻结计划。超时、中断、缺结果、未确认观察者、未执行或日志核对失败均不能算通过；全部断言通过也不等于没有相关引擎错误。
 - CLI不可用或需要人工验收时，在专用debug局使用测试决议／`event tca_tests.1`；观察者用 `effect tca_run_observer_tests_effect = yes`。说明未用CLI的原因及实际范围。不使用本机原因未明、会卡住的 `scripted_tests` 命令。
 - 按风险选择最小充分验证：先跑直接相关的静态／工具检查，必要时将失败用例和受影响路径合并为一次定向引擎运行；不固定要求逐项、整模块、全量层层重跑。共享接口、权限、生命周期变更仅扩展实际受影响组；已有同版本有效证据可复用，新增改动或未解决风险才追加运行。单项通过不覆盖全组失败，分局通过不等于同局通过；静态／工具检查不证明引擎、真实玩家路径、显示或保存重载。

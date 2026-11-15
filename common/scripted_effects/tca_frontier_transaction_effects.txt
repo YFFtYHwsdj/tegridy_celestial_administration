@@ -1,0 +1,77 @@
+﻿# 赠礼成功入口：人物作用域为原版实际付款者（puppet_or_actor），recipient为收礼者。
+# 仅当前有缓和去向时计分；在国家代表头衔保存对方头衔，双向检查、三年到期。
+# 局势记录所用头衔以便结束清理；普通继位不重置冷却，不建立双边阶段或点数。
+tca_frontier_gift_succeeded_effect = {
+    if = { limit = {
+        exists = situation:tca_northern_frontier
+        situation:tca_northern_frontier.situation_sub_region:tca_frontier_all = { NOT = { sub_region_current_phase = tca_frontier_amity } }
+        is_independent_ruler = yes
+        tca_frontier_is_participant_trigger = yes
+        scope:recipient = { is_independent_ruler = yes tca_frontier_is_participant_trigger = yes this != prev }
+        primary_title = { NOT = { is_target_in_variable_list = { name = tca_frontier_gift_partners target = scope:recipient.primary_title } } }
+    }
+        save_scope_as = tca_frontier_gift_actor
+        if = { limit = { scope:recipient.primary_title = { NOT = { is_target_in_variable_list = { name = tca_frontier_gift_partners target = scope:tca_frontier_gift_actor.primary_title } } } }
+            primary_title = { add_to_variable_list = { name = tca_frontier_gift_partners target = scope:recipient.primary_title years = 3 } }
+            situation:tca_northern_frontier = {
+                if = { limit = { NOT = { is_target_in_variable_list = { name = tca_frontier_gift_titles target = scope:tca_frontier_gift_actor.primary_title } } }
+                    add_to_variable_list = { name = tca_frontier_gift_titles target = scope:tca_frontier_gift_actor.primary_title }
+                }
+            }
+            tca_frontier_emit_catalyst_effect = { CATALYST = tca_frontier_gift_sovereign }
+        }
+    }
+}
+
+# 赎回共用原版上下文；读取prisoner／payer／imprisoner，无参数。
+# 每次覆盖本次临时值，防止批量处理沿用上一个囚犯的资格；不写人物持久状态。
+tca_frontier_prepare_ransom_effect = {
+    save_scope_value_as = { name = tca_frontier_ransom_eligible value = no }
+    if = { limit = {
+        exists = situation:tca_northern_frontier
+        exists = scope:prisoner
+        exists = scope:payer
+        exists = scope:imprisoner
+        scope:payer = { tca_frontier_is_participant_trigger = yes }
+        scope:imprisoner = { tca_frontier_is_participant_trigger = yes }
+        scope:prisoner = {
+            is_imprisoned_by = scope:imprisoner
+            tca_frontier_captive_action_valid_trigger = { ACTOR = scope:imprisoner }
+        }
+    }
+        save_scope_value_as = { name = tca_frontier_ransom_eligible value = yes }
+    }
+}
+
+# 仅由原版共用赎回效果在支付对价并release_from_prison后调用；不猜测交易选项。
+tca_frontier_ransom_succeeded_effect = {
+    if = { limit = { scope:tca_frontier_ransom_eligible = yes exists = situation:tca_northern_frontier scope:prisoner = { is_alive = yes is_imprisoned = no } }
+        tca_frontier_emit_catalyst_effect = { CATALYST = tca_frontier_ransom_important }
+    }
+}
+
+# 原版释放互动上下文；在任何释放／改宗／改隶前保存当前资格与主权身份。
+tca_frontier_prepare_release_effect = {
+    save_scope_value_as = { name = tca_frontier_release_eligible value = no }
+    if = { limit = {
+        exists = situation:tca_northern_frontier
+        scope:puppet_or_actor = { tca_frontier_is_participant_trigger = yes }
+        scope:recipient = {
+            is_imprisoned_by = scope:puppet_or_actor
+            tca_frontier_captive_action_valid_trigger = { ACTOR = scope:puppet_or_actor }
+            OR = {
+                is_independent_ruler = yes
+                AND = { has_variable = tca_frontier_captive_sovereign var:tca_frontier_captive_sovereign = yes }
+            }
+        }
+    }
+        save_scope_value_as = { name = tca_frontier_release_eligible value = yes }
+    }
+}
+
+# 只从原版13项条件均未勾选的无要求分支调用，实际获释后计分；不用于通用释放回调。
+tca_frontier_release_succeeded_effect = {
+    if = { limit = { scope:tca_frontier_release_eligible = yes exists = situation:tca_northern_frontier scope:recipient = { is_alive = yes is_imprisoned = no } }
+        tca_frontier_emit_catalyst_effect = { CATALYST = tca_frontier_release_sovereign }
+    }
+}

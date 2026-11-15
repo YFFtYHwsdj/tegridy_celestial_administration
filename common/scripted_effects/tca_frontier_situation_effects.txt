@@ -1,15 +1,41 @@
 ﻿# 作用域：任意；无参数；输出唯一Situation；重复调用保留原对象、阶段与进度。
-# P0仅供调试决议与原生探针调用，未接入正式开局或旧存档初始化。
+# 当前仍由显式入口创建，不静默迁移旧双区域存档。
 tca_frontier_situation_start_effect = {
     if = { limit = { NOT = { exists = situation:tca_northern_frontier } }
         start_situation = { type = tca_northern_frontier }
+        tca_frontier_initialize_ownership_effect = yes
     }
 }
 
 # 作用域：任意；无参数；结束本模块唯一Situation，无对象时不执行。
-# P0无外挂计时器、县级修正或参与者私有状态，清理由原生Situation承担。
+# 清理本局势的领土、人物身份及赠礼冷却；不清除建筑和设施。
 tca_frontier_situation_end_effect = {
-    situation:tca_northern_frontier ?= { end_situation = yes }
+    if = { limit = { exists = situation:tca_northern_frontier }
+        every_county_in_region = {
+            region = tca_frontier_region
+            remove_variable = tca_frontier_country_title
+            remove_variable = tca_frontier_country_ruler
+            duchy ?= { remove_variable = tca_frontier_country_title }
+            kingdom ?= { remove_variable = tca_frontier_country_title }
+            empire ?= { remove_variable = tca_frontier_country_title }
+        }
+        situation:tca_northern_frontier = {
+            every_in_list = { variable = tca_frontier_captives limit = { is_alive = yes } tca_frontier_clear_captive_effect = yes }
+            clear_variable_list = tca_frontier_captives
+            every_in_list = {
+                variable = tca_frontier_identity_people
+                limit = { is_alive = yes }
+                var:tca_frontier_identity_country ?= { remove_variable = tca_frontier_external_successor }
+                remove_variable = tca_frontier_identity_situation
+                remove_variable = tca_frontier_identity_country
+                remove_variable = tca_frontier_identity_independent
+            }
+            clear_variable_list = tca_frontier_identity_people
+            every_in_list = { variable = tca_frontier_gift_titles clear_variable_list = tca_frontier_gift_partners }
+            clear_variable_list = tca_frontier_gift_titles
+            end_situation = yes
+        }
+    }
 }
 
 # 作用域：任意；REGION为本局势子区键，CATALYST为已声明催化键；无saved scope输出。
@@ -18,5 +44,52 @@ tca_frontier_situation_end_effect = {
 tca_frontier_situation_catalyst_effect = {
     situation:tca_northern_frontier ?= {
         situation_sub_region:$REGION$ = { trigger_sub_region_catalyst = $CATALYST$ }
+    }
+}
+
+# 任意作用域；CATALYST为正式命名催化；只向整体区域投递一次。
+# 原生仅对当前阶段声明的去向加分，无对应去向的催化不存储、不抵消。
+tca_frontier_emit_catalyst_effect = {
+    tca_frontier_situation_catalyst_effect = { REGION = tca_frontier_all CATALYST = $CATALYST$ }
+}
+
+# Situation年度回调及定向测试共用；无参数，不检查战争；先维护名单与领土快照，再全局计分一次，不按参与人数重复。
+tca_frontier_natural_relaxation_effect = {
+    # 一日结算的承载者死亡时，两日锁自动失效；年度补校避免失去最后一批变化。
+    tca_frontier_settle_ownership_effect = yes
+    tca_frontier_refresh_participants_effect = yes
+    tca_frontier_emit_catalyst_effect = { CATALYST = tca_frontier_natural_relaxation }
+}
+
+# 任意作用域；从北疆实际国家收集首次参与名单，不扫描全世界人物。
+# 首次名单及无domicile中央部职显式补齐；后续原生刷新继续重查三个组。
+# 临时国家列表去重，同一国家不因拥有多个北疆县而重复遍历。
+tca_frontier_refresh_participants_effect = {
+    if = { limit = { exists = situation:tca_northern_frontier }
+        every_county_in_region = {
+            region = tca_frontier_region
+            holder.top_liege ?= {
+                if = { limit = { NOT = { is_in_list = tca_frontier_office_realms } } add_to_list = tca_frontier_office_realms }
+            }
+        }
+        every_in_list = {
+            list = tca_frontier_office_realms
+            if = {
+                limit = { tca_frontier_is_participant_trigger = yes }
+                tca_frontier_record_identity_effect = yes
+                if = { limit = { NOT = { any_character_situation = { situation_type = tca_northern_frontier } } }
+                    situation:tca_northern_frontier = { add_manual_participant = prev }
+                }
+            }
+            every_vassal_or_below = {
+                limit = {
+                    tca_frontier_is_participant_trigger = yes
+                }
+                tca_frontier_record_identity_effect = yes
+                if = { limit = { NOT = { any_character_situation = { situation_type = tca_northern_frontier } } }
+                    situation:tca_northern_frontier = { add_manual_participant = prev }
+                }
+            }
+        }
     }
 }

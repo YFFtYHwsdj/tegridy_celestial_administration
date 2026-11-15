@@ -1,0 +1,509 @@
+﻿# 新规则专用独立局；参与者变更、真实战争与自然年度回调分别登记WORLD。
+namespace = tca_frontier_rules_test
+
+# 参与者：实际原生名单，包含首府南迁及无domicile中央官署。
+tca_frontier_rules_test.1 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_frontier_rules_test.1 tca_test_frontier_participants"
+        remove_character_flag = tca_test_tca_frontier_rules_test_case_failed
+        title:h_china.holder = { save_scope_as = tca_frontier_rules_test_actor }
+        title:e_minister_of_personnel.holder ?= { save_scope_as = tca_frontier_rules_test_minister }
+        if = { limit = { NOT = { exists = situation:tca_northern_frontier } exists = scope:tca_frontier_rules_test_minister }
+            tca_frontier_situation_start_effect = yes
+            trigger_event = { id = tca_frontier_rules_test.2 days = 3 }
+        }
+        else = {
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_frontier_participants"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+            tca_test_lane_end_effect = { GROUP = tca_frontier_rules_test }
+        }
+    }
+}
+
+tca_frontier_rules_test.2 = {
+    type = character_event hidden = yes
+    immediate = {
+        scope:tca_frontier_rules_test_actor = {
+            if = { limit = { tca_frontier_border_participant_trigger = yes } debug_log = "TCA_FRONTIER_RULES ACTOR_BORDER" }
+            if = { limit = { tca_frontier_interior_participant_trigger = yes } debug_log = "TCA_FRONTIER_RULES ACTOR_INTERIOR" }
+        }
+        title:k_xia.holder = {
+            if = { limit = { tca_frontier_border_participant_trigger = yes } debug_log = "TCA_FRONTIER_RULES XIA_BORDER" }
+            if = { limit = { tca_frontier_interior_participant_trigger = yes } debug_log = "TCA_FRONTIER_RULES XIA_INTERIOR" }
+        }
+        if = { limit = { situation:tca_northern_frontier.situation_sub_region:tca_frontier_all = {
+            any_situation_sub_region_participant_group = { participant_group_type = tca_frontier_interior any_situation_group_participant = { this = scope:tca_frontier_rules_test_actor } }
+        } } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_participants 1" }
+        else = { add_character_flag = tca_test_tca_frontier_rules_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_participants 1" }
+        if = { limit = { situation:tca_northern_frontier.situation_sub_region:tca_frontier_all = {
+            any_situation_sub_region_participant_group = { participant_group_type = tca_frontier_border any_situation_group_participant = { this = title:k_xia.holder } }
+        } } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_participants 2" }
+        else = { add_character_flag = tca_test_tca_frontier_rules_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_participants 2" }
+        if = { limit = { situation:tca_northern_frontier.situation_sub_region:tca_frontier_all = {
+            any_situation_sub_region_participant_group = { participant_group_type = tca_frontier_related any_situation_group_participant = { this = scope:tca_frontier_rules_test_minister } }
+        } } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_participants 3" }
+        else = { add_character_flag = tca_test_tca_frontier_rules_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_participants 3" }
+        # 将皇帝迁到江南，仍保留全国北疆土地；不能因南方国境误归边疆组。
+        scope:tca_frontier_rules_test_actor = { create_title_and_vassal_change = { type = conquest save_scope_as = tca_frontier_rules_test_capital_change } }
+        title:c_hangzhou = { change_title_holder = { holder = scope:tca_frontier_rules_test_actor change = scope:tca_frontier_rules_test_capital_change } }
+        resolve_title_and_vassal_change = scope:tca_frontier_rules_test_capital_change
+        scope:tca_frontier_rules_test_actor = { set_realm_capital = title:c_hangzhou }
+        trigger_event = { id = tca_frontier_rules_test.3 days = 35 }
+    }
+}
+
+tca_frontier_rules_test.3 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { scope:tca_frontier_rules_test_actor = {
+            capital_county = title:c_hangzhou
+            NOT = { tca_frontier_border_participant_trigger = yes }
+            NOT = { tca_frontier_interior_participant_trigger = yes }
+            tca_frontier_related_participant_trigger = yes
+        } } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_participants 4" }
+        else = { add_character_flag = tca_test_tca_frontier_rules_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_participants 4" }
+        if = { limit = { situation:tca_northern_frontier.situation_sub_region:tca_frontier_all = {
+            any_situation_sub_region_participant_group = { participant_group_type = tca_frontier_related any_situation_group_participant = { this = scope:tca_frontier_rules_test_actor } }
+            NOT = { any_situation_sub_region_participant_group = { participant_group_type = tca_frontier_interior any_situation_group_participant = { this = scope:tca_frontier_rules_test_actor } } }
+        } } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_participants 5" }
+        else = { add_character_flag = tca_test_tca_frontier_rules_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_participants 5" }
+        tca_frontier_situation_end_effect = yes
+        if = { limit = { has_character_flag = tca_test_tca_frontier_rules_test_case_failed }
+            debug_log = "TCA_TEST FAIL tca_test_frontier_participants"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+        }
+        else = { debug_log = "TCA_TEST PASS tca_test_frontier_participants" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        tca_test_lane_end_effect = { GROUP = tca_frontier_rules_test }
+    }
+}
+
+# 不直接调用年度效果，真实等待400日跨过原生Situation年度回调。
+tca_frontier_rules_test.10 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_frontier_rules_test.10 tca_test_frontier_natural_year"
+        remove_character_flag = tca_test_tca_frontier_rules_test_case_failed
+        if = { limit = { NOT = { exists = situation:tca_northern_frontier } }
+            tca_frontier_situation_start_effect = yes
+            set_variable = { name = tca_frontier_rules_test_iterations value = 0 }
+            while = {
+                limit = { var:tca_frontier_rules_test_iterations < 40 }
+                tca_frontier_situation_catalyst_effect = { REGION = tca_frontier_all CATALYST = tca_frontier_to_warfare }
+                change_variable = { name = tca_frontier_rules_test_iterations add = 1 }
+            }
+            trigger_event = { id = tca_frontier_rules_test.11 days = 2 }
+        }
+        else = {
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_frontier_natural_year"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+            tca_test_lane_end_effect = { GROUP = tca_frontier_rules_test }
+        }
+    }
+}
+
+tca_frontier_rules_test.11 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { situation:tca_northern_frontier.situation_sub_region:tca_frontier_all = { sub_region_current_phase = tca_frontier_warfare phase_takeover_points:tca_frontier_tension = 0 } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_natural_year 1"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_rules_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_natural_year 1" }
+        debug_log = "TCA_TEST WAIT tca_test_frontier_natural_year 400 days"
+        trigger_event = { id = tca_frontier_rules_test.12 days = 400 }
+    }
+}
+
+tca_frontier_rules_test.12 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { situation:tca_northern_frontier.situation_sub_region:tca_frontier_all = { sub_region_current_phase = tca_frontier_warfare phase_takeover_points:tca_frontier_tension = 100 } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_natural_year 2"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_rules_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_natural_year 2" }
+        tca_frontier_situation_end_effect = yes
+        remove_variable = tca_frontier_rules_test_iterations
+        if = { limit = { has_character_flag = tca_test_tca_frontier_rules_test_case_failed }
+            debug_log = "TCA_TEST FAIL tca_test_frontier_natural_year"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+        }
+        else = { debug_log = "TCA_TEST PASS tca_test_frontier_natural_year" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        tca_test_lane_end_effect = { GROUP = tca_frontier_rules_test }
+    }
+}
+
+# 真实宣战、白和平、进攻胜利与土地变化使用同一最小战争，次日核对合并结算。
+tca_frontier_rules_test.20 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_frontier_rules_test.20 tca_test_frontier_war_catalysts"
+        remove_character_flag = tca_test_tca_frontier_rules_test_case_failed
+        title:h_china.holder = { save_scope_as = tca_frontier_rules_test_actor }
+        title:k_xia.holder = { save_scope_as = tca_frontier_rules_test_enemy }
+        if = { limit = {
+            NOT = { exists = situation:tca_northern_frontier }
+            scope:tca_frontier_rules_test_actor = { is_at_war = no }
+            scope:tca_frontier_rules_test_enemy.capital_county = { holder = scope:tca_frontier_rules_test_enemy }
+        }
+            tca_frontier_situation_start_effect = yes
+            scope:tca_frontier_rules_test_actor = {
+                set_variable = { name = tca_frontier_probe_target value = scope:tca_frontier_rules_test_enemy }
+                start_war = { cb = tca_frontier_probe_county_cb target = scope:tca_frontier_rules_test_enemy target_title = scope:tca_frontier_rules_test_enemy.capital_county }
+            }
+            trigger_event = { id = tca_frontier_rules_test.21 days = 2 }
+        }
+        else = {
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_frontier_war_catalysts"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+            tca_test_lane_end_effect = { GROUP = tca_frontier_rules_test }
+        }
+    }
+}
+
+tca_frontier_rules_test.21 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { situation:tca_northern_frontier.situation_sub_region:tca_frontier_all = { phase_takeover_points:tca_frontier_warfare = 20 } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_war_catalysts 1"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_rules_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_war_catalysts 1" }
+        scope:tca_frontier_rules_test_actor = {
+            every_character_war = { limit = { using_cb = tca_frontier_probe_county_cb primary_attacker = scope:tca_frontier_rules_test_actor } end_war = white_peace }
+        }
+        trigger_event = { id = tca_frontier_rules_test.22 days = 2 }
+    }
+}
+
+tca_frontier_rules_test.22 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { situation:tca_northern_frontier.situation_sub_region:tca_frontier_all = { phase_takeover_points:tca_frontier_warfare = 20 } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_war_catalysts 2"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_rules_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_war_catalysts 2" }
+        scope:tca_frontier_rules_test_actor = {
+            start_war = { cb = tca_frontier_probe_county_cb target = scope:tca_frontier_rules_test_enemy target_title = scope:tca_frontier_rules_test_enemy.capital_county }
+        }
+        trigger_event = { id = tca_frontier_rules_test.23 days = 2 }
+    }
+}
+
+tca_frontier_rules_test.23 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { situation:tca_northern_frontier.situation_sub_region:tca_frontier_all = { phase_takeover_points:tca_frontier_warfare = 40 } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_war_catalysts 3"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_rules_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_war_catalysts 3" }
+        scope:tca_frontier_rules_test_actor = {
+            every_character_war = { limit = { using_cb = tca_frontier_probe_county_cb primary_attacker = scope:tca_frontier_rules_test_actor } end_war = attacker }
+        }
+        trigger_event = { id = tca_frontier_rules_test.24 days = 3 }
+    }
+}
+
+tca_frontier_rules_test.24 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { situation:tca_northern_frontier.situation_sub_region:tca_frontier_all = { phase_takeover_points:tca_frontier_warfare = 190 } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_war_catalysts 4"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_rules_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_war_catalysts 4" }
+        scope:tca_frontier_rules_test_actor = { imprison = { target = scope:tca_frontier_rules_test_enemy type = dungeon } }
+        trigger_event = { id = tca_frontier_rules_test.25 days = 2 }
+    }
+}
+
+tca_frontier_rules_test.25 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { situation:tca_northern_frontier.situation_sub_region:tca_frontier_all = { phase_takeover_points:tca_frontier_warfare = 240 } scope:tca_frontier_rules_test_enemy = { has_variable = tca_frontier_captive_important } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_war_catalysts 5"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_rules_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_war_catalysts 5" }
+        # 通用释放本身不能猜成无条件释放或赎回；只清理快照。
+        scope:tca_frontier_rules_test_enemy = { release_from_prison = yes }
+        if = { limit = { situation:tca_northern_frontier.situation_sub_region:tca_frontier_all = { phase_takeover_points:tca_frontier_warfare = 240 phase_takeover_points:tca_frontier_amity = 0 } scope:tca_frontier_rules_test_enemy = { NOT = { has_variable = tca_frontier_captive_important } } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_war_catalysts 6"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_rules_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_war_catalysts 6" }
+        scope:tca_frontier_rules_test_actor = { imprison = { target = scope:tca_frontier_rules_test_enemy type = dungeon } }
+        scope:tca_frontier_rules_test_enemy = { death = { death_reason = death_execution killer = scope:tca_frontier_rules_test_actor } }
+        trigger_event = { id = tca_frontier_rules_test.26 days = 2 }
+    }
+}
+
+tca_frontier_rules_test.26 = {
+    type = character_event hidden = yes
+    immediate = {
+        # 190＋50＋50＋150，处决不能再按杀害多计150。
+        if = { limit = { situation:tca_northern_frontier.situation_sub_region:tca_frontier_all = { phase_takeover_points:tca_frontier_warfare = 440 } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_war_catalysts 7"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_rules_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_war_catalysts 7" }
+        title:k_xia.holder = { save_scope_as = tca_frontier_rules_test_successor }
+        scope:tca_frontier_rules_test_successor = { death = { death_reason = death_murder killer = scope:tca_frontier_rules_test_actor } }
+        trigger_event = { id = tca_frontier_rules_test.27 days = 2 }
+    }
+}
+
+tca_frontier_rules_test.27 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { situation:tca_northern_frontier.situation_sub_region:tca_frontier_all = { phase_takeover_points:tca_frontier_warfare = 590 } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_war_catalysts 8"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_rules_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_war_catalysts 8" }
+        scope:tca_frontier_rules_test_actor = { remove_variable = tca_frontier_probe_target }
+        tca_frontier_situation_end_effect = yes
+        if = { limit = { has_character_flag = tca_test_tca_frontier_rules_test_case_failed }
+            debug_log = "TCA_TEST FAIL tca_test_frontier_war_catalysts"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+        }
+        else = { debug_log = "TCA_TEST PASS tca_test_frontier_war_catalysts" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        tca_test_lane_end_effect = { GROUP = tca_frontier_rules_test }
+    }
+}
+
+# 外国伯爵夺取独立公国并升为公爵；旧代表头衔等于新主头衔也必须计入县份转国。
+tca_frontier_rules_test.30 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_frontier_rules_test.30 tca_test_frontier_realm_takeover"
+        remove_character_flag = tca_test_tca_frontier_rules_test_case_failed
+        random_vassal_or_below = {
+            limit = { highest_held_title_tier = tier_county is_at_war = no capital_county = { holder = prev title_province = { geographical_region = tca_frontier_region } } }
+            save_scope_as = tca_frontier_rules_test_count
+        }
+        title:c_lingzhou.duchy = { save_scope_as = tca_frontier_rules_test_duchy }
+        if = { limit = {
+            NOT = { exists = situation:tca_northern_frontier }
+            exists = scope:tca_frontier_rules_test_count
+        }
+            create_character = { age = 35 gender = male location = root.capital_province culture = root.culture faith = root.faith save_scope_as = tca_frontier_rules_test_duke }
+            scope:tca_frontier_rules_test_duke = { create_title_and_vassal_change = { type = conquest save_scope_as = tca_frontier_rules_test_duke_grant } }
+            scope:tca_frontier_rules_test_duchy = { change_title_holder = { holder = scope:tca_frontier_rules_test_duke change = scope:tca_frontier_rules_test_duke_grant } }
+            title:c_lingzhou = { change_title_holder = { holder = scope:tca_frontier_rules_test_duke change = scope:tca_frontier_rules_test_duke_grant } }
+            resolve_title_and_vassal_change = scope:tca_frontier_rules_test_duke_grant
+            scope:tca_frontier_rules_test_count = {
+                create_title_and_vassal_change = { type = independency save_scope_as = tca_frontier_rules_test_count_independence }
+                becomes_independent = { change = scope:tca_frontier_rules_test_count_independence }
+                resolve_title_and_vassal_change = scope:tca_frontier_rules_test_count_independence
+                change_government = feudal_government
+            }
+            scope:tca_frontier_rules_test_duke = {
+                if = { limit = { is_independent_ruler = no }
+                    create_title_and_vassal_change = { type = independency save_scope_as = tca_frontier_rules_test_duke_independence }
+                    becomes_independent = { change = scope:tca_frontier_rules_test_duke_independence }
+                    resolve_title_and_vassal_change = scope:tca_frontier_rules_test_duke_independence
+                }
+                change_government = feudal_government
+            }
+            tca_frontier_situation_start_effect = yes
+            scope:tca_frontier_rules_test_count = {
+                add_pressed_claim = scope:tca_frontier_rules_test_duchy
+                start_war = { cb = claim_cb target = scope:tca_frontier_rules_test_duke claimant = scope:tca_frontier_rules_test_count target_title = scope:tca_frontier_rules_test_duchy }
+            }
+            trigger_event = { id = tca_frontier_rules_test.31 days = 2 }
+        }
+        else = {
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_frontier_realm_takeover"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+            tca_test_lane_end_effect = { GROUP = tca_frontier_rules_test }
+        }
+    }
+}
+
+tca_frontier_rules_test.31 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = {
+            scope:tca_frontier_rules_test_count = { is_independent_ruler = yes highest_held_title_tier = tier_county is_at_war_with = scope:tca_frontier_rules_test_duke }
+            scope:tca_frontier_rules_test_duke = { is_independent_ruler = yes primary_title = scope:tca_frontier_rules_test_duchy }
+            situation:tca_northern_frontier.situation_sub_region:tca_frontier_all = { phase_takeover_points:tca_frontier_warfare = 20 }
+        } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_realm_takeover 1" }
+        else = { add_character_flag = tca_test_tca_frontier_rules_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_realm_takeover 1" }
+        scope:tca_frontier_rules_test_count = {
+            every_character_war = { limit = { using_cb = claim_cb primary_attacker = scope:tca_frontier_rules_test_count primary_defender = scope:tca_frontier_rules_test_duke } end_war = attacker }
+        }
+        trigger_event = { id = tca_frontier_rules_test.32 days = 3 }
+    }
+}
+
+tca_frontier_rules_test.32 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { scope:tca_frontier_rules_test_count = { primary_title = scope:tca_frontier_rules_test_duchy } title:c_lingzhou.holder.top_liege = scope:tca_frontier_rules_test_count }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_realm_takeover 2"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_rules_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_realm_takeover 2" }
+        if = { limit = { situation:tca_northern_frontier.situation_sub_region:tca_frontier_all = { phase_takeover_points:tca_frontier_warfare = 170 } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_realm_takeover 3"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_rules_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_realm_takeover 3" }
+        tca_frontier_situation_end_effect = yes
+        if = { limit = { has_character_flag = tca_test_tca_frontier_rules_test_case_failed }
+            debug_log = "TCA_TEST FAIL tca_test_frontier_realm_takeover"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+        }
+        else = { debug_log = "TCA_TEST PASS tca_test_frontier_realm_takeover" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        tca_test_lane_end_effect = { GROUP = tca_frontier_rules_test }
+    }
+}
+
+# 真实原版赠礼：付款、25点与反向回赠冷却；独立局不改变普通全量。
+tca_frontier_rules_test.40 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_frontier_rules_test.40 tca_test_frontier_gift"
+        remove_character_flag = tca_test_tca_frontier_rules_test_case_failed
+        title:h_china.holder = { save_scope_as = tca_frontier_rules_test_giver tca_test_protect_character_effect = yes add_gold = 10000 }
+        title:k_xia.holder = { save_scope_as = tca_frontier_rules_test_receiver tca_test_protect_character_effect = yes add_gold = 10000 }
+        if = { limit = { NOT = { exists = situation:tca_northern_frontier } }
+            tca_frontier_situation_start_effect = yes
+            scope:tca_frontier_rules_test_giver = { set_variable = { name = tca_frontier_rules_test_gold value = gold } }
+            run_interaction = { interaction = gift_interaction actor = scope:tca_frontier_rules_test_giver recipient = scope:tca_frontier_rules_test_receiver redirect = no send_threshold = decline }
+            trigger_event = { id = tca_frontier_rules_test.41 days = 5 }
+        }
+        else = {
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_frontier_gift"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+            tca_test_lane_end_effect = { GROUP = tca_frontier_rules_test }
+        }
+    }
+}
+
+tca_frontier_rules_test.41 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { scope:tca_frontier_rules_test_receiver = { has_opinion_modifier = { target = scope:tca_frontier_rules_test_giver modifier = gift_opinion } } scope:tca_frontier_rules_test_giver = { gold < var:tca_frontier_rules_test_gold } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_gift 1"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_rules_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_gift 1" }
+        if = { limit = { situation:tca_northern_frontier.situation_sub_region:tca_frontier_all = { phase_takeover_points:tca_frontier_amity = 25 } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_gift 2"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_rules_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_gift 2" }
+        run_interaction = { interaction = gift_interaction actor = scope:tca_frontier_rules_test_receiver recipient = scope:tca_frontier_rules_test_giver redirect = no send_threshold = decline }
+        trigger_event = { id = tca_frontier_rules_test.42 days = 5 }
+    }
+}
+
+tca_frontier_rules_test.42 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { scope:tca_frontier_rules_test_giver = { has_opinion_modifier = { target = scope:tca_frontier_rules_test_receiver modifier = gift_opinion } } situation:tca_northern_frontier.situation_sub_region:tca_frontier_all = { phase_takeover_points:tca_frontier_amity = 25 } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_gift 3"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_rules_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_gift 3" }
+        tca_frontier_situation_end_effect = yes
+        scope:tca_frontier_rules_test_giver = { remove_variable = tca_frontier_rules_test_gold }
+        if = { limit = { has_character_flag = tca_test_tca_frontier_rules_test_case_failed }
+            debug_log = "TCA_TEST FAIL tca_test_frontier_gift"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+        }
+        else = { debug_log = "TCA_TEST PASS tca_test_frontier_gift" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        tca_test_lane_end_effect = { GROUP = tca_frontier_rules_test }
+    }
+}
+
+# 原版自赎与无条件释放；run_interaction直接执行原版OnAccept成功事务，不验证AI接受意愿。
+# 不直接调用新增交易effect，仍须实际付款与获释，不能以进度单项通过替代。
+tca_frontier_rules_test.50 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_frontier_rules_test.50 tca_test_frontier_prison_transactions"
+        remove_character_flag = tca_test_tca_frontier_rules_test_case_failed
+        title:h_china.holder = { save_scope_as = tca_frontier_rules_test_keeper tca_test_protect_character_effect = yes add_gold = 10000 }
+        title:k_xia.holder = { save_scope_as = tca_frontier_rules_test_prisoner tca_test_protect_character_effect = yes add_gold = 10000 }
+        if = { limit = { NOT = { exists = situation:tca_northern_frontier } }
+            tca_frontier_situation_start_effect = yes
+            scope:tca_frontier_rules_test_keeper = { imprison = { target = scope:tca_frontier_rules_test_prisoner type = house_arrest } }
+            trigger_event = { id = tca_frontier_rules_test.51 days = 2 }
+        }
+        else = {
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_frontier_prison_transactions"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+            tca_test_lane_end_effect = { GROUP = tca_frontier_rules_test }
+        }
+    }
+}
+
+tca_frontier_rules_test.51 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { scope:tca_frontier_rules_test_prisoner = { is_imprisoned_by = scope:tca_frontier_rules_test_keeper has_variable = tca_frontier_captive_country } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_prison_transactions 1"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_rules_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_prison_transactions 1" }
+        scope:tca_frontier_rules_test_prisoner = { set_variable = { name = tca_frontier_rules_test_gold value = gold } }
+        run_interaction = { interaction = ransom_me_interaction actor = scope:tca_frontier_rules_test_prisoner recipient = scope:tca_frontier_rules_test_keeper redirect = no execute_threshold = decline }
+        trigger_event = { id = tca_frontier_rules_test.52 days = 20 }
+    }
+}
+
+tca_frontier_rules_test.52 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { scope:tca_frontier_rules_test_prisoner = { is_imprisoned = no gold < var:tca_frontier_rules_test_gold NOT = { has_variable = tca_frontier_captive_country } } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_prison_transactions 2"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_rules_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_prison_transactions 2" }
+        if = { limit = { situation:tca_northern_frontier.situation_sub_region:tca_frontier_all = { phase_takeover_points:tca_frontier_amity = 50 } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_prison_transactions 3"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_rules_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_prison_transactions 3" }
+        # 再次关押后用原版释放互动，只有无要求分支应增加150点。
+        if = { limit = { scope:tca_frontier_rules_test_prisoner = { is_imprisoned = no } }
+            scope:tca_frontier_rules_test_keeper = { imprison = { target = scope:tca_frontier_rules_test_prisoner type = house_arrest } }
+        }
+        trigger_event = { id = tca_frontier_rules_test.53 days = 2 }
+    }
+}
+
+tca_frontier_rules_test.53 = {
+    type = character_event hidden = yes
+    immediate = {
+        run_interaction = { interaction = release_from_prison_interaction actor = scope:tca_frontier_rules_test_keeper recipient = scope:tca_frontier_rules_test_prisoner redirect = no execute_threshold = decline }
+        trigger_event = { id = tca_frontier_rules_test.54 days = 20 }
+    }
+}
+
+tca_frontier_rules_test.54 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { scope:tca_frontier_rules_test_prisoner = { is_imprisoned = no } situation:tca_northern_frontier.situation_sub_region:tca_frontier_all = { phase_takeover_points:tca_frontier_amity = 200 } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_prison_transactions 4"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_rules_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_prison_transactions 4" }
+        # 脚本普通释放不能冒充无条件释放互动，再次羁押后核对零增分。
+        scope:tca_frontier_rules_test_keeper = { imprison = { target = scope:tca_frontier_rules_test_prisoner type = house_arrest } }
+        trigger_event = { id = tca_frontier_rules_test.55 days = 2 }
+    }
+}
+
+tca_frontier_rules_test.55 = {
+    type = character_event hidden = yes
+    immediate = {
+        scope:tca_frontier_rules_test_prisoner = { release_from_prison = yes }
+        trigger_event = { id = tca_frontier_rules_test.56 days = 2 }
+    }
+}
+
+tca_frontier_rules_test.56 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { scope:tca_frontier_rules_test_prisoner = { is_imprisoned = no NOT = { has_variable = tca_frontier_captive_country } } situation:tca_northern_frontier.situation_sub_region:tca_frontier_all = { phase_takeover_points:tca_frontier_amity = 200 } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_prison_transactions 5"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_rules_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_prison_transactions 5" }
+        tca_frontier_situation_end_effect = yes
+        scope:tca_frontier_rules_test_prisoner = { remove_variable = tca_frontier_rules_test_gold }
+        if = { limit = { has_character_flag = tca_test_tca_frontier_rules_test_case_failed }
+            debug_log = "TCA_TEST FAIL tca_test_frontier_prison_transactions"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+        }
+        else = { debug_log = "TCA_TEST PASS tca_test_frontier_prison_transactions" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        tca_test_lane_end_effect = { GROUP = tca_frontier_rules_test }
+    }
+}

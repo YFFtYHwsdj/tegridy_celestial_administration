@@ -1,4 +1,32 @@
-﻿# 报告者作用域；模块以 EVENT、CASE、DELAYED、GROUP、EXCLUSIVE 登记用例。
+﻿# 独立测试局登记入口；参数与普通登记一致，另需WORLD标识。
+# 仅CLI确认单局选择未跨WORLD后授权；普通游戏内全组入口不运行此类测试。
+# 同WORLD可登记多个兼容用例，局内调度仍由GROUP和EXCLUSIVE负责。
+tca_test_visit_independent_case_effect = {
+    # 显式默认值既防止普通全组授权，也满足引擎的变量引用检查。
+    if = {
+        limit = { var:tca_test_dispatch_phase = 0 NOT = { has_variable = tca_test_world_$WORLD$ } }
+        set_variable = { name = tca_test_world_$WORLD$ value = no }
+    }
+    if = {
+        limit = {
+            OR = {
+                var:tca_test_dispatch_phase = 3
+                AND = { has_variable = tca_test_world_$WORLD$ var:tca_test_world_$WORLD$ = yes }
+            }
+        }
+        tca_test_visit_case_effect = {
+            EVENT = $EVENT$ CASE = $CASE$ DELAYED = $DELAYED$
+            GROUP = $GROUP$ EXCLUSIVE = $EXCLUSIVE$
+        }
+    }
+    # 同WORLD多项登记也须逐项清理；阶段3不受授权已移除影响。
+    if = {
+        limit = { var:tca_test_dispatch_phase = 3 }
+        remove_variable = tca_test_world_$WORLD$
+    }
+}
+
+# 报告者作用域；模块以 EVENT、CASE、DELAYED、GROUP、EXCLUSIVE 登记用例。
 # 阶段 0 计数并重置派发记录，1 执行即时，2 按并发上限连续认领延迟，3 清理。
 # CASE 对应唯一日志标识；GROUP 为一个 lane（同一测试文件命名空间），同组同时至多一项延迟用例在途。
 # EXCLUSIVE 独占用例要求认领时没有其它活跃延迟用例，在途期间也不再认领任何用例。

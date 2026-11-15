@@ -1,0 +1,126 @@
+﻿# 北疆参与身份入口；均为人物作用域，不授予军事行动权限。
+# 治所解析由调用者先保存scope:tca_frontier_candidate；只写临时scope:tca_frontier_anchor（伯爵领）。
+# 失败时调用者不得读取上次候选遗留的anchor；对失去主头衔的瞬间使用安全redirect。
+tca_frontier_has_anchor_trigger = {
+    is_alive = yes
+    is_ruler = yes
+    trigger_if = {
+        limit = { tca_is_tongpan_official_trigger = yes }
+        primary_title = {
+            tca_is_valid_tongpan_holder_trigger = yes
+            exists = var:tca_tongpan_county
+            var:tca_tongpan_county = {
+                tca_is_tongpan_county_trigger = yes
+                tca_has_tongpan_office_trigger = yes
+                var:tca_tongpan_office = prev
+                holder = { top_liege = scope:tca_frontier_candidate.top_liege }
+                save_temporary_scope_as = tca_frontier_anchor
+            }
+        }
+    }
+    trigger_else_if = {
+        limit = { tca_is_judicial_official_trigger = yes }
+        tca_is_judicial_commissioner_trigger = yes
+        exists = primary_title.var:song_judicial_circuit.title_capital_county
+        primary_title.var:song_judicial_circuit.title_capital_county = {
+            exists = holder
+            holder = { top_liege = scope:tca_frontier_candidate.top_liege }
+            save_temporary_scope_as = tca_frontier_anchor
+        }
+    }
+    trigger_else = {
+        # 无直辖的普通国家首脑仍有政治首府；排除的是无地类型与家门，不是is_landed。
+        exists = primary_title
+        primary_title ?= { is_landless_type_title = no is_noble_family_title = no }
+        exists = capital_county
+        capital_county = { save_temporary_scope_as = tca_frontier_anchor }
+    }
+}
+
+# 本人首府或有效官署治所所在法理公国须涉及北疆；只检查本国土地对外国的邻接。
+tca_frontier_border_participant_trigger = {
+    save_temporary_scope_as = tca_frontier_candidate
+    trigger_if = {
+        limit = { tca_frontier_has_anchor_trigger = yes }
+        scope:tca_frontier_anchor.duchy = {
+            any_de_jure_county = { title_province = { geographical_region = tca_frontier_region } }
+            any_de_jure_county = {
+                exists = holder
+                holder = { top_liege = scope:tca_frontier_candidate.top_liege }
+                any_neighboring_county = {
+                    exists = holder
+                    holder = { NOT = { top_liege = scope:tca_frontier_candidate.top_liege } }
+                }
+            }
+        }
+    }
+    trigger_else = { always = no }
+}
+
+# 境内资格独立提供，原生组按边疆、境内、相关顺序取首个匹配，避免重复领取。
+tca_frontier_interior_participant_trigger = {
+    save_temporary_scope_as = tca_frontier_candidate
+    trigger_if = {
+        limit = { tca_frontier_has_anchor_trigger = yes }
+        scope:tca_frontier_anchor.title_province = { geographical_region = tca_frontier_region }
+    }
+    trigger_else = { always = no }
+}
+
+# 本国实际控制北疆土地；用于补入区外最高领主，不以法理、文化或朝贡替代。
+tca_frontier_realm_has_land_trigger = {
+    any_sub_realm_county = { title_province = { geographical_region = tca_frontier_region } }
+}
+
+# 已登记地方官署及原版实际中央部职；不包含家门、退休或泛无地人物。
+tca_frontier_is_office_trigger = {
+    is_alive = yes
+    is_landed = no
+    is_independent_ruler = no
+    OR = {
+        AND = {
+            tca_is_landless_official_trigger = yes
+            save_temporary_scope_as = tca_frontier_candidate
+            tca_frontier_has_anchor_trigger = yes
+        }
+        tgp_is_any_minister = yes
+    }
+}
+
+# 不递归：独立君主自身资格不依赖官署，直属官署才读取其君主的资格。
+tca_frontier_related_participant_trigger = {
+    is_alive = yes
+    OR = {
+        AND = { is_independent_ruler = yes tca_frontier_realm_has_land_trigger = yes }
+        AND = {
+            tca_frontier_is_office_trigger = yes
+            liege = {
+                is_independent_ruler = yes
+                OR = {
+                    tca_frontier_border_participant_trigger = yes
+                    tca_frontier_interior_participant_trigger = yes
+                    tca_frontier_realm_has_land_trigger = yes
+                }
+            }
+        }
+    }
+}
+
+# 无需等待原生参与组刷新即可重查行动资格；正式组与催化共用。
+tca_frontier_is_participant_trigger = {
+    OR = {
+        tca_frontier_border_participant_trigger = yes
+        tca_frontier_interior_participant_trigger = yes
+        tca_frontier_related_participant_trigger = yes
+    }
+}
+
+# 人物催化的重要性，不把全部境内或相关官署自动当作重要人物。
+tca_frontier_important_person_trigger = {
+    tca_frontier_is_participant_trigger = yes
+    OR = {
+        is_independent_ruler = yes
+        tca_frontier_border_participant_trigger = yes
+        AND = { exists = top_liege.primary_heir this = top_liege.primary_heir }
+    }
+}

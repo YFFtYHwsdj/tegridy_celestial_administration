@@ -42,6 +42,32 @@ class TestCatalogTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'exactly one'):
                 api.catalog(root)
 
+    def test_independent_worlds_are_opt_in_and_partitioned(self):
+        api = self.api()
+        rows = api.catalog(ROOT)
+        default = api.select_cases(ROOT)
+        worlds = api.world_metadata(ROOT)
+        self.assertTrue(any(value != 'shared' for value in worlds.values()))
+        self.assertTrue(all(worlds[row['name']] == 'shared' for row in default))
+        explicit = api.select_cases(ROOT, ['frontier'])
+        self.assertEqual(explicit, [row for row in rows if row['suite'].startswith('frontier')])
+        batches = api.partition_worlds(default[:1] + explicit, ROOT)
+        self.assertEqual(len(batches), len(explicit) + 1)
+        self.assertEqual([row for batch in batches for row in batch], default[:1] + explicit)
+        self.assertTrue(all(len({worlds[row['name']] for row in batch}) == 1 for batch in batches))
+        self.assertEqual(api.select_cases(ROOT, include_independent=True), rows)
+
+    def test_default_full_plan_excludes_independent_worlds_and_mixed_launch_is_rejected(self):
+        api = self.api()
+        default = api.select_cases(ROOT)
+        api.validate_plan({'scope': 'full', 'cases': default}, ROOT)
+        independent = api.select_cases(ROOT, ['frontier'])
+        with self.assertRaisesRegex(ValueError, 'world'):
+            api.validate_plan({'scope': 'selection', 'cases': default[:1] + independent[:1]}, ROOT)
+        with self.assertRaisesRegex(ValueError, 'world'):
+            api.validate_plan({'scope': 'selection', 'cases': independent}, ROOT)
+        api.validate_plan({'scope': 'selection', 'cases': independent[:1]}, ROOT)
+
     def test_immediate_case_can_be_selected_without_delayed_stage(self):
         rows = self.api().select_cases(ROOT, [], ['tca_exam_test.1'])
         self.assertEqual([r['event'] for r in rows], ['tca_exam_test.1'])
@@ -155,6 +181,21 @@ class ParallelMetadataTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'GROUP/EXCLUSIVE'):
                 api.catalog(root)
             self.assertTrue(api.verify_registration_metadata(root))
+
+    def test_independent_registration_requires_explicit_valid_world(self):
+        import testing.catalog as api
+        prefix = 'EVENT = tca_alpha_test.1 CASE = tca_test_alpha DELAYED = no GROUP = tca_alpha_test EXCLUSIVE = no'
+        for effect, suffix in [('case', ' WORLD = alpha'), ('independent_case', ''),
+                               ('independent_case', ' WORLD = shared'),
+                               ('independent_case', ' WORLD = invalid-world')]:
+            with self.subTest(effect=effect, suffix=suffix), tempfile.TemporaryDirectory() as temp:
+                root = self.module_root(temp, f'tca_test_visit_{effect}_effect = {{ {prefix}{suffix} }}')
+                with self.assertRaisesRegex(ValueError, 'WORLD'):
+                    api.registration_rows(root)
+        with tempfile.TemporaryDirectory() as temp:
+            root = self.module_root(temp,
+                f'tca_test_visit_independent_case_effect = {{ {prefix} WORLD = alpha }}')
+            self.assertEqual(api.world_metadata(root), {'tca_test_alpha': 'alpha'})
 
     def test_cross_namespace_group_merge_is_allowed(self):
         import testing.catalog as api

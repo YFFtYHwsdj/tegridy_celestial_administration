@@ -156,17 +156,23 @@ def configure_selection(run, rows, selected, parallel=1):
         # 克隆已选择运行时先撤去旧标记，再安装本子运行的范围。
         text = re.sub(r'\s*set_variable = \{ name = tca_test_(?:selected_run|max_active|\w+_selected) '
                       r'value = (?:yes|\d+) \}', '', text)
+    text = re.sub(r'\s*set_variable = \{ name = tca_test_world_[a-z0-9_]+ value = yes \}', '', text)
+    from testing.catalog import world_metadata
+    worlds = world_metadata(run / 'mod/tca_main')
+    selected_worlds = {worlds[row['name']] for row in rows}
     marker = 'tca_run_observer_tests_effect = yes'
     if text.count(marker) != 1:
         raise ValueError('CLI observer entry must occur exactly once')
     flags = [f'set_variable = {{ name = tca_test_max_active value = {parallel} }}']
+    if len(selected_worlds) == 1 and 'shared' not in selected_worlds:
+        flags.append('set_variable = { name = tca_test_world_' + next(iter(selected_worlds)) + ' value = yes }')
     if selected:
         flags.append('set_variable = { name = tca_test_selected_run value = yes }')
         flags += [f"   set_variable = {{ name = {row['name']}_selected value = yes }}" for row in rows]
     events.write_text(text.replace(marker, '\n'.join(flags) + '\n   ' + marker), encoding='utf-8-sig')
 
 
-def prepare_run(repo, run_root, settings, selected_case=None, suites=(), cases=(), execution=None, parallel=1):
+def prepare_run(repo, run_root, settings, selected_case=None, suites=(), cases=(), execution=None, parallel=1, include_independent=False):
     if run_root.resolve().is_relative_to(repo.resolve()):
         raise ValueError('Run root must be outside the source directory')
     run_root.mkdir(parents=True, exist_ok=True)
@@ -198,8 +204,8 @@ def prepare_run(repo, run_root, settings, selected_case=None, suites=(), cases=(
     requested = list(cases) + ([selected_case] if selected_case else [])
     if list((snapshot / 'common/scripted_effects').rglob('tca_test_catalog_effects.txt')):
         from testing.catalog import select_cases
-        rows = select_cases(snapshot, suites, requested)
-        configure_selection(run, rows, bool(suites or requested), parallel)
+        rows = select_cases(snapshot, suites, requested, include_independent=include_independent)
+        configure_selection(run, rows, bool(suites or requested or include_independent), parallel)
     elif suites or requested:
         raise ValueError('Native catalog missing')
     write_json(run / 'dlc_load.json', {'disabled_dlcs': [], 'enabled_mods': [
@@ -665,6 +671,10 @@ def game_environment(game_dir):
 
 
 def run_game(args, run):
+    # 拒绝直接启动跨WORLD的总计划；只有分局后的子计划可以进入引擎。
+    from testing.catalog import validate_plan
+    validate_plan(json.loads((run / 'selection.json').read_text(encoding='utf-8')),
+                  run / 'mod/tca_main')
     issues = verify_snapshot(run)
     if issues:
         raise ValueError('; '.join(issues))
@@ -836,7 +846,8 @@ def main(argv=None):
     parser.add_argument('--case', action='append', default=[], help='选择原生用例，可重复')
     parser.add_argument('--suite', action='append', default=[], help='选择模块或模块前缀，可重复')
     parser.add_argument('--list', action='store_true', help='列出所选范围，不启动游戏')
-    parser.add_argument('--isolate', choices=('none', 'suite'), default='none', help='默认同局；suite 按模块分别开局')
+    parser.add_argument('--include-independent', action='store_true', help='同时纳入独立测试局用例，自动分局执行')
+    parser.add_argument('--isolate', choices=('none', 'suite'), default='none', help='默认按强制WORLD边界分局；suite 进一步按模块分局')
     args = parser.parse_args(argv)
     args.game_dir = args.game_dir.expanduser().resolve()
     args.run_root = args.run_root.expanduser().resolve()
@@ -848,11 +859,12 @@ def main(argv=None):
         parser.error('--timeout 必须为正数')
     base, runs, task = None, [], None
     try:
-        from testing.catalog import select_cases
-        rows = select_cases(ROOT, args.suite, args.case)
+        from testing.catalog import select_cases, partition_worlds, world_metadata
+        rows = select_cases(ROOT, args.suite, args.case, include_independent=args.include_independent)
         if args.list:
+            worlds = world_metadata(ROOT)
             for row in rows:
-                print(f"{row['suite']}  {row['event']}  {'delayed' if row['delayed'] else 'immediate'}  {row['checks']} checks")
+                print(f"[{worlds[row['name']]}] {row['suite']}  {row['event']}  {'delayed' if row['delayed'] else 'immediate'}  {row['checks']} checks")
             print(f'{len(rows)} cases; {sum(row["checks"] for row in rows)} assertions')
             return 0
         if not args.prepare_only and not (game_executable(args.game_dir)).is_file():
@@ -865,15 +877,15 @@ def main(argv=None):
             dated_execution = dict(execution, start_date={'1066': '1066.9.15', '1178': '1178.10.1'}[date],
                                    bookmark=f'bm_{date}_china')
             dated = prepare_run(ROOT, args.run_root, args.settings.expanduser(), suites=args.suite, cases=args.case,
-                                execution=dated_execution, parallel=args.parallel)
+                                execution=dated_execution, parallel=args.parallel, include_independent=args.include_independent)
             base = base or dated
             rows = json.loads((dated / 'selection.json').read_text(encoding='utf-8'))['cases']
-            if args.isolate == 'suite':
-                for suite in dict.fromkeys(row['suite'] for row in rows):
-                    runs.append(clone_run(dated, args.run_root, [row for row in rows if row['suite'] == suite]))
-            else:
+            batches = partition_worlds(rows, dated / 'mod/tca_main', args.isolate == 'suite')
+            if len(batches) == 1:
                 runs.append(dated)
-        task = {'task_id': base.name, 'execution': 'isolated' if args.isolate == 'suite' else 'same_world',
+            else:
+                runs.extend(clone_run(dated, args.run_root, batch) for batch in batches)
+        task = {'task_id': base.name, 'execution': 'isolated' if args.isolate == 'suite' or len(runs) > len(dates) else 'same_world',
                 'scope': json.loads((base / 'selection.json').read_text(encoding='utf-8'))['scope'],
                 'parallel': args.parallel, 'start_dates': list(dates),
                 'runs': [str(run) for run in runs], 'state': 'prepared'}

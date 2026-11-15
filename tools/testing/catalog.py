@@ -4,12 +4,12 @@ import re
 from check_upstream_overrides import definitions
 
 ROOT = Path(__file__).resolve().parents[2]
-# 注册行参数顺序固定为 EVENT CASE DELAYED GROUP EXCLUSIVE。
+# 普通登记顺序为 EVENT CASE DELAYED GROUP EXCLUSIVE；独立入口另带WORLD。
 # GROUP/EXCLUSIVE 是单实例并行（lane）元数据；迁移窗口内容忍旧式三参数行，
 # 由 verify_registration_metadata()/check_test_parallel.py 强制要求显式携带。
 _REGISTRATION = re.compile(
-    r'tca_test_visit_case_effect = \{ EVENT = (\S+) CASE = (\S+) DELAYED = (yes|no)'
-    r'(?: GROUP = (\S+) EXCLUSIVE = (yes|no))? \}')
+    r'tca_test_visit_(independent_)?case_effect = \{ EVENT = (\S+) CASE = (\S+) DELAYED = (yes|no)'
+    r'(?: GROUP = (\S+) EXCLUSIVE = (yes|no))?(?: WORLD = (\S+))? \}')
 _GROUP = re.compile(r'[a-z0-9_]+')
 
 
@@ -47,9 +47,11 @@ def _parse_modules(root):
             suite = effect.removeprefix('tca_test_module_').removesuffix('_effect')
             text = ' '.join(body)
             registrations = _REGISTRATION.findall(text)
-            if not registrations or text.count('tca_test_visit_case_effect') != len(registrations):
+            if not registrations or len(re.findall(r'tca_test_visit_(?:independent_)?case_effect', text)) != len(registrations):
                 raise ValueError(f'Invalid module registration: {effect}')
-            for event, name, delayed, group, exclusive in registrations:
+            for independent, event, name, delayed, group, exclusive, world in registrations:
+                if bool(independent) != bool(world) or (world and (not _GROUP.fullmatch(world) or world == 'shared')):
+                    raise ValueError(f'Invalid independent WORLD in {effect}: {world}')
                 # 未匹配的可选分组在 findall 中返回空字符串，按缺省处理。
                 group = group or None
                 exclusive = exclusive or None
@@ -67,7 +69,7 @@ def _parse_modules(root):
                 events.add(event)
                 row = dict(suite=suite, event=event, name=name, delayed=delayed == 'yes',
                            group=effective, exclusive=exclusive == 'yes',
-                           declared=group is not None, source=path.name)
+                           declared=group is not None, source=path.name, world=world or 'shared')
                 effects[effect].append(row)
                 rows.append(row)
     return effects, rows
@@ -142,8 +144,23 @@ def catalog(root=ROOT):
     return result
 
 
-def select_cases(root=ROOT, suites=(), cases=()):
-    """合并模块及入口选择并去重；无选择代表完整回归。"""
+def world_metadata(root=ROOT):
+    """从原生登记读取独立测试局标识；shared代表普通共享局。"""
+    return {row['name']: row['world'] for row in registration_rows(root)}
+
+
+def partition_worlds(rows, root=ROOT, isolate_suite=False):
+    """按强制世界边界拆局；相同WORLD可共局，suite选项只会进一步拆分。"""
+    worlds = world_metadata(root)
+    batches = {}
+    for row in rows:
+        key = (worlds[row['name']], row['suite'] if isolate_suite else None)
+        batches.setdefault(key, []).append(row)
+    return list(batches.values())
+
+
+def select_cases(root=ROOT, suites=(), cases=(), include_independent=False):
+    """合并显式选择；无选择默认仅普通回归，独立局须选择或显式纳入。"""
     rows = catalog(root)
     selected = set()
     for suite in suites:
@@ -155,7 +172,9 @@ def select_cases(root=ROOT, suites=(), cases=()):
         if not any(row['event'] == event for row in rows):
             raise ValueError(f'Unknown native test entry: {event}')
         selected.add(event)
-    return [row for row in rows if not selected or row['event'] in selected]
+    worlds = world_metadata(root)
+    return [row for row in rows if row['event'] in selected or
+            (not suites and not cases and (include_independent or worlds[row['name']] == 'shared'))]
 
 
 def validate_plan(plan, root=ROOT):
@@ -170,6 +189,9 @@ def validate_plan(plan, root=ROOT):
     events = [row['event'] for row in selected]
     if len(events) != len(set(events)) or selected != [row for row in rows if row['event'] in events]:
         raise ValueError('Selection order or uniqueness invalid')
-    if plan['scope'] == 'full' and selected != rows:
+    worlds = world_metadata(root)
+    if len({worlds[row['name']] for row in selected}) != 1:
+        raise ValueError('Selection crosses independent test world boundaries')
+    if plan['scope'] == 'full' and selected != [row for row in rows if worlds[row['name']] == 'shared']:
         raise ValueError('Incomplete full regression plan')
     return {row['name']: row['checks'] for row in selected}

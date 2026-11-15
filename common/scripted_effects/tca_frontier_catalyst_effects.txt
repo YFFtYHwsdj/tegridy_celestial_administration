@@ -1,0 +1,213 @@
+﻿# 人物作用域；记录当前局势下的国家与独立身份，供交接后识别行动前所属。
+# 列表按局势对象去重，结束时清理；不构成双边关系或独立点数系统。
+tca_frontier_record_identity_effect = {
+    save_scope_as = tca_frontier_identity_actor
+    if = { limit = { NOT = { exists = var:tca_frontier_identity_situation } }
+        situation:tca_northern_frontier = { add_to_variable_list = { name = tca_frontier_identity_people target = scope:tca_frontier_identity_actor } }
+    }
+    else_if = { limit = { var:tca_frontier_identity_situation != situation:tca_northern_frontier }
+        situation:tca_northern_frontier = { add_to_variable_list = { name = tca_frontier_identity_people target = scope:tca_frontier_identity_actor } }
+    }
+    set_variable = { name = tca_frontier_identity_situation value = situation:tca_northern_frontier }
+    set_variable = { name = tca_frontier_identity_country value = top_liege.primary_title }
+    set_variable = { name = tca_frontier_identity_independent value = no }
+    if = { limit = { is_independent_ruler = yes } set_variable = { name = tca_frontier_identity_independent value = yes } }
+}
+
+# on_title_gain/usurpation的人物上下文；仅明确的征服、篡夺、跨国独立君主继承作补判。
+# 不把禅让、选举、任命或普通同国继位当作转国；标记绑定实际接收国家，避免影响无关继位。
+tca_frontier_mark_external_takeover_effect = {
+    if = { limit = {
+        exists = situation:tca_northern_frontier
+        exists = var:tca_frontier_identity_situation
+        var:tca_frontier_identity_situation = situation:tca_northern_frontier
+        exists = var:tca_frontier_identity_country
+        var:tca_frontier_identity_independent = yes
+        exists = scope:title.var:tca_frontier_country_title
+        var:tca_frontier_identity_country != scope:title.var:tca_frontier_country_title
+        OR = {
+            scope:transfer_type = flag:conquest
+            scope:transfer_type = flag:conquest_holy_war
+            scope:transfer_type = flag:conquest_claim
+            scope:transfer_type = flag:conquest_populist
+            scope:transfer_type = flag:usurped
+            scope:transfer_type = flag:inheritance
+        }
+    }
+        save_scope_as = tca_frontier_identity_actor
+        scope:title.var:tca_frontier_country_title = {
+            set_variable = { name = tca_frontier_external_successor value = scope:tca_frontier_identity_actor.top_liege days = 2 }
+        }
+    }
+}
+
+# 任意作用域；首次创建记录全部北疆县及高阶法理头衔的国家快照，不计分。
+# 同时保存代表头衔与最高领主人物，分别容忍普通继位与同一君主换主头衔。
+tca_frontier_initialize_ownership_effect = {
+    every_county_in_region = {
+        region = tca_frontier_region
+        limit = { exists = holder }
+        set_variable = { name = tca_frontier_country_title value = holder.top_liege.primary_title }
+        set_variable = { name = tca_frontier_country_ruler value = holder.top_liege }
+        duchy ?= { if = { limit = { exists = holder } set_variable = { name = tca_frontier_country_title value = holder.top_liege.primary_title } } }
+        kingdom ?= { if = { limit = { exists = holder } set_variable = { name = tca_frontier_country_title value = holder.top_liege.primary_title } } }
+        empire ?= { if = { limit = { exists = holder } set_variable = { name = tca_frontier_country_title value = holder.top_liege.primary_title } } }
+    }
+}
+
+# 任意作用域；稳定到下一日后比较最终国家，国内分封与多回调不会重复记分。
+# 全范围仅184县；仅相关头衔／辖属变化排队，不作月度全地图扫描。
+tca_frontier_settle_ownership_effect = {
+    if = { limit = { exists = situation:tca_northern_frontier }
+        every_county_in_region = {
+            region = tca_frontier_region
+            limit = { exists = holder }
+            save_scope_as = tca_frontier_settling_county
+            if = {
+                limit = {
+                    exists = var:tca_frontier_country_title
+                    exists = var:tca_frontier_country_ruler
+                    NOT = { var:tca_frontier_country_ruler = holder.top_liege }
+                    OR = {
+                        NOT = { var:tca_frontier_country_title = holder.top_liege.primary_title }
+                        var:tca_frontier_country_title = {
+                            trigger_if = {
+                                limit = { exists = var:tca_frontier_external_successor }
+                                var:tca_frontier_external_successor = scope:tca_frontier_settling_county.holder.top_liege
+                            }
+                            trigger_else = { always = no }
+                        }
+                    }
+                }
+                tca_frontier_emit_catalyst_effect = { CATALYST = tca_frontier_county_changed_country }
+            }
+            set_variable = { name = tca_frontier_country_title value = holder.top_liege.primary_title }
+            set_variable = { name = tca_frontier_country_ruler value = holder.top_liege }
+        }
+        situation:tca_northern_frontier = { remove_variable = tca_frontier_ownership_pending }
+    }
+}
+
+# 任意角色作用域；合并同一批所有权／改隶变化，事件次日执行，避免中间分封状态。
+tca_frontier_queue_ownership_effect = {
+    if = { limit = { exists = situation:tca_northern_frontier situation:tca_northern_frontier = { NOT = { has_variable = tca_frontier_ownership_pending } } }
+        situation:tca_northern_frontier = { set_variable = { name = tca_frontier_ownership_pending value = yes days = 2 } }
+        trigger_event = { id = tca_frontier_lifecycle.1 days = 1 }
+    }
+}
+
+# 战争on_action上下文：scope:war／attacker／defender由引擎提供；声明与结果分别防重。
+tca_frontier_war_started_effect = {
+    if = { limit = {
+        exists = situation:tca_northern_frontier
+        exists = scope:war
+        scope:attacker.top_liege != scope:defender.top_liege
+        scope:war = { tca_frontier_war_in_scope_trigger = yes NOT = { has_variable = tca_frontier_declaration_counted } }
+    }
+        scope:attacker = { tca_frontier_record_identity_effect = yes }
+        scope:defender = { tca_frontier_record_identity_effect = yes }
+        scope:war = { set_variable = { name = tca_frontier_declaration_counted value = yes } }
+        tca_frontier_emit_catalyst_effect = { CATALYST = tca_frontier_war_declared }
+    }
+}
+
+# 战争结果在持久人物作用域承接，不解引用已销毁的CB或war。
+# 原生两个胜方回调互斥且各运行一次；不另挂通用结束回调重复计算。
+# 目标取原生上下文的目标头衔或目标列表，不在结果时重猜参战国归区。
+tca_frontier_war_result_effect = {
+    if = { limit = {
+        exists = situation:tca_northern_frontier
+        OR = {
+            scope:attacker.top_liege != scope:defender.top_liege
+            AND = {
+                exists = scope:attacker.var:tca_frontier_identity_country
+                exists = scope:defender.var:tca_frontier_identity_country
+                scope:attacker.var:tca_frontier_identity_country != scope:defender.var:tca_frontier_identity_country
+            }
+            # 全部吞并后双方可能已同国，以目标战前快照保留这次对外结果。
+            AND = { exists = scope:target.var:tca_frontier_country_title scope:target.var:tca_frontier_country_title != scope:attacker.top_liege.primary_title }
+        }
+        OR = {
+            AND = { exists = scope:target scope:target = { tca_frontier_title_in_scope_trigger = yes } }
+            any_in_list = { list = target_titles tca_frontier_title_in_scope_trigger = yes }
+        }
+    }
+        tca_frontier_emit_catalyst_effect = { CATALYST = $CATALYST$ }
+    }
+}
+
+# on_title_gain_usurpation上下文；旧国家取创建快照，避免旧持有人失位后误判。
+tca_frontier_title_usurped_effect = {
+    if = { limit = {
+        exists = situation:tca_northern_frontier
+        tca_frontier_is_participant_trigger = yes
+        scope:title = { tca_frontier_title_in_scope_trigger = yes exists = var:tca_frontier_country_title }
+        OR = {
+            scope:title.var:tca_frontier_country_title != root.top_liege.primary_title
+            AND = {
+                exists = var:tca_frontier_identity_country
+                var:tca_frontier_identity_country != scope:title.var:tca_frontier_country_title
+            }
+        }
+    }
+        tca_frontier_mark_external_takeover_effect = yes
+        scope:title = {
+            if = { limit = { tier = tier_duchy } tca_frontier_emit_catalyst_effect = { CATALYST = tca_frontier_usurp_duchy } }
+            else_if = { limit = { tier = tier_kingdom } tca_frontier_emit_catalyst_effect = { CATALYST = tca_frontier_usurp_kingdom } }
+            else_if = { limit = { tier = tier_empire } tca_frontier_emit_catalyst_effect = { CATALYST = tca_frontier_usurp_empire } }
+            set_variable = { name = tca_frontier_country_title value = holder.top_liege.primary_title }
+        }
+    }
+}
+
+# on_imprison上下文：root为囚犯，scope:imprisoner为关押者。
+# 记录本次羁押前政治身份，后续死亡／交易不读取已经失效的任职状态。
+tca_frontier_imprisoned_effect = {
+    if = { limit = { exists = situation:tca_northern_frontier tca_frontier_person_action_valid_trigger = { ACTOR = scope:imprisoner } }
+        save_scope_as = tca_frontier_captive
+        situation:tca_northern_frontier = {
+            if = { limit = { NOT = { is_target_in_variable_list = { name = tca_frontier_captives target = scope:tca_frontier_captive } } }
+                add_to_variable_list = { name = tca_frontier_captives target = scope:tca_frontier_captive }
+            }
+        }
+        set_variable = { name = tca_frontier_captive_country value = top_liege.primary_title }
+        set_variable = { name = tca_frontier_captive_keeper value = scope:imprisoner.top_liege.primary_title }
+        set_variable = { name = tca_frontier_captive_important value = yes }
+        if = { limit = { is_independent_ruler = yes } set_variable = { name = tca_frontier_captive_sovereign value = yes } }
+        tca_frontier_emit_catalyst_effect = { CATALYST = tca_frontier_imprison_important }
+    }
+}
+
+# 任意囚犯作用域；只清理羁押快照，不把原生释放回调误判为无条件或赎回。
+tca_frontier_clear_captive_effect = {
+    remove_variable = tca_frontier_captive_country
+    remove_variable = tca_frontier_captive_keeper
+    remove_variable = tca_frontier_captive_important
+    remove_variable = tca_frontier_captive_sovereign
+}
+
+# on_death死亡前上下文；只认引擎提供的killer，不推测秘密幕后凶手。
+# 处决与杀害互斥，死亡原因未属于明确集合的情况不猜测。
+tca_frontier_person_killed_effect = {
+    if = { limit = {
+        exists = situation:tca_northern_frontier
+        exists = scope:killer
+        scope:killer = { tca_frontier_is_participant_trigger = yes }
+        OR = {
+            tca_frontier_person_action_valid_trigger = { ACTOR = scope:killer }
+            AND = {
+                has_variable = tca_frontier_captive_important
+                exists = var:tca_frontier_captive_country
+                var:tca_frontier_captive_country != scope:killer.top_liege.primary_title
+            }
+        }
+    }
+        # on_death此时人物仍活着，不能读取人物death_reason；将已确认资格带到次日。
+        save_scope_as = tca_frontier_dead_person
+        scope:killer = { trigger_event = { id = tca_frontier_lifecycle.2 days = 1 } }
+    }
+    tca_frontier_clear_captive_effect = yes
+}
+
+# 无条件释放／赎回／赠礼的成功接入集中在tca_frontier_transaction_effects.txt；
+# 本文件通用释放清理不判断原因，避免与实际交易重复计分。

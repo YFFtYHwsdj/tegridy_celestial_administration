@@ -1,0 +1,25 @@
+﻿# 只承接相关领土变化的一日合并结算；不定期寻敌，不改变测试调度。
+namespace = tca_frontier_lifecycle
+
+tca_frontier_lifecycle.1 = {
+    type = character_event hidden = yes
+    immediate = { tca_frontier_settle_ownership_effect = yes tca_frontier_refresh_participants_effect = yes }
+}
+
+# 由死亡前已完成双方参与／重要性检查的入口投递；受害者已经死亡后读取实际死因。
+# root为仍存在的责任人物，scope:tca_frontier_dead_person是本次独立事件链的死者。
+tca_frontier_lifecycle.2 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { exists = situation:tca_northern_frontier exists = scope:tca_frontier_dead_person scope:tca_frontier_dead_person = { is_alive = no } }
+            scope:tca_frontier_dead_person = {
+                if = { limit = { OR = { death_reason = death_execution death_reason = death_execution_blood_eagle death_reason = death_execution_blot death_reason = death_hostage_execution } }
+                    tca_frontier_emit_catalyst_effect = { CATALYST = tca_frontier_execute_important }
+                }
+                else_if = { limit = { OR = { death_reason = death_murder death_reason = death_murder_known death_reason = death_mysterious death_reason = death_battle death_reason = death_duel death_reason = death_poison } }
+                    tca_frontier_emit_catalyst_effect = { CATALYST = tca_frontier_kill_important }
+                }
+            }
+        }
+    }
+}

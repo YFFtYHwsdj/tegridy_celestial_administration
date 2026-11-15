@@ -746,6 +746,27 @@ time.sleep(20)
                 with self.assertRaisesRegex(ValueError, 'Source changed'):
                     prepare_run(repo, Path(temp)/'runs', Path(temp)/'absent')
 
+    def test_independent_child_authorization_is_not_inherited_by_shared_child(self):
+        from run_game_tests import clone_run, verify_snapshot, run_game
+        from testing.catalog import select_cases
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            base = prepare_run(ROOT, root, root/'absent', suites=['exam', 'frontier'])
+            # 混合总计划不可直接进入引擎，即使快照本身完好。
+            with self.assertRaisesRegex(ValueError, 'world'):
+                run_game(None, base)
+            rows = select_cases(base/'mod/tca_main', cases=['tca_frontier_situation_test.1'])
+            child = clone_run(base, root, rows)
+            text = (child/'mod/tca_cli_adapter/events/tca_cli_events.txt').read_text(encoding='utf-8-sig')
+            self.assertIn('name = tca_test_world_tca_frontier_situation_test value = yes', text)
+            self.assertEqual(verify_snapshot(child), [])
+            shared_rows = select_cases(child/'mod/tca_main', cases=['tca_exam_test.1'])
+            shared = clone_run(child, root, shared_rows)
+            text = (shared/'mod/tca_cli_adapter/events/tca_cli_events.txt').read_text(encoding='utf-8-sig')
+            self.assertNotIn('name = tca_test_world_', text)
+            self.assertNotIn(rows[0]['name'] + '_selected', text)
+            self.assertEqual(verify_snapshot(shared), [])
+
     def test_isolated_children_reuse_frozen_input_and_own_selection(self):
         from run_game_tests import clone_run, verify_snapshot
         with tempfile.TemporaryDirectory() as temp:

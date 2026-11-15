@@ -1,8 +1,8 @@
-﻿# P0双区域最小局势：仅显式调试入口创建，无开局自动挂载、自然催化或阶段修正。
-# 使用原版通用窗口的独立副本，只替换无定期阶段的结束日期提示；不覆盖原版窗口。
-# 参与组仅用于查看地图和窗口，不代表P2正式边疆身份。
+﻿# 整体北疆局势：一个内部区域承载全范围，不提供玩家可选子区域。
+# 当前显式创建；开局自动初始化与胜利后自动重启另行实施，阶段效果后置。
 tca_northern_frontier = {
     is_unique = yes
+    ending_decisions = { tca_frontier_unification_decision }
     icon = { reference = "gfx/interface/icons/situation_types/silk_road_situation.dds" }
     window = situation
     gui_window_name = "tca_frontier_situation_window"
@@ -10,45 +10,63 @@ tca_northern_frontier = {
     situation_group_type = major
     map_mode = sub_regions
     illustration = "gfx/interface/illustrations/terrain_types/mpo_season_abudant_grazing.dds"
-    start_phase = tca_frontier_amity
+    start_phase = tca_frontier_tension
     sub_regions = {
-        tca_frontier_north = {
-            geographical_regions = { tca_frontier_north_region }
-            start_phase = tca_frontier_amity
+        tca_frontier_all = {
+            geographical_regions = { tca_frontier_region }
+            start_phase = tca_frontier_tension
             icon = "gfx/interface/icons/situation_types/silk_road_situation.dds"
             map_color = { 90 145 195 }
         }
-        tca_frontier_west = {
-            geographical_regions = { tca_frontier_west_region }
-            start_phase = tca_frontier_warfare
-            icon = "gfx/interface/icons/situation_types/silk_road_situation.dds"
-            map_color = { 195 145 90 }
-        }
     }
+    on_start = { tca_frontier_refresh_participants_effect = yes }
+    on_yearly = { tca_frontier_natural_relaxation_effect = yes }
     participant_groups = {
-        tca_frontier_probe_rulers = {
+        tca_frontier_border = {
             auto_add_rulers = yes
-            auto_add_landless_rulers = no
-            require_realm_in_sub_region = yes
+            auto_add_landless_rulers = yes
+            require_realm_in_sub_region = no
+            is_character_valid = { tca_frontier_border_participant_trigger = yes }
+            icon = "gfx/interface/icons/silk_road_group_types/icon_silk_road_realm.dds"
+            map_color = { 195 100 65 }
+        }
+        tca_frontier_interior = {
+            auto_add_rulers = yes
+            auto_add_landless_rulers = yes
+            require_realm_in_sub_region = no
+            is_character_valid = { tca_frontier_interior_participant_trigger = yes }
             icon = "gfx/interface/icons/silk_road_group_types/icon_silk_road_realm.dds"
             map_color = { 90 145 195 }
         }
+        tca_frontier_related = {
+            auto_add_rulers = yes
+            auto_add_landless_rulers = yes
+            require_realm_in_sub_region = no
+            is_character_valid = { tca_frontier_related_participant_trigger = yes }
+            icon = "gfx/interface/icons/silk_road_group_types/icon_silk_road_realm.dds"
+            map_color = { 145 145 145 }
+        }
     }
-    # 每次调试催化25点，100点转段；仅为观察独立进度的探针参数，不作正式平衡。
-    # 不设max_duration和时间催化，等待本身不会推动转换。
     phases = {
         tca_frontier_amity = {
             icon = "gfx/interface/icons/struggle_types/struggle_iberia_phase_conciliation.dds"
             future_phases = {
                 tca_frontier_tension = {
                     takeover_type = points
-                    takeover_points = 100
-                    catalysts = { tca_frontier_to_tension = 25 }
-                }
-                tca_frontier_warfare = {
-                    takeover_type = points
-                    takeover_points = 100
-                    catalysts = { tca_frontier_to_warfare = 25 }
+                    takeover_points = 1000
+                    catalysts = {
+                        tca_frontier_to_tension = 25
+                        tca_frontier_war_declared = 20
+                        tca_frontier_attacker_victory = 50
+                        tca_frontier_defender_victory = 25
+                        tca_frontier_county_changed_country = 100
+                        tca_frontier_usurp_duchy = 100
+                        tca_frontier_usurp_kingdom = 250
+                        tca_frontier_usurp_empire = 500
+                        tca_frontier_imprison_important = 50
+                        tca_frontier_execute_important = 150
+                        tca_frontier_kill_important = 150
+                    }
                 }
             }
         }
@@ -57,28 +75,47 @@ tca_northern_frontier = {
             future_phases = {
                 tca_frontier_amity = {
                     takeover_type = points
-                    takeover_points = 100
-                    catalysts = { tca_frontier_to_amity = 25 }
+                    takeover_points = 1000
+                    catalysts = {
+                        tca_frontier_to_amity = 25
+                        tca_frontier_natural_relaxation = 100
+                        tca_frontier_release_sovereign = 150
+                        tca_frontier_ransom_important = 50
+                        tca_frontier_gift_sovereign = 25
+                    }
                 }
                 tca_frontier_warfare = {
                     takeover_type = points
-                    takeover_points = 100
-                    catalysts = { tca_frontier_to_warfare = 25 }
+                    takeover_points = 1000
+                    catalysts = {
+                        tca_frontier_to_warfare = 25
+                        tca_frontier_war_declared = 20
+                        tca_frontier_attacker_victory = 50
+                        tca_frontier_defender_victory = 25
+                        tca_frontier_county_changed_country = 100
+                        tca_frontier_usurp_duchy = 100
+                        tca_frontier_usurp_kingdom = 250
+                        tca_frontier_usurp_empire = 500
+                        tca_frontier_imprison_important = 50
+                        tca_frontier_execute_important = 150
+                        tca_frontier_kill_important = 150
+                    }
                 }
             }
         }
         tca_frontier_warfare = {
             icon = "gfx/interface/icons/struggle_types/struggle_iberia_phase_hostility.dds"
             future_phases = {
-                tca_frontier_amity = {
-                    takeover_type = points
-                    takeover_points = 100
-                    catalysts = { tca_frontier_to_amity = 25 }
-                }
                 tca_frontier_tension = {
                     takeover_type = points
-                    takeover_points = 100
-                    catalysts = { tca_frontier_to_tension = 25 }
+                    takeover_points = 1000
+                    catalysts = {
+                        tca_frontier_to_tension = 25
+                        tca_frontier_natural_relaxation = 100
+                        tca_frontier_release_sovereign = 150
+                        tca_frontier_ransom_important = 50
+                        tca_frontier_gift_sovereign = 25
+                    }
                 }
             }
         }

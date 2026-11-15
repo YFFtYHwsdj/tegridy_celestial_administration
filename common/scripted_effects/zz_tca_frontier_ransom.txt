@@ -1,0 +1,238 @@
+﻿# 必要单对象覆盖：原版流程保留，仅增加北疆成功交易钩子。
+# 原版审阅基线与不可替代理由见tools/upstream_overrides.json；同名修改须合并。
+ransom_interaction_effect = {
+	# 释放会触发通用清理，故先保存本次实际羁押的资格，成功后才计分。
+	hidden_effect = { tca_frontier_prepare_ransom_effect = yes }
+
+	if = {
+		limit = {
+			NOR = {
+				scope:influence_send_option = yes
+				scope:herd_send_option = yes
+				scope:current_herd = yes
+				scope:extortionate_current_gold = yes
+				scope:extortionate_gold = yes
+				scope:gold = yes
+				scope:current_gold = yes
+				scope:favor = yes
+				scope:hook ?= yes
+			}
+
+			exists = scope:payer
+		}
+		save_scope_value_as = {
+			name = ransom_saved_gold_value
+			value = scope:payer.current_gold_value
+		}
+		if = {
+			limit = {
+				scope:imprisoner.dynasty ?= { has_dynasty_perk = fp1_pillage_legacy_3 }
+				scope:payer.gold >= scope:prisoner.increased_ransom_cost_value
+			}
+			save_scope_value_as = { name = extortionate_gold value = yes }
+		}
+		else_if = {
+			limit = {
+				scope:imprisoner.dynasty ?= { has_dynasty_perk = fp1_pillage_legacy_3 }
+				scope:payer.gold < scope:prisoner.increased_ransom_cost_value
+				scope:payer.gold >= 1
+			}
+			save_scope_value_as = { name = extortionate_current_gold value = yes }
+		}
+		else_if = {
+			limit = { scope:payer.gold >= scope:prisoner.normal_ransom_cost_value }
+			save_scope_value_as = { name = gold value = yes }
+		}
+		else_if = {
+			limit = {
+				scope:payer.gold < scope:prisoner.normal_ransom_cost_value
+				scope:payer.gold >= 1
+			}
+			save_scope_value_as = { name = current_gold value = yes }
+		}
+		else = {
+			save_scope_value_as = { name = favor value = yes }
+		}
+	}
+	scope:prisoner = {
+		add_character_flag = {
+			flag = block_for_prison_release_notification
+			days = 1
+		}
+		if = {
+			limit = { this != scope:payer }
+			if = {
+				limit = {
+					scope:payer = { is_ai = no }
+					scope:prisoner = { is_ai = yes }
+				}
+				add_opinion = {
+					modifier = ransomed_from_prison
+					target = scope:payer
+					years = 1
+				}
+				if = {
+					limit = {
+						is_ai = yes
+						ai_honor >= 25
+						ai_greed <= 0
+					}
+					scope:payer = {
+						if = {
+							limit = {
+								can_add_hook = {
+									target = scope:prisoner
+									type = favor_hook
+								}
+							}
+							add_hook = {
+								target = scope:prisoner
+								type = indebted_hook
+							}
+						}
+					}
+				}
+				else = {
+					scope:payer = {
+						progress_towards_hook_effect = {
+							CHARACTER = scope:prisoner
+							HOOK_TYPE = indebted_hook
+						}
+					}
+				}
+			}
+			else = {
+				hidden_effect = {
+					if = {
+						limit = {
+							is_ai = yes
+							ai_honor >= 25
+							ai_greed <= 0
+						}
+						scope:payer = {
+							if = {
+								limit = {
+									can_add_hook = {
+										target = scope:prisoner
+										type = favor_hook
+									}
+								}
+								add_hook = {
+									target = scope:prisoner
+									type = indebted_hook
+								}
+							}
+						}
+					}
+					else = {
+						scope:payer = {
+							progress_towards_hook_effect = {
+								CHARACTER = scope:prisoner
+								HOOK_TYPE = indebted_hook
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	scope:payer = {
+		switch = {
+			trigger = always
+
+			scope:extortionate_gold = {
+				pay_short_term_gold = {
+					gold = scope:prisoner.increased_ransom_cost_value
+					target = scope:imprisoner
+				}
+				scope:imprisoner = {
+					add_prestige = scope:prisoner.increased_ransom_cost_value
+					mandala_trickster_increment_gold_ransomed_effect = { GOLD_AMOUNT = scope:prisoner.increased_ransom_cost_value }
+				}
+			}
+
+			scope:extortionate_current_gold = {
+				pay_short_term_gold = {
+					gold = scope:ransom_saved_gold_value
+					target = scope:imprisoner
+				}
+				scope:imprisoner = {
+					add_prestige = scope:ransom_saved_gold_value
+					mandala_trickster_increment_gold_ransomed_effect = { GOLD_AMOUNT = scope:ransom_saved_gold_value }
+				}
+			}
+
+			scope:gold = {
+				pay_short_term_gold = {
+					gold = scope:prisoner.normal_ransom_cost_value
+					target = scope:imprisoner
+				}
+				scope:imprisoner = {
+					mandala_trickster_increment_gold_ransomed_effect = { GOLD_AMOUNT = scope:prisoner.normal_ransom_cost_value }
+				}
+			}
+
+			scope:current_gold = {
+				pay_short_term_gold = {
+					gold = scope:ransom_saved_gold_value
+					target = scope:imprisoner
+				}
+				scope:imprisoner = {
+					mandala_trickster_increment_gold_ransomed_effect = { GOLD_AMOUNT = scope:ransom_saved_gold_value }
+				}
+			}
+		}
+
+		if = {
+			limit = { scope:favor = yes }
+			if = {
+				limit = { scope:payer = scope:prisoner }
+				add_opinion = {
+					modifier = demanded_hook
+					target = scope:imprisoner
+				}
+			}
+			scope:imprisoner = {
+				add_hook = {
+					target = scope:payer
+					type = favor_hook
+				}
+			}
+		}
+
+		if = {
+			limit = { scope:influence_send_option = yes }
+			scope:payer = {
+				change_influence = {
+					value = {
+						value = medium_influence_value
+						multiply = -1
+					}
+				}
+			}
+			scope:imprisoner = { change_influence = scope:payer.medium_influence_value }
+		}
+
+		if = {
+			limit = { scope:herd_send_option = yes }
+			scope:payer = {
+				pay_herd = {
+					target = scope:imprisoner
+					value = scope:prisoner.ransom_herd_value
+				}
+			}
+		}
+		else_if = {
+			limit = { scope:current_herd = yes }
+			scope:payer = {
+				pay_herd = {
+					target = scope:imprisoner
+					value = domicile.herd
+				}
+			}
+		}
+	}
+	pam_philanthropia_ransom_payer_effect = yes
+	scope:prisoner = { release_from_prison = yes }
+	hidden_effect = { tca_frontier_ransom_succeeded_effect = yes }
+}
