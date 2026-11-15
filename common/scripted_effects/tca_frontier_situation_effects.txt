@@ -64,9 +64,9 @@ tca_frontier_natural_relaxation_effect = {
     tca_frontier_emit_catalyst_effect = { CATALYST = tca_frontier_natural_relaxation }
 }
 
-# 任意作用域；从北疆实际国家收集首次参与名单，不扫描全世界人物。
-# 首次名单及无domicile中央部职显式补齐；后续原生刷新继续重查三个组。
-# 临时国家列表去重，同一国家不因拥有多个北疆县而重复遍历。
+# 任意作用域；有地领主由原生自动搜集与分组，仅补入无地官署候选，不手动指定组。
+# 北疆国家去重后只保存最高领主的转国快照，并读取有限内阁；不遍历全层级封臣。
+# 地方无地官署直接读取既有注册表，资格仍统一经过正式trigger；临时候选列表不持久化。
 tca_frontier_refresh_participants_effect = {
     if = { limit = { exists = situation:tca_northern_frontier }
         every_county_in_region = {
@@ -77,22 +77,33 @@ tca_frontier_refresh_participants_effect = {
         }
         every_in_list = {
             list = tca_frontier_office_realms
-            if = {
-                limit = { tca_frontier_is_participant_trigger = yes }
-                tca_frontier_record_identity_effect = yes
-                if = { limit = { NOT = { any_character_situation = { situation_type = tca_northern_frontier } } }
-                    situation:tca_northern_frontier = { add_manual_participant = prev }
-                }
+            # 最高领主换用旧国主头衔时仍须识别实际转国；战争双方另在宣战入口记录。
+            tca_frontier_record_identity_effect = yes
+            every_councillor = {
+                limit = { tgp_is_any_minister = yes }
+                add_to_list = tca_frontier_office_candidates
             }
-            every_vassal_or_below = {
-                limit = {
-                    tca_frontier_is_participant_trigger = yes
-                }
-                tca_frontier_record_identity_effect = yes
-                if = { limit = { NOT = { any_character_situation = { situation_type = tca_northern_frontier } } }
-                    situation:tca_northern_frontier = { add_manual_participant = prev }
-                }
+        }
+        if = { limit = { has_global_variable_list = tca_tongpan_counties }
+            every_in_global_list = {
+                variable = tca_tongpan_counties
+                var:tca_tongpan_office.holder ?= { add_to_list = tca_frontier_office_candidates }
             }
+        }
+        if = { limit = { has_global_variable_list = tca_judicial_circuits }
+            every_in_global_list = {
+                variable = tca_judicial_circuits
+                var:song_judicial_title.holder ?= { add_to_list = tca_frontier_office_candidates }
+            }
+        }
+        every_in_list = {
+            list = tca_frontier_office_candidates
+            limit = {
+                tca_frontier_is_office_trigger = yes
+                tca_frontier_is_participant_trigger = yes
+                NOT = { any_character_situation = { situation_type = tca_northern_frontier } }
+            }
+            situation:tca_northern_frontier = { add_manual_participant = prev }
         }
     }
 }

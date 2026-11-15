@@ -103,7 +103,9 @@
 
 原版手动候选退出依据：`game/common/scripted_effects/10_dlc_tgp_scripted_effects.txt`的`destroy_held_ministry_titles_effect`在撤官后明确调用`remove_manual_participant`，`game/common/on_action/title_on_actions.txt`亦有按身份失效撤销手动候选的实际用例。探针沿用配对入口，未手工指定改组结果、切换阶段催生退出或直接删除县效果。
 
-正式方案不另设双边阶段或点数，所有催化作用于同一整体阶段。原生无地自动候选以domicile为入口，无domicile中央部职参照原版`10_dlc_tgp_scripted_effects.txt`的`add_manual_participant`做手动补入。首次名单从北疆实际国家向下收集并去重，后续原生刷新仍重查身份。
+正式方案不另设双边阶段或点数，所有催化作用于同一整体阶段。有地领主交给原生`auto_add_rulers`自动搜集，不再遍历相关国家的全层级封臣或为其登记手动候选。原生无地自动候选以domicile为入口，遗漏的无地官署参照原版`10_dlc_tgp_scripted_effects.txt`做手动补入：中央部职读取相关最高领主的内阁，提刑、通判分别读取既有`tca_judicial_circuits`与`tca_tongpan_counties`注册表；最终仍经过同一正式资格入口。转国快照只预存相关最高领主，战争双方另在宣战时记录，不为全体参与者反复写入身份变量。
+
+`add_manual_participant`登记的是持续考虑的候选，不强制人物进入任何组；没有匹配组时不属于实际参与者。实际分组与修正更新交给原生机制，`remove_manual_participant`用于撤销候选资格，不能把未显式撤销候选直接当作实际参与或修正残留。
 
 
 战争回调的root可能是短命Casus Belli。二级回调先转到`scope:attacker`／`scope:defender`的持久人物作用域承接，不把CB作为延迟事件载体。同一脚本里立即开战并结束可能在二级回调执行前销毁CB，此时人物作用域转移本身也会报错，普通root存在检查不能修复；测试夹具须真实跨日结束战争。此为已知原生时序限制，尚未证明所有瞬时脚本战争兼容。胜利原生回调互斥；白和平不注册计分子回调。土地变化延后一日合并，避免征服后分封把同一事实重复记分；快照同时记录代表头衔与最高领主人物，容忍普通继位和同一君主更换主头衔。
