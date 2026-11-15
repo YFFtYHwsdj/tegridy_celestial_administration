@@ -25,7 +25,10 @@ tca_court_task_ai_aptitude_factor = {
     if = {
         limit = { exists = scope:employee }
         scope:employee = {
-            if = { limit = { has_court_position = tca_household_registrar_court_position } value = aptitude:tca_household_registrar_court_position }
+            if = { limit = { has_court_position = tca_transport_secretary_court_position } value = aptitude:tca_transport_secretary_court_position }
+            else_if = { limit = { has_court_position = tca_transport_manager_court_position } value = aptitude:tca_transport_manager_court_position }
+            else_if = { limit = { has_court_position = tca_military_secretary_court_position } value = aptitude:tca_military_secretary_court_position }
+            else_if = { limit = { has_court_position = tca_household_registrar_court_position } value = aptitude:tca_household_registrar_court_position }
             else_if = { limit = { has_court_position = tca_judicial_advisor_court_position } value = aptitude:tca_judicial_advisor_court_position }
             else_if = { limit = { has_court_position = tca_civil_adjutant_court_position } value = aptitude:tca_civil_adjutant_court_position }
             else_if = { limit = { has_court_position = tca_army_judge_court_position } value = aptitude:tca_army_judge_court_position }
@@ -40,9 +43,15 @@ tca_court_task_ai_aptitude_factor = {
 # 只减本项当前已执行的临时好感，其他任务与常驻收益保留，防止自身收益导致循环。
 tca_court_relieve_households_active_bonus = {
     value = 0
-    if = { limit = { court_position:tca_household_registrar_court_position ?= { has_variable = tca_court_relieving_households } }
-        value = court_position:tca_household_registrar_court_position.aptitude:tca_household_registrar_court_position
-        add = 1 multiply = 3
+    if = { limit = { scope:employee ?= { has_variable = tca_court_relieving_households } }
+        scope:employee = {
+            if = { limit = { has_court_position = tca_transport_manager_court_position }
+                value = aptitude:tca_transport_manager_court_position add = 1 multiply = 3
+            }
+            else_if = { limit = { has_court_position = tca_household_registrar_court_position }
+                value = aptitude:tca_household_registrar_court_position add = 1 multiply = 3
+            }
+        }
     }
 }
 tca_court_explain_statutes_active_bonus = {
@@ -306,3 +315,19 @@ tca_military_supervisor_order_barracks_ai_score = { value = -100 }
 tca_military_inspector_maintain_gear_ai_score = { value = -100 }
 tca_military_inspector_inspect_troops_ai_score = { value = -100 }
 tca_corps_inspector_enforce_discipline_ai_score = { value = -100 }
+
+# 主官人物作用域；储备只近似衡量影响力需求，不宣称读取了未加成月收入或精确净回报。
+# 边界分档互斥；不设置新资源、持续评分账本或任务冷却。
+tca_court_correspondence_ai_base_score = {
+    value = 20
+    if = { limit = { influence < 200 } value = 170 }
+    else_if = { limit = { influence < 500 } value = 100 }
+    else_if = { limit = { influence < 1000 } value = 50 }
+    if = { limit = { has_trait = ambitious } add = 10 }
+    if = { limit = { has_trait = content } add = -10 }
+}
+tca_court_correspondence_ai_score = {
+    value = tca_court_correspondence_ai_base_score
+    multiply = tca_court_task_ai_aptitude_factor
+    add = tca_court_task_ai_budget_penalty
+}
