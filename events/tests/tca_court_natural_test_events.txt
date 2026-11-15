@@ -266,6 +266,9 @@ tca_court_natural_test.2 = {
             create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_court_natural_capital_restore }
             scope:tca_court_natural_capital_county = { change_title_holder = { holder = scope:tca_court_natural_capital_old_owner change = scope:tca_court_natural_capital_restore take_baronies = no } }
             resolve_title_and_vassal_change = scope:tca_court_natural_capital_restore
+            # 先完成原主官领属、主头衔及首府恢复；这些原生操作可能重整寺院租借。
+            # 私有首府的非县治男爵领在最后归还，避免正确快照被共享夹具的后续恢复改写。
+            tca_test_military_council_cleanup_effect = yes
             create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_court_natural_capital_baron_restore }
             every_in_list = { variable = tca_court_natural_capital_baronies
                 limit = {
@@ -276,7 +279,6 @@ tca_court_natural_test.2 = {
                 change_title_holder = { holder = var:tca_court_natural_capital_saved_baron change = scope:tca_court_natural_capital_baron_restore }
             }
             resolve_title_and_vassal_change = scope:tca_court_natural_capital_baron_restore
-            tca_test_military_council_cleanup_effect = yes
             # 归还临借县以后，私有帝国及准备期廷臣才可销毁；不能留下无主的测试宫廷。
             every_in_list = { list = tca_court_natural_initial_courtiers
                 if = { limit = { is_alive = yes is_ruler = no } scope:tca_court_natural_emperor = { add_courtier = prev } }
@@ -289,7 +291,23 @@ tca_court_natural_test.2 = {
                 NOT = { any_in_list = { variable = tca_court_natural_capital_baronies NOT = { holder = var:tca_court_natural_capital_saved_baron } } }
                 scope:tca_mcp_officer = { NOT = { has_variable = tca_military_council_lock_owner } NOT = { has_variable = block_fire_councillor } }
             } debug_log = "TCA_TEST CHECK_PASS tca_test_court_positions_natural_quarter 8" }
-            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_positions_natural_quarter 8" }
+            else = {
+                add_character_flag = tca_test_tca_military_court_positions_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_court_positions_natural_quarter 8"
+                # 归还头衔和内阁保护分别诊断，不以清除保护变量掩盖真实生命周期问题。
+                if = { limit = { NOT = { scope:tca_mcp_county = { holder = scope:tca_mcp_old_holder } } } debug_log = "TCA_COURT_NATURAL restore county failed" }
+                if = { limit = { NOT = { scope:tca_court_natural_capital_county = { holder = scope:tca_court_natural_capital_old_owner } } } debug_log = "TCA_COURT_NATURAL restore capital failed" }
+                every_in_list = { variable = tca_court_natural_capital_baronies
+                    limit = { NOT = { holder = var:tca_court_natural_capital_saved_baron } }
+                    debug_log = "TCA_COURT_NATURAL restore barony=[THIS.Title.GetKey]"
+                    holder ?= { debug_log = "TCA_COURT_NATURAL restore actual=[THIS.Char.GetID]" }
+                    var:tca_court_natural_capital_saved_baron = { debug_log = "TCA_COURT_NATURAL restore expected=[THIS.Char.GetID]" }
+                }
+                scope:tca_mcp_officer = {
+                    if = { limit = { has_variable = tca_military_council_lock_owner } debug_log = "TCA_COURT_NATURAL restore lock_owner remained" }
+                    if = { limit = { has_variable = block_fire_councillor } debug_log = "TCA_COURT_NATURAL restore block_fire remained" }
+                }
+            }
             # 私有帝国与全部自备人物先退出世界，再读取全朝真实计数；不提前改写统计或清失败。
             scope:tca_court_natural_emperor = {
                 tca_test_restore_character_effect = yes
