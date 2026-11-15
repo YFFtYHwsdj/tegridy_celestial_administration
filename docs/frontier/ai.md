@@ -93,7 +93,7 @@
 
 ## 局势参与组与阶段修正
 
-原版依据为`game/common/situation/situations/_situations.info`：同一人物在同一子区域只进入第一个满足条件的参与组，分组顺序有业务意义。正式三组职责以[玩法设计](design.md#参与资格与边疆身份)为准。
+原版依据为`game/common/situation/situations/_situations.info`：同一人物在同一子区域只进入第一个满足条件的参与组，分组顺序有业务意义。正式三组职责以[玩法设计](design.md#参与资格与边疆身份)为准。境内组对普通领主复用`any_sub_realm_county`检查本人领地，包含封臣土地，不向上扩大为全国；提刑、通判保留绑定治所分支。相关组只检查参与独立最高领主的直属无地官署，不再重复纳入最高领主本人。
 
 阶段`modifier_sets`可按组配置`character_modifier`与`county_modifier`，前者作用于参与人物，后者的文档定义为统治者参与者的全部直辖伯爵领（domain counties），不是含封臣的整个领地（realm）。最高领主的土地修正不会由该入口自动覆盖封臣土地；封臣须通过自己的参与组承接相应效果。原版`the_great_steppe.txt`专设`settled_rulers`组，为定居统治者的伯爵领施加肥力修正，可作为两类效果并用的实际用例。
 

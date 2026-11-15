@@ -57,17 +57,27 @@ tca_frontier_border_participant_trigger = {
     trigger_else = { always = no }
 }
 
-# 境内资格独立提供，原生组按边疆、境内、相关顺序取首个匹配，避免重复领取。
+# 普通领主按本人领地（含封臣）判断，不使用最高领主的全国领地，也不要求首府在北疆。
+# 已登记无地地方官署仍按正式治所判断；原生按边疆、境内、相关顺序匹配，不重复领取。
 tca_frontier_interior_participant_trigger = {
-    save_temporary_scope_as = tca_frontier_candidate
+    is_alive = yes
+    is_ruler = yes
     trigger_if = {
-        limit = { tca_frontier_has_anchor_trigger = yes }
-        scope:tca_frontier_anchor.title_province = { geographical_region = tca_frontier_region }
+        limit = { tca_is_landless_official_trigger = yes }
+        save_temporary_scope_as = tca_frontier_candidate
+        trigger_if = {
+            limit = { tca_frontier_has_anchor_trigger = yes }
+            scope:tca_frontier_anchor.title_province = { geographical_region = tca_frontier_region }
+        }
+        trigger_else = { always = no }
     }
-    trigger_else = { always = no }
+    trigger_else = {
+        primary_title ?= { is_landless_type_title = no is_noble_family_title = no }
+        tca_frontier_realm_has_land_trigger = yes
+    }
 }
 
-# 本国实际控制北疆土地；用于补入区外最高领主，不以法理、文化或朝贡替代。
+# 人物本人的实际领地，含直辖与封臣土地；不自动扩大到其最高领主的整个国家。
 tca_frontier_realm_has_land_trigger = {
     any_sub_realm_county = { title_province = { geographical_region = tca_frontier_region } }
 }
@@ -87,21 +97,16 @@ tca_frontier_is_office_trigger = {
     }
 }
 
-# 不递归：独立君主自身资格不依赖官署，直属官署才读取其君主的资格。
+# 只补充参与最高领主的直属无地官署；最高领主已由前两组覆盖，不再单列相关组分支。
+# 独立君主自身资格不依赖官署，避免递归；直属官署不向下级领主的官署扩散。
 tca_frontier_related_participant_trigger = {
     is_alive = yes
-    OR = {
-        AND = { is_independent_ruler = yes tca_frontier_realm_has_land_trigger = yes }
-        AND = {
-            tca_frontier_is_office_trigger = yes
-            liege = {
-                is_independent_ruler = yes
-                OR = {
-                    tca_frontier_border_participant_trigger = yes
-                    tca_frontier_interior_participant_trigger = yes
-                    tca_frontier_realm_has_land_trigger = yes
-                }
-            }
+    tca_frontier_is_office_trigger = yes
+    liege = {
+        is_independent_ruler = yes
+        OR = {
+            tca_frontier_border_participant_trigger = yes
+            tca_frontier_interior_participant_trigger = yes
         }
     }
 }

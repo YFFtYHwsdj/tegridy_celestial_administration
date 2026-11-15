@@ -1,7 +1,7 @@
 ﻿# 新规则专用独立局；参与者变更、真实战争与自然年度回调分别登记WORLD。
 namespace = tca_frontier_rules_test
 
-# 参与者：实际原生名单，包含首府南迁及无domicile中央官署。
+# 参与者：实际原生名单；南迁并转出全部北疆直辖后仍按封臣土地参与，含区外反例和无地部职。
 tca_frontier_rules_test.1 = {
     type = character_event hidden = yes
     immediate = {
@@ -9,7 +9,15 @@ tca_frontier_rules_test.1 = {
         remove_character_flag = tca_test_tca_frontier_rules_test_case_failed
         title:h_china.holder = { save_scope_as = tca_frontier_rules_test_actor }
         title:e_minister_of_personnel.holder ?= { save_scope_as = tca_frontier_rules_test_minister }
-        if = { limit = { NOT = { exists = situation:tca_northern_frontier } exists = scope:tca_frontier_rules_test_minister }
+        random_vassal_or_below = {
+            limit = { is_landed = yes highest_held_title_tier = tier_duchy capital_county = { title_province = { geographical_region = tca_frontier_region } } }
+            save_scope_as = tca_frontier_rules_test_northern_recipient
+        }
+        random_vassal_or_below = {
+            limit = { is_landed = yes NOT = { tca_frontier_realm_has_land_trigger = yes } NOT = { tca_frontier_border_participant_trigger = yes } }
+            save_scope_as = tca_frontier_rules_test_outside_lord
+        }
+        if = { limit = { NOT = { exists = situation:tca_northern_frontier } exists = scope:tca_frontier_rules_test_minister exists = scope:tca_frontier_rules_test_northern_recipient exists = scope:tca_frontier_rules_test_outside_lord }
             tca_frontier_situation_start_effect = yes
             # 不再手动预填有地名单；等待原生自动候选刷新，再核对实际分组。
             trigger_event = { id = tca_frontier_rules_test.2 days = 35 }
@@ -53,7 +61,22 @@ tca_frontier_rules_test.2 = {
         scope:tca_frontier_rules_test_actor = { create_title_and_vassal_change = { type = conquest save_scope_as = tca_frontier_rules_test_capital_change } }
         title:c_hangzhou = { change_title_holder = { holder = scope:tca_frontier_rules_test_actor change = scope:tca_frontier_rules_test_capital_change } }
         resolve_title_and_vassal_change = scope:tca_frontier_rules_test_capital_change
-        scope:tca_frontier_rules_test_actor = { set_realm_capital = title:c_hangzhou }
+        scope:tca_frontier_rules_test_actor = {
+            set_realm_capital = title:c_hangzhou
+            # 县与残余男爵领分别转交，确保本人已无北疆直辖；保留封臣辖下的北疆领地。
+            create_title_and_vassal_change = { type = granted save_scope_as = tca_frontier_rules_test_northern_counties }
+            every_held_title = {
+                limit = { tier = tier_county title_province = { geographical_region = tca_frontier_region } }
+                change_title_holder = { holder = scope:tca_frontier_rules_test_northern_recipient change = scope:tca_frontier_rules_test_northern_counties }
+            }
+            resolve_title_and_vassal_change = scope:tca_frontier_rules_test_northern_counties
+            create_title_and_vassal_change = { type = granted save_scope_as = tca_frontier_rules_test_northern_baronies }
+            every_held_title = {
+                limit = { tier = tier_barony title_province = { geographical_region = tca_frontier_region } }
+                change_title_holder = { holder = scope:tca_frontier_rules_test_northern_recipient change = scope:tca_frontier_rules_test_northern_baronies }
+            }
+            resolve_title_and_vassal_change = scope:tca_frontier_rules_test_northern_baronies
+        }
         trigger_event = { id = tca_frontier_rules_test.3 days = 35 }
     }
 }
@@ -64,15 +87,23 @@ tca_frontier_rules_test.3 = {
         if = { limit = { scope:tca_frontier_rules_test_actor = {
             capital_county = title:c_hangzhou
             NOT = { tca_frontier_border_participant_trigger = yes }
-            NOT = { tca_frontier_interior_participant_trigger = yes }
-            tca_frontier_related_participant_trigger = yes
-        } } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_participants 4" }
+            NOT = { any_held_title = { tier <= tier_county title_province = { geographical_region = tca_frontier_region } } }
+            tca_frontier_realm_has_land_trigger = yes
+            tca_frontier_interior_participant_trigger = yes
+            NOT = { tca_frontier_related_participant_trigger = yes }
+        }
+            scope:tca_frontier_rules_test_outside_lord = {
+                NOT = { tca_frontier_realm_has_land_trigger = yes }
+                NOT = { tca_frontier_interior_participant_trigger = yes }
+                NOT = { tca_frontier_related_participant_trigger = yes }
+            }
+        } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_participants 4" }
         else = { add_character_flag = tca_test_tca_frontier_rules_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_participants 4" }
         if = { limit = {
             situation:tca_northern_frontier = { NOT = { is_manual_participant = scope:tca_frontier_rules_test_actor } }
             situation:tca_northern_frontier.situation_sub_region:tca_frontier_all = {
-            any_situation_sub_region_participant_group = { participant_group_type = tca_frontier_related any_situation_group_participant = { this = scope:tca_frontier_rules_test_actor } }
-            NOT = { any_situation_sub_region_participant_group = { participant_group_type = tca_frontier_interior any_situation_group_participant = { this = scope:tca_frontier_rules_test_actor } } }
+            any_situation_sub_region_participant_group = { participant_group_type = tca_frontier_interior any_situation_group_participant = { this = scope:tca_frontier_rules_test_actor } }
+            NOT = { any_situation_sub_region_participant_group = { participant_group_type = tca_frontier_related any_situation_group_participant = { this = scope:tca_frontier_rules_test_actor } } }
         } } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_participants 5" }
         else = { add_character_flag = tca_test_tca_frontier_rules_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_participants 5" }
         tca_frontier_situation_end_effect = yes
