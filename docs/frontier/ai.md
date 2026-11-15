@@ -69,9 +69,9 @@
 
 当前debug原型已通过原生互动投递验证了受保护地方领主的脚本战争、单上级延迟加入及保存重载续接，见[验证页](verification.md)。这支持专属互动方向，不证明普通宣战界面或自然AI能够绕过原保护，也不证明完整军力估计已经可用。已有头衔兵士在地方和单上级军队中的实际集结，另由原生现场存档引用链核验，未见需要自建军队调用机制的问题。
 
-自定义寇边现采用专属人物互动加自有宣战界面的设计方向，旨在独立判断地方目标并灵活配置AI评分。早先优先普通宣战窗口的设想由此替代；原生军力与参战接口仍可作为可复用依据，不能假定互动会自动调用完整的自然宣战评估。
+正式方向改为“发动边境战争”互动、原生选择界面与自定义CB，首版由局势限制范围；旧自有窗口不再是交付依赖。互动仍须自行处理资格与战略评分，不自动调用完整自然宣战评估。
 
-`game/common/character_interactions/_character_interactions.info` 提供 `ai_targets`、`ai_frequency`、`ai_frequency_by_tier` 和 `ai_will_do`。其说明将`ai_will_do`定义为选出候选后检查的0—100发送概率；头衔互动另会逐个评估目标头衔，存在选项时选取最高评分组合。不能由此推断普通人物收件人必定取全局最高分。这为互动自身驱动AI提供依据，但自有界面中的全部选择能否进入同一评估路径，仍须验证。
+`game/common/character_interactions/_character_interactions.info` 提供 `ai_targets`、`ai_frequency`、`ai_frequency_by_tier` 和 `ai_will_do`。其说明将`ai_will_do`定义为选出候选后检查的0—100发送概率；头衔互动另会逐个评估目标头衔，存在选项时选取最高评分组合。不能由此推断普通人物收件人必定取全局最高分。这为互动自身驱动AI提供依据，但正式头衔与战争类型选择能否进入同一评估路径，仍须验证。
 
 `ai_will_do`在接口说明中是选定目标后执行的0至100意愿／概率，并会被限制在此范围；不能把它理解为任意大的CB分数，也不能只改一个值就假定有完整战略规划。候选目标和选项的优选说明不代表可以无代价穷举全国角色与头衔，需要限制候选范围和检查频率。
 
@@ -141,3 +141,31 @@
 
 
 适配文件须保持`zz_tca_cli_frontier_lifecycle_triggers.txt`名称：引擎的实际数据库冲突日志曾显示不带`zz_`时主文件反而覆盖适配，单看启用模组顺序和冻结文件内容不能证明关闭已生效。独立关闭用例同时读取实际解析的两个入口，并等待开局窗口结束，确认没有Situation、初始化、休止或排队标记；旧手动探针先创建对象，不能单独证明默认关闭。
+
+## 有限战争与追讨的技术核查
+
+以下是本机原版源码核查结果，不是新方案的引擎验收。玩法共识以[设计](design.md#持续控制目标与胜利)和[追讨](design.md#战后追讨)为准。
+
+### 原生互动选择
+
+`game/common/character_interactions/pam_interactions.txt`的`ecclesiastic_incite_claim_war_interaction`使用`target_type = title`、`target_filter = realm_titles`、`target_source = recipient`，以`populate_recipient_list`生成第二人物候选，并以`can_be_picked_title`过滤目标。`send_option`承载参战、资助等选择；`game/common/scripted_effects/pam_effects.txt`的`pam_incite_claim_war_effect`最终调用`start_war`和`claim_cb`。这是原生互动选择后脚本开战的依据，不是普通宣战窗口绕过封臣保护的依据；该原版互动明确要求收件人独立，资格也不能照搬到天朝。
+
+### 战争分数
+
+`game/common/casus_belli_types/_casus_belli.info`定义`full_occupation_by_attacker_gives_victory`、`max_attacker_score_from_occupation`、`max_attacker_score_from_battles`、`imprisonment_by_attacker_give_war_score`、`defender_capital_gives_war_score`及目标持续分数、延迟和控制比例字段。可配置取消完全占领自动满分、俘虏分数并限制战斗与占领来源；分数合计、全部目标失守、俘虏首领及持续控制后的真实读数须在独立局核验。字段存在不证明组合效果，也不证明实际议和路径。
+
+### 议和AI与低于满分的结算
+
+`game/common/character_interactions/00_war.txt`的`end_war_attacker_victory_interaction`分别定义`is_available`、`ai_will_do`、`ai_accept`与`auto_accept`。提议门槛有100、90、80、70分等分支，涉及和平缔造者、游牧宗族传承、首级威慑及征服者；不能把所有低于满分的分支都称作强制接受。接受基础为-99，再计分数和加成；自动接受另有满分、向进攻者投降及征服者军力分支。仅降低战争分数上限不能证明必须控制目标后才能结算，也不能靠调整`ai_accept`覆盖`auto_accept`。
+
+白和平的`end_war_attacker_white_peace_interaction`也分别维护提议与接受逻辑；接受值考虑战争分数、持续时间、债务、其他战争及性格等。后续须分别核对地方AI主动投降、接受胜利要求、提议和接受白和平，保留玩家自愿投降，不以全面禁议和代替援军判断。
+
+目前已查CB说明未提供独立的议和AI修正字段；上述互动内也未发现预留给本模组援军承诺的追加入口。精确接入可能需要覆盖必要的顶层互动对象，但尚未确认不存在免覆盖替代，故当前不新增覆盖、不改评分。若最终必须覆盖，保留原版逻辑，仅对指定CB及正确一方添加条件，并登记上游清单与基线；不得同路径覆盖整份`00_war.txt`。
+
+### 追讨结算与停战
+
+`game/common/casus_belli_types/00_claim.txt`在胜利、白和平及失败事务分别调用`add_truce_attacker_victory_effect`、`add_truce_white_peace_effect`、`add_truce_attacker_defeat_effect`。因此不能仅看CB的`truce_days`推断整场战争全部停战关系，更不能预先假定脚本开战不会产生违约成本。新CB、实际主战双方及已加入上级的停战结果须直接测量。
+
+原生`on_war_won_attacker`已有成功事务入口，但战争／CB作用域短命；本模块已知二级回调和瞬时结束的时序限制仍适用。承诺名单须以持久载体保存，不能将待追讨任务挂在销毁中的战争上。此轮未找到主动替换主防守者的通用脚本用例，继承字段不能作为移交接口证据；新方案无需依赖该接口。
+
+追讨必须另查原进攻者已交地、失去全部土地、已有战争、盟友、死亡及改隶。原进攻者与现持有人不一致时，既定的反向攻守身份与目标有效性可能冲突，属于设计待决，不可由测试偷偷替换防守者。
