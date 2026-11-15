@@ -1,0 +1,204 @@
+﻿# 正式三阶段修正的独立可丢弃WORLD；原生参考修正先校准收入，不能用定义常量冒充效果。
+# ROOT保持中国报告者；自建封建边疆县主仅为隔离官库拨款和兵士维护对收入的干扰。
+namespace = tca_frontier_phase_test
+
+tca_frontier_phase_test.1 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_frontier_phase_test.1 tca_test_frontier_phase_modifiers"
+        remove_character_flag = tca_test_tca_frontier_phase_test_case_failed
+        capital_county = { save_scope_as = tca_frontier_phase_test_inside }
+        title:e_minister_of_personnel.holder = { save_scope_as = tca_frontier_phase_test_related }
+        create_character = { age = 35 gender = male random_traits = no stewardship = { 10 10 } martial = { 10 10 } diplomacy = { 10 10 } learning = { 10 10 } intrigue = { 10 10 } culture = title:k_france.holder.culture faith = title:k_france.holder.faith location = root.capital_province save_scope_as = tca_frontier_phase_test_border }
+        scope:tca_frontier_phase_test_border = { tca_test_protect_character_effect = yes create_title_and_vassal_change = { type = granted save_scope_as = tca_frontier_phase_test_grant } }
+        title:c_lingzhou = { change_title_holder = { holder = scope:tca_frontier_phase_test_border change = scope:tca_frontier_phase_test_grant } }
+        resolve_title_and_vassal_change = scope:tca_frontier_phase_test_grant
+        scope:tca_frontier_phase_test_border = {
+            scriptedtests_recalculate_character_modifier = yes
+            change_government = feudal_government
+            set_focus = stewardship_domain_focus
+            capital_county = { change_county_control = 100 }
+            force_character_skill_recalculation = yes
+            if = { limit = { is_independent_ruler = no }
+                create_title_and_vassal_change = { type = independency save_scope_as = tca_frontier_phase_test_independent }
+                becomes_independent = { change = scope:tca_frontier_phase_test_independent }
+                resolve_title_and_vassal_change = scope:tca_frontier_phase_test_independent
+            }
+        }
+        # 提前固定高能力财政总管及无效果测试任务，避免AI任命或改派征税改变本底。
+        scope:tca_frontier_phase_test_border = {
+            create_character = { age = 35 gender = male random_traits = no culture = this.culture faith = this.faith employer = this stewardship = { 100 100 } save_scope_as = tca_frontier_phase_test_steward }
+            assign_councillor_type = { type = councillor_steward target = scope:tca_frontier_phase_test_steward fire_on_actions = no }
+        }
+        scope:tca_frontier_phase_test_steward = { tca_test_protect_character_effect = yes add_character_flag = tca_frontier_phase_test_fixed_steward block_firing_councillor_effect = { COURT_OWNER = scope:tca_frontier_phase_test_border } set_council_task = { task_type = tca_frontier_phase_test_idle_task } }
+        create_title_and_vassal_change = { type = granted save_scope_as = tca_frontier_phase_test_outside_grant }
+        title:c_hangzhou = { save_scope_as = tca_frontier_phase_test_outside change_title_holder = { holder = root change = scope:tca_frontier_phase_test_outside_grant } }
+        resolve_title_and_vassal_change = scope:tca_frontier_phase_test_outside_grant
+        trigger_event = { id = tca_frontier_phase_test.2 days = 35 }
+    }
+}
+
+tca_frontier_phase_test.2 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = {
+            NOT = { exists = situation:tca_northern_frontier }
+            tca_frontier_interior_participant_trigger = yes
+            scope:tca_frontier_phase_test_border = { tca_frontier_border_participant_trigger = yes scriptedtests_gold_income_no_theocracy > 0 }
+            scope:tca_frontier_phase_test_related = { tca_frontier_related_participant_trigger = yes }
+        }
+            debug_log = "TCA_FRONTIER_PHASE BASELINE"
+            scope:tca_frontier_phase_test_border = {
+                scriptedtests_recalculate_character_modifier = yes
+                set_variable = { name = tca_frontier_phase_test_bare value = scriptedtests_gold_income_no_theocracy }
+                capital_county = { add_county_modifier = { modifier = tca_frontier_phase_test_amity_county } }
+                add_character_modifier = { modifier = tca_frontier_phase_test_amity_person }
+            }
+            tca_frontier_phase_test_log_effect = yes
+            trigger_event = { id = tca_frontier_phase_test.3 days = 35 }
+        }
+        else = {
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_frontier_phase_modifiers"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+            trigger_event = tca_frontier_phase_test.99
+        }
+    }
+}
+
+tca_frontier_phase_test.3 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_FRONTIER_PHASE REFERENCE_AMITY"
+        tca_frontier_phase_test_log_effect = yes
+        scope:tca_frontier_phase_test_border = {
+            scriptedtests_recalculate_character_modifier = yes
+            set_variable = { name = tca_frontier_phase_test_amity_income value = scriptedtests_gold_income_no_theocracy }
+            capital_county = { remove_county_modifier = tca_frontier_phase_test_amity_county add_county_modifier = { modifier = tca_frontier_phase_test_tension_county } }
+            remove_character_modifier = tca_frontier_phase_test_amity_person
+            add_character_modifier = { modifier = tca_frontier_phase_test_tension_person }
+        }
+        trigger_event = { id = tca_frontier_phase_test.4 days = 35 }
+    }
+}
+
+tca_frontier_phase_test.4 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_FRONTIER_PHASE REFERENCE_TENSION"
+        tca_frontier_phase_test_log_effect = yes
+        scope:tca_frontier_phase_test_border = {
+            scriptedtests_recalculate_character_modifier = yes
+            set_variable = { name = tca_frontier_phase_test_tension_income value = scriptedtests_gold_income_no_theocracy }
+            capital_county = { remove_county_modifier = tca_frontier_phase_test_tension_county add_county_modifier = { modifier = tca_frontier_phase_test_warfare_county } }
+            remove_character_modifier = tca_frontier_phase_test_tension_person
+            add_character_modifier = { modifier = tca_frontier_phase_test_warfare_person }
+        }
+        trigger_event = { id = tca_frontier_phase_test.5 days = 35 }
+    }
+}
+
+tca_frontier_phase_test.5 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_FRONTIER_PHASE REFERENCE_WARFARE"
+        tca_frontier_phase_test_log_effect = yes
+        scope:tca_frontier_phase_test_border = {
+            scriptedtests_recalculate_character_modifier = yes
+            set_variable = { name = tca_frontier_phase_test_warfare_income value = scriptedtests_gold_income_no_theocracy }
+            capital_county = { remove_county_modifier = tca_frontier_phase_test_warfare_county }
+            remove_character_modifier = tca_frontier_phase_test_warfare_person
+        }
+        trigger_event = { id = tca_frontier_phase_test.6 days = 35 }
+    }
+}
+
+tca_frontier_phase_test.6 = {
+    type = character_event hidden = yes
+    immediate = {
+        scope:tca_frontier_phase_test_border = { scriptedtests_recalculate_character_modifier = yes }
+        if = { limit = { scope:tca_frontier_phase_test_border = {
+            scriptedtests_gold_income_no_theocracy = var:tca_frontier_phase_test_bare
+            var:tca_frontier_phase_test_amity_income < var:tca_frontier_phase_test_bare
+            var:tca_frontier_phase_test_tension_income < var:tca_frontier_phase_test_amity_income
+            var:tca_frontier_phase_test_warfare_income < var:tca_frontier_phase_test_tension_income
+        } } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_phase_modifiers 1" }
+        else = { add_character_flag = tca_test_tca_frontier_phase_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_phase_modifiers 1" }
+        tca_frontier_situation_start_effect = yes
+        trigger_event = { id = tca_frontier_phase_test.7 days = 35 }
+    }
+}
+
+tca_frontier_phase_test.7 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_FRONTIER_PHASE ACTUAL_TENSION"
+        tca_frontier_phase_test_log_effect = yes
+        if = { limit = {
+            situation:tca_northern_frontier.situation_sub_region:tca_frontier_all = {
+                sub_region_current_phase = tca_frontier_tension
+                any_situation_sub_region_participant_group = { participant_group_type = tca_frontier_border any_situation_group_participant = { this = scope:tca_frontier_phase_test_border } }
+                any_situation_sub_region_participant_group = { participant_group_type = tca_frontier_interior any_situation_group_participant = { this = root } }
+                any_situation_sub_region_participant_group = { participant_group_type = tca_frontier_related any_situation_group_participant = { this = scope:tca_frontier_phase_test_related } }
+            }
+            scope:tca_frontier_phase_test_border = { scriptedtests_gold_income_no_theocracy = var:tca_frontier_phase_test_tension_income }
+        } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_phase_modifiers 2" }
+        else = { add_character_flag = tca_test_tca_frontier_phase_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_phase_modifiers 2" }
+        situation:tca_northern_frontier.situation_sub_region:tca_frontier_all = { change_phase = tca_frontier_amity }
+        trigger_event = { id = tca_frontier_phase_test.8 days = 35 }
+    }
+}
+
+tca_frontier_phase_test.8 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_FRONTIER_PHASE ACTUAL_AMITY"
+        tca_frontier_phase_test_log_effect = yes
+        if = { limit = { scope:tca_frontier_phase_test_border = { scriptedtests_gold_income_no_theocracy = var:tca_frontier_phase_test_amity_income } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_phase_modifiers 3"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_phase_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_phase_modifiers 3" }
+        situation:tca_northern_frontier.situation_sub_region:tca_frontier_all = { change_phase = tca_frontier_warfare }
+        trigger_event = { id = tca_frontier_phase_test.9 days = 35 }
+    }
+}
+
+tca_frontier_phase_test.9 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_FRONTIER_PHASE ACTUAL_WARFARE"
+        tca_frontier_phase_test_log_effect = yes
+        if = { limit = { scope:tca_frontier_phase_test_border = { scriptedtests_gold_income_no_theocracy = var:tca_frontier_phase_test_warfare_income } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_phase_modifiers 4"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_phase_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_phase_modifiers 4" }
+        tca_frontier_situation_end_effect = yes
+        trigger_event = { id = tca_frontier_phase_test.10 days = 35 }
+    }
+}
+
+tca_frontier_phase_test.10 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_FRONTIER_PHASE ENDED"
+        tca_frontier_phase_test_log_effect = yes
+        if = { limit = { NOT = { exists = situation:tca_northern_frontier } scope:tca_frontier_phase_test_border = { scriptedtests_gold_income_no_theocracy = var:tca_frontier_phase_test_bare } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_phase_modifiers 5"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_phase_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_phase_modifiers 5" }
+        if = { limit = { has_character_flag = tca_test_tca_frontier_phase_test_case_failed }
+            debug_log = "TCA_TEST FAIL tca_test_frontier_phase_modifiers"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+        }
+        else = { debug_log = "TCA_TEST PASS tca_test_frontier_phase_modifiers" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        trigger_event = tca_frontier_phase_test.99
+    }
+}
+
+tca_frontier_phase_test.99 = {
+    type = character_event hidden = yes
+    immediate = {
+        scope:tca_frontier_phase_test_border = { tca_test_restore_character_effect = yes }
+        scope:tca_frontier_phase_test_steward = { tca_test_restore_character_effect = yes }
+        tca_test_lane_end_effect = { GROUP = tca_frontier_phase_test }
+    }
+}

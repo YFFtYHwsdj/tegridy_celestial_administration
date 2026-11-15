@@ -97,7 +97,9 @@
 
 阶段`modifier_sets`可按组配置`character_modifier`与`county_modifier`，前者作用于参与人物，后者的文档定义为统治者参与者的全部直辖伯爵领（domain counties），不是含封臣的整个领地（realm）。最高领主的土地修正不会由该入口自动覆盖封臣土地；封臣须通过自己的参与组承接相应效果。原版`the_great_steppe.txt`专设`settled_rulers`组，为定居统治者的伯爵领施加肥力修正，可作为两类效果并用的实际用例。
 
-参与条件中的`require_domain_in_sub_region`与`require_realm_in_sub_region`只分别要求区内存在直辖或领地，不能单凭资格条件推断效果范围。格式说明没有承诺地理裁剪；本机1.20.1.2独立探针已分别验证指定组和`all`的`county_modifier`：区内直辖样本生效，同一参与者的区外直辖、区内封臣及外国样本不变，结束后恢复。当前证据支持原生按区域裁剪直辖效果，具体测量、失败边界及复现命令见[作用范围探针](verification.md#county_modifier作用范围探针)。原生迁都及测试组往返切换已补验：首府在江南时，北疆直辖仍生效、江南直辖不受影响；旧组效果最终撤除。名单与县读数存在异步更新，不能承诺立即同步，探针有界等待后才判断。仅变更私有资格flag未触发退出；显式`remove_manual_participant`后最终清理通过。正式三组的全部身份变化、改隶、无地官署和经济军事modifier键仍未逐项验证，不代表完整P2验收。
+参与条件中的`require_domain_in_sub_region`与`require_realm_in_sub_region`只分别要求区内存在直辖或领地，不能单凭资格条件推断效果范围。格式说明没有承诺地理裁剪；本机1.20.1.2独立探针已分别验证指定组和`all`的`county_modifier`：区内直辖样本生效，同一参与者的区外直辖、区内封臣及外国样本不变，结束后恢复。当前证据支持原生按区域裁剪直辖效果，具体测量、失败边界及复现命令见[作用范围探针](verification.md#county_modifier作用范围探针)。原生迁都及测试组往返切换已补验：首府在江南时，北疆直辖仍生效、江南直辖不受影响；旧组效果最终撤除。名单与县读数存在异步更新，不能承诺立即同步，探针有界等待后才判断。仅变更私有资格flag未触发退出；显式`remove_manual_participant`后最终清理通过。这项范围探针不覆盖正式三组的全部身份变化、改隶、无地官署或全部经济军事modifier键；正式阶段的另行验收见[验证页](verification.md#正式三阶段修正)，不代表完整P2验收。
+
+正式三阶段在Situation自身的`modifier_sets`中按境内／边疆组分别写入，边疆县值已经包含区域基准，不再叠加`all`；相关组没有修正块。土地使用原生`tax_mult`、`garrison_size`与`levy_size`，人物使用`men_at_arms_recruitment_cost`与`defender_advantage`。数值只在[阶段修正设计](design.md#阶段负担与动员收益)维护。原版兵士窗口的`GetCostString`与`GetTitleRegimentCostString`可分别记录人物、头衔军报价，不能以报价替代实际扣款验收。`GetCommanderAdvantageDesc`只展示通用指挥优势，不能证明条件性`defender_advantage`已经传入战斗；防守方实际战斗、统治者与指挥官传递关系仍待验证。
 
 原版手动候选退出依据：`game/common/scripted_effects/10_dlc_tgp_scripted_effects.txt`的`destroy_held_ministry_titles_effect`在撤官后明确调用`remove_manual_participant`，`game/common/on_action/title_on_actions.txt`亦有按身份失效撤销手动候选的实际用例。探针沿用配对入口，未手工指定改组结果、切换阶段催生退出或直接删除县效果。
 

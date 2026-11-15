@@ -1,0 +1,33 @@
+﻿# 伯爵领作用域；只读原版Holding接口记录真实税收、驻军及征召。ROLE仅作日志标签。
+tca_frontier_phase_test_holding_log_effect = {
+    title_province = {
+        debug_log = "TCA_FRONTIER_PHASE_HOLDING $ROLE$ province=[THIS.Province.GetName] tax=[THIS.Province.GetHolding.GetIncome|3] garrison=[THIS.Province.GetHolding.GetMaxGarrisonSize] levies=[THIS.Province.GetHolding.GetMaxLevySize]"
+        debug_log = "TCA_FRONTIER_PHASE_TAX_DETAIL $ROLE$ [THIS.Province.GetHolding.GetTaxTooltip]"
+    }
+}
+
+# 人物作用域；原版兵士类型窗口使用相同报价函数。不代表已执行购买或实际战斗。
+tca_frontier_phase_test_person_log_effect = {
+    # 仅自建样本保持无积蓄，防止收入被AI用于招募或建设，改变后续本底。
+    if = { limit = { this = scope:tca_frontier_phase_test_border gold > 0 } remove_short_term_gold = gold }
+    set_variable = { name = tca_frontier_phase_test_current_income value = scriptedtests_gold_income_no_theocracy }
+    debug_log = "TCA_FRONTIER_PHASE_INCOME character=[THIS.Char.GetID] income=[THIS.Char.MakeScope.Var('tca_frontier_phase_test_current_income').GetValue]"
+    remove_variable = tca_frontier_phase_test_current_income
+    debug_log = "TCA_FRONTIER_PHASE_PRICE character=[THIS.Char.GetID] personal=[GetMaA('light_footmen').GetCostString(THIS.Char)] title=[GetMaA('light_footmen').GetTitleRegimentCostString(THIS.Char)]"
+    debug_log = "TCA_FRONTIER_PHASE_COMMANDER character=[THIS.Char.GetID] [THIS.Char.GetCommanderAdvantageDesc]"
+}
+
+# 报告者作用域；要求border/inside/outside/related四个saved scopes由本用例创建。
+tca_frontier_phase_test_log_effect = {
+    scope:tca_frontier_phase_test_steward = {
+        debug_log = "TCA_FRONTIER_PHASE_STEWARD character=[THIS.Char.GetID]"
+        employer ?= { debug_log = "TCA_FRONTIER_PHASE_STEWARD_EMPLOYER character=[THIS.Char.GetID]" }
+        if = { limit = { is_councillor_of = scope:tca_frontier_phase_test_border is_performing_council_task = tca_frontier_phase_test_idle_task } debug_log = "TCA_FRONTIER_PHASE_STEWARD_FIXED" }
+        else = { debug_log = "TCA_FRONTIER_PHASE_STEWARD_CHANGED" }
+    }
+    scope:tca_frontier_phase_test_border = { capital_county = { tca_frontier_phase_test_holding_log_effect = { ROLE = BORDER } } tca_frontier_phase_test_person_log_effect = yes }
+    scope:tca_frontier_phase_test_inside = { tca_frontier_phase_test_holding_log_effect = { ROLE = INTERIOR } }
+    scope:tca_frontier_phase_test_outside = { tca_frontier_phase_test_holding_log_effect = { ROLE = OUTSIDE } }
+    scope:tca_frontier_phase_test_related = { tca_frontier_phase_test_person_log_effect = yes }
+    tca_frontier_phase_test_person_log_effect = yes
+}
