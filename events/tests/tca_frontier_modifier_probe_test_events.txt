@@ -1,0 +1,475 @@
+﻿# 原生county_modifier作用范围探针；仅专属可丢弃WORLD，默认全量不派发。
+# ROOT为中国测试报告者；先验静态范围，再实际往返迁都与退出；不启动正式北疆局势。
+# 名单与县读数分别等待自然更新，最多45天；数值与空白对照相隔一日。
+namespace = tca_frontier_modifier_probe_test
+
+tca_frontier_modifier_probe_test.1 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_frontier_modifier_probe_test.1 tca_test_frontier_county_modifier_scope"
+        remove_character_flag = tca_test_tca_frontier_modifier_probe_test_case_failed
+        add_character_flag = tca_frontier_modifier_probe_test_owner
+        create_title_and_vassal_change = { type = granted save_scope_as = tca_frontier_modifier_probe_test_grant }
+        title:c_hangzhou = { change_title_holder = { holder = root change = scope:tca_frontier_modifier_probe_test_grant } }
+        resolve_title_and_vassal_change = scope:tca_frontier_modifier_probe_test_grant
+        trigger_event = { id = tca_frontier_modifier_probe_test.2 days = 3 }
+    }
+}
+
+tca_frontier_modifier_probe_test.2 = {
+    type = character_event hidden = yes
+    immediate = {
+        capital_county = { save_scope_as = tca_frontier_modifier_probe_test_inside }
+        title:c_hangzhou = { save_scope_as = tca_frontier_modifier_probe_test_outside }
+        random_county_in_region = {
+            region = tca_frontier_region
+            limit = { exists = holder holder = { NOT = { this = root } top_liege = root } }
+            save_scope_as = tca_frontier_modifier_probe_test_vassal
+        }
+        random_county_in_region = {
+            region = tca_frontier_region
+            limit = { exists = holder holder = { NOT = { top_liege = root } } }
+            save_scope_as = tca_frontier_modifier_probe_test_foreign
+        }
+        if = { limit = {
+            scope:tca_frontier_modifier_probe_test_inside = { holder = root title_province = { geographical_region = tca_frontier_region } }
+            scope:tca_frontier_modifier_probe_test_outside = { holder = root title_province = { NOT = { geographical_region = tca_frontier_region } } }
+            exists = scope:tca_frontier_modifier_probe_test_vassal
+            exists = scope:tca_frontier_modifier_probe_test_foreign
+            NOT = { exists = situation:tca_northern_frontier }
+            NOT = { exists = situation:tca_frontier_modifier_probe }
+        }
+            start_situation = { type = tca_frontier_modifier_probe }
+            situation:tca_frontier_modifier_probe = { add_manual_participant = root }
+            trigger_event = { id = tca_frontier_modifier_probe_test.3 days = 3 }
+        }
+        else = {
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_frontier_county_modifier_scope"
+            remove_character_flag = tca_frontier_modifier_probe_test_owner
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+            tca_test_lane_end_effect = { GROUP = tca_frontier_modifier_probe_test }
+        }
+    }
+}
+
+tca_frontier_modifier_probe_test.3 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = {
+            situation:tca_frontier_modifier_probe.situation_sub_region:tca_frontier_modifier_probe_region = {
+                sub_region_current_phase = tca_frontier_modifier_probe_control
+                any_situation_sub_region_participant_group = {
+                    participant_group_type = tca_frontier_modifier_probe_owner
+                    any_situation_group_participant = { this = root }
+                }
+                NOT = { any_situation_sub_region_participant = { NOT = { this = root } } }
+            }
+            scope:tca_frontier_modifier_probe_test_inside = { holder = root }
+            scope:tca_frontier_modifier_probe_test_outside = { holder = root }
+        } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_county_modifier_scope 1" }
+        else = { add_character_flag = tca_test_tca_frontier_modifier_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_county_modifier_scope 1" }
+        scope:tca_frontier_modifier_probe_test_inside = { tca_frontier_modifier_probe_test_snapshot_effect = yes }
+        scope:tca_frontier_modifier_probe_test_outside = { tca_frontier_modifier_probe_test_snapshot_effect = yes }
+        scope:tca_frontier_modifier_probe_test_vassal = { tca_frontier_modifier_probe_test_snapshot_effect = yes }
+        scope:tca_frontier_modifier_probe_test_foreign = { tca_frontier_modifier_probe_test_snapshot_effect = yes }
+        situation:tca_frontier_modifier_probe.situation_sub_region:tca_frontier_modifier_probe_region = { change_phase = tca_frontier_modifier_probe_group }
+        trigger_event = { id = tca_frontier_modifier_probe_test.4 days = 1 }
+    }
+}
+
+tca_frontier_modifier_probe_test.4 = {
+    type = character_event hidden = yes
+    immediate = {
+        scope:tca_frontier_modifier_probe_test_inside = { tca_frontier_modifier_probe_test_log_effect = { STAGE = GROUP ROLE = inside } }
+        scope:tca_frontier_modifier_probe_test_outside = { tca_frontier_modifier_probe_test_log_effect = { STAGE = GROUP ROLE = outside } }
+        scope:tca_frontier_modifier_probe_test_vassal = { tca_frontier_modifier_probe_test_log_effect = { STAGE = GROUP ROLE = vassal } }
+        scope:tca_frontier_modifier_probe_test_foreign = { tca_frontier_modifier_probe_test_log_effect = { STAGE = GROUP ROLE = foreign } }
+        if = { limit = { scope:tca_frontier_modifier_probe_test_inside = { holder = root monthly_county_control_growth = var:tca_frontier_modifier_probe_test_group } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_county_modifier_scope 2"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_modifier_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_county_modifier_scope 2" }
+        # 探索性分类：两种明确机制均记录；其它数值是失败，不能当成区域裁剪的证据。
+        if = { limit = { scope:tca_frontier_modifier_probe_test_outside = { holder = root monthly_county_control_growth = var:tca_frontier_modifier_probe_test_group } }
+            debug_log = "TCA_FRONTIER_MODIFIER_SCOPE GROUP OUTSIDE_APPLIED growth_delta=0.7"
+        }
+        else_if = { limit = { scope:tca_frontier_modifier_probe_test_outside = { holder = root monthly_county_control_growth = var:tca_frontier_modifier_probe_test_before } }
+            debug_log = "TCA_FRONTIER_MODIFIER_SCOPE GROUP OUTSIDE_CLIPPED delta=0"
+        }
+        if = { limit = { scope:tca_frontier_modifier_probe_test_outside = { holder = root OR = { monthly_county_control_growth = var:tca_frontier_modifier_probe_test_group monthly_county_control_growth = var:tca_frontier_modifier_probe_test_before } } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_county_modifier_scope 3"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_modifier_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_county_modifier_scope 3" }
+        if = { limit = {
+            scope:tca_frontier_modifier_probe_test_vassal = { holder = { NOT = { this = root } top_liege = root } monthly_county_control_growth = var:tca_frontier_modifier_probe_test_before }
+            scope:tca_frontier_modifier_probe_test_foreign = { holder = { NOT = { top_liege = root } } monthly_county_control_growth = var:tca_frontier_modifier_probe_test_before }
+        } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_county_modifier_scope 4" }
+        else = { add_character_flag = tca_test_tca_frontier_modifier_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_county_modifier_scope 4" }
+        situation:tca_frontier_modifier_probe.situation_sub_region:tca_frontier_modifier_probe_region = { change_phase = tca_frontier_modifier_probe_all }
+        trigger_event = { id = tca_frontier_modifier_probe_test.5 days = 1 }
+    }
+}
+
+tca_frontier_modifier_probe_test.5 = {
+    type = character_event hidden = yes
+    immediate = {
+        scope:tca_frontier_modifier_probe_test_inside = { tca_frontier_modifier_probe_test_log_effect = { STAGE = ALL ROLE = inside } }
+        scope:tca_frontier_modifier_probe_test_outside = { tca_frontier_modifier_probe_test_log_effect = { STAGE = ALL ROLE = outside } }
+        scope:tca_frontier_modifier_probe_test_vassal = { tca_frontier_modifier_probe_test_log_effect = { STAGE = ALL ROLE = vassal } }
+        scope:tca_frontier_modifier_probe_test_foreign = { tca_frontier_modifier_probe_test_log_effect = { STAGE = ALL ROLE = foreign } }
+        if = { limit = { scope:tca_frontier_modifier_probe_test_inside = { holder = root monthly_county_control_growth = var:tca_frontier_modifier_probe_test_all } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_county_modifier_scope 5"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_modifier_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_county_modifier_scope 5" }
+        if = { limit = { scope:tca_frontier_modifier_probe_test_outside = { holder = root monthly_county_control_growth = var:tca_frontier_modifier_probe_test_all } }
+            debug_log = "TCA_FRONTIER_MODIFIER_SCOPE ALL OUTSIDE_APPLIED growth_delta=1.1"
+        }
+        else_if = { limit = { scope:tca_frontier_modifier_probe_test_outside = { holder = root monthly_county_control_growth = var:tca_frontier_modifier_probe_test_before } }
+            debug_log = "TCA_FRONTIER_MODIFIER_SCOPE ALL OUTSIDE_CLIPPED delta=0"
+        }
+        if = { limit = { scope:tca_frontier_modifier_probe_test_outside = { holder = root OR = { monthly_county_control_growth = var:tca_frontier_modifier_probe_test_all monthly_county_control_growth = var:tca_frontier_modifier_probe_test_before } } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_county_modifier_scope 6"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_modifier_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_county_modifier_scope 6" }
+        if = { limit = {
+            scope:tca_frontier_modifier_probe_test_vassal = { holder = { NOT = { this = root } top_liege = root } monthly_county_control_growth = var:tca_frontier_modifier_probe_test_before }
+            scope:tca_frontier_modifier_probe_test_foreign = { holder = { NOT = { top_liege = root } } monthly_county_control_growth = var:tca_frontier_modifier_probe_test_before }
+        } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_county_modifier_scope 7" }
+        else = { add_character_flag = tca_test_tca_frontier_modifier_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_county_modifier_scope 7" }
+        situation:tca_frontier_modifier_probe = { end_situation = yes }
+        remove_character_flag = tca_frontier_modifier_probe_test_owner
+        trigger_event = { id = tca_frontier_modifier_probe_test.6 days = 1 }
+    }
+}
+
+tca_frontier_modifier_probe_test.6 = {
+    type = character_event hidden = yes
+    immediate = {
+        scope:tca_frontier_modifier_probe_test_inside = { tca_frontier_modifier_probe_test_log_effect = { STAGE = ENDED ROLE = inside } }
+        scope:tca_frontier_modifier_probe_test_outside = { tca_frontier_modifier_probe_test_log_effect = { STAGE = ENDED ROLE = outside } }
+        scope:tca_frontier_modifier_probe_test_vassal = { tca_frontier_modifier_probe_test_log_effect = { STAGE = ENDED ROLE = vassal } }
+        scope:tca_frontier_modifier_probe_test_foreign = { tca_frontier_modifier_probe_test_log_effect = { STAGE = ENDED ROLE = foreign } }
+        if = { limit = {
+            NOT = { exists = situation:tca_frontier_modifier_probe }
+            NOT = { exists = situation:tca_northern_frontier }
+            scope:tca_frontier_modifier_probe_test_inside = { holder = root monthly_county_control_growth = var:tca_frontier_modifier_probe_test_before }
+            scope:tca_frontier_modifier_probe_test_outside = { holder = root monthly_county_control_growth = var:tca_frontier_modifier_probe_test_before }
+            scope:tca_frontier_modifier_probe_test_vassal = { monthly_county_control_growth = var:tca_frontier_modifier_probe_test_before }
+            scope:tca_frontier_modifier_probe_test_foreign = { monthly_county_control_growth = var:tca_frontier_modifier_probe_test_before }
+        } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_county_modifier_scope 8" }
+        else = { add_character_flag = tca_test_tca_frontier_modifier_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_county_modifier_scope 8" }
+        # 静态探针已结束，保留原八条断言；同一独立世界继续测试动态名单。
+        scope:tca_frontier_modifier_probe_test_inside = { tca_frontier_modifier_probe_test_snapshot_effect = yes }
+        scope:tca_frontier_modifier_probe_test_outside = { tca_frontier_modifier_probe_test_snapshot_effect = yes }
+        scope:tca_frontier_modifier_probe_test_vassal = { tca_frontier_modifier_probe_test_snapshot_effect = yes }
+        scope:tca_frontier_modifier_probe_test_foreign = { tca_frontier_modifier_probe_test_snapshot_effect = yes }
+        add_character_flag = tca_frontier_modifier_probe_test_owner
+        start_situation = { type = tca_frontier_modifier_probe }
+        situation:tca_frontier_modifier_probe = { add_manual_participant = root }
+        situation:tca_frontier_modifier_probe.situation_sub_region:tca_frontier_modifier_probe_region = { change_phase = tca_frontier_modifier_probe_group }
+        trigger_event = { id = tca_frontier_modifier_probe_test.10 days = 1 }
+    }
+}
+
+# 重建后先验证北方组确有+7效果，随后在效果仍有效时实际迁都。
+tca_frontier_modifier_probe_test.10 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = {
+            capital_county = scope:tca_frontier_modifier_probe_test_inside
+            situation:tca_frontier_modifier_probe.situation_sub_region:tca_frontier_modifier_probe_region = {
+                any_situation_sub_region_participant_group = { participant_group_type = tca_frontier_modifier_probe_owner any_situation_group_participant = { this = root } }
+            }
+            scope:tca_frontier_modifier_probe_test_inside = { holder = root monthly_county_control_growth = var:tca_frontier_modifier_probe_test_group }
+            scope:tca_frontier_modifier_probe_test_outside = { holder = root monthly_county_control_growth = var:tca_frontier_modifier_probe_test_before }
+        } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_county_modifier_scope 9" }
+        else = { add_character_flag = tca_test_tca_frontier_modifier_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_county_modifier_scope 9" }
+        debug_log = "TCA_FRONTIER_MODIFIER_SCOPE SOUTH_MOVE date=[GetCurrentDate.GetStringLong]"
+        set_realm_capital = scope:tca_frontier_modifier_probe_test_outside
+        add_character_flag = { flag = tca_frontier_modifier_probe_test_waiting days = 45 }
+        trigger_event = { id = tca_frontier_modifier_probe_test.11 days = 1 }
+    }
+}
+
+# 只观察原生匹配，不调用名单重建或强制指定参与组；超时明确失败。
+tca_frontier_modifier_probe_test.11 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = {
+            situation:tca_frontier_modifier_probe.situation_sub_region:tca_frontier_modifier_probe_region = {
+                any_situation_sub_region_participant_group = { participant_group_type = tca_frontier_modifier_probe_southern_owner any_situation_group_participant = { this = root } }
+            }
+            scope:tca_frontier_modifier_probe_test_inside = { monthly_county_control_growth = var:tca_frontier_modifier_probe_test_south }
+        }
+            remove_character_flag = tca_frontier_modifier_probe_test_waiting
+            # 迁都后月初结算会改变江南样本本底；就绪后另等一周稳定再做相邻日对照。
+            # 不改预期、不调用效果刷新，不能把该等待解释为准确的引擎缓存周期。
+            trigger_event = { id = tca_frontier_modifier_probe_test.12 days = 7 }
+        }
+        else_if = { limit = { has_character_flag = tca_frontier_modifier_probe_test_waiting }
+            trigger_event = { id = tca_frontier_modifier_probe_test.11 days = 1 }
+        }
+        else = {
+            add_character_flag = tca_test_tca_frontier_modifier_probe_test_case_failed
+            debug_log = "TCA_FRONTIER_MODIFIER_SCOPE SOUTH_GROUP_TIMEOUT"
+            trigger_event = tca_frontier_modifier_probe_test.99
+        }
+    }
+}
+
+tca_frontier_modifier_probe_test.12 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = {
+            capital_county = title:c_hangzhou
+            scope:tca_frontier_modifier_probe_test_inside = { holder = root }
+            scope:tca_frontier_modifier_probe_test_outside = { holder = root }
+            situation:tca_frontier_modifier_probe.situation_sub_region:tca_frontier_modifier_probe_region = {
+                sub_region_current_phase = tca_frontier_modifier_probe_group
+                any_situation_sub_region_participant_group = { participant_group_type = tca_frontier_modifier_probe_southern_owner any_situation_group_participant = { this = root } }
+                NOT = { any_situation_sub_region_participant_group = { participant_group_type = tca_frontier_modifier_probe_owner any_situation_group_participant = { this = root } } }
+                NOT = { any_situation_sub_region_participant = { NOT = { this = root } } }
+            }
+        } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_county_modifier_scope 10" }
+        else = { add_character_flag = tca_test_tca_frontier_modifier_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_county_modifier_scope 10" }
+        tca_frontier_modifier_probe_test_capture_all_effect = yes
+        scope:tca_frontier_modifier_probe_test_inside = { tca_frontier_modifier_probe_test_log_effect = { STAGE = SOUTH_ACTIVE ROLE = inside } }
+        scope:tca_frontier_modifier_probe_test_outside = { tca_frontier_modifier_probe_test_log_effect = { STAGE = SOUTH_ACTIVE ROLE = outside } }
+        situation:tca_frontier_modifier_probe.situation_sub_region:tca_frontier_modifier_probe_region = { change_phase = tca_frontier_modifier_probe_control }
+        trigger_event = { id = tca_frontier_modifier_probe_test.13 days = 1 }
+    }
+}
+
+tca_frontier_modifier_probe_test.13 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_frontier_modifier_probe_test_snapshot_all_effect = yes
+        # 基准取迁都后的状态；有效读数须只有新组+13，不能残留原组+7或叠加成+20。
+        if = { limit = {
+            scope:tca_frontier_modifier_probe_test_inside = { var:tca_frontier_modifier_probe_test_active = var:tca_frontier_modifier_probe_test_south }
+            scope:tca_frontier_modifier_probe_test_outside = { var:tca_frontier_modifier_probe_test_active = var:tca_frontier_modifier_probe_test_before }
+            scope:tca_frontier_modifier_probe_test_vassal = { holder = { NOT = { this = root } top_liege = root } var:tca_frontier_modifier_probe_test_active = var:tca_frontier_modifier_probe_test_before }
+            scope:tca_frontier_modifier_probe_test_foreign = { holder = { NOT = { top_liege = root } } var:tca_frontier_modifier_probe_test_active = var:tca_frontier_modifier_probe_test_before }
+        } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_county_modifier_scope 11" }
+        else = { add_character_flag = tca_test_tca_frontier_modifier_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_county_modifier_scope 11" }
+        scope:tca_frontier_modifier_probe_test_inside = { tca_frontier_modifier_probe_test_log_effect = { STAGE = SOUTH_CONTROL ROLE = inside } }
+        scope:tca_frontier_modifier_probe_test_outside = { tca_frontier_modifier_probe_test_log_effect = { STAGE = SOUTH_CONTROL ROLE = outside } }
+        situation:tca_frontier_modifier_probe.situation_sub_region:tca_frontier_modifier_probe_region = { change_phase = tca_frontier_modifier_probe_all }
+        trigger_event = { id = tca_frontier_modifier_probe_test.14 days = 1 }
+    }
+}
+
+tca_frontier_modifier_probe_test.14 = {
+    type = character_event hidden = yes
+    immediate = {
+        scope:tca_frontier_modifier_probe_test_inside = { tca_frontier_modifier_probe_test_log_effect = { STAGE = SOUTH_ALL ROLE = inside } }
+        scope:tca_frontier_modifier_probe_test_outside = { tca_frontier_modifier_probe_test_log_effect = { STAGE = SOUTH_ALL ROLE = outside } }
+        scope:tca_frontier_modifier_probe_test_vassal = { tca_frontier_modifier_probe_test_log_effect = { STAGE = SOUTH_ALL ROLE = vassal } }
+        scope:tca_frontier_modifier_probe_test_foreign = { tca_frontier_modifier_probe_test_log_effect = { STAGE = SOUTH_ALL ROLE = foreign } }
+        if = { limit = {
+            capital_county = title:c_hangzhou
+            scope:tca_frontier_modifier_probe_test_inside = { holder = root monthly_county_control_growth = var:tca_frontier_modifier_probe_test_all }
+            scope:tca_frontier_modifier_probe_test_outside = { holder = root monthly_county_control_growth = var:tca_frontier_modifier_probe_test_before }
+            scope:tca_frontier_modifier_probe_test_vassal = { monthly_county_control_growth = var:tca_frontier_modifier_probe_test_before }
+            scope:tca_frontier_modifier_probe_test_foreign = { monthly_county_control_growth = var:tca_frontier_modifier_probe_test_before }
+        } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_county_modifier_scope 12" }
+        else = { add_character_flag = tca_test_tca_frontier_modifier_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_county_modifier_scope 12" }
+        situation:tca_frontier_modifier_probe.situation_sub_region:tca_frontier_modifier_probe_region = { change_phase = tca_frontier_modifier_probe_group }
+        trigger_event = { id = tca_frontier_modifier_probe_test.15 days = 1 }
+    }
+}
+
+tca_frontier_modifier_probe_test.15 = {
+    type = character_event hidden = yes
+    immediate = {
+        scope:tca_frontier_modifier_probe_test_inside = { tca_frontier_modifier_probe_test_log_effect = { STAGE = SOUTH_GROUP_AGAIN ROLE = inside } }
+        scope:tca_frontier_modifier_probe_test_outside = { tca_frontier_modifier_probe_test_log_effect = { STAGE = SOUTH_GROUP_AGAIN ROLE = outside } }
+        scope:tca_frontier_modifier_probe_test_vassal = { tca_frontier_modifier_probe_test_log_effect = { STAGE = SOUTH_GROUP_AGAIN ROLE = vassal } }
+        scope:tca_frontier_modifier_probe_test_foreign = { tca_frontier_modifier_probe_test_log_effect = { STAGE = SOUTH_GROUP_AGAIN ROLE = foreign } }
+        if = { limit = {
+            scope:tca_frontier_modifier_probe_test_inside = { monthly_county_control_growth = var:tca_frontier_modifier_probe_test_south }
+            scope:tca_frontier_modifier_probe_test_outside = { monthly_county_control_growth = var:tca_frontier_modifier_probe_test_before }
+        } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_county_modifier_scope 13" }
+        else = { add_character_flag = tca_test_tca_frontier_modifier_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_county_modifier_scope 13" }
+        debug_log = "TCA_FRONTIER_MODIFIER_SCOPE NORTH_MOVE date=[GetCurrentDate.GetStringLong]"
+        set_realm_capital = scope:tca_frontier_modifier_probe_test_inside
+        add_character_flag = { flag = tca_frontier_modifier_probe_test_waiting days = 45 }
+        trigger_event = { id = tca_frontier_modifier_probe_test.16 days = 1 }
+    }
+}
+
+tca_frontier_modifier_probe_test.16 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = {
+            situation:tca_frontier_modifier_probe.situation_sub_region:tca_frontier_modifier_probe_region = {
+                any_situation_sub_region_participant_group = { participant_group_type = tca_frontier_modifier_probe_owner any_situation_group_participant = { this = root } }
+            }
+            scope:tca_frontier_modifier_probe_test_inside = { monthly_county_control_growth = var:tca_frontier_modifier_probe_test_group }
+        }
+            remove_character_flag = tca_frontier_modifier_probe_test_waiting
+            trigger_event = { id = tca_frontier_modifier_probe_test.17 days = 7 }
+        }
+        else_if = { limit = { has_character_flag = tca_frontier_modifier_probe_test_waiting }
+            trigger_event = { id = tca_frontier_modifier_probe_test.16 days = 1 }
+        }
+        else = {
+            add_character_flag = tca_test_tca_frontier_modifier_probe_test_case_failed
+            debug_log = "TCA_FRONTIER_MODIFIER_SCOPE NORTH_GROUP_TIMEOUT"
+            trigger_event = tca_frontier_modifier_probe_test.99
+        }
+    }
+}
+
+tca_frontier_modifier_probe_test.17 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = {
+            capital_county = scope:tca_frontier_modifier_probe_test_inside
+            situation:tca_frontier_modifier_probe.situation_sub_region:tca_frontier_modifier_probe_region = {
+                sub_region_current_phase = tca_frontier_modifier_probe_group
+                any_situation_sub_region_participant_group = { participant_group_type = tca_frontier_modifier_probe_owner any_situation_group_participant = { this = root } }
+                NOT = { any_situation_sub_region_participant_group = { participant_group_type = tca_frontier_modifier_probe_southern_owner any_situation_group_participant = { this = root } } }
+            }
+        } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_county_modifier_scope 14" }
+        else = { add_character_flag = tca_test_tca_frontier_modifier_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_county_modifier_scope 14" }
+        tca_frontier_modifier_probe_test_capture_all_effect = yes
+        scope:tca_frontier_modifier_probe_test_inside = { tca_frontier_modifier_probe_test_log_effect = { STAGE = NORTH_ACTIVE ROLE = inside } }
+        scope:tca_frontier_modifier_probe_test_outside = { tca_frontier_modifier_probe_test_log_effect = { STAGE = NORTH_ACTIVE ROLE = outside } }
+        situation:tca_frontier_modifier_probe.situation_sub_region:tca_frontier_modifier_probe_region = { change_phase = tca_frontier_modifier_probe_control }
+        trigger_event = { id = tca_frontier_modifier_probe_test.18 days = 1 }
+    }
+}
+
+tca_frontier_modifier_probe_test.18 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_frontier_modifier_probe_test_snapshot_all_effect = yes
+        if = { limit = {
+            scope:tca_frontier_modifier_probe_test_inside = { var:tca_frontier_modifier_probe_test_active = var:tca_frontier_modifier_probe_test_group }
+            scope:tca_frontier_modifier_probe_test_outside = { var:tca_frontier_modifier_probe_test_active = var:tca_frontier_modifier_probe_test_before }
+            scope:tca_frontier_modifier_probe_test_vassal = { var:tca_frontier_modifier_probe_test_active = var:tca_frontier_modifier_probe_test_before }
+            scope:tca_frontier_modifier_probe_test_foreign = { var:tca_frontier_modifier_probe_test_active = var:tca_frontier_modifier_probe_test_before }
+        } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_county_modifier_scope 15" }
+        else = { add_character_flag = tca_test_tca_frontier_modifier_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_county_modifier_scope 15" }
+        situation:tca_frontier_modifier_probe.situation_sub_region:tca_frontier_modifier_probe_region = { change_phase = tca_frontier_modifier_probe_group }
+        trigger_event = { id = tca_frontier_modifier_probe_test.19 days = 1 }
+    }
+}
+
+tca_frontier_modifier_probe_test.19 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = {
+            scope:tca_frontier_modifier_probe_test_inside = { monthly_county_control_growth = var:tca_frontier_modifier_probe_test_group }
+            scope:tca_frontier_modifier_probe_test_outside = { monthly_county_control_growth = var:tca_frontier_modifier_probe_test_before }
+        } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_county_modifier_scope 16" }
+        else = { add_character_flag = tca_test_tca_frontier_modifier_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_county_modifier_scope 16" }
+        tca_frontier_modifier_probe_test_exit_reference_effect = yes
+        remove_character_flag = tca_frontier_modifier_probe_test_owner
+        # 与进入时add_manual_participant配对；原版撤官同样显式撤销手动候选。
+        # 只改私有flag不会通知名单重算，不能冒充正式退出入口。
+        debug_log = "TCA_FRONTIER_MODIFIER_SCOPE EXPLICIT_EXIT date=[GetCurrentDate.GetStringLong]"
+        situation:tca_frontier_modifier_probe = { remove_manual_participant = root }
+        add_character_flag = { flag = tca_frontier_modifier_probe_test_waiting days = 45 }
+        trigger_event = { id = tca_frontier_modifier_probe_test.20 days = 1 }
+    }
+}
+
+tca_frontier_modifier_probe_test.20 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = {
+            situation:tca_frontier_modifier_probe.situation_sub_region:tca_frontier_modifier_probe_region = {
+                NOT = { any_situation_sub_region_participant = { this = root } }
+            }
+            scope:tca_frontier_modifier_probe_test_inside = { monthly_county_control_growth = var:tca_frontier_modifier_probe_test_exit_expected }
+        }
+            remove_character_flag = tca_frontier_modifier_probe_test_waiting
+            trigger_event = { id = tca_frontier_modifier_probe_test.21 days = 1 }
+        }
+        else_if = { limit = { has_character_flag = tca_frontier_modifier_probe_test_waiting }
+            # 名单已退出时冻结最后有效参考，不能对可能已清理的读数再减一次0.7。
+            if = { limit = {
+                situation:tca_frontier_modifier_probe.situation_sub_region:tca_frontier_modifier_probe_region = {
+                    any_situation_sub_region_participant_group = { participant_group_type = tca_frontier_modifier_probe_owner any_situation_group_participant = { this = root } }
+                }
+            } tca_frontier_modifier_probe_test_exit_reference_effect = yes }
+            trigger_event = { id = tca_frontier_modifier_probe_test.20 days = 1 }
+        }
+        else = {
+            add_character_flag = tca_test_tca_frontier_modifier_probe_test_case_failed
+            debug_log = "TCA_FRONTIER_MODIFIER_SCOPE EXIT_TIMEOUT"
+            trigger_event = tca_frontier_modifier_probe_test.99
+        }
+    }
+}
+
+tca_frontier_modifier_probe_test.21 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = {
+            situation:tca_frontier_modifier_probe.situation_sub_region:tca_frontier_modifier_probe_region = {
+                sub_region_current_phase = tca_frontier_modifier_probe_group
+                NOT = { any_situation_sub_region_participant = { this = root } }
+            }
+            scope:tca_frontier_modifier_probe_test_inside = { holder = root monthly_county_control_growth = var:tca_frontier_modifier_probe_test_exit_expected }
+            scope:tca_frontier_modifier_probe_test_outside = { holder = root monthly_county_control_growth = var:tca_frontier_modifier_probe_test_exit_expected }
+            scope:tca_frontier_modifier_probe_test_vassal = { monthly_county_control_growth = var:tca_frontier_modifier_probe_test_exit_expected }
+            scope:tca_frontier_modifier_probe_test_foreign = { monthly_county_control_growth = var:tca_frontier_modifier_probe_test_exit_expected }
+        } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_county_modifier_scope 17" }
+        else = { add_character_flag = tca_test_tca_frontier_modifier_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_county_modifier_scope 17" }
+        tca_frontier_modifier_probe_test_capture_all_effect = yes
+        scope:tca_frontier_modifier_probe_test_inside = { tca_frontier_modifier_probe_test_log_effect = { STAGE = EXITED_ACTIVE_PHASE ROLE = inside } }
+        scope:tca_frontier_modifier_probe_test_outside = { tca_frontier_modifier_probe_test_log_effect = { STAGE = EXITED_ACTIVE_PHASE ROLE = outside } }
+        situation:tca_frontier_modifier_probe.situation_sub_region:tca_frontier_modifier_probe_region = { change_phase = tca_frontier_modifier_probe_control }
+        trigger_event = { id = tca_frontier_modifier_probe_test.22 days = 1 }
+    }
+}
+
+tca_frontier_modifier_probe_test.22 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_frontier_modifier_probe_test_snapshot_all_effect = yes
+        if = { limit = {
+            scope:tca_frontier_modifier_probe_test_inside = { var:tca_frontier_modifier_probe_test_active = var:tca_frontier_modifier_probe_test_before }
+            scope:tca_frontier_modifier_probe_test_outside = { var:tca_frontier_modifier_probe_test_active = var:tca_frontier_modifier_probe_test_before }
+            scope:tca_frontier_modifier_probe_test_vassal = { var:tca_frontier_modifier_probe_test_active = var:tca_frontier_modifier_probe_test_before }
+            scope:tca_frontier_modifier_probe_test_foreign = { var:tca_frontier_modifier_probe_test_active = var:tca_frontier_modifier_probe_test_before }
+        } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_county_modifier_scope 18" }
+        else = { add_character_flag = tca_test_tca_frontier_modifier_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_county_modifier_scope 18" }
+        situation:tca_frontier_modifier_probe = { end_situation = yes }
+        trigger_event = { id = tca_frontier_modifier_probe_test.23 days = 1 }
+    }
+}
+
+tca_frontier_modifier_probe_test.23 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = {
+            NOT = { exists = situation:tca_frontier_modifier_probe }
+            NOT = { exists = situation:tca_northern_frontier }
+            scope:tca_frontier_modifier_probe_test_inside = { monthly_county_control_growth = var:tca_frontier_modifier_probe_test_before }
+            scope:tca_frontier_modifier_probe_test_outside = { monthly_county_control_growth = var:tca_frontier_modifier_probe_test_before }
+            scope:tca_frontier_modifier_probe_test_vassal = { monthly_county_control_growth = var:tca_frontier_modifier_probe_test_before }
+            scope:tca_frontier_modifier_probe_test_foreign = { monthly_county_control_growth = var:tca_frontier_modifier_probe_test_before }
+        } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_county_modifier_scope 19" }
+        else = { add_character_flag = tca_test_tca_frontier_modifier_probe_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_county_modifier_scope 19" }
+        trigger_event = tca_frontier_modifier_probe_test.99
+    }
+}
+
+# 正常结束与等待超时共用收尾，失败不改写为跳过；独立世界随后丢弃。
+tca_frontier_modifier_probe_test.99 = {
+    type = character_event hidden = yes
+    immediate = {
+        remove_character_flag = tca_frontier_modifier_probe_test_owner
+        remove_character_flag = tca_frontier_modifier_probe_test_waiting
+        situation:tca_frontier_modifier_probe ?= { end_situation = yes }
+        if = { limit = { has_character_flag = tca_test_tca_frontier_modifier_probe_test_case_failed }
+            debug_log = "TCA_TEST FAIL tca_test_frontier_county_modifier_scope"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+        }
+        else = { debug_log = "TCA_TEST PASS tca_test_frontier_county_modifier_scope" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        tca_test_lane_end_effect = { GROUP = tca_frontier_modifier_probe_test }
+    }
+}

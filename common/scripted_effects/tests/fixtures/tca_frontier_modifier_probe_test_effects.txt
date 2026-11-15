@@ -1,0 +1,55 @@
+﻿# 伯爵领作用域；记录原生每月增长值并计算各实验的预期增量。不施加修正、不改控制力。
+# 1.20.1.2同一原生样本实测：+7/+11的增长倍率修正分别增加0.7/1.1月增长；
+# 比较增长读数，不把输入的倍率修正值误当成最终增长值。所有状态为本探针私有，整局丢弃；正式Situation使用的效果不调用本入口。
+tca_frontier_modifier_probe_test_snapshot_effect = {
+    set_variable = { name = tca_frontier_modifier_probe_test_before value = monthly_county_control_growth }
+    set_variable = { name = tca_frontier_modifier_probe_test_group value = { value = var:tca_frontier_modifier_probe_test_before add = 0.7 } }
+    set_variable = { name = tca_frontier_modifier_probe_test_south value = { value = var:tca_frontier_modifier_probe_test_before add = 1.3 } }
+    set_variable = { name = tca_frontier_modifier_probe_test_all value = { value = var:tca_frontier_modifier_probe_test_before add = 1.1 } }
+}
+
+# 伯爵领作用域；ROLE/STAGE只用于日志标签。读取真实月增长与基准，转回报告者输出数值。
+tca_frontier_modifier_probe_test_log_effect = {
+    save_scope_value_as = { name = tca_frontier_modifier_probe_test_current value = monthly_county_control_growth }
+    save_scope_value_as = { name = tca_frontier_modifier_probe_test_base value = var:tca_frontier_modifier_probe_test_before }
+    root = {
+        set_variable = { name = tca_frontier_modifier_probe_test_current value = scope:tca_frontier_modifier_probe_test_current }
+        set_variable = { name = tca_frontier_modifier_probe_test_base value = scope:tca_frontier_modifier_probe_test_base }
+        if = { limit = { has_variable = tca_frontier_modifier_probe_test_base has_variable = tca_frontier_modifier_probe_test_current }
+            debug_log = "TCA_FRONTIER_MODIFIER_SCOPE date=[GetCurrentDate.GetStringLong] stage=$STAGE$ role=$ROLE$ base=[THIS.Char.MakeScope.Var('tca_frontier_modifier_probe_test_base').GetValue] current=[THIS.Char.MakeScope.Var('tca_frontier_modifier_probe_test_current').GetValue]"
+        }
+        remove_variable = tca_frontier_modifier_probe_test_base
+        remove_variable = tca_frontier_modifier_probe_test_current
+    }
+}
+
+# 伯爵领作用域；先保存有效组下的原生增长，随后切控制阶段取迁都后的相邻日基准。
+# 不沿用迁都前基准，以免首府变化和自然维护被误认为旧组残留。
+tca_frontier_modifier_probe_test_capture_effect = {
+    set_variable = { name = tca_frontier_modifier_probe_test_active value = monthly_county_control_growth }
+}
+
+# 报告者作用域；要求本用例四个县saved scopes仍有效。重取当前首府状态下的基准。
+tca_frontier_modifier_probe_test_snapshot_all_effect = {
+    scope:tca_frontier_modifier_probe_test_inside = { tca_frontier_modifier_probe_test_snapshot_effect = yes }
+    scope:tca_frontier_modifier_probe_test_outside = { tca_frontier_modifier_probe_test_snapshot_effect = yes }
+    scope:tca_frontier_modifier_probe_test_vassal = { tca_frontier_modifier_probe_test_snapshot_effect = yes }
+    scope:tca_frontier_modifier_probe_test_foreign = { tca_frontier_modifier_probe_test_snapshot_effect = yes }
+}
+
+# 报告者作用域；保存切换控制阶段前四个样本的实际读数，不改阶段、组或县。
+tca_frontier_modifier_probe_test_capture_all_effect = {
+    scope:tca_frontier_modifier_probe_test_inside = { tca_frontier_modifier_probe_test_capture_effect = yes }
+    scope:tca_frontier_modifier_probe_test_outside = { tca_frontier_modifier_probe_test_capture_effect = yes }
+    scope:tca_frontier_modifier_probe_test_vassal = { tca_frontier_modifier_probe_test_capture_effect = yes }
+    scope:tca_frontier_modifier_probe_test_foreign = { tca_frontier_modifier_probe_test_capture_effect = yes }
+}
+
+# 报告者作用域；退出等待期间逐日记录最后一次仍在北方组时的读数。
+# 退出时须比最后有效读数少0.7，不只依赖退出后切空白阶段的比较。
+tca_frontier_modifier_probe_test_exit_reference_effect = {
+    scope:tca_frontier_modifier_probe_test_inside = { set_variable = { name = tca_frontier_modifier_probe_test_exit_expected value = { value = monthly_county_control_growth subtract = 0.7 } } }
+    scope:tca_frontier_modifier_probe_test_outside = { set_variable = { name = tca_frontier_modifier_probe_test_exit_expected value = monthly_county_control_growth } }
+    scope:tca_frontier_modifier_probe_test_vassal = { set_variable = { name = tca_frontier_modifier_probe_test_exit_expected value = monthly_county_control_growth } }
+    scope:tca_frontier_modifier_probe_test_foreign = { set_variable = { name = tca_frontier_modifier_probe_test_exit_expected value = monthly_county_control_growth } }
+}
