@@ -1,0 +1,41 @@
+﻿# 天朝任官评分：只读取候选人的核定官品与现有功绩，不写资源、身份或授品事务。
+# 共用入口为 appointment_score_governor，文武地方、中央、通判与提刑各调用一次。
+# 满额仅此处配置；门槛复用原版对象，避免另存逐品平衡参数。
+tca_merit_surplus_appointment_max_score_value = 30
+
+# 人物作用域；返回当前核定官品的功绩基准，未入品返回0。
+# 授品同链必须使用 tca_merit_level_value，不能读取尚未跨日确认的原生等级。
+tca_merit_current_threshold_value = {
+    value = 0
+    if = { limit = { tca_merit_level_value = 1 } value = merit_level_1_value }
+    else_if = { limit = { tca_merit_level_value = 2 } value = merit_level_2_value }
+    else_if = { limit = { tca_merit_level_value = 3 } value = merit_level_3_value }
+    else_if = { limit = { tca_merit_level_value = 4 } value = merit_level_4_value }
+    else_if = { limit = { tca_merit_level_value = 5 } value = merit_level_5_value }
+    else_if = { limit = { tca_merit_level_value = 6 } value = merit_level_6_value }
+    else_if = { limit = { tca_merit_level_value = 7 } value = merit_level_7_value }
+    else_if = { limit = { tca_merit_level_value = 8 } value = merit_level_8_value }
+    else_if = { limit = { tca_merit_level_value = 9 } value = merit_level_9_value }
+}
+
+# 人物（任命候选）作用域；无需目标头衔、参数或预存作用域，输出0至满额的整数分。
+# 九品至二品按距一品门槛的剩余空间归一化；一品直接不计，进入除法前排除零分母。
+# 先钳余额差、乘满额再除，避免定点运算过早截断比例；最后向下取整，非四舍五入。
+# 非天朝领主下返回0，保留贤能制规则；没有文武、实土或考试身份限制。
+tca_merit_surplus_appointment_score_value = {
+    value = 0
+    if = {
+        limit = {
+            top_liege ?= { government_has_flag = government_is_celestial }
+            tca_merit_level_value >= 1
+            tca_merit_level_value <= 8
+        }
+        value = merit
+        subtract = tca_merit_current_threshold_value
+        min = 0
+        max = { value = merit_level_9_value subtract = tca_merit_current_threshold_value }
+        multiply = tca_merit_surplus_appointment_max_score_value
+        divide = { value = merit_level_9_value subtract = tca_merit_current_threshold_value }
+        floor = yes
+    }
+}
