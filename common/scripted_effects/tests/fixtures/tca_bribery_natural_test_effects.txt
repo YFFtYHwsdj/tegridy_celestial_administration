@@ -1,0 +1,331 @@
+﻿# 自然AI夹具；报告者作用域，创建同朝私有人物／头衔并临时借非首府县，不修改正式互动或概率。
+# 借县和保护原任／男爵的状态由本夹具归还；不回滚观察期间人物自身的自然升迁或领属变化。
+tca_test_bribery_natural_prepare_effect = {
+    save_scope_as = tca_bribery_natural_reporter
+    clear_variable_list = tca_bribery_natural_people
+    clear_variable_list = tca_bribery_natural_observers
+    clear_variable_list = tca_bribery_natural_actors
+    clear_variable_list = tca_bribery_natural_borrowed
+    clear_variable_list = tca_bribery_natural_original_people
+    clear_variable_list = tca_bribery_natural_baronies
+    clear_variable_list = tca_bribery_natural_titles
+    # 空无地天朝的附庸会被原生维护归入首府所在天朝；自建演员直接留在真实中国，
+    # 不借县、不反复改领属。最高领主为真实报告者，仅用于只读排除观察。
+    save_scope_as = tca_bribery_natural_emperor
+    tca_test_bribery_natural_create_group_effect = { TARGET = tca_bribery_natural_thin TIER = 1 }
+    tca_test_bribery_natural_create_group_effect = { TARGET = tca_bribery_natural_generous TIER = 2 }
+    tca_test_bribery_natural_create_group_effect = { TARGET = tca_bribery_natural_lavish TIER = 3 }
+    # 独立无地天朝只作为外朝反例，不承载自然AI付款者或受贿目标。
+    tca_test_create_merit_interface_character_effect = { CHARACTER = tca_bribery_natural_foreign GOVERNMENT = celestial_government }
+    scope:tca_bribery_natural_foreign = { set_merit_level = 1 save_scope_as = tca_bribery_natural_person }
+    add_to_variable_list = { name = tca_bribery_natural_people target = scope:tca_bribery_natural_person }
+    create_dynamic_title = { tier = hegemony name = tca_test_arrest_office_name }
+    scope:new_title = { save_scope_as = tca_bribery_natural_empire set_capital_county = root.capital_county set_landless_title = yes set_delete_on_destroy = yes }
+    add_to_variable_list = { name = tca_bribery_natural_titles target = scope:tca_bribery_natural_empire }
+    create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_bribery_natural_grant }
+    scope:tca_bribery_natural_empire = { change_title_holder = { holder = scope:tca_bribery_natural_foreign change = scope:tca_bribery_natural_grant } }
+    resolve_title_and_vassal_change = scope:tca_bribery_natural_grant
+    scope:tca_bribery_natural_foreign = {
+        change_government = celestial_government
+        if = { limit = { is_independent_ruler = yes } debug_log = "TCA_BRIBERY_NATURAL prepare_foreign_independent=yes" }
+        else = { debug_log = "TCA_BRIBERY_NATURAL prepare_foreign_independent=no top=[THIS.Char.GetTopLiege.GetID]" }
+    }
+    set_variable = { name = tca_bribery_natural_days value = 0 }
+    set_variable = { name = tca_bribery_natural_seen_1 value = 0 }
+    set_variable = { name = tca_bribery_natural_seen_2 value = 0 }
+    set_variable = { name = tca_bribery_natural_seen_3 value = 0 }
+}
+
+# 报告者作用域；TARGET输出本组受贿者，TIER仅设定人格／关系，不写报价选项。
+# 每组八位富有的有地AI付款者，原生档位9及准备期直属关系提供正式目标权重；仍可能随机不发送。
+tca_test_bribery_natural_create_group_effect = {
+    tca_test_create_merit_interface_character_effect = { CHARACTER = $TARGET$ GOVERNMENT = celestial_government }
+    scope:$TARGET$ = { set_merit_level = 1 remove_short_term_gold = gold add_gold = 75 save_scope_as = tca_bribery_natural_person }
+    add_to_variable_list = { name = tca_bribery_natural_people target = scope:tca_bribery_natural_person }
+    add_to_variable_list = { name = tca_bribery_natural_observers target = scope:tca_bribery_natural_person }
+    create_dynamic_title = { tier = duchy name = tca_test_arrest_office_name }
+    scope:new_title = { save_scope_as = tca_bribery_natural_duchy set_capital_county = root.capital_county set_landless_title = yes set_delete_on_destroy = yes }
+    add_to_variable_list = { name = tca_bribery_natural_titles target = scope:tca_bribery_natural_duchy }
+    create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_bribery_natural_grant }
+    scope:tca_bribery_natural_duchy = { change_title_holder = { holder = scope:$TARGET$ change = scope:tca_bribery_natural_grant } }
+    resolve_title_and_vassal_change = scope:tca_bribery_natural_grant
+    scope:$TARGET$ = {
+        change_government = celestial_government
+        create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_bribery_natural_fealty }
+        change_liege = { liege = scope:tca_bribery_natural_emperor change = scope:tca_bribery_natural_fealty }
+        resolve_title_and_vassal_change = scope:tca_bribery_natural_fealty
+        set_variable = { name = tca_bribery_natural_tier value = $TIER$ }
+        # 通过既有正式上限接口准备高品级目标，第二日缓存生效后才设原生档位9。
+        add_character_flag = tca_merit_active
+        add_character_flag = tca_merit_grant_suppress
+        set_variable = { name = tca_merit_approved_level value = 9 }
+        tca_merit_refresh_cap_effect = yes
+        # 正直但贪财的受贿者仍可能被关系／困境说动；其正式主动兴趣为零，
+        # 避免收款当日又自行行贿，干扰精确入账观察。薄礼对象以负债而非更改概率获得最低档。
+        add_trait = greedy add_trait = just
+        if = { limit = { var:tca_bribery_natural_tier = 1 } remove_short_term_gold = gold remove_short_term_gold = 1000 }
+
+    }
+    set_variable = { name = tca_bribery_natural_remaining value = 8 }
+    while = {
+        limit = { var:tca_bribery_natural_remaining > 0 }
+        tca_test_create_merit_interface_character_effect = { CHARACTER = tca_bribery_natural_new_actor GOVERNMENT = celestial_government }
+        add_to_variable_list = { name = tca_bribery_natural_people target = scope:tca_bribery_natural_new_actor }
+        add_to_variable_list = { name = tca_bribery_natural_actors target = scope:tca_bribery_natural_new_actor }
+        add_to_variable_list = { name = tca_bribery_natural_observers target = scope:tca_bribery_natural_new_actor }
+        scope:tca_bribery_natural_new_actor = {
+            set_merit_level = 1 remove_short_term_gold = gold add_gold = 5000
+            add_trait = ambitious add_trait = deceitful add_trait = arbitrary
+            set_variable = { name = tca_bribery_natural_target value = scope:$TARGET$ }
+            create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_bribery_natural_fealty }
+            change_liege = { liege = scope:$TARGET$ change = scope:tca_bribery_natural_fealty }
+            resolve_title_and_vassal_change = scope:tca_bribery_natural_fealty
+            if = { limit = { scope:$TARGET$.var:tca_bribery_natural_tier = 1 } set_relation_best_friend = scope:$TARGET$ }
+            else_if = { limit = { scope:$TARGET$.var:tca_bribery_natural_tier = 2 } set_relation_best_friend = scope:$TARGET$ }
+        }
+        # 原版test_opinion_modifier无monthly_change，支持固定期限与显式opinion数值；只给自建人物五年好感缓冲，
+        # 抵御任命／契约产生的正常波动，不写正式接受评分或发送概率。
+        scope:$TARGET$ = { add_opinion = { target = scope:tca_bribery_natural_new_actor modifier = test_opinion_modifier opinion = 300 years = 5 } }
+        tca_test_bribery_natural_borrow_county_effect = yes
+        change_variable = { name = tca_bribery_natural_remaining subtract = 1 }
+    }
+}
+
+# 报告者作用域；向刚创建的付款者借一个真实非首府县，使原生AI使用有地角色路径。
+# 只从至少仍有两县、持公国以上官署的原任借县；原任保留首府/主官职/领属，全部借用者与男爵受保护。
+tca_test_bribery_natural_borrow_county_effect = {
+    save_scope_value_as = { name = tca_bribery_natural_borrow_selected value = no }
+    random_vassal_or_below = {
+        limit = {
+            is_alive = yes is_landed = yes government_has_flag = government_is_celestial
+            highest_held_title_tier >= tier_duchy
+            NOT = { has_variable = tca_bribery_natural_target }
+            any_held_title = { tier = tier_county is_landless_type_title = no count >= 2 }
+            any_held_title = { tier = tier_county is_landless_type_title = no this != prev.capital_county NOT = { has_variable = tca_bribery_natural_old_holder } }
+        }
+        save_scope_as = tca_bribery_natural_old_person
+        random_held_title = {
+            limit = { tier = tier_county is_landless_type_title = no this != prev.capital_county NOT = { has_variable = tca_bribery_natural_old_holder } }
+            save_scope_as = tca_bribery_natural_borrow_county
+            save_scope_value_as = { name = tca_bribery_natural_borrow_selected value = yes }
+            set_variable = { name = tca_bribery_natural_old_holder value = holder }
+        }
+    }
+    if = { limit = { scope:tca_bribery_natural_borrow_selected = yes }
+        scope:tca_bribery_natural_old_person = { tca_test_bribery_natural_snapshot_person_effect = yes }
+        add_to_variable_list = { name = tca_bribery_natural_borrowed target = scope:tca_bribery_natural_borrow_county }
+        scope:tca_bribery_natural_borrow_county = {
+            every_county_province = {
+                limit = { exists = barony.holder }
+                barony = {
+                    set_variable = { name = tca_bribery_natural_old_baron value = holder }
+                    save_scope_as = tca_bribery_natural_borrow_barony
+                    root = { add_to_variable_list = { name = tca_bribery_natural_baronies target = scope:tca_bribery_natural_borrow_barony } }
+                    holder = { tca_test_bribery_natural_snapshot_person_effect = yes }
+                }
+            }
+        }
+        create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_bribery_natural_borrow_change }
+        scope:tca_bribery_natural_borrow_county = { change_title_holder = { holder = scope:tca_bribery_natural_new_actor change = scope:tca_bribery_natural_borrow_change take_baronies = no } }
+        resolve_title_and_vassal_change = scope:tca_bribery_natural_borrow_change
+        scope:tca_bribery_natural_new_actor = {
+            change_government = celestial_government
+            set_realm_capital = scope:tca_bribery_natural_borrow_county
+            create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_bribery_natural_borrow_fealty }
+            change_liege = { liege = var:tca_bribery_natural_target change = scope:tca_bribery_natural_borrow_fealty }
+            resolve_title_and_vassal_change = scope:tca_bribery_natural_borrow_fealty
+        }
+    }
+}
+
+# 原人物作用域；仅首次快照，已有保护不取得所有权；原任不改人格、金币或原任官职。
+tca_test_bribery_natural_snapshot_person_effect = {
+    if = { limit = { NOT = { has_character_flag = tca_bribery_natural_original_tracked } }
+        add_character_flag = tca_bribery_natural_original_tracked
+        if = { limit = { NOT = { has_trait = tca_test_death_protection } }
+            add_trait = tca_test_death_protection
+            add_character_flag = tca_bribery_natural_protection_owned
+        }
+        # 不朽不能阻止人物池脚本剪枝；只对借用原人物临时加防剪枝标记。
+        if = { limit = { NOT = { has_character_flag = ai_will_not_convert } }
+            add_character_flag = ai_will_not_convert
+            add_character_flag = tca_bribery_natural_prune_protection_owned
+        }
+        save_scope_as = tca_bribery_natural_snapshot_person
+        root = { add_to_variable_list = { name = tca_bribery_natural_original_people target = scope:tca_bribery_natural_snapshot_person } }
+    }
+}
+
+# 报告者作用域；县先随县治归还，再归还其他男爵，最后只撤除本例添加的保护。
+# 原任一直保有主官职／首府；一年内自然升迁、改任和领属并非借县造成，不回滚这些自然状态。
+# 任何一项恢复不符留失败flag，供用例清理后独立断言，绝不将归还失败算作通过。
+tca_test_bribery_natural_return_counties_effect = {
+    create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_bribery_natural_return_change }
+    every_in_list = { variable = tca_bribery_natural_borrowed
+        if = { limit = { var:tca_bribery_natural_old_holder = { is_alive = yes } }
+            change_title_holder = { holder = var:tca_bribery_natural_old_holder change = scope:tca_bribery_natural_return_change take_baronies = no }
+        }
+        else = { debug_log = "TCA_BRIBERY_NATURAL restore_failed=dead_county_owner" root = { add_character_flag = tca_test_tca_bribery_natural_test_case_failed add_character_flag = tca_bribery_natural_restore_failed } }
+    }
+    resolve_title_and_vassal_change = scope:tca_bribery_natural_return_change
+    create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_bribery_natural_return_baronies }
+    every_in_list = { variable = tca_bribery_natural_baronies
+        limit = { var:tca_bribery_natural_old_baron = { is_alive = yes } NOT = { holder = var:tca_bribery_natural_old_baron } }
+        change_title_holder = { holder = var:tca_bribery_natural_old_baron change = scope:tca_bribery_natural_return_baronies }
+    }
+    resolve_title_and_vassal_change = scope:tca_bribery_natural_return_baronies
+    if = { limit = { any_in_list = { variable = tca_bribery_natural_original_people is_alive = no } }
+        debug_log = "TCA_BRIBERY_NATURAL restore_failed=dead_original_person"
+        add_character_flag = tca_test_tca_bribery_natural_test_case_failed add_character_flag = tca_bribery_natural_restore_failed
+    }
+    every_in_list = { variable = tca_bribery_natural_original_people
+        limit = { is_alive = yes }
+        if = { limit = { has_character_flag = tca_bribery_natural_protection_owned } remove_trait = tca_test_death_protection remove_character_flag = tca_bribery_natural_protection_owned }
+        if = { limit = { has_character_flag = tca_bribery_natural_prune_protection_owned }
+            remove_character_flag = ai_will_not_convert
+            remove_character_flag = tca_bribery_natural_prune_protection_owned
+        }
+        remove_character_flag = tca_bribery_natural_original_tracked
+    }
+    every_in_list = { variable = tca_bribery_natural_borrowed
+        if = { limit = { NOT = { holder = var:tca_bribery_natural_old_holder } } debug_log = "TCA_BRIBERY_NATURAL restore_failed=county title=[THIS.Title.GetKey]" root = { add_character_flag = tca_test_tca_bribery_natural_test_case_failed add_character_flag = tca_bribery_natural_restore_failed } }
+        remove_variable = tca_bribery_natural_old_holder
+    }
+    every_in_list = { variable = tca_bribery_natural_baronies
+        if = { limit = { NOT = { holder = var:tca_bribery_natural_old_baron } } debug_log = "TCA_BRIBERY_NATURAL restore_failed=barony title=[THIS.Title.GetKey]" root = { add_character_flag = tca_test_tca_bribery_natural_test_case_failed add_character_flag = tca_bribery_natural_restore_failed } }
+        remove_variable = tca_bribery_natural_old_baron
+    }
+    clear_variable_list = tca_bribery_natural_borrowed
+    clear_variable_list = tca_bribery_natural_original_people
+    clear_variable_list = tca_bribery_natural_baronies
+}
+
+# 报告者作用域；每日观察已有自然成交，随后保存下一日比较基线，不发送任何互动。
+# 每位付款者观察三位私有目标；目标的汇总入账按当日新增的全部冷却关系计算，
+# 可同时成交多人；精确匹配最低档总价才接受报价证据。无关金币变动会留下失败而非放宽预期。
+tca_test_bribery_natural_observe_effect = {
+    scope:tca_bribery_natural_thin = { set_variable = { name = tca_bribery_natural_expected_income value = 0 } }
+    scope:tca_bribery_natural_generous = { set_variable = { name = tca_bribery_natural_expected_income value = 0 } }
+    scope:tca_bribery_natural_lavish = { set_variable = { name = tca_bribery_natural_expected_income value = 0 } }
+    every_in_list = {
+        variable = tca_bribery_natural_observers
+        save_scope_as = actor
+        tca_test_bribery_natural_observe_pair_effect = { TARGET = tca_bribery_natural_thin KEY = thin }
+        tca_test_bribery_natural_observe_pair_effect = { TARGET = tca_bribery_natural_generous KEY = generous }
+        tca_test_bribery_natural_observe_pair_effect = { TARGET = tca_bribery_natural_lavish KEY = lavish }
+        if = { limit = { OR = {
+            has_hook_of_type = { target = scope:tca_bribery_natural_emperor type = tca_bribery_hook }
+            has_hook_of_type = { target = scope:tca_bribery_natural_foreign type = tca_bribery_hook }
+            is_target_in_variable_list = { name = tca_bribery_recent_partners target = scope:tca_bribery_natural_emperor }
+            is_target_in_variable_list = { name = tca_bribery_recent_partners target = scope:tca_bribery_natural_foreign }
+        } } root = { add_character_flag = tca_bribery_natural_exclusion_failed } }
+    }
+    tca_test_bribery_natural_check_income_effect = { TARGET = tca_bribery_natural_thin }
+    tca_test_bribery_natural_check_income_effect = { TARGET = tca_bribery_natural_generous }
+    tca_test_bribery_natural_check_income_effect = { TARGET = tca_bribery_natural_lavish }
+}
+
+# 付款者作用域；TARGET为被观察对象，KEY隔离每一对人物的观测基线。
+# 原生AI可选择任意本朝对象，因此三位受贿者都观察，不能只追踪预先指定的直属目标。
+tca_test_bribery_natural_observe_pair_effect = {
+    scope:$TARGET$ = { save_scope_as = recipient }
+    if = {
+        limit = { NOT = { has_character_flag = tca_bribery_natural_observed_$KEY$ } is_target_in_variable_list = { name = tca_bribery_recent_partners target = scope:recipient } }
+        add_character_flag = tca_bribery_natural_observed_$KEY$
+        if = { limit = {
+            has_hook_of_type = { target = scope:recipient type = tca_bribery_hook }
+            scope:recipient = { is_target_in_variable_list = { name = tca_bribery_recent_partners target = scope:actor } }
+            has_variable = tca_bribery_natural_previous_quote_$KEY$
+            var:tca_bribery_natural_previous_tier_$KEY$ > 0
+        }
+            scope:recipient = { change_variable = { name = tca_bribery_natural_expected_income add = scope:actor.var:tca_bribery_natural_previous_quote_$KEY$ } }
+            if = { limit = { var:tca_bribery_natural_previous_tier_$KEY$ = 1 } root = { change_variable = { name = tca_bribery_natural_seen_1 add = 1 } } }
+            else_if = { limit = { var:tca_bribery_natural_previous_tier_$KEY$ = 2 } root = { change_variable = { name = tca_bribery_natural_seen_2 add = 1 } } }
+            else = { root = { change_variable = { name = tca_bribery_natural_seen_3 add = 1 } } }
+            set_variable = { name = tca_bribery_natural_diag_pair_tier value = var:tca_bribery_natural_previous_tier_$KEY$ }
+            set_variable = { name = tca_bribery_natural_diag_pair_quote value = var:tca_bribery_natural_previous_quote_$KEY$ }
+            debug_log = "TCA_BRIBERY_NATURAL observed actor=[THIS.Char.GetID] tier=[THIS.Char.MakeScope.Var('tca_bribery_natural_diag_pair_tier').GetValue] quote=[THIS.Char.MakeScope.Var('tca_bribery_natural_diag_pair_quote').GetValue]"
+            remove_variable = tca_bribery_natural_diag_pair_tier
+            remove_variable = tca_bribery_natural_diag_pair_quote
+        }
+        else = {
+            debug_log = "TCA_BRIBERY_NATURAL transaction_failed actor=[THIS.Char.GetID]"
+            if = { limit = { NOT = { has_hook_of_type = { target = scope:recipient type = tca_bribery_hook } } } debug_log = "TCA_BRIBERY_NATURAL transaction_failed=hook" }
+            if = { limit = { scope:recipient = { NOT = { is_target_in_variable_list = { name = tca_bribery_recent_partners target = scope:actor } } } } debug_log = "TCA_BRIBERY_NATURAL transaction_failed=reciprocal_list" }
+            if = { limit = { NOT = { has_variable = tca_bribery_natural_previous_quote_$KEY$ } } debug_log = "TCA_BRIBERY_NATURAL transaction_failed=quote_baseline" }
+            if = { limit = { NOT = { var:tca_bribery_natural_previous_tier_$KEY$ > 0 } } debug_log = "TCA_BRIBERY_NATURAL transaction_failed=tier_baseline" }
+            root = { add_character_flag = tca_test_tca_bribery_natural_test_case_failed add_character_flag = tca_bribery_natural_transaction_failed }
+        }
+    }
+    # 只读计算下一日最低报价；不写saved send_option值，不将报价注入自然AI上下文。
+    set_variable = { name = tca_bribery_natural_previous_tier_$KEY$ value = tca_bribery_cheapest_tier_value }
+    set_variable = { name = tca_bribery_natural_previous_quote_$KEY$ value = scope:recipient.tca_bribery_base_price_value }
+    if = { limit = { var:tca_bribery_natural_previous_tier_$KEY$ = 2 } set_variable = { name = tca_bribery_natural_previous_quote_$KEY$ value = { value = var:tca_bribery_natural_previous_quote_$KEY$ multiply = 1.5 ceiling = yes } } }
+    else_if = { limit = { var:tca_bribery_natural_previous_tier_$KEY$ = 3 } set_variable = { name = tca_bribery_natural_previous_quote_$KEY$ value = { value = var:tca_bribery_natural_previous_quote_$KEY$ multiply = 2 ceiling = yes } } }
+}
+
+# 报告者作用域；首次仅设基线，实际发生自然成交的日期才核对精确总入账。
+tca_test_bribery_natural_check_income_effect = {
+    scope:$TARGET$ = {
+        if = { limit = { var:tca_bribery_natural_expected_income > 0 }
+            if = { limit = { NOT = { gold = { value = var:tca_bribery_natural_previous_gold add = var:tca_bribery_natural_expected_income } } }
+                debug_log = "TCA_BRIBERY_NATURAL income_mismatch recipient=[THIS.Char.GetID] expected=[THIS.Char.MakeScope.Var('tca_bribery_natural_expected_income').GetValue]"
+                root = { add_character_flag = tca_test_tca_bribery_natural_test_case_failed add_character_flag = tca_bribery_natural_transaction_failed }
+            }
+        }
+        set_variable = { name = tca_bribery_natural_previous_gold value = gold }
+    }
+}
+
+# 报告者作用域；年度末只读记录真实人物状态，区分未发送与准备后领属／预算漂移。
+# 不注入选项、不触发原生AI，事件上下文中的selected值不能当作AI发送时的选项证据。
+tca_test_bribery_natural_diagnose_effect = {
+    every_in_list = {
+        variable = tca_bribery_natural_actors
+        save_scope_as = actor
+        var:tca_bribery_natural_target = { save_scope_as = recipient }
+        set_variable = { name = tca_bribery_natural_diag_interest value = tca_bribery_ai_interest_value }
+        set_variable = { name = tca_bribery_natural_diag_weight value = tca_bribery_ai_target_weight_value }
+        set_variable = { name = tca_bribery_natural_diag_cheapest value = tca_bribery_cheapest_tier_value }
+        debug_log = "TCA_BRIBERY_NATURAL final_actor id=[THIS.Char.GetID] gold=[THIS.Char.GetGold] top=[THIS.Char.GetTopLiege.GetID] liege=[THIS.Char.GetLiege.GetID] merit=[THIS.Char.GetMeritLevel] interest=[THIS.Char.MakeScope.Var('tca_bribery_natural_diag_interest').GetValue] weight=[THIS.Char.MakeScope.Var('tca_bribery_natural_diag_weight').GetValue] cheapest=[THIS.Char.MakeScope.Var('tca_bribery_natural_diag_cheapest').GetValue]"
+        remove_variable = tca_bribery_natural_diag_interest
+        remove_variable = tca_bribery_natural_diag_weight
+        remove_variable = tca_bribery_natural_diag_cheapest
+        if = { limit = { NOT = { top_liege = scope:tca_bribery_natural_emperor } } debug_log = "TCA_BRIBERY_NATURAL final_drift=actor_top" }
+        if = { limit = { NOT = { liege = scope:recipient } } debug_log = "TCA_BRIBERY_NATURAL final_drift=actor_liege" }
+        if = { limit = { NOT = { government_has_flag = government_is_celestial } } debug_log = "TCA_BRIBERY_NATURAL final_drift=actor_government" }
+        save_scope_as = tca_bribery_natural_diag_actor
+        every_in_list = { variable = tca_bribery_recent_partners
+            debug_log = "TCA_BRIBERY_NATURAL final_actor_partner=[THIS.Char.GetID]"
+            if = { limit = { scope:tca_bribery_natural_diag_actor = { has_hook_of_type = { target = prev type = tca_bribery_hook } } } debug_log = "TCA_BRIBERY_NATURAL final_actor_partner_hook=present" }
+        }
+        scope:recipient = {
+            set_variable = { name = tca_bribery_natural_diag_price value = tca_bribery_base_price_value }
+            set_variable = { name = tca_bribery_natural_diag_acceptance value = tca_bribery_acceptance_base_value }
+            debug_log = "TCA_BRIBERY_NATURAL final_recipient id=[THIS.Char.GetID] gold=[THIS.Char.GetGold] top=[THIS.Char.GetTopLiege.GetID] merit=[THIS.Char.GetMeritLevel] base_price=[THIS.Char.MakeScope.Var('tca_bribery_natural_diag_price').GetValue] acceptance=[THIS.Char.MakeScope.Var('tca_bribery_natural_diag_acceptance').GetValue]"
+            if = { limit = { NOT = { top_liege = scope:tca_bribery_natural_emperor } } debug_log = "TCA_BRIBERY_NATURAL final_drift=recipient_top" }
+            if = { limit = { tca_bribery_recipient_trigger = no } debug_log = "TCA_BRIBERY_NATURAL final_drift=recipient_eligibility" }
+            every_in_list = { variable = tca_bribery_recent_partners debug_log = "TCA_BRIBERY_NATURAL final_recipient_partner=[THIS.Char.GetID]" }
+            remove_variable = tca_bribery_natural_diag_price
+            remove_variable = tca_bribery_natural_diag_acceptance
+        }
+    }
+}
+
+# 报告者作用域；清理仅作用于自建人口和头衔，保留正式成交证据到结果核对之后。
+tca_test_bribery_natural_cleanup_effect = {
+    tca_test_bribery_natural_return_counties_effect = yes
+    every_in_list = { variable = tca_bribery_natural_titles save_scope_as = tca_bribery_natural_destroy_title root = { destroy_title = scope:tca_bribery_natural_destroy_title } }
+    every_in_list = { variable = tca_bribery_natural_people tca_test_cleanup_merit_probe_character_effect = yes }
+    clear_variable_list = tca_bribery_natural_titles
+    clear_variable_list = tca_bribery_natural_people
+    clear_variable_list = tca_bribery_natural_observers
+    clear_variable_list = tca_bribery_natural_actors
+    remove_variable = tca_bribery_natural_remaining
+    remove_variable = tca_bribery_natural_days
+    remove_variable = tca_bribery_natural_seen_1
+    remove_variable = tca_bribery_natural_seen_2
+    remove_variable = tca_bribery_natural_seen_3
+    remove_character_flag = tca_bribery_natural_exclusion_failed
+    save_scope_as = actor
+}

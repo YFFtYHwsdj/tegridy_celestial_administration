@@ -1,0 +1,54 @@
+﻿# 中国皇帝报告者作用域；四名私有人物只供本例使用，不借用历史官员。
+# 输出四个tca_bsl_* saved scopes；头衔引用仅供GUI破坏，事件链引用须由存档恢复。
+tca_test_bribery_saveload_prepare_effect = {
+    tca_test_create_merit_interface_character_effect = { CHARACTER = tca_bsl_actor GOVERNMENT = celestial_government }
+    tca_test_create_merit_interface_character_effect = { CHARACTER = tca_bsl_recipient GOVERNMENT = celestial_government }
+    tca_test_create_merit_interface_character_effect = { CHARACTER = tca_bsl_pending_actor GOVERNMENT = celestial_government }
+    tca_test_create_merit_interface_character_effect = { CHARACTER = tca_bsl_pending_recipient GOVERNMENT = celestial_government }
+    scope:tca_bsl_actor = { set_merit_level = 1 add_gold = { value = 5000 subtract = gold } }
+    scope:tca_bsl_recipient = { set_merit_level = 1 }
+    scope:tca_bsl_pending_actor = { set_merit_level = 1 add_gold = { value = 5000 subtract = gold } }
+    scope:tca_bsl_pending_recipient = { set_merit_level = 1 }
+    save_scope_value_as = { name = tca_bribery_thin value = yes }
+    save_scope_value_as = { name = tca_bribery_generous value = no }
+    save_scope_value_as = { name = tca_bribery_lavish value = no }
+    title:h_china = {
+        set_variable = { name = tca_bsl_actor value = scope:tca_bsl_actor }
+        set_variable = { name = tca_bsl_recipient value = scope:tca_bsl_recipient }
+        set_variable = { name = tca_bsl_pending_actor value = scope:tca_bsl_pending_actor }
+        set_variable = { name = tca_bsl_pending_recipient value = scope:tca_bsl_pending_recipient }
+        set_variable = { name = tca_bsl_saved value = 0 }
+        set_variable = { name = tca_bsl_reload_ready value = 0 }
+    }
+}
+
+# 头衔作用域；保存之后真实移除牵制、双方名单，并改变待回复者资格与报价快照。
+# 不触发续接，不重新prepare；若没有加载原存档，这些破坏必须留下并使断言失败。
+tca_test_bribery_saveload_corrupt_effect = {
+    var:tca_bsl_actor = {
+        remove_hook = { target = title:h_china.var:tca_bsl_recipient }
+        clear_variable_list = tca_bribery_recent_partners
+    }
+    var:tca_bsl_recipient = { clear_variable_list = tca_bribery_recent_partners }
+    var:tca_bsl_pending_recipient = { set_merit_level = 0 }
+    set_variable = { name = tca_bsl_quote value = 999 }
+}
+
+# 皇帝报告者作用域；仅清理本例创建对象及GUI引用，恢复actor别名后归还lane。
+tca_test_bribery_saveload_cleanup_effect = {
+    scope:tca_bsl_actor = { tca_test_cleanup_merit_probe_character_effect = yes }
+    scope:tca_bsl_recipient = { tca_test_cleanup_merit_probe_character_effect = yes }
+    scope:tca_bsl_pending_actor = { tca_test_cleanup_merit_probe_character_effect = yes }
+    scope:tca_bsl_pending_recipient = { tca_test_cleanup_merit_probe_character_effect = yes }
+    title:h_china = {
+        remove_variable = tca_bsl_actor
+        remove_variable = tca_bsl_recipient
+        remove_variable = tca_bsl_pending_actor
+        remove_variable = tca_bsl_pending_recipient
+        remove_variable = tca_bsl_quote
+        remove_variable = tca_bsl_saved
+        remove_variable = tca_bsl_reload_ready
+        set_variable = { name = tca_bsl_phase value = 5 }
+    }
+    save_scope_as = actor
+}

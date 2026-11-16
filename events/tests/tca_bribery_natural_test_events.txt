@@ -1,0 +1,147 @@
+﻿# 自然年度AI验收：不调用run_interaction、发送效果或成交helper，只等待原生AI调度。
+# 真实中国内的自建家门AI；外朝反例另持独立无地天朝。前置未满足计未执行。
+namespace = tca_bribery_natural_test
+
+tca_bribery_natural_test.1 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_bribery_natural_test.1 tca_test_bribery_natural_year"
+        remove_character_flag = tca_test_tca_bribery_natural_test_case_failed
+        remove_character_flag = tca_bribery_natural_exclusion_failed
+        remove_character_flag = tca_bribery_natural_restore_failed
+        remove_character_flag = tca_bribery_natural_transaction_failed
+        tca_test_bribery_natural_prepare_effect = yes
+        trigger_event = { id = tca_bribery_natural_test.2 days = 2 }
+    }
+}
+
+tca_bribery_natural_test.2 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            save_scope_value_as = { name = tca_bribery_natural_ready value = yes }
+            if = { limit = { NOT = { scope:tca_bribery_natural_emperor = { is_independent_ruler = yes is_ai = yes government_has_flag = government_is_celestial } scope:tca_bribery_natural_foreign = { is_independent_ruler = yes NOT = { top_liege = scope:tca_bribery_natural_emperor } } } }
+                save_scope_value_as = { name = tca_bribery_natural_ready value = no }
+                scope:tca_bribery_natural_foreign = {
+                    if = { limit = { is_independent_ruler = no } debug_log = "TCA_BRIBERY_NATURAL failed=foreign_independent" }
+                    if = { limit = { top_liege = scope:tca_bribery_natural_emperor } debug_log = "TCA_BRIBERY_NATURAL failed=foreign_top" }
+                }
+                scope:tca_bribery_natural_emperor = {
+                    debug_log = "TCA_BRIBERY_NATURAL precondition_emperor id=[THIS.Char.GetID] top=[THIS.Char.GetTopLiege.GetID] primary=[THIS.Char.GetPrimaryTitle.GetKey]"
+                    if = { limit = { is_independent_ruler = no } debug_log = "TCA_BRIBERY_NATURAL failed=emperor_independent" }
+                    if = { limit = { is_ai = no } debug_log = "TCA_BRIBERY_NATURAL failed=emperor_ai" }
+                    if = { limit = { NOT = { government_has_flag = government_is_celestial } } debug_log = "TCA_BRIBERY_NATURAL failed=emperor_government" }
+                }
+            }
+            scope:tca_bribery_natural_thin = { set_merit_level = 9 }
+            scope:tca_bribery_natural_generous = { set_merit_level = 9 }
+            scope:tca_bribery_natural_lavish = { set_merit_level = 9 }
+            every_in_list = {
+                variable = tca_bribery_natural_actors
+                save_scope_as = actor
+                var:tca_bribery_natural_target = { save_scope_as = recipient }
+                if = { limit = { NOT = {
+                    is_alive = yes is_adult = yes is_ai = yes is_ruler = yes is_landed = yes is_imprisoned = no is_incapable = no
+                    government_has_flag = government_is_celestial
+                    top_liege = scope:tca_bribery_natural_emperor liege = scope:recipient
+                    gold >= 1000
+                    scope:recipient = { tca_bribery_recipient_trigger = yes merit_level = 9 top_liege = scope:tca_bribery_natural_emperor tca_bribery_ai_interest_value = 0 }
+                    tca_bribery_cheapest_tier_value = scope:recipient.var:tca_bribery_natural_tier
+                } }
+                    save_scope_value_as = { name = tca_bribery_natural_ready value = no }
+                    set_variable = { name = tca_bribery_natural_diag_cheapest value = tca_bribery_cheapest_tier_value }
+                    debug_log = "TCA_BRIBERY_NATURAL precondition_actor id=[THIS.Char.GetID] gold=[THIS.Char.GetGold] top=[THIS.Char.GetTopLiege.GetID] liege=[THIS.Char.GetLiege.GetID] cheapest=[THIS.Char.MakeScope.Var('tca_bribery_natural_diag_cheapest').GetValue]"
+                    scope:recipient = { debug_log = "TCA_BRIBERY_NATURAL precondition_recipient id=[THIS.Char.GetID] gold=[THIS.Char.GetGold] top=[THIS.Char.GetTopLiege.GetID] merit=[THIS.Char.GetMeritLevel] tier=[THIS.Char.MakeScope.Var('tca_bribery_natural_tier').GetValue] interest=[THIS.Char.MakeScope.ScriptValue('tca_bribery_ai_interest_value')]" }
+                    remove_variable = tca_bribery_natural_diag_cheapest
+                    if = { limit = { is_alive = no } debug_log = "TCA_BRIBERY_NATURAL failed=actor_alive" }
+                    if = { limit = { is_adult = no } debug_log = "TCA_BRIBERY_NATURAL failed=actor_adult" }
+                    if = { limit = { is_ai = no } debug_log = "TCA_BRIBERY_NATURAL failed=actor_ai" }
+                    if = { limit = { is_ruler = no } debug_log = "TCA_BRIBERY_NATURAL failed=actor_ruler" }
+                    if = { limit = { is_landed = no } debug_log = "TCA_BRIBERY_NATURAL failed=actor_landed" }
+                    if = { limit = { is_imprisoned = yes } debug_log = "TCA_BRIBERY_NATURAL failed=actor_imprisoned" }
+                    if = { limit = { is_incapable = yes } debug_log = "TCA_BRIBERY_NATURAL failed=actor_incapable" }
+                    if = { limit = { NOT = { government_has_flag = government_is_celestial } } debug_log = "TCA_BRIBERY_NATURAL failed=actor_government" }
+                    if = { limit = { NOT = { top_liege = scope:tca_bribery_natural_emperor } } debug_log = "TCA_BRIBERY_NATURAL failed=actor_top" }
+                    if = { limit = { NOT = { liege = scope:recipient } } debug_log = "TCA_BRIBERY_NATURAL failed=actor_liege" }
+                    if = { limit = { gold < 1000 } debug_log = "TCA_BRIBERY_NATURAL failed=actor_budget" }
+                    if = { limit = { scope:recipient = { tca_bribery_recipient_trigger = no } } debug_log = "TCA_BRIBERY_NATURAL failed=recipient_eligibility" }
+                    if = { limit = { scope:recipient = { NOT = { top_liege = scope:tca_bribery_natural_emperor } } } debug_log = "TCA_BRIBERY_NATURAL failed=recipient_top" }
+                    if = { limit = { NOT = { scope:recipient.tca_bribery_ai_interest_value = 0 } } debug_log = "TCA_BRIBERY_NATURAL failed=recipient_interest" }
+                    if = { limit = { NOT = { tca_bribery_cheapest_tier_value = scope:recipient.var:tca_bribery_natural_tier } } debug_log = "TCA_BRIBERY_NATURAL failed=cheapest_tier" }
+                }
+            }
+            if = { limit = { scope:tca_bribery_natural_ready = yes }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_natural_year 1"
+                tca_test_bribery_natural_observe_effect = yes
+                debug_log = "TCA_TEST WAIT tca_test_bribery_natural_year 780 days maximum"
+                trigger_event = { id = tca_bribery_natural_test.3 days = 1 }
+            }
+            else = {
+                debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_bribery_natural_year"
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+                tca_test_bribery_natural_cleanup_effect = yes
+                tca_test_lane_end_effect = { GROUP = tca_bribery_natural_test }
+            }
+        }
+    }
+}
+
+tca_bribery_natural_test.3 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            change_variable = { name = tca_bribery_natural_days add = 1 }
+            tca_test_bribery_natural_observe_effect = yes
+            # 至少等待390天，超过完整12个月考虑窗口与最长5日答复；三档已齐才收口。
+            # 真实全朝候选可能先选其他人，最多再等一轮年度窗口，不强制发送、不改概率。
+            if = { limit = { OR = { var:tca_bribery_natural_days < 390 AND = {
+                var:tca_bribery_natural_days < 780
+                OR = { var:tca_bribery_natural_seen_1 = 0 var:tca_bribery_natural_seen_2 = 0 var:tca_bribery_natural_seen_3 = 0 }
+            } } }
+                trigger_event = { id = tca_bribery_natural_test.3 days = 1 }
+            }
+            else = { trigger_event = { id = tca_bribery_natural_test.4 days = 0 } }
+        }
+    }
+}
+
+tca_bribery_natural_test.4 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            tca_test_bribery_natural_diagnose_effect = yes
+            if = { limit = { var:tca_bribery_natural_days >= 390 var:tca_bribery_natural_days <= 780 } debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_natural_year 2" }
+            else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_natural_year 2" add_character_flag = tca_test_tca_bribery_natural_test_case_failed }
+            if = { limit = { var:tca_bribery_natural_seen_1 > 0 } debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_natural_year 3" }
+            else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_natural_year 3" add_character_flag = tca_test_tca_bribery_natural_test_case_failed }
+            if = { limit = { var:tca_bribery_natural_seen_2 > 0 } debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_natural_year 4" }
+            else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_natural_year 4" add_character_flag = tca_test_tca_bribery_natural_test_case_failed }
+            if = { limit = { var:tca_bribery_natural_seen_3 > 0 } debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_natural_year 5" }
+            else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_natural_year 5" add_character_flag = tca_test_tca_bribery_natural_test_case_failed }
+            if = { limit = { NOT = { has_character_flag = tca_bribery_natural_exclusion_failed } } debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_natural_year 6" }
+            else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_natural_year 6" add_character_flag = tca_test_tca_bribery_natural_test_case_failed }
+            # 此断言汇总逐日精确最低报价入账、真实弱牵制和双向冷却；任何一天异常均保留失败。
+            if = { limit = { NOT = { has_character_flag = tca_bribery_natural_transaction_failed } OR = { var:tca_bribery_natural_seen_1 > 0 var:tca_bribery_natural_seen_2 > 0 var:tca_bribery_natural_seen_3 > 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_natural_year 7" }
+            else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_natural_year 7" }
+            debug_log = "TCA_BRIBERY_NATURAL totals days=[THIS.Char.MakeScope.Var('tca_bribery_natural_days').GetValue] thin=[THIS.Char.MakeScope.Var('tca_bribery_natural_seen_1').GetValue] generous=[THIS.Char.MakeScope.Var('tca_bribery_natural_seen_2').GetValue] lavish=[THIS.Char.MakeScope.Var('tca_bribery_natural_seen_3').GetValue]"
+            tca_test_bribery_natural_cleanup_effect = yes
+            if = { limit = { NOT = { has_character_flag = tca_bribery_natural_restore_failed } } debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_natural_year 8" }
+            else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_natural_year 8" }
+            if = { limit = { has_character_flag = tca_test_tca_bribery_natural_test_case_failed }
+                debug_log = "TCA_TEST FAIL tca_test_bribery_natural_year"
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+            }
+            else = {
+                debug_log = "TCA_TEST PASS tca_test_bribery_natural_year"
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } }
+            }
+            remove_character_flag = tca_test_tca_bribery_natural_test_case_failed
+            remove_character_flag = tca_bribery_natural_restore_failed
+            remove_character_flag = tca_bribery_natural_transaction_failed
+            tca_test_lane_end_effect = { GROUP = tca_bribery_natural_test }
+        }
+    }
+}

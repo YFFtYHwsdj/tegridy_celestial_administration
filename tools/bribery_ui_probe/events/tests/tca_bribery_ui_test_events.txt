@@ -1,0 +1,70 @@
+﻿# 可丢弃GUI专用验收；独立运行器启动，不由普通全组派发。不直接调用正式成交effect。
+namespace = tca_bribery_ui_test
+tca_bribery_ui_test.1 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { debug_only = yes this = title:h_china.holder }
+            # 使用实际开局玩家发送，避免把能否切换自建家门人物混入互动验收。
+            save_scope_as = tca_bribery_test_actor
+            remove_short_term_gold = gold add_gold = 5000
+            tca_test_create_merit_interface_character_effect = { CHARACTER = tca_bribery_test_recipient GOVERNMENT = celestial_government }
+            scope:tca_bribery_test_recipient = { set_merit_level = 1 remove_short_term_gold = gold add_gold = 100 set_relation_friend = scope:tca_bribery_test_actor }
+            tca_test_create_merit_interface_character_effect = { CHARACTER = tca_bui_lavish_recipient GOVERNMENT = celestial_government }
+            scope:tca_bui_lavish_recipient = { set_merit_level = 1 remove_short_term_gold = gold add_gold = 100 }
+            title:h_china = {
+                set_variable = { name = tca_bui_actor value = scope:tca_bribery_test_actor }
+                set_variable = { name = tca_bui_thick value = scope:tca_bribery_test_recipient }
+                set_variable = { name = tca_bui_lavish value = scope:tca_bui_lavish_recipient }
+                set_variable = { name = tca_bui_stage value = 1 }
+                set_variable = { name = tca_bui_ticks value = 0 }
+            }
+            debug_log = "TCA_BUI_FIXTURE_READY"
+            trigger_event = { id = tca_bribery_ui_test.2 days = 1 }
+        }
+        else = { debug_log = "TCA_BUI_PRECONDITION_FAIL" debug_log = "TCA_BUI_COMPLETE" }
+    }
+}
+# 真实GUI发送后只读观察hook与金币，不发互动、不代替对方回复。
+tca_bribery_ui_test.2 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { title:h_china = { OR = { var:tca_bui_stage = 4 var:tca_bui_stage = 8 } } }
+            title:h_china = { change_variable = { name = tca_bui_ticks add = 1 } }
+            title:h_china.var:tca_bui_actor = { save_scope_as = actor }
+            if = { limit = { title:h_china = { var:tca_bui_stage = 4 } } title:h_china.var:tca_bui_thick = { save_scope_as = recipient } }
+            else = { title:h_china.var:tca_bui_lavish = { save_scope_as = recipient } }
+            if = { limit = { scope:actor = { has_hook_of_type = { target = scope:recipient type = tca_bribery_hook } } }
+                if = { limit = {
+                    scope:actor = { gold = { value = title:h_china.var:tca_bui_before_actor subtract = title:h_china.var:tca_bui_price } }
+                    scope:recipient = { gold = { value = title:h_china.var:tca_bui_before_recipient add = title:h_china.var:tca_bui_price } }
+                    tca_bribery_no_cooldown_trigger = no
+                    scope:actor = { is_target_in_variable_list = { name = tca_bribery_recent_partners target = scope:recipient } }
+                    scope:recipient = { is_target_in_variable_list = { name = tca_bribery_recent_partners target = scope:actor } }
+                }
+                    if = { limit = { title:h_china = { var:tca_bui_stage = 4 } }
+                        debug_log = "TCA_BUI_PASS_THICK_PAYMENT"
+                        title:h_china = { set_variable = { name = tca_bui_stage value = 5 } set_variable = { name = tca_bui_ticks value = 0 } }
+                    }
+                    else = {
+                        debug_log = "TCA_BUI_PASS_LAVISH_PAYMENT"
+                        title:h_china = { set_variable = { name = tca_bui_stage value = 9 } }
+                        debug_log = "TCA_BUI_COMPLETE"
+                    }
+                }
+                else = {
+                    debug_log = "TCA_BUI_FAIL_PAYMENT"
+                    scope:actor = { debug_log = "TCA_BUI_BALANCE actor=[THIS.Char.GetGold]" }
+                    scope:recipient = { debug_log = "TCA_BUI_BALANCE recipient=[THIS.Char.GetGold]" }
+                    title:h_china = { set_variable = { name = tca_bui_stage value = 99 } }
+                    debug_log = "TCA_BUI_COMPLETE"
+                }
+            }
+            else_if = { limit = { title:h_china = { var:tca_bui_ticks >= 20 } }
+                debug_log = "TCA_BUI_FAIL_NO_REPLY"
+                title:h_china = { set_variable = { name = tca_bui_stage value = 99 } }
+                debug_log = "TCA_BUI_COMPLETE"
+            }
+        }
+        if = { limit = { title:h_china = { var:tca_bui_stage < 9 } } trigger_event = { id = tca_bribery_ui_test.2 days = 1 } }
+    }
+}

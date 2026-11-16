@@ -53,10 +53,25 @@ tca_bribery_interaction = {
     }
     can_send = {
         tca_bribery_basic_valid_trigger = yes
+        trigger_if = { limit = { scope:actor = { is_ai = yes } } tca_bribery_ai_offer_valid_trigger = yes }
         custom_tooltip = { text = tca_bribery_select_offer tca_bribery_selected_tier_value > 0 }
         scope:actor.gold >= tca_bribery_price_value
     }
-    on_send = { save_scope_value_as = { name = tca_bribery_quote value = tca_bribery_price_value } }
+    on_send = {
+        # AI未带显式选项时，将候选阶段选定的最低档固化为原生saved scopes。
+        # 回复不重新择档；人物财务／好感改变后仍按发送档位复核报价。
+        if = { limit = {
+            scope:actor = { is_ai = yes }
+            NOT = { scope:tca_bribery_thin ?= yes }
+            NOT = { scope:tca_bribery_generous ?= yes }
+            NOT = { scope:tca_bribery_lavish ?= yes }
+        }
+            if = { limit = { tca_bribery_cheapest_tier_value = 1 } save_scope_value_as = { name = tca_bribery_thin value = yes } }
+            else_if = { limit = { tca_bribery_cheapest_tier_value = 2 } save_scope_value_as = { name = tca_bribery_generous value = yes } }
+            else_if = { limit = { tca_bribery_cheapest_tier_value = 3 } save_scope_value_as = { name = tca_bribery_lavish value = yes } }
+        }
+        save_scope_value_as = { name = tca_bribery_quote value = tca_bribery_price_value }
+    }
     on_accept = {
         # 原生on_accept负责效果预览；预览不读取尚未创建的发送快照，也不执行付款。
         show_as_tooltip = {

@@ -1,0 +1,84 @@
+﻿# 独立行贿保存重载GUI；debug、CLI ready与显式phase共同防止正常存档执行。
+# 保存态2先写入磁盘，8秒后真实破坏；事件900核对现场后请求CLI重启。
+# 重载保留的phase=2/saved=1转4，绝不重建夹具或重新派发续接事件。
+widget = {
+    name = "tca_bsl_probe"
+    size = { 1 1 }
+    alwaystransparent = yes
+    alpha = 0
+    visible_at_creation = no
+    datacontext = "[GetTitleByKey('h_china')]"
+    visible = "[And(InDebugMode, And(IsInGame, And(GreaterThan_CFixedPoint(Title.MakeScope.Var('tca_cli_ready').GetValue, '(CFixedPoint)0'), And(GreaterThanOrEqualTo_CFixedPoint(Title.MakeScope.Var('tca_bsl_phase').GetValue, '(CFixedPoint)1'), LessThanOrEqualTo_CFixedPoint(Title.MakeScope.Var('tca_bsl_phase').GetValue, '(CFixedPoint)3')))))]"
+    state = {
+        name = _show
+        on_start = "[SetGameSpeed('(int32)1')]"
+        duration = 1
+        next = "tca_bsl_begin"
+    }
+    state = {
+        name = "tca_bsl_begin"
+        on_start = "[ExecuteConsoleCommand(Select_CString(And(EqualTo_CFixedPoint(Title.MakeScope.Var('tca_bsl_phase').GetValue, '(CFixedPoint)2'), EqualTo_CFixedPoint(Title.MakeScope.Var('tca_bsl_saved').GetValue, '(CFixedPoint)1')), 'effect title:h_china = { if = { limit = { var:tca_bsl_phase = 2 } set_variable = { name = tca_bsl_phase value = 4 } } }', 'effect title:h_china = { if = { limit = { var:tca_bsl_phase = 1 } set_variable = { name = tca_bsl_phase value = 2 } } }'))]"
+        duration = 0.1
+        next = "tca_bsl_slow"
+    }
+    state = {
+        name = "tca_bsl_slow"
+        on_start = "[ExecuteConsoleCommand('effect title:h_china = { if = { limit = { var:tca_bsl_phase = 2 } set_variable = { name = tca_bsl_saved value = 1 } } }')]"
+        duration = 6
+        next = "tca_bsl_save"
+    }
+    state = {
+        name = "tca_bsl_save"
+        on_start = "[ExecuteConsoleCommand(Select_CString(And(EqualTo_CFixedPoint(Title.MakeScope.Var('tca_bsl_phase').GetValue, '(CFixedPoint)2'), Not(GetVariableSystem.HasValue('tca_bribery_probe_saved', 'yes'))), 'save tca_bribery_saveload_probe', ''))]"
+        on_start = "[GetVariableSystem.Set('tca_bribery_probe_saved', 'yes')]"
+        duration = 8
+        next = "tca_bsl_corrupt"
+    }
+    state = {
+        name = "tca_bsl_corrupt"
+        on_start = "[ExecuteConsoleCommand('effect title:h_china = { if = { limit = { var:tca_bsl_phase = 2 } set_variable = { name = tca_bsl_phase value = 3 } tca_test_bribery_saveload_corrupt_effect = yes } }')]"
+    }
+
+}
+
+# 续局从2转4产生明确的显隐边沿；通用CLI控件在载入既有观察者时不保证重放_show。
+# 本控件重新执行原生observe以提供每进程确认，并立即恢复速度，绝不重派suite或修补夹具。
+widget = {
+    name = "tca_bsl_resume_observer"
+    size = { 1 1 }
+    alwaystransparent = yes
+    alpha = 0
+    visible_at_creation = no
+    datacontext = "[GetTitleByKey('h_china')]"
+    visible = "[And(InDebugMode, And(IsInGame, And(GreaterThan_CFixedPoint(Title.MakeScope.Var('tca_cli_ready').GetValue, '(CFixedPoint)0'), EqualTo_CFixedPoint(Title.MakeScope.Var('tca_bsl_phase').GetValue, '(CFixedPoint)4'))))]"
+    state = {
+        name = _show
+        on_start = "[ExecuteConsoleCommand('observe')]"
+        on_start = "[SetGameSpeed('(int32)4')]"
+    }
+}
+
+widget = {
+    name = "tca_bsl_speedup"
+    size = { 1 1 }
+    alwaystransparent = yes
+    alpha = 0
+    visible_at_creation = no
+    datacontext = "[GetTitleByKey('h_china')]"
+    visible = "[And(InDebugMode, And(IsInGame, And(GreaterThan_CFixedPoint(Title.MakeScope.Var('tca_cli_ready').GetValue, '(CFixedPoint)0'), EqualTo_CFixedPoint(Title.MakeScope.Var('tca_bsl_phase').GetValue, '(CFixedPoint)5'))))]"
+    state = { name = _show on_start = "[SetGameSpeed('(int32)4')]" duration = 0.1 next = "tca_bsl_cleanup_phase" }
+    state = { name = "tca_bsl_cleanup_phase" on_start = "[ExecuteConsoleCommand('effect title:h_china = { remove_variable = tca_bsl_phase }')]" }
+}
+
+widget = {
+    name = "tca_bsl_manual_pause"
+    size = { 1 1 }
+    alwaystransparent = yes
+    alpha = 0
+    visible_at_creation = no
+    datacontext = "[GetTitleByKey('h_china')]"
+    visible = "[And(InDebugMode, And(IsInGame, And(EqualTo_CFixedPoint(Title.MakeScope.Var('tca_bsl_phase').GetValue, '(CFixedPoint)3'), And(EqualTo_CFixedPoint(Title.MakeScope.Var('tca_bsl_reload_ready').GetValue, '(CFixedPoint)1'), Not(IsManuallyPaused)))))]"
+    state = { name = _show on_start = "[OnPause]" }
+}
+
+

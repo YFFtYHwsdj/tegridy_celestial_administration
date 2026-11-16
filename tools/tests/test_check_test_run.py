@@ -286,6 +286,24 @@ class RunEvidenceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             self.assertTrue(inspect_engine_errors(error(self_body), source_root=Path(temp)))
 
+    def test_native_add_courtier_runtime_character_keeps_mod_errors_blocking(self):
+        from check_test_run import ROOT
+        body = "add_courtier effect [ Trying to put character ('tca_name_tca_gen_1066_c_tca_tongpan_fuzhou_4 Wu of c_tca_tongpan_fuzhou_4 (Internal ID: 32869 - Historical ID tca_gen_1066_c_tca_tongpan_fuzhou_4)') in court despite being a ruler ]"
+        raw = '[21:00:19][E]: Script system error!\n Error: ' + body + '\n Script location: file: events/activities/tournaments/tournament_events.txt line: 3437 (tournament_events.1140:option)\n'
+        visible = []
+        self.assertEqual(inspect_engine_errors(raw, source_root=ROOT, diagnostics=visible), [])
+        self.assertEqual(visible[0]['classification'], 'native-runtime-character')
+        self.assertEqual(visible[0]['raw'], raw)
+        self.assertTrue(inspect_engine_errors(raw))
+        self.assertTrue(inspect_engine_errors(raw, source_root=ROOT/'absent-source'))
+        for invalid in (
+            raw + ' file: common/scripted_effects/tca_real.txt line: 8 (tca_actual_effect)\n',
+            raw.replace('Internal ID:', 'Invalid ID:'),
+            raw.replace('in court despite being a ruler ]', 'in court despite being a ruler; tca_real ]'),
+            raw.replace(body, 'Unknown effect tca_real ' + body),
+        ):
+            self.assertTrue(inspect_engine_errors(invalid, source_root=ROOT))
+
     def test_historical_runtime_title_variants_remain_visible_and_do_not_hide_mod_frames(self):
         from check_test_run import ROOT
         body = "is_in_guest_subset trigger [ Character 'Song_980C Sū of d_tca_judicial_fujian (Internal ID: 32057 - Historical ID han_7424)' is not involved in any activity. ]"

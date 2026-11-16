@@ -1,0 +1,127 @@
+﻿# 可选GUI验收适配器；只复用原生OpenCharacterInteraction、OptionItem.OnClick和窗口Send。
+# 不调用run_interaction，也不以scripted effect代替按钮发送。
+widget = {
+ name = "tca_bui_boot_widget"
+ size = { 1 1 } alwaystransparent = yes visible_at_creation = no
+ visible = "[And(IsInGame, And(GreaterThan_CFixedPoint(GetTitleByKey('h_china').MakeScope.Var('tca_bui_stage').GetValue, '(CFixedPoint)0'), Not(GetVariableSystem.HasValue('tca_bui_booted', 'yes'))))]"
+ state = { name = _show
+  on_start = "[GetVariableSystem.Set('tca_bui_booted', 'yes')]"
+  on_start = "[ExecuteConsoleCommand(Localize('tca_bui_play_command'))]"
+ }
+
+}
+widget = {
+ name = "tca_bui_initial_marker"
+ size = { 1 1 } alwaystransparent = yes visible_at_creation = no
+ visible = "[And(IsInGame, EqualTo_CFixedPoint(GetTitleByKey('h_china').MakeScope.Var('tca_bui_stage').GetValue, '(CFixedPoint)1'))]"
+ state = { name = _show on_start = "[GetVariableSystem.Set('tca_bui_initial_process', 'yes')]" }
+}
+widget = {
+ name = "tca_bui_loaded_marker"
+ size = { 1 1 } alwaystransparent = yes visible_at_creation = no
+ visible = "[And(IsInGame, And(EqualTo_CFixedPoint(GetTitleByKey('h_china').MakeScope.Var('tca_bui_stage').GetValue, '(CFixedPoint)8'), Not(GetVariableSystem.HasValue('tca_bui_initial_process', 'yes'))))]"
+ state = { name = _show on_start = "[GetVariableSystem.Set('tca_bui_reloaded', 'yes')]" }
+}
+widget = {
+ name = "tca_bui_open_thick"
+ size = { 1 1 } alwaystransparent = yes visible_at_creation = no
+ visible = "[And(IsInGame, EqualTo_CFixedPoint(GetTitleByKey('h_china').MakeScope.Var('tca_bui_stage').GetValue, '(CFixedPoint)2'))]"
+ state = { name = _show duration = 5 next = tca_bui_open_thick_window }
+ state = { name = tca_bui_open_thick_window
+  on_start = "[OpenCharacterInteraction('tca_bribery_interaction', GetTitleByKey('h_china').MakeScope.Var('tca_bui_thick').Char)]"
+ }
+}
+widget = {
+ name = "tca_bui_open_lavish"
+ size = { 1 1 } alwaystransparent = yes visible_at_creation = no
+ visible = "[And(IsInGame, EqualTo_CFixedPoint(GetTitleByKey('h_china').MakeScope.Var('tca_bui_stage').GetValue, '(CFixedPoint)5'))]"
+ state = { name = _show duration = 0.5 next = tca_bui_open_lavish_window }
+ state = { name = tca_bui_open_lavish_window
+  on_start = "[GetScriptedGui('tca_bui_open_lavish').Execute(GuiScope.End)]"
+  on_start = "[OpenCharacterInteraction('tca_bribery_interaction', GetTitleByKey('h_china').MakeScope.Var('tca_bui_lavish').Char)]"
+ }
+}
+widget = {
+ name = "tca_bui_pause"
+ size = { 1 1 } alwaystransparent = yes visible_at_creation = no
+ visible = "[And(IsInGame, And(Not(IsManuallyPaused), Or4(EqualTo_CFixedPoint(GetTitleByKey('h_china').MakeScope.Var('tca_bui_stage').GetValue, '(CFixedPoint)2'), EqualTo_CFixedPoint(GetTitleByKey('h_china').MakeScope.Var('tca_bui_stage').GetValue, '(CFixedPoint)3'), EqualTo_CFixedPoint(GetTitleByKey('h_china').MakeScope.Var('tca_bui_stage').GetValue, '(CFixedPoint)5'), EqualTo_CFixedPoint(GetTitleByKey('h_china').MakeScope.Var('tca_bui_stage').GetValue, '(CFixedPoint)7'))))]"
+ state = { name = _show on_start = "[OnPause]" }
+}
+widget = {
+ name = "tca_bui_unpause"
+ size = { 1 1 } alwaystransparent = yes visible_at_creation = no
+ visible = "[And(IsInGame, And(IsManuallyPaused, And(ObjectsEqual(GetPlayer.Self, GetTitleByKey('h_china').MakeScope.Var('tca_bui_actor').Char.Self), Or(EqualTo_CFixedPoint(GetTitleByKey('h_china').MakeScope.Var('tca_bui_stage').GetValue, '(CFixedPoint)4'), And(EqualTo_CFixedPoint(GetTitleByKey('h_china').MakeScope.Var('tca_bui_stage').GetValue, '(CFixedPoint)8'), GetVariableSystem.HasValue('tca_bui_reloaded', 'yes'))))))]"
+ state = { name = _show on_start = "[SetGameSpeed('(int32)4')]" on_start = "[OnPause]" }
+}
+widget = {
+ name = "tca_bui_option_driver"
+ size = { 1 1 } alwaystransparent = yes
+ datamodel = "[CharacterInteractionConfirmationWindow.GetOptionItems]"
+ item = { widget = {
+  size = { 1 1 } alwaystransparent = yes
+  visible = "[And(OptionItem.IsShown, Or(And(Or(EqualTo_CFixedPoint(GetTitleByKey('h_china').MakeScope.Var('tca_bui_stage').GetValue, '(CFixedPoint)2'), EqualTo_CFixedPoint(GetTitleByKey('h_china').MakeScope.Var('tca_bui_stage').GetValue, '(CFixedPoint)6')), OptionItem.HasFlag('tca_bribery_thin')), Or(And(EqualTo_CFixedPoint(GetTitleByKey('h_china').MakeScope.Var('tca_bui_stage').GetValue, '(CFixedPoint)3'), OptionItem.HasFlag('tca_bribery_generous')), And(EqualTo_CFixedPoint(GetTitleByKey('h_china').MakeScope.Var('tca_bui_stage').GetValue, '(CFixedPoint)7'), OptionItem.HasFlag('tca_bribery_lavish')))))]"
+  widget = {
+   size = { 1 1 } alwaystransparent = yes visible_at_creation = no
+   visible = "[And(OptionItem.IsValid, Not(OptionItem.HasOption))]"
+   state = { name = _show on_start = "[OptionItem.OnClick]" }
+  }
+  widget = {
+   size = { 1 1 } alwaystransparent = yes visible_at_creation = no
+   visible = "[And(OptionItem.HasOption, Or(EqualTo_CFixedPoint(GetTitleByKey('h_china').MakeScope.Var('tca_bui_stage').GetValue, '(CFixedPoint)2'), EqualTo_CFixedPoint(GetTitleByKey('h_china').MakeScope.Var('tca_bui_stage').GetValue, '(CFixedPoint)6')))]"
+   state = { name = _show duration = 0.25 next = tca_bui_mark_thin }
+   state = { name = tca_bui_mark_thin on_start = "[GetScriptedGui('tca_bui_thin_selected').Execute(GuiScope.End)]" }
+  }
+  widget = {
+   size = { 1 1 } alwaystransparent = yes visible_at_creation = no
+   visible = "[And(OptionItem.HasOption, Or(EqualTo_CFixedPoint(GetTitleByKey('h_china').MakeScope.Var('tca_bui_stage').GetValue, '(CFixedPoint)3'), EqualTo_CFixedPoint(GetTitleByKey('h_china').MakeScope.Var('tca_bui_stage').GetValue, '(CFixedPoint)7')))]"
+   state = { name = _show duration = 0.5 next = tca_bui_send }
+   state = { name = tca_bui_send
+    on_start = "[GetScriptedGui(Select_CString(CharacterInteractionConfirmationWindow.CanSend, 'tca_bui_prepare_send', 'tca_bui_fail_send')).Execute(GuiScope.End)]"
+
+   }
+  }
+ } }
+}
+# 选项点击改写阶段后原item会隐藏；发送在窗口本身的稳定上下文执行。
+widget = {
+ name = "tca_bui_native_sender"
+ size = { 1 1 } visible_at_creation = no alwaystransparent = yes
+ visible = "[And(CharacterInteractionConfirmationWindow.CanSend, Or(And(EqualTo_CFixedPoint(GetTitleByKey('h_china').MakeScope.Var('tca_bui_stage').GetValue, '(CFixedPoint)4'), Not(GetVariableSystem.HasValue('tca_bui_sent_thick', 'yes'))), And(EqualTo_CFixedPoint(GetTitleByKey('h_china').MakeScope.Var('tca_bui_stage').GetValue, '(CFixedPoint)8'), Not(GetVariableSystem.HasValue('tca_bui_sent_lavish', 'yes')))))]"
+ state = { name = _show duration = 0.1 next = tca_bui_do_send }
+ state = { name = tca_bui_do_send
+  on_start = "[GetVariableSystem.Set(Select_CString(EqualTo_CFixedPoint(GetTitleByKey('h_china').MakeScope.Var('tca_bui_stage').GetValue, '(CFixedPoint)4'), 'tca_bui_sent_thick', 'tca_bui_sent_lavish'), 'yes')]"
+  on_start = "[CharacterInteractionConfirmationWindow.Send]"
+ }
+}
+# 保存真实待回复的重金请求；当前进程保持暂停，防止存档前AI先行回复。
+widget = {
+ name = "tca_bui_pending_save"
+ size = { 1 1 } alwaystransparent = yes visible_at_creation = no
+ visible = "[And(IsInGame, And(EqualTo_CFixedPoint(GetTitleByKey('h_china').MakeScope.Var('tca_bui_stage').GetValue, '(CFixedPoint)8'), GetVariableSystem.HasValue('tca_bui_initial_process', 'yes')))]"
+ state = { name = _show
+  on_start = "[GetVariableSystem.Set('tca_bui_save_requested', 'yes')]"
+  duration = 2 next = tca_bui_save
+ }
+ state = { name = tca_bui_save
+  on_start = "[ExecuteConsoleCommand('save tca_bribery_ui_pending')]"
+  duration = 8 next = tca_bui_reload_request
+ }
+ state = { name = tca_bui_reload_request on_start = "[GetScriptedGui('tca_bui_reload_ready').Execute(GuiScope.End)]" }
+}
+
+# 切换玩家命令异步更新GetPlayer；按实际身份就绪触发，不用固定一秒假定已完成。
+widget = {
+ name = "tca_bui_player_ready"
+ size = { 1 1 } alwaystransparent = yes visible_at_creation = no
+ visible = "[And(IsInGame, And(ObjectsEqual(GetPlayer.Self, GetTitleByKey('h_china').MakeScope.Var('tca_bui_actor').Char.Self), Not(GetVariableSystem.HasValue('tca_bui_player_checked', 'yes'))))]"
+ state = { name = _show
+  on_start = "[GetVariableSystem.Set('tca_bui_player_checked', 'yes')]"
+  on_start = "[GetScriptedGui('tca_bui_boot').Execute(GuiScope.AddScope('player', GetPlayer.MakeScope).End)]"
+ }
+}
+widget = {
+ name = "tca_bui_boot_unpause"
+ size = { 1 1 } alwaystransparent = yes visible_at_creation = no
+ visible = "[And(IsInGame, And(IsManuallyPaused, EqualTo_CFixedPoint(GetTitleByKey('h_china').MakeScope.Var('tca_bui_stage').GetValue, '(CFixedPoint)1')))]"
+ state = { name = _show on_start = "[SetGameSpeed('(int32)1')]" on_start = "[OnPause]" }
+}
