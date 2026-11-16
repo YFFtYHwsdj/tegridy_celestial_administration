@@ -1,0 +1,45 @@
+﻿# 原生事件只提供本批土地去向；功绩已在战争结果发放，不在选择中重复奖励。
+namespace = tca_frontier_distribution
+
+tca_frontier_distribution.1 = {
+    type = character_event
+    title = tca_frontier_distribution.1.t
+    desc = tca_frontier_distribution.1.desc
+    theme = realm
+    trigger = { scope:tca_fb_batch ?= { tca_fb_batch_valid_trigger = yes var:tca_fb_actor = root } }
+    # 选项打开后资格仍可变化；事务拒绝旧选择时重新投递，避免留下无人能处理的批次。
+    after = { scope:tca_fb_batch ?= { if = { limit = { tca_fb_batch_valid_trigger = yes }
+        var:tca_fb_actor = { trigger_event = { id = tca_frontier_distribution.1 days = 1 } }
+    } } }
+    on_trigger_fail = { scope:tca_fb_batch ?= { end_story = yes } }
+    option = {
+        name = tca_frontier_distribution.1.a
+        trigger = { scope:tca_fb_batch = { tca_fb_can_keep_trigger = yes } }
+        custom_tooltip = tca_frontier_distribution.1.a.tt
+        hidden_effect = { scope:tca_fb_batch = { tca_fb_finish_effect = { CHOICE = 0 } } }
+        ai_chance = { base = 50 modifier = { factor = 0.5 government_has_flag = government_is_celestial } }
+    }
+    option = {
+        name = tca_frontier_distribution.1.b
+        trigger = { scope:tca_fb_batch = { tca_fb_can_give_liege_trigger = yes } }
+        custom_tooltip = tca_frontier_distribution.1.b.tt
+        hidden_effect = { scope:tca_fb_batch = { tca_fb_finish_effect = { CHOICE = 1 } } }
+        ai_chance = { base = 50 modifier = { factor = 2 government_has_flag = government_is_celestial } }
+    }
+    option = {
+        name = tca_frontier_distribution.1.c
+        trigger = { scope:tca_fb_batch = { tca_fb_can_give_top_trigger = yes OR = { tca_fb_distinct_top_trigger = yes NOT = { tca_fb_can_give_liege_trigger = yes } } } }
+        custom_tooltip = tca_frontier_distribution.1.c.tt
+        hidden_effect = { scope:tca_fb_batch = { tca_fb_finish_effect = { CHOICE = 2 } } }
+        ai_chance = { base = 25 modifier = { factor = 2 government_has_flag = government_is_celestial } }
+    }
+}
+
+# 征服者死亡后，等待原生继承结算再接D；不重建分配选择或重复发奖。
+tca_frontier_distribution.2 = {
+    type = character_event hidden = yes
+    immediate = { scope:tca_fs_record ?= { if = { limit = {
+        var:tca_fs_closed ?= 1 var:tca_ws_schema ?= 2
+        NOT = { has_variable = tca_fb_distribution } NOT = { has_variable = tca_fd_state }
+    } tca_fb_begin_recovery_effect = yes } } }
+}

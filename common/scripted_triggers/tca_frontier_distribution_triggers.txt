@@ -1,0 +1,32 @@
+﻿# 批次story作用域；只处理该次仍由征服者直持的县，不强取已经易主的土地。
+tca_fb_batch_valid_trigger = {
+    save_temporary_scope_as = tca_fb_checked_batch
+    var:tca_fb_actor ?= { is_alive = yes is_landed = yes }
+    var:tca_fb_country.holder ?= { is_alive = yes is_independent_ruler = yes primary_title = scope:tca_fb_checked_batch.var:tca_fb_country }
+    var:tca_fb_actor ?= { top_liege = scope:tca_fb_checked_batch.var:tca_fb_country.holder }
+    any_in_list = { variable = tca_fb_counties holder ?= scope:tca_fb_checked_batch.var:tca_fb_actor }
+}
+
+# 战后已经取得土地，直接检查当前原生直辖读数；独立者与公爵以上不受伯爵保留限制。
+tca_fb_can_keep_trigger = {
+    tca_fb_batch_valid_trigger = yes
+    var:tca_fb_actor = {
+        OR = { is_independent_ruler = yes highest_held_title_tier >= tier_duchy domain_size <= domain_limit }
+    }
+}
+
+# 当前直属上级须仍是本次冻结对象；同国继位的中央可由代表头衔现任承接。
+tca_fb_can_give_liege_trigger = {
+    tca_fb_batch_valid_trigger = yes
+    var:tca_fb_liege ?= { is_alive = yes is_landed = yes }
+    var:tca_fb_actor = { liege ?= scope:tca_fb_checked_batch.var:tca_fb_liege }
+}
+tca_fb_can_give_top_trigger = {
+    tca_fb_batch_valid_trigger = yes
+    var:tca_fb_actor = { is_independent_ruler = no }
+}
+# 选项显示条件；中央与当前直属上级相同只保留“上交”一项。
+tca_fb_distinct_top_trigger = {
+    tca_fb_can_give_top_trigger = yes
+    var:tca_fb_actor = { NOT = { liege = scope:tca_fb_checked_batch.var:tca_fb_country.holder } }
+}

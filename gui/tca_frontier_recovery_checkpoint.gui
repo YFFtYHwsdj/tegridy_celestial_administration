@@ -47,3 +47,39 @@ widget = {
         on_start = "[SetGameSpeed('(int32)4')]"
     }
 }
+
+# 保存期间显式手动暂停，避免仅设置速度0时日期继续前进，越过待援边界。
+# 恢复阶段只撤销本检查点的暂停；两控件条件互斥，不改变业务等待天数。
+widget = {
+    name = "tca_frontier_recovery_checkpoint_pause"
+    size = { 1 1 }
+    alwaystransparent = yes
+    alpha = 0
+    visible_at_creation = no
+    datacontext = "[GetTitleByKey('h_china')]"
+    visible = "[And(InDebugMode, And(IsInGame, And(GreaterThan_CFixedPoint(Title.MakeScope.Var('tca_cli_ready').GetValue, '(CFixedPoint)0'), And(And(GreaterThanOrEqualTo_CFixedPoint(Title.MakeScope.Var('tca_frontier_recovery_checkpoint_phase').GetValue, '(CFixedPoint)1'), LessThanOrEqualTo_CFixedPoint(Title.MakeScope.Var('tca_frontier_recovery_checkpoint_phase').GetValue, '(CFixedPoint)2')), Not(IsManuallyPaused)))))]"
+    state = { name = _show on_start = "[OnPause]" }
+}
+widget = {
+    name = "tca_frontier_recovery_checkpoint_unpause"
+    size = { 1 1 }
+    alwaystransparent = yes
+    alpha = 0
+    visible_at_creation = no
+    datacontext = "[GetTitleByKey('h_china')]"
+    visible = "[And(InDebugMode, And(IsInGame, And(GreaterThan_CFixedPoint(Title.MakeScope.Var('tca_cli_ready').GetValue, '(CFixedPoint)0'), And(EqualTo_CFixedPoint(Title.MakeScope.Var('tca_frontier_recovery_checkpoint_phase').GetValue, '(CFixedPoint)3'), IsManuallyPaused))))]"
+    state = { name = _show on_start = "[OnPause]" }
+}
+
+# 七日边界探针在开局显式设置阶段4，先降低推进速度，避免一次渲染间隔跨过待保存日期。
+# 正式D用例不设置阶段4，不改变其等待天数或正常游戏速度。
+widget = {
+    name = "tca_frontier_recovery_checkpoint_prepare"
+    size = { 1 1 }
+    alwaystransparent = yes
+    alpha = 0
+    visible_at_creation = no
+    datacontext = "[GetTitleByKey('h_china')]"
+    visible = "[And(InDebugMode, And(IsInGame, And(GreaterThan_CFixedPoint(Title.MakeScope.Var('tca_cli_ready').GetValue, '(CFixedPoint)0'), EqualTo_CFixedPoint(Title.MakeScope.Var('tca_frontier_recovery_checkpoint_phase').GetValue, '(CFixedPoint)4'))))]"
+    state = { name = _show on_start = "[SetGameSpeed('(int32)1')]" }
+}

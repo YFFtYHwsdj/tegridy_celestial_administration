@@ -1,0 +1,87 @@
+﻿# 输入scope:attacker；可选scope:tca_fs_record必须属于本次已结束的战争。
+# 输出scope:tca_fb_batch，每次独立创建；prepare只准备记录，不投递事件、不发功绩。
+tca_fb_prepare_effect = {
+    scope:attacker = { create_story = { type = tca_frontier_distribution save_scope_as = tca_fb_batch } }
+    scope:tca_fb_batch ?= {
+        set_variable = { name = tca_fb_actor value = scope:attacker }
+        set_variable = { name = tca_fb_country value = scope:attacker.top_liege.primary_title }
+        scope:attacker.liege ?= { scope:tca_fb_batch ?= { set_variable = { name = tca_fb_liege value = prev } } }
+        if = { limit = { scope:tca_fs_record ?= { var:tca_fs_closed ?= 1 var:tca_fs_attacker = scope:attacker NOT = { has_variable = tca_fd_state } NOT = { has_variable = tca_fb_distribution } } }
+            set_variable = { name = tca_fb_recovery value = scope:tca_fs_record }
+            scope:tca_fs_record = {
+                set_variable = { name = tca_fb_distribution value = scope:tca_fb_batch }
+                # 活人阶段冻结敌方头衔，待选期间死亡可在继承落定后由既有D接口续接。
+                set_variable = { name = tca_fd_enemy value = scope:attacker }
+                set_variable = { name = tca_fd_enemy_title value = scope:attacker.primary_title }
+            }
+        }
+    }
+    scope:attacker = { add_to_variable_list = { name = tca_fb_batches target = scope:tca_fb_batch } }
+}
+
+# 伯爵领作用域，B征服事务转地前调用。只在同次同步事务中暂存前值，settle逐县清除。
+# 输入scope:tca_fb_batch，候选县并非最终战果；实际持有成功才给奖励并纳入可分配清单。
+tca_fb_capture_county_effect = {
+    set_variable = { name = tca_fb_frozen_merit value = tca_frontier_conquest_merit_value }
+    scope:tca_fb_batch ?= { add_to_variable_list = { name = tca_fb_candidates target = prev } }
+}
+
+# 批次story作用域；原生征服事务完成后调用。功绩仅此处发放，独立者不弹选择。
+tca_fb_settle_effect = {
+    save_scope_as = tca_fb_batch
+    every_in_list = { variable = tca_fb_candidates
+        if = { limit = { holder ?= scope:tca_fb_batch.var:tca_fb_actor }
+            save_scope_value_as = { name = tca_fb_county_merit value = var:tca_fb_frozen_merit }
+            scope:tca_fb_batch.var:tca_fb_actor = { change_merit = scope:tca_fb_county_merit }
+            scope:tca_fb_batch ?= { add_to_variable_list = { name = tca_fb_counties target = prev } }
+        }
+        remove_variable = tca_fb_frozen_merit
+    }
+    clear_variable_list = tca_fb_candidates
+    if = { limit = { tca_fb_batch_valid_trigger = yes var:tca_fb_actor = { is_independent_ruler = no } }
+        var:tca_fb_actor = { trigger_event = { id = tca_frontier_distribution.1 days = 1 } }
+    }
+    else = { end_story = yes }
+}
+
+# 批次story作用域；CHOICE=0保留、1直属上级、2中央。拒绝非法选择时保留批次供重新选择。
+# 上交只调用原生granted转授，不另选官、不改法理；已易主县跳过，整批与其他战争隔离。
+tca_fb_finish_effect = {
+    save_scope_as = tca_fb_batch
+    save_scope_value_as = { name = tca_fb_choice value = $CHOICE$ }
+    if = { limit = { NOT = { tca_fb_batch_valid_trigger = yes } } end_story = yes }
+    else_if = { limit = { scope:tca_fb_choice = 0 tca_fb_can_keep_trigger = yes } end_story = yes }
+    else_if = { limit = { OR = {
+        AND = { scope:tca_fb_choice = 1 tca_fb_can_give_liege_trigger = yes }
+        AND = { scope:tca_fb_choice = 2 tca_fb_can_give_top_trigger = yes }
+    } }
+        var:tca_fb_country.holder = { save_scope_as = tca_fb_recipient }
+        if = { limit = { scope:tca_fb_choice = 1 } var:tca_fb_liege = { save_scope_as = tca_fb_recipient } }
+        var:tca_fb_actor = { create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_fb_transfer } }
+        every_in_list = { variable = tca_fb_counties
+            limit = { holder ?= scope:tca_fb_batch.var:tca_fb_actor }
+            change_title_holder_include_vassals = { holder = scope:tca_fb_recipient change = scope:tca_fb_transfer }
+        }
+        resolve_title_and_vassal_change = scope:tca_fb_transfer
+        # 只有确实全部交割完成才换追讨对象；失败仍可重选，不虚报已完成。
+        if = { limit = { NOT = { any_in_list = { variable = tca_fb_counties holder ?= scope:tca_fb_batch.var:tca_fb_actor } } }
+            var:tca_fb_recovery ?= {
+                set_variable = { name = tca_fd_enemy value = scope:tca_fb_recipient }
+                set_variable = { name = tca_fd_enemy_title value = scope:tca_fb_recipient.primary_title }
+            }
+            end_story = yes
+        }
+    }
+}
+
+# 原战争记录作用域；分配完成后先承接待选期间发生的上级继承，再调用既有D选择。
+# 不改原承诺时间，不重新冻结参战状态；活跃D不得重复启动。
+tca_fb_begin_recovery_effect = {
+    save_scope_as = tca_fs_record
+    tca_fd_resolve_enemy_effect = yes
+    every_in_list = { variable = tca_fs_rows limit = { has_variable_list = tca_ws_successors }
+        save_scope_as = tca_fs_row
+        tca_ws_resolve_support_successor_effect = yes
+    }
+    tca_fd_begin_effect = yes
+}

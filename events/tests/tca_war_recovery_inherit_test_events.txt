@@ -7,7 +7,7 @@ tca_war_recovery_inherit_test.1 = {
     immediate = {
         debug_log = "TCA_TEST BEGIN tca_war_recovery_inherit_test.1 tca_test_war_recovery_inherit"
         remove_character_flag = tca_test_tca_war_recovery_inherit_test_case_failed
-        title:h_china = { remove_variable = tca_frontier_recovery_checkpoint_phase }
+        title:h_china = { set_variable = { name = tca_frontier_recovery_checkpoint_phase value = 4 } }
         remove_variable = tca_war_recovery_inherit_test_elapsed
         title:k_france.holder = { save_scope_as = tca_war_recovery_inherit_test_base tca_test_protect_character_effect = yes }
         title:h_china.holder = { save_scope_as = tca_war_recovery_inherit_test_enemy tca_test_protect_character_effect = yes add_prestige = 10000 }
@@ -106,6 +106,31 @@ tca_war_recovery_inherit_test.2 = {
             scope:tca_war_recovery_inherit_test_original_row ?= { var:tca_fs_state = 1 var:tca_fs_accepted ?= yes var:tca_fs_person = scope:tca_war_recovery_inherit_test_a var:tca_fs_delay = 180 }
         } debug_log = "TCA_TEST CHECK_PASS tca_test_war_recovery_inherit 5" }
         else = { add_character_flag = tca_test_tca_war_recovery_inherit_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_war_recovery_inherit 5" }
+        # 私有已关闭记录模拟另一场战争正在等战果分配；真实头衔继承仍须采集承诺继任者。
+        scope:tca_war_recovery_inherit_test_victim = { create_story = { type = tca_frontier_support_record save_scope_as = tca_war_recovery_inherit_test_distribution_record } }
+        scope:tca_war_recovery_inherit_test_distribution_record = {
+            set_variable = { name = tca_ws_schema value = 2 }
+            set_variable = { name = tca_fs_closed value = 1 }
+            set_variable = { name = tca_fs_retention value = yes days = 30 }
+            set_variable = { name = tca_fb_distribution value = yes }
+            set_variable = { name = tca_fs_defender value = scope:tca_war_recovery_inherit_test_victim }
+            set_variable = { name = tca_fs_attacker value = scope:tca_war_recovery_inherit_test_enemy }
+            set_variable = { name = tca_fd_country value = scope:tca_war_recovery_inherit_test_country }
+            set_variable = { name = tca_fd_attacker_country value = title:h_china }
+            set_variable = { name = tca_fd_enemy value = scope:tca_war_recovery_inherit_test_enemy }
+        }
+        scope:tca_war_recovery_inherit_test_victim = { create_story = { type = tca_frontier_support_row save_scope_as = tca_war_recovery_inherit_test_distribution_row } }
+        scope:tca_war_recovery_inherit_test_distribution_row = {
+            save_scope_as = tca_fs_row
+            set_variable = { name = tca_fs_parent value = scope:tca_war_recovery_inherit_test_distribution_record }
+            set_variable = { name = tca_fs_person value = scope:tca_war_recovery_inherit_test_a }
+            set_variable = { name = tca_fs_kind value = 2 }
+            set_variable = { name = tca_fs_state value = 4 }
+            set_variable = { name = tca_fs_accepted value = yes }
+            set_variable = { name = tca_fd_eligible value = yes }
+        }
+        scope:tca_war_recovery_inherit_test_a = { tca_ws_index_support_row_effect = yes }
+        scope:tca_war_recovery_inherit_test_distribution_record = { add_to_variable_list = { name = tca_fs_rows target = scope:tca_war_recovery_inherit_test_distribution_row } }
         scope:tca_war_recovery_inherit_test_a = { death = { death_reason = death_natural_causes } }
         scope:tca_war_recovery_inherit_test_original_war ?= { end_war = white_peace }
         if = { limit = {
@@ -119,6 +144,13 @@ tca_war_recovery_inherit_test.2 = {
             }
         } debug_log = "TCA_TEST CHECK_PASS tca_test_war_recovery_inherit 4" }
         else = { add_character_flag = tca_test_tca_war_recovery_inherit_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_war_recovery_inherit 4" }
+        scope:tca_war_recovery_inherit_test_distribution_record = { save_scope_as = tca_fs_record }
+        scope:tca_war_recovery_inherit_test_distribution_row = { save_scope_as = tca_fs_row tca_ws_resolve_support_successor_effect = yes }
+        if = { limit = { scope:tca_war_recovery_inherit_test_distribution_row = { var:tca_fs_person = scope:tca_war_recovery_inherit_test_b var:tca_fd_eligible ?= yes } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_war_recovery_inherit 12"
+        }
+        else = { add_character_flag = tca_test_tca_war_recovery_inherit_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_war_recovery_inherit 12" }
+        scope:tca_war_recovery_inherit_test_distribution_record = { end_story = yes }
         # 组件边界：原战已经冻结待援上级A的牵头资格后，真实继承人B已有已参战行。
         # 私有记录与失地不借用下方真实收复战；只调用正式合并入口，不另行宣战。
         scope:tca_war_recovery_inherit_test_victim = { create_story = { type = tca_frontier_support_record save_scope_as = tca_war_recovery_inherit_test_merge_record } }
@@ -285,6 +317,7 @@ tca_war_recovery_inherit_test.5 = {
             scope:tca_war_recovery_inherit_test_war ?= { primary_attacker = scope:tca_war_recovery_inherit_test_d NOT = { is_attacker = scope:tca_war_recovery_inherit_test_helper_heir } }
         } debug_log = "TCA_TEST CHECK_PASS tca_test_war_recovery_inherit 8" }
         else = { add_character_flag = tca_test_tca_war_recovery_inherit_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_war_recovery_inherit 8" }
+        debug_log = "TCA_DISTRIBUTION_INHERIT_DIAG CHECKPOINT_REQUEST date=[GetCurrentDate.GetStringLong]"
         title:h_china = { set_variable = { name = tca_frontier_recovery_checkpoint_phase value = 1 } }
         trigger_event = { id = tca_war_recovery_inherit_test.7 days = 1 }
     }
@@ -297,6 +330,16 @@ tca_war_recovery_inherit_test.7 = {
     immediate = {
         change_variable = { name = tca_war_recovery_inherit_test_elapsed add = 1 }
         if = { limit = { title:h_china = { var:tca_frontier_recovery_checkpoint_phase = 3 } }
+            debug_log = "TCA_DISTRIBUTION_INHERIT_DIAG RELOADED date=[GetCurrentDate.GetStringLong]"
+            scope:tca_war_recovery_inherit_test_record = { every_in_list = { variable = tca_fd_invites
+                if = { limit = { var:tca_fd_response = 1 } debug_log = "TCA_DISTRIBUTION_INHERIT_DIAG RESPONSE_WAITING" }
+                if = { limit = { var:tca_fd_response = 3 } debug_log = "TCA_DISTRIBUTION_INHERIT_DIAG RESPONSE_JOINED" }
+                if = { limit = { has_variable = tca_ws_alias_wait_only } debug_log = "TCA_DISTRIBUTION_INHERIT_DIAG ALIAS_PRESENT" }
+                every_in_list = { variable = tca_ws_wait_sources
+                    if = { limit = { has_variable = tca_fd_wait } debug_log = "TCA_DISTRIBUTION_INHERIT_DIAG SOURCE_STILL_WAITING" }
+                    else = { debug_log = "TCA_DISTRIBUTION_INHERIT_DIAG SOURCE_EXPIRED" }
+                }
+            } }
             if = { limit = {
                 scope:tca_war_recovery_inherit_test_record = { tca_fd_live_trigger = yes var:tca_fd_leader = scope:tca_war_recovery_inherit_test_d any_in_list = { variable = tca_fd_invites count = 1 var:tca_fd_person = scope:tca_war_recovery_inherit_test_helper_heir var:tca_fd_response = 1 any_in_list = { variable = tca_ws_wait_sources count = 1 this = scope:tca_war_recovery_inherit_test_accepted_invite has_variable = tca_fd_wait } } }
                 scope:tca_war_recovery_inherit_test_war ?= { primary_attacker = scope:tca_war_recovery_inherit_test_d NOT = { is_attacker = scope:tca_war_recovery_inherit_test_helper_heir } }

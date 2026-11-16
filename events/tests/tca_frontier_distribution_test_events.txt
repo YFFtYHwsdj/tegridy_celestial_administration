@@ -1,0 +1,245 @@
+﻿# 战果分配组件与正式战争使用独立可丢弃世界；不代替玩家点击验收。
+namespace = tca_frontier_distribution_test
+
+tca_frontier_distribution_test.1 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_frontier_distribution_test.1 tca_test_frontier_distribution"
+        remove_character_flag = tca_test_tca_frontier_distribution_test_case_failed
+        title:h_china.holder = { save_scope_as = tca_frontier_distribution_test_top }
+        tca_frontier_situation_start_effect = yes
+        create_character = { age = 35 gender = male dynasty = scope:tca_frontier_distribution_test_top.dynasty random_traits = no culture = root.culture faith = root.faith location = root.capital_province save_scope_as = actor }
+        create_character = { age = 40 gender = male dynasty = scope:tca_frontier_distribution_test_top.dynasty random_traits = no culture = root.culture faith = root.faith location = root.capital_province save_scope_as = tca_frontier_distribution_test_upper }
+        create_character = { age = 40 gender = male random_traits = no culture = root.culture faith = root.faith location = root.capital_province save_scope_as = recipient }
+        scope:actor = { tca_test_protect_character_effect = yes add_prestige = 10000 add_character_flag = tca_frontier_border_war_enabled add_character_modifier = { modifier = tca_frontier_distribution_test_limit } }
+        scope:tca_frontier_distribution_test_upper = { tca_test_protect_character_effect = yes }
+        scope:recipient = { tca_test_protect_character_effect = yes add_trait = content }
+        title:c_lingzhou = { random_neighboring_county = { limit = { this != title:c_huaiyuan } save_scope_as = tca_frontier_distribution_test_border } }
+        scope:actor = { create_title_and_vassal_change = { type = granted save_scope_as = tca_frontier_distribution_test_grant } }
+        scope:tca_frontier_distribution_test_border = { change_title_holder = { holder = scope:actor change = scope:tca_frontier_distribution_test_grant take_baronies = yes } }
+        resolve_title_and_vassal_change = scope:tca_frontier_distribution_test_grant
+        scope:tca_frontier_distribution_test_upper = { create_title_and_vassal_change = { type = granted save_scope_as = tca_frontier_distribution_test_grant } }
+        title:c_hangzhou = { change_title_holder = { holder = scope:tca_frontier_distribution_test_upper change = scope:tca_frontier_distribution_test_grant } }
+        title:k_xia = { change_title_holder = { holder = scope:tca_frontier_distribution_test_upper change = scope:tca_frontier_distribution_test_grant } }
+        resolve_title_and_vassal_change = scope:tca_frontier_distribution_test_grant
+        scope:recipient = { create_title_and_vassal_change = { type = granted save_scope_as = tca_frontier_distribution_test_grant } }
+        title:c_lingzhou = { change_title_holder = { holder = scope:recipient change = scope:tca_frontier_distribution_test_grant take_baronies = yes } }
+        resolve_title_and_vassal_change = scope:tca_frontier_distribution_test_grant
+        scope:tca_frontier_distribution_test_upper = {
+            debug_log = "TCA_DISTRIBUTION_FIXTURE UPPER_AFTER_GRANT [THIS.Char.GetID]"
+            change_government = feudal_government
+            create_title_and_vassal_change = { type = swear_fealty save_scope_as = tca_frontier_distribution_test_fealty }
+            change_liege = { liege = scope:tca_frontier_distribution_test_top change = scope:tca_frontier_distribution_test_fealty }
+            resolve_title_and_vassal_change = scope:tca_frontier_distribution_test_fealty
+        }
+        scope:actor = {
+            change_government = feudal_government
+            create_title_and_vassal_change = { type = swear_fealty save_scope_as = tca_frontier_distribution_test_fealty }
+            change_liege = { liege = scope:tca_frontier_distribution_test_upper change = scope:tca_frontier_distribution_test_fealty }
+            resolve_title_and_vassal_change = scope:tca_frontier_distribution_test_fealty
+        }
+        scope:recipient = {
+            change_government = feudal_government
+            create_title_and_vassal_change = { type = independency save_scope_as = tca_frontier_distribution_test_independent }
+            becomes_independent = { change = scope:tca_frontier_distribution_test_independent }
+            resolve_title_and_vassal_change = scope:tca_frontier_distribution_test_independent
+        }
+        # 用独立基层市长核对征服后再次上交仍保留持有人及封属，不把县主自持地产当作反例。
+        create_character = { age = 35 gender = male random_traits = no culture = root.culture faith = root.faith location = scope:recipient.capital_province save_scope_as = tca_frontier_distribution_test_mayor }
+        scope:recipient = { create_title_and_vassal_change = { type = granted save_scope_as = tca_frontier_distribution_test_grant } }
+        title:b_lingwu = { change_title_holder = { holder = scope:tca_frontier_distribution_test_mayor change = scope:tca_frontier_distribution_test_grant government_base = scope:recipient } }
+        scope:tca_frontier_distribution_test_mayor = { tca_test_protect_character_effect = yes change_liege = { liege = scope:recipient change = scope:tca_frontier_distribution_test_grant } }
+        resolve_title_and_vassal_change = scope:tca_frontier_distribution_test_grant
+        trigger_event = { id = tca_frontier_distribution_test.2 days = 3 }
+    }
+}
+tca_frontier_distribution_test.2 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { scope:actor = { highest_held_title_tier = tier_county liege = scope:tca_frontier_distribution_test_upper domain_limit = 1 } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_distribution 1"
+            title:c_lingzhou = { save_scope_as = target }
+            save_scope_value_as = { name = tca_frontier_raid value = no }
+            tca_frontier_border_war_start_effect = yes
+            trigger_event = { id = tca_frontier_distribution_test.3 days = 2 }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_frontier_distribution" tca_test_lane_end_effect = { GROUP = tca_frontier_distribution_test } }
+    }
+}
+tca_frontier_distribution_test.3 = {
+    type = character_event hidden = yes
+    immediate = {
+        scope:tca_frontier_border_war ?= { var:tca_fs_record ?= { save_scope_as = tca_frontier_distribution_test_recovery } end_war = attacker }
+        # 正式战争必须建立独立批次，且在选择前不启动追讨；当日直接消费正式选择入口。
+        scope:actor = { random_in_list = { variable = tca_fb_batches save_scope_as = tca_frontier_distribution_test_batch } }
+        if = { limit = { exists = scope:tca_frontier_distribution_test_batch title:c_lingzhou = { holder = scope:actor } scope:tca_frontier_distribution_test_recovery = { has_variable = tca_fb_distribution NOT = { has_variable = tca_fd_state } } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_distribution 2"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_distribution_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_distribution 2" }
+        scope:tca_frontier_distribution_test_batch ?= { tca_fb_finish_effect = { CHOICE = 1 } }
+        if = { limit = { title:c_lingzhou = { holder = scope:tca_frontier_distribution_test_upper } title:b_lingwu = { holder = scope:tca_frontier_distribution_test_mayor } scope:tca_frontier_distribution_test_mayor = { is_vassal_or_below_of = scope:tca_frontier_distribution_test_upper } scope:tca_frontier_distribution_test_recovery = { var:tca_fd_enemy = scope:tca_frontier_distribution_test_upper NOT = { has_variable = tca_fb_distribution } } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_distribution 3"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_distribution_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_distribution 3" }
+        # 组件场景使用正式prepare，不投递玩家事件；待选记录经原生保存重载保留。
+        scope:actor = { save_scope_as = attacker }
+        clear_saved_scope = tca_fs_record
+        tca_fb_prepare_effect = yes
+        scope:tca_fb_batch ?= { add_to_variable_list = { name = tca_fb_counties target = scope:tca_frontier_distribution_test_border } save_scope_as = tca_frontier_distribution_test_batch_one }
+        tca_fb_prepare_effect = yes
+        scope:tca_fb_batch ?= { add_to_variable_list = { name = tca_fb_counties target = scope:tca_frontier_distribution_test_border } save_scope_as = tca_frontier_distribution_test_batch_two }
+        title:h_china = { set_variable = { name = tca_frontier_distribution_checkpoint_phase value = 1 } }
+        trigger_event = { id = tca_frontier_distribution_test.4 days = 1 }
+    }
+}
+tca_frontier_distribution_test.4 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { title:h_china = { var:tca_frontier_distribution_checkpoint_phase = 3 } }
+            if = { limit = { exists = scope:tca_frontier_distribution_test_batch_one exists = scope:tca_frontier_distribution_test_batch_two scope:tca_frontier_distribution_test_batch_one = { tca_fb_batch_valid_trigger = yes } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_distribution 4"
+            }
+            else = { add_character_flag = tca_test_tca_frontier_distribution_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_distribution 4" }
+            scope:actor = { remove_character_modifier = tca_frontier_distribution_test_limit add_character_modifier = { modifier = tca_frontier_distribution_test_capacity } }
+            trigger_event = { id = tca_frontier_distribution_test.5 days = 2 }
+        }
+        else = { trigger_event = { id = tca_frontier_distribution_test.4 days = 1 } }
+    }
+}
+tca_frontier_distribution_test.5 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { scope:tca_frontier_distribution_test_batch_one = { tca_fb_can_keep_trigger = yes } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_distribution 5"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_distribution_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_distribution 5" }
+        scope:tca_frontier_distribution_test_batch_one = { tca_fb_finish_effect = { CHOICE = 0 } }
+        if = { limit = { title:c_lingzhou = { holder = scope:tca_frontier_distribution_test_upper } scope:tca_frontier_distribution_test_border = { holder = scope:actor } scope:tca_frontier_distribution_test_batch_two = { tca_fb_batch_valid_trigger = yes } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_distribution 6"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_distribution_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_distribution 6" }
+        # 上限内留归后，重新准备同一县的组件记录，测试伯爵超限拒绝与公爵豁免。
+        scope:actor = { remove_character_modifier = tca_frontier_distribution_test_capacity add_character_modifier = { modifier = tca_frontier_distribution_test_limit } }
+        create_title_and_vassal_change = { type = granted save_scope_as = tca_frontier_distribution_test_grant }
+        title:c_huaiyuan = { change_title_holder = { holder = scope:actor change = scope:tca_frontier_distribution_test_grant } }
+        resolve_title_and_vassal_change = scope:tca_frontier_distribution_test_grant
+        trigger_event = { id = tca_frontier_distribution_test.6 days = 2 }
+    }
+}
+tca_frontier_distribution_test.6 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { scope:actor = { domain_size > domain_limit } scope:tca_frontier_distribution_test_batch_two = { NOT = { tca_fb_can_keep_trigger = yes } } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_distribution 7"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_distribution_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_distribution 7" }
+        scope:tca_frontier_distribution_test_batch_two = { tca_fb_finish_effect = { CHOICE = 0 } }
+        if = { limit = { exists = scope:tca_frontier_distribution_test_batch_two scope:tca_frontier_distribution_test_border = { holder = scope:actor } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_distribution 8"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_distribution_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_distribution 8" }
+        # 超限伯爵没有保留选项，原生AI须实际选择直属或中央上交；不直接调用选择effect代替。
+        scope:actor = { set_variable = { name = tca_frontier_distribution_test_merit value = merit } }
+        scope:tca_frontier_distribution_test_batch_two = { save_scope_as = tca_fb_batch }
+        scope:actor = { trigger_event = { id = tca_frontier_distribution.1 } }
+        trigger_event = { id = tca_frontier_distribution_test.10 days = 2 }
+    }
+}
+tca_frontier_distribution_test.10 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = {
+            NOT = { exists = scope:tca_frontier_distribution_test_batch_two }
+            scope:tca_frontier_distribution_test_border = { holder = { OR = { this = scope:tca_frontier_distribution_test_upper this = scope:tca_frontier_distribution_test_top } } }
+            scope:actor = { merit = var:tca_frontier_distribution_test_merit }
+        } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_distribution 14" }
+        else = { add_character_flag = tca_test_tca_frontier_distribution_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_distribution 14" }
+        # 另备组件批次核对公爵豁免，不复活已结束的真实AI选择。
+        scope:actor = { create_title_and_vassal_change = { type = granted save_scope_as = tca_frontier_distribution_test_grant } }
+        scope:tca_frontier_distribution_test_border = { change_title_holder_include_vassals = { holder = scope:actor change = scope:tca_frontier_distribution_test_grant } }
+        resolve_title_and_vassal_change = scope:tca_frontier_distribution_test_grant
+        tca_fb_prepare_effect = yes
+        scope:tca_fb_batch = { add_to_variable_list = { name = tca_fb_counties target = scope:tca_frontier_distribution_test_border } save_scope_as = tca_frontier_distribution_test_batch_two }
+        create_title_and_vassal_change = { type = granted save_scope_as = tca_frontier_distribution_test_grant }
+        title:d_shuofang = { change_title_holder = { holder = scope:actor change = scope:tca_frontier_distribution_test_grant } }
+        resolve_title_and_vassal_change = scope:tca_frontier_distribution_test_grant
+        # 同级公爵不能继续臣属于公爵，按原生规则重新归最高领主。
+        scope:actor = { create_title_and_vassal_change = { type = swear_fealty save_scope_as = tca_frontier_distribution_test_fealty } change_liege = { liege = scope:tca_frontier_distribution_test_top change = scope:tca_frontier_distribution_test_fealty } resolve_title_and_vassal_change = scope:tca_frontier_distribution_test_fealty }
+        trigger_event = { id = tca_frontier_distribution_test.7 days = 2 }
+    }
+}
+tca_frontier_distribution_test.7 = {
+    type = character_event hidden = yes
+    immediate = {
+        # 原上级已改变，旧批次不得把土地交给旧上级；中央仍是同一国。
+        if = { limit = { scope:tca_frontier_distribution_test_batch_two = { NOT = { tca_fb_can_give_liege_trigger = yes } tca_fb_can_give_top_trigger = yes tca_fb_can_keep_trigger = yes } scope:actor = { highest_held_title_tier = tier_duchy domain_size > domain_limit } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_distribution 9"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_distribution_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_distribution 9" }
+        scope:actor = { set_variable = { name = tca_frontier_distribution_test_merit value = merit } }
+        scope:tca_frontier_distribution_test_batch_two = { tca_fb_finish_effect = { CHOICE = 2 } }
+        scope:tca_frontier_distribution_test_batch_two ?= { tca_fb_finish_effect = { CHOICE = 1 } }
+        if = { limit = { scope:tca_frontier_distribution_test_border = { holder = scope:tca_frontier_distribution_test_top } scope:actor = { merit = var:tca_frontier_distribution_test_merit } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_distribution 10"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_distribution_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_distribution 10" }
+        tca_fb_prepare_effect = yes
+        scope:tca_fb_batch = { add_to_variable_list = { name = tca_fb_counties target = title:c_huaiyuan } save_scope_as = tca_frontier_distribution_test_batch_three }
+        if = { limit = { scope:tca_frontier_distribution_test_batch_three = { tca_fb_can_give_liege_trigger = yes NOT = { tca_fb_distinct_top_trigger = yes } } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_distribution 11"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_distribution_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_distribution 11" }
+        scope:tca_frontier_distribution_test_batch_three = { tca_fb_finish_effect = { CHOICE = 0 } }
+        tca_fb_prepare_effect = yes
+        scope:tca_fb_batch = { add_to_variable_list = { name = tca_fb_counties target = title:c_lingzhou } tca_fb_finish_effect = { CHOICE = 2 } }
+        if = { limit = { title:c_lingzhou = { holder = scope:tca_frontier_distribution_test_upper } scope:actor = { NOT = { has_variable_list = tca_fb_batches } } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_distribution 12"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_distribution_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_distribution 12" }
+        # 组件场景：真实死亡继承发生在待分配期间。失地记录自备，不冒充另一场原版战争。
+        create_character = { age = 16 gender = male father = scope:actor dynasty = scope:actor.dynasty random_traits = no culture = scope:actor.culture faith = scope:actor.faith location = scope:actor.capital_province save_scope_as = tca_frontier_distribution_test_heir }
+        scope:tca_frontier_distribution_test_heir = { tca_test_protect_character_effect = yes }
+        scope:actor = { add_realm_law_skip_effects = single_heir_succession_law set_designated_heir = scope:tca_frontier_distribution_test_heir }
+        title:k_france.holder = { save_scope_as = tca_frontier_distribution_test_old_holder create_story = { type = tca_frontier_support_record save_scope_as = tca_frontier_distribution_test_death_record } }
+        scope:tca_frontier_distribution_test_death_record = {
+            set_variable = { name = tca_ws_schema value = 2 }
+            set_variable = { name = tca_fs_closed value = 1 }
+            set_variable = { name = tca_fs_retention value = yes days = 30 }
+            set_variable = { name = tca_fs_defender value = scope:tca_frontier_distribution_test_old_holder }
+            set_variable = { name = tca_fs_attacker value = scope:actor }
+            set_variable = { name = tca_fd_country value = title:k_france }
+            set_variable = { name = tca_fd_attacker_country value = title:h_china }
+            set_variable = { name = tca_fd_enemy value = scope:actor }
+            set_variable = { name = tca_fd_enemy_title value = scope:actor.primary_title }
+        }
+        scope:tca_frontier_distribution_test_old_holder = { create_story = { type = tca_frontier_recovery_loss save_scope_as = tca_frontier_distribution_test_death_loss } }
+        scope:tca_frontier_distribution_test_death_loss = {
+            set_variable = { name = tca_fd_parent value = scope:tca_frontier_distribution_test_death_record }
+            set_variable = { name = tca_fd_title value = title:c_huaiyuan }
+            set_variable = { name = tca_fd_holder value = scope:tca_frontier_distribution_test_old_holder }
+        }
+        scope:tca_frontier_distribution_test_death_record = { add_to_variable_list = { name = tca_fd_losses target = scope:tca_frontier_distribution_test_death_loss } add_to_variable_list = { name = tca_fd_goals target = title:c_huaiyuan } }
+        tca_fb_prepare_effect = yes
+        scope:tca_fb_batch = { add_to_variable_list = { name = tca_fb_counties target = title:c_huaiyuan } set_variable = { name = tca_fb_recovery value = scope:tca_frontier_distribution_test_death_record } }
+        scope:tca_frontier_distribution_test_death_record = { set_variable = { name = tca_fb_distribution value = scope:tca_fb_batch } }
+        scope:actor = { death = { death_reason = death_natural_causes } }
+        trigger_event = { id = tca_frontier_distribution_test.8 days = 3 }
+    }
+}
+tca_frontier_distribution_test.8 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = {
+            title:c_huaiyuan = { holder = scope:tca_frontier_distribution_test_heir }
+            scope:tca_frontier_distribution_test_death_record = { var:tca_fd_enemy = scope:tca_frontier_distribution_test_heir has_variable_list = tca_fd_losses var:tca_fd_state = 4 }
+        } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_distribution 13" }
+        else = { add_character_flag = tca_test_tca_frontier_distribution_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_distribution 13" }
+        scope:tca_frontier_distribution_test_death_record ?= { end_story = yes }
+        if = { limit = { has_character_flag = tca_test_tca_frontier_distribution_test_case_failed }
+            debug_log = "TCA_TEST FAIL tca_test_frontier_distribution"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+        }
+        else = { debug_log = "TCA_TEST PASS tca_test_frontier_distribution" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        tca_test_lane_end_effect = { GROUP = tca_frontier_distribution_test }
+    }
+}

@@ -1,0 +1,29 @@
+﻿# 每场征服一批，不能用征服者单一变量覆盖另一场待选战果。
+# 死亡或国家变化时不代替继承人作旧选择；清理索引并释放原战争快照，再接既有追讨。
+tca_frontier_distribution = {
+    on_owner_death = { set_variable = { name = tca_fb_owner_died value = yes } end_story = yes }
+    on_end = {
+        save_scope_as = tca_fb_ending_batch
+        var:tca_fb_actor ?= { if = { limit = { is_alive = yes }
+            remove_list_variable = { name = tca_fb_batches target = scope:tca_fb_ending_batch }
+        } }
+        var:tca_fb_recovery ?= {
+            save_scope_as = tca_fs_record
+            if = { limit = { var:tca_fb_distribution ?= scope:tca_fb_ending_batch }
+                remove_variable = tca_fb_distribution
+                set_variable = { name = tca_fs_retention value = yes days = 30 }
+                if = { limit = { var:tca_fs_closed ?= 1 var:tca_ws_schema ?= 2 }
+                    if = { limit = { scope:tca_fb_ending_batch = { has_variable = tca_fb_owner_died } }
+                        # 死亡回调内领地继承尚未完成，次日再解析实际接收者，不能先剔除失地。
+                        var:tca_fd_country.holder ?= { trigger_event = { id = tca_frontier_distribution.2 days = 1 } }
+                    }
+                    else = { tca_fb_begin_recovery_effect = yes }
+                }
+            }
+        }
+    }
+    effect_group = { days = 1 triggered_effect = {
+        trigger = { NOT = { tca_fb_batch_valid_trigger = yes } }
+        effect = { end_story = yes }
+    } }
+}
