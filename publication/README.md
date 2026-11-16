@@ -5,6 +5,8 @@
 ## 规划目录结构
 
 - `steam/`：Steam 创意工坊首页简介、特性说明、常见问答与版本更新公告（可同时维护 Markdown 草稿与 BBCode 成稿）。
+  - [创意工坊简介（Markdown）](steam/workshop_description.md)
+  - [创意工坊简介（BBCode）](steam/workshop_description.bbcode)
 - `dev_diaries/`：开发日志（Dev Diaries），面向玩家介绍北宋天朝制度的设计思路、玩法机制与开发进展。
   - [开发手记（一）：班白之老，不识干戈](dev_diaries/01_overview_and_design_philosophy.md)
 - `assets/`：对外展示与社区宣发用图、封面及排版素材（与游戏内资源目录 `gfx/` 分离）。
