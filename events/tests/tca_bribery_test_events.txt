@@ -1,0 +1,421 @@
+﻿# 一次性行贿原生回归；只操作私有对象，断言调用正式接口。
+namespace = tca_bribery_test
+
+tca_bribery_test.1 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_bribery_test.1 tca_test_bribery_prices"
+        remove_character_flag = tca_test_tca_bribery_test_case_failed
+        tca_test_bribery_prepare_effect = yes
+
+        trigger_event = { id = tca_bribery_test.101 days = 1 }
+    }
+}
+tca_bribery_test.101 = {
+    type = character_event hidden = yes
+    immediate = {
+        scope:tca_bribery_test_actor = { save_scope_as = actor }
+        scope:tca_bribery_test_recipient = { save_scope_as = recipient }
+        if = { limit = { scope:recipient = { tca_bribery_recipient_trigger = yes tca_bribery_merit_price_value = 25 tca_bribery_title_price_value = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_prices 1" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_prices 1" add_character_flag = tca_test_tca_bribery_test_case_failed }
+        scope:recipient = { set_merit_level = 0 }
+        if = { limit = { scope:recipient = { tca_bribery_recipient_trigger = no tca_bribery_merit_price_value = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_prices 2" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_prices 2" add_character_flag = tca_test_tca_bribery_test_case_failed }
+        scope:recipient = { add_trait = tca_fengci create_dynamic_title = { tier = duchy name = tca_judicial_retirement_name } }
+        scope:new_title = { save_scope_as = tca_bribery_test_title set_capital_county = root.capital_county set_landless_title = yes set_delete_on_destroy = yes set_variable = { name = tca_retirement_title value = yes } }
+        create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_bribery_test_change }
+        scope:tca_bribery_test_title = { change_title_holder = { holder = scope:recipient change = scope:tca_bribery_test_change } }
+        resolve_title_and_vassal_change = scope:tca_bribery_test_change
+        # 对齐正式退休授衔：授予无地头衔可能使人物短暂独立，重建政体与真实领属。
+        scope:recipient = {
+            change_government = celestial_government
+            create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_bribery_test_change }
+            change_liege = { liege = root change = scope:tca_bribery_test_change }
+            resolve_title_and_vassal_change = scope:tca_bribery_test_change
+            # 使用现有正式上限接入，不以额外+7修正绕过已存在的官品锁定。
+            add_character_flag = tca_merit_active
+            add_character_flag = tca_merit_grant_suppress
+            set_variable = { name = tca_merit_approved_level value = 9 }
+            tca_merit_refresh_cap_effect = yes
+            set_merit_level = 9
+        }
+        trigger_event = { id = tca_bribery_test.301 days = 1 }
+    }
+}
+# 等上限修正进入原生缓存后再设置一品；不降低225金的正式断言。
+tca_bribery_test.301 = {
+    type = character_event hidden = yes
+    immediate = {
+        scope:tca_bribery_test_actor = { save_scope_as = actor }
+        scope:tca_bribery_test_recipient = { save_scope_as = recipient set_merit_level = 9 }
+        if = { limit = { scope:recipient = { tca_bribery_recipient_trigger = yes tca_bribery_merit_price_value = 225 tca_bribery_title_price_value = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_prices 3" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_prices 3" add_character_flag = tca_test_tca_bribery_test_case_failed }
+        if = { limit = { has_character_flag = tca_test_tca_bribery_test_case_failed }
+            set_variable = { name = tca_bribery_test_selected value = tca_bribery_selected_tier_value }
+            set_variable = { name = tca_bribery_test_cheapest value = tca_bribery_cheapest_tier_value }
+            set_variable = { name = tca_bribery_test_base value = scope:recipient.tca_bribery_acceptance_base_value }
+            debug_log = "TCA_BRIBERY_DIAG selected=[THIS.Char.MakeScope.Var('tca_bribery_test_selected').GetValue] cheapest=[THIS.Char.MakeScope.Var('tca_bribery_test_cheapest').GetValue] base=[THIS.Char.MakeScope.Var('tca_bribery_test_base').GetValue]"
+            scope:recipient = { debug_log = "TCA_BRIBERY_DIAG merit=[THIS.Char.GetMeritLevel] primary=[THIS.Char.GetPrimaryTitle.GetKey]" }
+            remove_variable = tca_bribery_test_selected
+            remove_variable = tca_bribery_test_cheapest
+            remove_variable = tca_bribery_test_base
+        }
+
+
+        scope:tca_bribery_test_title = { remove_variable = tca_retirement_title set_variable = { name = tca_judicial_title value = yes } }
+        if = { limit = { scope:recipient = { tca_bribery_title_price_value = 50 } } debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_prices 4" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_prices 4" add_character_flag = tca_test_tca_bribery_test_case_failed }
+        save_scope_value_as = { name = tca_bribery_thin value = yes }
+        if = { limit = { tca_bribery_selected_tier_value = 1 tca_bribery_price_value = scope:recipient.tca_bribery_base_price_value } debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_prices 5" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_prices 5" add_character_flag = tca_test_tca_bribery_test_case_failed }
+        save_scope_value_as = { name = tca_bribery_test_expected_thick value = { value = scope:recipient.tca_bribery_base_price_value multiply = 1.5 ceiling = yes } }
+        save_scope_value_as = { name = tca_bribery_test_expected_lavish value = { value = scope:recipient.tca_bribery_base_price_value multiply = 2 } }
+        clear_saved_scope = tca_bribery_thin
+        save_scope_value_as = { name = tca_bribery_generous value = yes }
+        if = { limit = { tca_bribery_selected_tier_value = 2 tca_bribery_price_value = scope:tca_bribery_test_expected_thick tca_bribery_offer_score_value = 25 } debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_prices 6" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_prices 6" add_character_flag = tca_test_tca_bribery_test_case_failed }
+        clear_saved_scope = tca_bribery_generous
+        save_scope_value_as = { name = tca_bribery_lavish value = yes }
+        if = { limit = { tca_bribery_price_value = scope:tca_bribery_test_expected_lavish tca_bribery_offer_score_value = 50 } debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_prices 7" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_prices 7" add_character_flag = tca_test_tca_bribery_test_case_failed }
+        scope:recipient = { set_merit_level = 0 }
+        if = { limit = { scope:recipient = { tca_is_celestial_governor_trigger = yes tca_bribery_recipient_trigger = yes tca_bribery_merit_price_value = 0 tca_bribery_title_price_value = 50 } } debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_prices 8" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_prices 8" add_character_flag = tca_test_tca_bribery_test_case_failed }
+        if = { limit = { has_character_flag = tca_test_tca_bribery_test_case_failed }
+            set_variable = { name = tca_bribery_test_selected value = tca_bribery_selected_tier_value }
+            set_variable = { name = tca_bribery_test_cheapest value = tca_bribery_cheapest_tier_value }
+            set_variable = { name = tca_bribery_test_base value = scope:recipient.tca_bribery_acceptance_base_value }
+            debug_log = "TCA_BRIBERY_DIAG selected=[THIS.Char.MakeScope.Var('tca_bribery_test_selected').GetValue] cheapest=[THIS.Char.MakeScope.Var('tca_bribery_test_cheapest').GetValue] base=[THIS.Char.MakeScope.Var('tca_bribery_test_base').GetValue]"
+            scope:recipient = { debug_log = "TCA_BRIBERY_DIAG merit=[THIS.Char.GetMeritLevel] primary=[THIS.Char.GetPrimaryTitle.GetKey]" }
+            remove_variable = tca_bribery_test_selected
+            remove_variable = tca_bribery_test_cheapest
+            remove_variable = tca_bribery_test_base
+        }
+
+
+        scope:recipient = { destroy_title = scope:tca_bribery_test_title }
+        tca_test_bribery_cleanup_effect = yes
+        if = { limit = { has_character_flag = tca_test_tca_bribery_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_bribery_prices" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+        else = { debug_log = "TCA_TEST PASS tca_test_bribery_prices" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        remove_character_flag = tca_test_tca_bribery_test_case_failed
+        tca_test_lane_end_effect = { GROUP = tca_bribery_test }
+    }
+}
+tca_bribery_test.2 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_bribery_test.2 tca_test_bribery_scores"
+        remove_character_flag = tca_test_tca_bribery_test_case_failed
+        tca_test_bribery_prepare_effect = yes
+        scope:tca_bribery_test_recipient = { add_trait = greedy add_trait = deceitful }
+        trigger_event = { id = tca_bribery_test.102 days = 1 }
+    }
+}
+tca_bribery_test.102 = {
+    type = character_event hidden = yes
+    immediate = {
+        scope:tca_bribery_test_actor = { save_scope_as = actor }
+        scope:tca_bribery_test_recipient = { save_scope_as = recipient }
+        if = { limit = { scope:recipient = { tca_bribery_greed_score_value = 25 tca_bribery_honor_score_value = 20 } } debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_scores 1" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_scores 1" add_character_flag = tca_test_tca_bribery_test_case_failed }
+        scope:recipient = { remove_short_term_gold = gold remove_short_term_gold = 1 }
+        if = { limit = { scope:recipient = { tca_bribery_finance_tier_value = 0 tca_bribery_finance_score_value = 30 } } debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_scores 2" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_scores 2" add_character_flag = tca_test_tca_bribery_test_case_failed }
+        scope:recipient = { add_gold = 1 }
+        if = { limit = { scope:recipient = { tca_bribery_finance_tier_value = 1 tca_bribery_finance_score_value = 20 } } debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_scores 3" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_scores 3" add_character_flag = tca_test_tca_bribery_test_case_failed }
+
+        scope:recipient = { remove_short_term_gold = gold add_gold = tca_bribery_poor_threshold_value }
+        if = { limit = { scope:recipient = { tca_bribery_finance_tier_value = 2 tca_bribery_finance_score_value = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_scores 4" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_scores 4" add_character_flag = tca_test_tca_bribery_test_case_failed }
+
+        scope:recipient = { remove_short_term_gold = gold add_gold = tca_bribery_rich_threshold_value set_relation_best_friend = scope:actor }
+        if = { limit = { scope:recipient = { tca_bribery_finance_tier_value = 3 tca_bribery_finance_score_value = -10 tca_bribery_relation_score_value = 20 } } debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_scores 5" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_scores 5" add_character_flag = tca_test_tca_bribery_test_case_failed }
+        scope:recipient = { remove_relation_best_friend = scope:actor set_relation_nemesis = scope:actor }
+        if = { limit = { scope:recipient = { tca_bribery_relation_score_value = -50 } } debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_scores 6" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_scores 6" add_character_flag = tca_test_tca_bribery_test_case_failed }
+        scope:recipient = { remove_relation_nemesis = scope:actor remove_trait = greedy remove_trait = deceitful add_trait = generous add_trait = just }
+        trigger_event = { id = tca_bribery_test.202 days = 1 }
+    }
+}
+tca_bribery_test.202 = {
+    type = character_event hidden = yes
+    immediate = {
+        scope:tca_bribery_test_actor = { save_scope_as = actor }
+        scope:tca_bribery_test_recipient = { save_scope_as = recipient }
+        if = { limit = { scope:recipient = { tca_bribery_greed_score_value = -15 tca_bribery_honor_score_value = -40 } } debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_scores 7" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_scores 7" add_character_flag = tca_test_tca_bribery_test_case_failed }
+        tca_test_bribery_cleanup_effect = yes
+        if = { limit = { has_character_flag = tca_test_tca_bribery_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_bribery_scores" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+        else = { debug_log = "TCA_TEST PASS tca_test_bribery_scores" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        remove_character_flag = tca_test_tca_bribery_test_case_failed
+        tca_test_lane_end_effect = { GROUP = tca_bribery_test }
+    }
+}
+tca_bribery_test.3 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_bribery_test.3 tca_test_bribery_transaction"
+        remove_character_flag = tca_test_tca_bribery_test_case_failed
+        tca_test_bribery_prepare_effect = yes
+
+        trigger_event = { id = tca_bribery_test.103 days = 1 }
+    }
+}
+tca_bribery_test.103 = {
+    type = character_event hidden = yes
+    immediate = {
+        scope:tca_bribery_test_actor = { save_scope_as = actor }
+        scope:tca_bribery_test_recipient = { save_scope_as = recipient }
+        save_scope_value_as = { name = tca_bribery_thin value = yes }
+        save_scope_value_as = { name = tca_bribery_quote value = tca_bribery_price_value }
+        save_scope_value_as = { name = tca_bribery_test_actor_gold value = scope:actor.gold }
+        save_scope_value_as = { name = tca_bribery_test_recipient_gold value = scope:recipient.gold }
+        save_scope_value_as = { name = tca_bribery_test_actor_treasury value = scope:actor.treasury }
+        tca_bribery_complete_effect = yes
+        if = { limit = { scope:actor = { has_hook_of_type = { target = scope:recipient type = tca_bribery_hook } gold = { value = scope:tca_bribery_test_actor_gold subtract = scope:tca_bribery_quote } treasury = scope:tca_bribery_test_actor_treasury } scope:recipient = { gold = { value = scope:tca_bribery_test_recipient_gold add = scope:tca_bribery_quote } } } debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_transaction 1" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_transaction 1" add_character_flag = tca_test_tca_bribery_test_case_failed }
+        if = { limit = { tca_bribery_no_cooldown_trigger = no tca_bribery_basic_valid_trigger = no } debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_transaction 2" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_transaction 2" add_character_flag = tca_test_tca_bribery_test_case_failed }
+        scope:actor = { use_hook = scope:recipient }
+        if = { limit = { scope:actor = { NOT = { has_hook = scope:recipient } } tca_bribery_basic_valid_trigger = no } debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_transaction 3" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_transaction 3" add_character_flag = tca_test_tca_bribery_test_case_failed }
+        scope:actor = { remove_list_variable = { name = tca_bribery_recent_partners target = scope:recipient } }
+        if = { limit = { tca_bribery_no_cooldown_trigger = no } debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_transaction 4" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_transaction 4" add_character_flag = tca_test_tca_bribery_test_case_failed }
+        scope:recipient = { remove_list_variable = { name = tca_bribery_recent_partners target = scope:actor } }
+        if = { limit = { tca_bribery_reply_valid_trigger = yes } debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_transaction 5" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_transaction 5" add_character_flag = tca_test_tca_bribery_test_case_failed }
+        save_scope_value_as = { name = tca_bribery_quote value = { value = tca_bribery_price_value add = 1 } }
+        save_scope_value_as = { name = tca_bribery_test_actor_gold value = scope:actor.gold }
+        tca_bribery_complete_effect = yes
+        if = { limit = { scope:actor.gold = scope:tca_bribery_test_actor_gold scope:actor = { NOT = { has_hook = scope:recipient } } tca_bribery_no_cooldown_trigger = yes } debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_transaction 6" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_transaction 6" add_character_flag = tca_test_tca_bribery_test_case_failed }
+        save_scope_value_as = { name = tca_bribery_quote value = tca_bribery_price_value }
+        scope:actor = { add_hook = { target = scope:recipient type = favor_hook } }
+        if = { limit = { tca_bribery_reply_valid_trigger = no } debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_transaction 7" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_transaction 7" add_character_flag = tca_test_tca_bribery_test_case_failed }
+        scope:actor = { use_hook = scope:recipient }
+        tca_test_bribery_cleanup_effect = yes
+        if = { limit = { has_character_flag = tca_test_tca_bribery_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_bribery_transaction" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+        else = { debug_log = "TCA_TEST PASS tca_test_bribery_transaction" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        remove_character_flag = tca_test_tca_bribery_test_case_failed
+        tca_test_lane_end_effect = { GROUP = tca_bribery_test }
+    }
+}
+tca_bribery_test.4 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_bribery_test.4 tca_test_bribery_native"
+        remove_character_flag = tca_test_tca_bribery_test_case_failed
+        tca_test_bribery_prepare_effect = yes
+        scope:tca_bribery_test_recipient = { add_trait = greedy add_trait = arbitrary set_relation_best_friend = scope:tca_bribery_test_actor }
+        trigger_event = { id = tca_bribery_test.104 days = 1 }
+    }
+}
+tca_bribery_test.104 = {
+    type = character_event hidden = yes
+    immediate = {
+        scope:tca_bribery_test_actor = { save_scope_as = actor }
+        scope:tca_bribery_test_recipient = { save_scope_as = recipient }
+        save_scope_value_as = { name = tca_bribery_thin value = no }
+        save_scope_value_as = { name = tca_bribery_generous value = no }
+        save_scope_value_as = { name = tca_bribery_lavish value = no }
+        save_scope_value_as = { name = tca_bribery_thin value = yes }
+        if = { limit = { tca_bribery_cheapest_tier_value = 1 tca_bribery_ai_ready_trigger = yes } debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_native 1" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_native 1" add_character_flag = tca_test_tca_bribery_test_case_failed }
+        save_scope_value_as = { name = tca_bribery_test_quote value = tca_bribery_price_value }
+        scope:actor = { remove_short_term_gold = gold add_gold = { value = scope:tca_bribery_test_quote multiply = 4 } }
+        if = { limit = { tca_bribery_ai_ready_trigger = yes } debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_native 2" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_native 2" add_character_flag = tca_test_tca_bribery_test_case_failed }
+        scope:actor = { remove_short_term_gold = 1 }
+        if = { limit = { tca_bribery_ai_ready_trigger = no } debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_native 3" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_native 3" add_character_flag = tca_test_tca_bribery_test_case_failed }
+        scope:actor = { remove_short_term_gold = gold add_gold = 5000 }
+        scope:tca_bribery_test_reporter = { save_scope_as = recipient }
+        if = { limit = { tca_bribery_ai_ready_trigger = no } debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_native 4" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_native 4" add_character_flag = tca_test_tca_bribery_test_case_failed }
+        scope:tca_bribery_test_recipient = { save_scope_as = recipient }
+        save_scope_value_as = { name = tca_bribery_test_actor_gold value = scope:actor.gold }
+        run_interaction = { interaction = tca_bribery_interaction actor = scope:actor recipient = scope:recipient send_threshold = decline }
+        trigger_event = { id = tca_bribery_test.204 days = 10 }
+    }
+}
+tca_bribery_test.204 = {
+    type = character_event hidden = yes
+    immediate = {
+        scope:tca_bribery_test_actor = { save_scope_as = actor }
+        scope:tca_bribery_test_recipient = { save_scope_as = recipient }
+        # 原生回复跨十日，可能经过个人月收入；这里只查确实付款，精确金额由同帧事务用例严格核对。
+        if = { limit = { scope:actor = { has_hook_of_type = { target = scope:recipient type = tca_bribery_hook } gold < scope:tca_bribery_test_actor_gold } tca_bribery_no_cooldown_trigger = no } debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_native 5" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_native 5" add_character_flag = tca_test_tca_bribery_test_case_failed }
+        if = { limit = { has_character_flag = tca_test_tca_bribery_test_case_failed }
+            set_variable = { name = tca_bribery_test_native_paid value = { value = scope:tca_bribery_test_actor_gold subtract = scope:actor.gold } }
+            debug_log = "TCA_BRIBERY_DIAG native_paid=[THIS.Char.MakeScope.Var('tca_bribery_test_native_paid').GetValue]"
+            if = { limit = { scope:actor = { has_hook_of_type = { target = scope:recipient type = tca_bribery_hook } } } debug_log = "TCA_BRIBERY_DIAG native_hook_present" }
+            else = { debug_log = "TCA_BRIBERY_DIAG native_hook_absent" }
+            remove_variable = tca_bribery_test_native_paid
+        }
+
+        tca_test_bribery_cleanup_effect = yes
+        if = { limit = { has_character_flag = tca_test_tca_bribery_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_bribery_native" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+        else = { debug_log = "TCA_TEST PASS tca_test_bribery_native" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        remove_character_flag = tca_test_tca_bribery_test_case_failed
+        tca_test_lane_end_effect = { GROUP = tca_bribery_test }
+    }
+}
+
+tca_bribery_test.5 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_bribery_test.5 tca_test_bribery_offer_thick"
+        remove_character_flag = tca_test_tca_bribery_test_case_failed
+        tca_test_bribery_prepare_effect = yes
+        scope:tca_bribery_test_recipient = { set_relation_friend = scope:tca_bribery_test_actor }
+        trigger_event = { id = tca_bribery_test.105 days = 1 }
+    }
+}
+tca_bribery_test.105 = {
+    type = character_event hidden = yes
+    immediate = {
+        scope:tca_bribery_test_actor = { save_scope_as = actor }
+        scope:tca_bribery_test_recipient = { save_scope_as = recipient }
+        save_scope_value_as = { name = tca_bribery_thin value = no }
+        save_scope_value_as = { name = tca_bribery_generous value = no }
+        save_scope_value_as = { name = tca_bribery_lavish value = no }
+        save_scope_value_as = { name = tca_bribery_generous value = yes }
+        if = { limit = { tca_bribery_cheapest_tier_value = 2 tca_bribery_ai_ready_trigger = yes } debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_offer_thick 1" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_offer_thick 1" add_character_flag = tca_test_tca_bribery_test_case_failed }
+        if = { limit = { has_character_flag = tca_test_tca_bribery_test_case_failed }
+            set_variable = { name = tca_bribery_test_selected value = tca_bribery_selected_tier_value }
+            set_variable = { name = tca_bribery_test_cheapest value = tca_bribery_cheapest_tier_value }
+            set_variable = { name = tca_bribery_test_base value = scope:recipient.tca_bribery_acceptance_base_value }
+            debug_log = "TCA_BRIBERY_DIAG selected=[THIS.Char.MakeScope.Var('tca_bribery_test_selected').GetValue] cheapest=[THIS.Char.MakeScope.Var('tca_bribery_test_cheapest').GetValue] base=[THIS.Char.MakeScope.Var('tca_bribery_test_base').GetValue]"
+            scope:recipient = { debug_log = "TCA_BRIBERY_DIAG merit=[THIS.Char.GetMeritLevel] primary=[THIS.Char.GetPrimaryTitle.GetKey]" }
+            remove_variable = tca_bribery_test_selected
+            remove_variable = tca_bribery_test_cheapest
+            remove_variable = tca_bribery_test_base
+        }
+
+
+        save_scope_value_as = { name = tca_bribery_test_quote value = tca_bribery_price_value }
+        scope:actor = { remove_short_term_gold = gold add_gold = { value = scope:tca_bribery_test_quote multiply = 4 } }
+        if = { limit = { tca_bribery_ai_ready_trigger = yes } debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_offer_thick 2" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_offer_thick 2" add_character_flag = tca_test_tca_bribery_test_case_failed }
+        scope:actor = { remove_short_term_gold = 1 }
+        if = { limit = { tca_bribery_ai_ready_trigger = no } debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_offer_thick 3" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_offer_thick 3" add_character_flag = tca_test_tca_bribery_test_case_failed }
+        scope:actor = { remove_short_term_gold = gold add_gold = 5000 }
+        scope:tca_bribery_test_reporter = { save_scope_as = recipient }
+        if = { limit = { tca_bribery_ai_ready_trigger = no } debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_offer_thick 4" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_offer_thick 4" add_character_flag = tca_test_tca_bribery_test_case_failed }
+        scope:tca_bribery_test_recipient = { save_scope_as = recipient }
+        save_scope_value_as = { name = tca_bribery_test_actor_gold value = scope:actor.gold }
+        # run_interaction未提供报价选项参数；实际观察本路径未进入on_send。
+        # 本例验证明确报价后的正式事务，不能据此声称厚礼真实菜单／发送已经通过。
+        save_scope_value_as = { name = tca_bribery_quote value = tca_bribery_price_value }
+        tca_bribery_complete_effect = yes
+        trigger_event = { id = tca_bribery_test.205 days = 0 }
+    }
+}
+tca_bribery_test.205 = {
+    type = character_event hidden = yes
+    immediate = {
+        scope:tca_bribery_test_actor = { save_scope_as = actor }
+        scope:tca_bribery_test_recipient = { save_scope_as = recipient }
+        if = { limit = { scope:actor = { has_hook_of_type = { target = scope:recipient type = tca_bribery_hook } gold = { value = scope:tca_bribery_test_actor_gold subtract = scope:tca_bribery_test_quote } } tca_bribery_no_cooldown_trigger = no } debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_offer_thick 5" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_offer_thick 5" add_character_flag = tca_test_tca_bribery_test_case_failed }
+        if = { limit = { has_character_flag = tca_test_tca_bribery_test_case_failed }
+            set_variable = { name = tca_bribery_test_paid value = { value = scope:tca_bribery_test_actor_gold subtract = scope:actor.gold } }
+            set_variable = { name = tca_bribery_test_expected value = scope:tca_bribery_test_quote }
+            debug_log = "TCA_BRIBERY_DIAG paid=[THIS.Char.MakeScope.Var('tca_bribery_test_paid').GetValue] expected=[THIS.Char.MakeScope.Var('tca_bribery_test_expected').GetValue]"
+            if = { limit = { scope:actor = { has_hook_of_type = { target = scope:recipient type = tca_bribery_hook } } } debug_log = "TCA_BRIBERY_DIAG hook_present" }
+            else = { debug_log = "TCA_BRIBERY_DIAG hook_absent" }
+            remove_variable = tca_bribery_test_paid remove_variable = tca_bribery_test_expected
+        }
+
+        tca_test_bribery_cleanup_effect = yes
+        if = { limit = { has_character_flag = tca_test_tca_bribery_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_bribery_offer_thick" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+        else = { debug_log = "TCA_TEST PASS tca_test_bribery_offer_thick" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        remove_character_flag = tca_test_tca_bribery_test_case_failed
+        tca_test_lane_end_effect = { GROUP = tca_bribery_test }
+    }
+}
+
+tca_bribery_test.6 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_bribery_test.6 tca_test_bribery_offer_lavish"
+        remove_character_flag = tca_test_tca_bribery_test_case_failed
+        tca_test_bribery_prepare_effect = yes
+
+        trigger_event = { id = tca_bribery_test.106 days = 1 }
+    }
+}
+tca_bribery_test.106 = {
+    type = character_event hidden = yes
+    immediate = {
+        scope:tca_bribery_test_actor = { save_scope_as = actor }
+        scope:tca_bribery_test_recipient = { save_scope_as = recipient }
+        save_scope_value_as = { name = tca_bribery_thin value = no }
+        save_scope_value_as = { name = tca_bribery_generous value = no }
+        save_scope_value_as = { name = tca_bribery_lavish value = no }
+        save_scope_value_as = { name = tca_bribery_lavish value = yes }
+        if = { limit = { tca_bribery_cheapest_tier_value = 3 tca_bribery_ai_ready_trigger = yes } debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_offer_lavish 1" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_offer_lavish 1" add_character_flag = tca_test_tca_bribery_test_case_failed }
+        if = { limit = { has_character_flag = tca_test_tca_bribery_test_case_failed }
+            set_variable = { name = tca_bribery_test_selected value = tca_bribery_selected_tier_value }
+            set_variable = { name = tca_bribery_test_cheapest value = tca_bribery_cheapest_tier_value }
+            set_variable = { name = tca_bribery_test_base value = scope:recipient.tca_bribery_acceptance_base_value }
+            debug_log = "TCA_BRIBERY_DIAG selected=[THIS.Char.MakeScope.Var('tca_bribery_test_selected').GetValue] cheapest=[THIS.Char.MakeScope.Var('tca_bribery_test_cheapest').GetValue] base=[THIS.Char.MakeScope.Var('tca_bribery_test_base').GetValue]"
+            scope:recipient = { debug_log = "TCA_BRIBERY_DIAG merit=[THIS.Char.GetMeritLevel] primary=[THIS.Char.GetPrimaryTitle.GetKey]" }
+            remove_variable = tca_bribery_test_selected
+            remove_variable = tca_bribery_test_cheapest
+            remove_variable = tca_bribery_test_base
+        }
+
+
+        save_scope_value_as = { name = tca_bribery_test_quote value = tca_bribery_price_value }
+        scope:actor = { remove_short_term_gold = gold add_gold = { value = scope:tca_bribery_test_quote multiply = 4 } }
+        if = { limit = { tca_bribery_ai_ready_trigger = yes } debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_offer_lavish 2" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_offer_lavish 2" add_character_flag = tca_test_tca_bribery_test_case_failed }
+        scope:actor = { remove_short_term_gold = 1 }
+        if = { limit = { tca_bribery_ai_ready_trigger = no } debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_offer_lavish 3" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_offer_lavish 3" add_character_flag = tca_test_tca_bribery_test_case_failed }
+        scope:actor = { remove_short_term_gold = gold add_gold = 5000 }
+        scope:tca_bribery_test_reporter = { save_scope_as = recipient }
+        if = { limit = { tca_bribery_ai_ready_trigger = no } debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_offer_lavish 4" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_offer_lavish 4" add_character_flag = tca_test_tca_bribery_test_case_failed }
+        scope:tca_bribery_test_recipient = { save_scope_as = recipient }
+        save_scope_value_as = { name = tca_bribery_test_actor_gold value = scope:actor.gold }
+        # run_interaction未提供报价选项参数；实际观察本路径未进入on_send。
+        # 本例验证明确报价后的正式事务，不能据此声称厚礼真实菜单／发送已经通过。
+        save_scope_value_as = { name = tca_bribery_quote value = tca_bribery_price_value }
+        tca_bribery_complete_effect = yes
+        trigger_event = { id = tca_bribery_test.206 days = 0 }
+    }
+}
+tca_bribery_test.206 = {
+    type = character_event hidden = yes
+    immediate = {
+        scope:tca_bribery_test_actor = { save_scope_as = actor }
+        scope:tca_bribery_test_recipient = { save_scope_as = recipient }
+        if = { limit = { scope:actor = { has_hook_of_type = { target = scope:recipient type = tca_bribery_hook } gold = { value = scope:tca_bribery_test_actor_gold subtract = scope:tca_bribery_test_quote } } tca_bribery_no_cooldown_trigger = no } debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_offer_lavish 5" }
+        else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_offer_lavish 5" add_character_flag = tca_test_tca_bribery_test_case_failed }
+        if = { limit = { has_character_flag = tca_test_tca_bribery_test_case_failed }
+            set_variable = { name = tca_bribery_test_paid value = { value = scope:tca_bribery_test_actor_gold subtract = scope:actor.gold } }
+            set_variable = { name = tca_bribery_test_expected value = scope:tca_bribery_test_quote }
+            debug_log = "TCA_BRIBERY_DIAG paid=[THIS.Char.MakeScope.Var('tca_bribery_test_paid').GetValue] expected=[THIS.Char.MakeScope.Var('tca_bribery_test_expected').GetValue]"
+            if = { limit = { scope:actor = { has_hook_of_type = { target = scope:recipient type = tca_bribery_hook } } } debug_log = "TCA_BRIBERY_DIAG hook_present" }
+            else = { debug_log = "TCA_BRIBERY_DIAG hook_absent" }
+            remove_variable = tca_bribery_test_paid remove_variable = tca_bribery_test_expected
+        }
+
+        tca_test_bribery_cleanup_effect = yes
+        if = { limit = { has_character_flag = tca_test_tca_bribery_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_bribery_offer_lavish" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+        else = { debug_log = "TCA_TEST PASS tca_test_bribery_offer_lavish" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        remove_character_flag = tca_test_tca_bribery_test_case_failed
+        tca_test_lane_end_effect = { GROUP = tca_bribery_test }
+    }
+}

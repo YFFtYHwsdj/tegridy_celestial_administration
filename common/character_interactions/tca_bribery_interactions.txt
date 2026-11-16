@@ -1,0 +1,87 @@
+﻿# 天朝一次性行贿；原生回应与互斥报价，无原版覆盖。
+# on_send只冻结金额，不扣钱；on_accept调用正式事务，拒绝无需退款。
+tca_bribery_interaction = {
+    category = interaction_category_friendly
+    icon = tca_bribery
+    common_interaction = yes
+    interface_priority = 60
+    use_diplomatic_range = yes
+    desc = tca_bribery_interaction_desc
+    greeting = positive
+    notification_text = tca_bribery_notification
+    popup_on_receive = yes
+    ai_min_reply_days = 1
+    ai_max_reply_days = 5
+    pre_answer_yes_key = ACCEPT
+    pre_answer_no_key = DECLINE
+    on_decline_summary = tca_bribery_decline_summary
+    is_available = { is_alive = yes is_adult = yes }
+    is_shown = {
+        scope:actor != scope:recipient
+        scope:recipient = { tca_bribery_recipient_trigger = yes }
+    }
+    is_valid_showing_failures_only = {
+        scope:actor = { is_imprisoned = no is_incapable = no }
+        scope:recipient = { is_imprisoned = no }
+        custom_tooltip = { text = tca_bribery_no_existing_hook scope:actor = { NOT = { has_hook = scope:recipient } } }
+        custom_tooltip = { text = tca_bribery_no_cooldown tca_bribery_no_cooldown_trigger = yes }
+        scope:recipient.tca_bribery_base_price_value > 0
+        scope:actor.gold >= scope:recipient.tca_bribery_base_price_value
+    }
+    # 默认提示最低可接受档；无法说动时回退薄礼，玩家仍可自由切换。
+    send_options_exclusive = yes
+    send_option = {
+        flag = tca_bribery_thin
+        localization = tca_bribery_thin
+        starts_enabled = { tca_bribery_cheapest_tier_value <= 1 }
+        can_invalidate_interaction = yes
+        is_valid = { scope:actor.gold >= scope:recipient.tca_bribery_base_price_value }
+    }
+    send_option = {
+        flag = tca_bribery_generous
+        starts_enabled = { tca_bribery_cheapest_tier_value = 2 }
+        localization = tca_bribery_generous
+        can_invalidate_interaction = yes
+        is_valid = { scope:actor.gold >= { value = scope:recipient.tca_bribery_base_price_value multiply = 1.5 ceiling = yes } }
+    }
+    send_option = {
+        flag = tca_bribery_lavish
+        starts_enabled = { tca_bribery_cheapest_tier_value = 3 }
+        localization = tca_bribery_lavish
+        can_invalidate_interaction = yes
+        is_valid = { scope:actor.gold >= { value = scope:recipient.tca_bribery_base_price_value multiply = 2 ceiling = yes } }
+    }
+    can_send = {
+        tca_bribery_basic_valid_trigger = yes
+        custom_tooltip = { text = tca_bribery_select_offer tca_bribery_selected_tier_value > 0 }
+        scope:actor.gold >= tca_bribery_price_value
+    }
+    on_send = { save_scope_value_as = { name = tca_bribery_quote value = tca_bribery_price_value } }
+    on_accept = {
+        # 原生on_accept负责效果预览；预览不读取尚未创建的发送快照，也不执行付款。
+        show_as_tooltip = {
+            scope:actor = {
+                pay_short_term_gold = { target = scope:recipient gold = tca_bribery_price_value }
+                add_hook = { target = scope:recipient type = tca_bribery_hook }
+            }
+            custom_tooltip = tca_bribery_three_years_tt
+        }
+        hidden_effect = { tca_bribery_complete_effect = yes }
+    }
+    ai_accept = {
+        base = -40
+        modifier = { add = tca_bribery_offer_score_value desc = tca_bribery_offer_reason }
+        modifier = { add = scope:recipient.tca_bribery_greed_score_value desc = tca_bribery_greed_reason }
+        modifier = { add = scope:recipient.tca_bribery_honor_score_value desc = tca_bribery_honor_reason }
+        modifier = { add = scope:recipient.tca_bribery_opinion_score_value desc = tca_bribery_opinion_reason }
+        modifier = { add = scope:recipient.tca_bribery_relation_score_value desc = tca_bribery_relation_reason }
+        modifier = { add = scope:recipient.tca_bribery_finance_score_value desc = tca_bribery_finance_reason }
+    }
+    ai_targets = { ai_recipients = realm_characters }
+    ai_frequency = 12
+    ai_will_do = {
+        base = 0
+        modifier = { add = tca_bribery_ai_will_do_value }
+        modifier = { factor = 0 NOT = { tca_bribery_ai_ready_trigger = yes } }
+    }
+}

@@ -1,0 +1,22 @@
+﻿# 互动上下文需要actor/recipient和on_send保存的报价；无外部参数。
+# 正式on_accept唯一成交入口；先整体复核，再转账、加牵制、写双向三年名单。
+# 名单使用原生逐项到期，多个交易对象互不覆盖；拒绝、失效和预览均不写名单。
+tca_bribery_complete_effect = {
+    if = {
+        limit = { tca_bribery_reply_valid_trigger = yes }
+        scope:actor = {
+            pay_short_term_gold = { target = scope:recipient gold = scope:tca_bribery_quote }
+            add_hook = { target = scope:recipient type = tca_bribery_hook }
+            add_to_variable_list = { name = tca_bribery_recent_partners target = scope:recipient years = 3 }
+        }
+        scope:recipient = { add_to_variable_list = { name = tca_bribery_recent_partners target = scope:actor years = 3 } }
+    }
+    else = {
+        scope:actor = {
+            send_interface_toast = { type = event_toast_effect_neutral title = tca_bribery_cancelled left_icon = scope:recipient custom_tooltip = tca_bribery_cancelled_desc }
+        }
+        scope:recipient = {
+            send_interface_toast = { type = event_toast_effect_neutral title = tca_bribery_cancelled left_icon = scope:actor custom_tooltip = tca_bribery_cancelled_desc }
+        }
+    }
+}
