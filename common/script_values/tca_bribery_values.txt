@@ -64,12 +64,14 @@ tca_bribery_acceptance_base_value = {
     add = tca_bribery_relation_score_value
     add = tca_bribery_finance_score_value
 }
-# 原生互斥选项；薄礼必须显式选中，避免取消所有选项后免费或默认成交。
+# 原生互斥选项；玩家必须显式选中，避免取消所有选项后免费或默认成交。
 tca_bribery_selected_tier_value = {
     value = 0
     if = { limit = { scope:tca_bribery_thin ?= yes } value = 1 }
     else_if = { limit = { scope:tca_bribery_generous ?= yes } value = 2 }
     else_if = { limit = { scope:tca_bribery_lavish ?= yes } value = 3 }
+    # 原生AI可能尚未建立GUI选项；此时按同一最低可接受档评估并在发送时固化。
+    else_if = { limit = { scope:actor = { is_ai = yes } } value = tca_bribery_cheapest_tier_value }
 }
 tca_bribery_offer_score_value = {
     value = 0
@@ -87,6 +89,13 @@ tca_bribery_cheapest_tier_value = {
     if = { limit = { scope:recipient.tca_bribery_acceptance_base_value >= 0 } value = 1 }
     else_if = { limit = { scope:recipient.tca_bribery_acceptance_base_value >= -25 } value = 2 }
     else_if = { limit = { scope:recipient.tca_bribery_acceptance_base_value >= -50 } value = 3 }
+}
+# 互动候选上下文需要actor/recipient；独立于尚未建立的发送选项flags计算预算。
+tca_bribery_ai_price_value = {
+    value = scope:recipient.tca_bribery_base_price_value
+    if = { limit = { tca_bribery_cheapest_tier_value = 2 } multiply = 1.5 }
+    else_if = { limit = { tca_bribery_cheapest_tier_value = 3 } multiply = 2 }
+    ceiling = yes
 }
 # 付款者作用域；数值为设计者补齐的初版调参，资格和预算由ai_ready单独控制。
 tca_bribery_ai_interest_value = {

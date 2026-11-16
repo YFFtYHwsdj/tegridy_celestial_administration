@@ -1,0 +1,51 @@
+﻿# GUI维护专用验收阶段与保存前后夹具；所有成交由原生窗口发送及AI回复执行。
+tca_bui_boot = { scope = none saved_scopes = { player } effect = {
+    if = { limit = { scope:player = title:h_china.var:tca_bui_actor }
+        if = { limit = { title:h_china = { var:tca_bui_stage = 1 } }
+            debug_log = "TCA_BUI_PASS_PLAYER"
+            title:h_china = { set_variable = { name = tca_bui_stage value = 2 } }
+        }
+        else_if = { limit = { title:h_china = { var:tca_bui_stage = 8 } }
+            title:h_china.var:tca_bui_actor = { save_scope_as = actor }
+            title:h_china.var:tca_bui_thick = { save_scope_as = recipient }
+            if = { limit = { scope:actor = { has_hook_of_type = { target = scope:recipient type = tca_bribery_hook } } tca_bribery_no_cooldown_trigger = no }
+                debug_log = "TCA_BUI_PASS_RELOADED_STATE"
+            }
+            else = { debug_log = "TCA_BUI_FAIL_RELOADED_STATE" }
+        }
+    }
+    else = { debug_log = "TCA_BUI_PRECONDITION_FAIL" }
+} }
+tca_bui_thin_selected = { scope = none effect = { title:h_china = {
+    if = { limit = { var:tca_bui_stage = 2 } debug_log = "TCA_BUI_PASS_THICK_THIN_SELECTED" set_variable = { name = tca_bui_stage value = 3 } }
+    else_if = { limit = { var:tca_bui_stage = 6 } debug_log = "TCA_BUI_PASS_LAVISH_THIN_SELECTED" set_variable = { name = tca_bui_stage value = 7 } }
+} } }
+tca_bui_prepare_send = { scope = none effect = {
+    title:h_china.var:tca_bui_actor = { save_scope_as = actor }
+    if = { limit = { title:h_china = { var:tca_bui_stage = 3 } }
+        title:h_china.var:tca_bui_thick = { save_scope_as = recipient }
+        save_scope_value_as = { name = tca_bribery_generous value = yes }
+        debug_log = "TCA_BUI_PASS_THICK_SELECTED"
+    }
+    else = {
+        title:h_china.var:tca_bui_lavish = { save_scope_as = recipient }
+        save_scope_value_as = { name = tca_bribery_lavish value = yes }
+        debug_log = "TCA_BUI_PASS_LAVISH_SELECTED"
+    }
+    title:h_china = {
+        set_variable = { name = tca_bui_price value = tca_bribery_price_value }
+        set_variable = { name = tca_bui_before_actor value = scope:actor.gold }
+        set_variable = { name = tca_bui_before_recipient value = scope:recipient.gold }
+        if = { limit = { var:tca_bui_stage = 3 } set_variable = { name = tca_bui_stage value = 4 } }
+        else = { set_variable = { name = tca_bui_stage value = 8 } }
+    }
+} }
+tca_bui_open_lavish = { scope = none effect = { title:h_china = { set_variable = { name = tca_bui_stage value = 6 } } } }
+tca_bui_fail_send = { scope = none effect = { debug_log = "TCA_BUI_FAIL_CANNOT_SEND" debug_log_scopes = yes } }
+# 保存完成后才破坏现场；没有触发任何成交，第二进程必须靠已存请求自行获得重金牵制。
+tca_bui_reload_ready = { scope = none effect = {
+    title:h_china.var:tca_bui_actor = { use_hook = title:h_china.var:tca_bui_thick clear_variable_list = tca_bribery_recent_partners }
+    title:h_china.var:tca_bui_thick = { clear_variable_list = tca_bribery_recent_partners }
+    debug_log = "TCA_BUI_DESTROYED_LIVE_STATE"
+    debug_log = "TCA_BUI_RELOAD_READY"
+} }

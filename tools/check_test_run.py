@@ -138,7 +138,7 @@ def _registration_frame(frame, source_root):
 
 
 def _runtime_character_field(detail, frames, source_root):
-    """仅识别两种原生错误的人物字段；源码登记与完整脚本栈缺失时不应用。"""
+    """仅识别已核对的原生错误固定语法中的人物字段；源码登记与完整脚本栈缺失时不应用。"""
     if source_root is None or not Path(source_root).is_dir() or not frames:
         return None
     source = Path(source_root)
@@ -157,6 +157,7 @@ def _runtime_character_field(detail, frames, source_root):
     character = (r'(?P<character>[^()\[\]\r\n]+ of [^()\[\]\r\n]+ '
                  r'\(Internal ID:? (?P<id>[1-9]\d*)(?: - Historical ID (?P<history>[\w.-]+))?\))')
     patterns = (
+        r"add_courtier effect \[ Trying to put character \('" + character + r"'\) in court despite being a ruler \]",
         r'reverse_add_opinion effect \[ ' + character + r' is trying to add an opinion of themself \]',
         r"change_opportunities effect \[ Invalid scheme '[A-Za-z_]\w*' with owner " + character + r' and target [^\r\n]+ \]',
     )

@@ -1,0 +1,128 @@
+﻿# 独立CLI保存重载探针；不代替原生未结互动队列或真实收信验收。
+# 已成交状态与待提交报价saved scopes共用一次真实保存、现场破坏及CLI重启。
+namespace = tca_bribery_saveload_test
+
+tca_bribery_saveload_test.1 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_bribery_saveload_test.1 tca_test_bribery_saveload"
+        remove_character_flag = tca_test_tca_bribery_saveload_test_case_failed
+        if = {
+            limit = { debug_only = yes is_alive = yes title:h_china.holder = root title:h_china = { var:tca_cli_ready > 0 NOT = { has_variable = tca_bsl_phase } } }
+            tca_test_bribery_saveload_prepare_effect = yes
+            trigger_event = { id = tca_bribery_saveload_test.100 days = 1 }
+        }
+        else = {
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_bribery_saveload"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+            tca_test_lane_end_effect = { GROUP = tca_bribery_saveload_test }
+        }
+    }
+}
+
+tca_bribery_saveload_test.100 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            scope:tca_bsl_actor = { save_scope_as = actor }
+            scope:tca_bsl_recipient = { save_scope_as = recipient }
+            save_scope_value_as = { name = tca_bribery_quote value = tca_bribery_price_value }
+            tca_bribery_complete_effect = yes
+            if = { limit = { scope:actor = { has_hook_of_type = { target = scope:recipient type = tca_bribery_hook } is_target_in_variable_list = { name = tca_bribery_recent_partners target = scope:recipient } } scope:recipient = { is_target_in_variable_list = { name = tca_bribery_recent_partners target = scope:actor } } tca_bribery_basic_valid_trigger = no }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_saveload 1" }
+            else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_saveload 1" add_character_flag = tca_test_tca_bribery_saveload_test_case_failed }
+            scope:tca_bsl_pending_actor = { save_scope_as = actor }
+            scope:tca_bsl_pending_recipient = { save_scope_as = recipient }
+            save_scope_value_as = { name = tca_bribery_quote value = tca_bribery_price_value }
+            title:h_china = { set_variable = { name = tca_bsl_quote value = scope:tca_bribery_quote } }
+            if = { limit = { tca_bribery_reply_valid_trigger = yes scope:tca_bribery_quote > 0 }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_saveload 2" }
+            else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_saveload 2" add_character_flag = tca_test_tca_bribery_saveload_test_case_failed }
+            # 原事件链逐日等候真实重载；恢复后首日即核对报价，避免人为多等两个月
+            # 导致影响力等自然变化令报价按正式规则失效，把业务取消误报为持久化失败。
+            # GUI只切阶段，不建立人物、报价或重派这条原生续接链。
+            trigger_event = { id = tca_bribery_saveload_test.200 days = 1 }
+            trigger_event = { id = tca_bribery_saveload_test.900 days = 1 }
+            title:h_china = { set_variable = { name = tca_bsl_phase value = 1 } }
+            debug_log = "TCA_TEST WAIT tca_test_bribery_saveload 1 day"
+        }
+    }
+}
+
+# 现场断言留在本轮日志，存档回滚不能抹去；缺失该断言也不能通过日志核对。
+tca_bribery_saveload_test.900 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            if = {
+                limit = { title:h_china = { var:tca_bsl_phase = 3 } }
+                if = { limit = {
+                    title:h_china = { var:tca_bsl_quote = 999 }
+                    scope:tca_bsl_actor = { NOT = { has_hook = scope:tca_bsl_recipient } NOT = { has_variable_list = tca_bribery_recent_partners } }
+                    scope:tca_bsl_recipient = { NOT = { has_variable_list = tca_bribery_recent_partners } }
+                    scope:tca_bsl_pending_recipient = { tca_bribery_recipient_trigger = no }
+                } debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_saveload 3" }
+                else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_saveload 3" add_character_flag = tca_test_tca_bribery_saveload_test_case_failed }
+                add_character_flag = tca_bribery_saveload_test_corruption_logged
+                title:h_china = { set_variable = { name = tca_bsl_reload_ready value = 1 } set_variable = { name = tca_cli_ready value = 0 } }
+                debug_log = "TCA_CLI RELOAD_SAVE tca_bribery_saveload_probe"
+            }
+            else_if = {
+                limit = { title:h_china = { var:tca_bsl_phase >= 1 var:tca_bsl_phase <= 2 } }
+                trigger_event = { id = tca_bribery_saveload_test.900 days = 1 }
+            }
+        }
+    }
+}
+
+tca_bribery_saveload_test.200 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } title:h_china = { var:tca_bsl_phase = 4 } }
+            if = { limit = { title:h_china = { var:tca_bsl_saved = 1 var:tca_bsl_phase = 4 } NOT = { has_character_flag = tca_bribery_saveload_test_corruption_logged } scope:tca_bsl_actor = title:h_china.var:tca_bsl_actor scope:tca_bsl_pending_recipient = title:h_china.var:tca_bsl_pending_recipient }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_saveload 4" }
+            else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_saveload 4" add_character_flag = tca_test_tca_bribery_saveload_test_case_failed }
+            scope:tca_bsl_actor = { save_scope_as = actor }
+            scope:tca_bsl_recipient = { save_scope_as = recipient }
+            if = { limit = { scope:actor = { has_hook_of_type = { target = scope:recipient type = tca_bribery_hook } is_target_in_variable_list = { name = tca_bribery_recent_partners target = scope:recipient } } scope:recipient = { is_target_in_variable_list = { name = tca_bribery_recent_partners target = scope:actor } } tca_bribery_no_cooldown_trigger = no tca_bribery_basic_valid_trigger = no }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_saveload 5" }
+            else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_saveload 5" add_character_flag = tca_test_tca_bribery_saveload_test_case_failed }
+            scope:tca_bsl_recipient = { save_scope_as = actor }
+            scope:tca_bsl_actor = { save_scope_as = recipient }
+            if = { limit = { tca_bribery_no_cooldown_trigger = no tca_bribery_basic_valid_trigger = no }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_saveload 6" }
+            else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_saveload 6" add_character_flag = tca_test_tca_bribery_saveload_test_case_failed }
+            scope:tca_bsl_pending_actor = { save_scope_as = actor }
+            scope:tca_bsl_pending_recipient = { save_scope_as = recipient }
+            # 同轮诊断只读正式值；失败时可区分保存报价丢失与自然价格／身份变化。
+            set_variable = { name = tca_bribery_saveload_test_current_price value = tca_bribery_price_value }
+            set_variable = { name = tca_bribery_saveload_test_quote value = scope:tca_bribery_quote }
+            debug_log = "TCA_BRIBERY_SAVELOAD price=[THIS.Char.MakeScope.Var('tca_bribery_saveload_test_current_price').GetValue] quote=[THIS.Char.MakeScope.Var('tca_bribery_saveload_test_quote').GetValue]"
+            remove_variable = tca_bribery_saveload_test_current_price
+            remove_variable = tca_bribery_saveload_test_quote
+            if = { limit = { tca_bribery_reply_valid_trigger = yes tca_bribery_selected_tier_value = 1 scope:tca_bribery_quote = title:h_china.var:tca_bsl_quote scope:recipient = { tca_bribery_recipient_trigger = yes } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_saveload 7" }
+            else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_saveload 7" add_character_flag = tca_test_tca_bribery_saveload_test_case_failed }
+            save_scope_value_as = { name = tca_bsl_gold value = scope:actor.gold }
+            tca_bribery_complete_effect = yes
+            if = { limit = { scope:actor = { gold = { value = scope:tca_bsl_gold subtract = scope:tca_bribery_quote } has_hook_of_type = { target = scope:recipient type = tca_bribery_hook } } tca_bribery_no_cooldown_trigger = no }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_bribery_saveload 8" }
+            else = { debug_log = "TCA_TEST CHECK_FAIL tca_test_bribery_saveload 8" add_character_flag = tca_test_tca_bribery_saveload_test_case_failed }
+            tca_test_bribery_saveload_cleanup_effect = yes
+            if = { limit = { has_character_flag = tca_test_tca_bribery_saveload_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_bribery_saveload" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_bribery_saveload" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            remove_character_flag = tca_test_tca_bribery_saveload_test_case_failed
+            tca_test_lane_end_effect = { GROUP = tca_bribery_saveload_test }
+        }
+        else_if = {
+            limit = { NOT = { has_character_flag = tca_test_suite_aborted } title:h_china = { var:tca_bsl_phase >= 1 var:tca_bsl_phase <= 3 } }
+            trigger_event = { id = tca_bribery_saveload_test.200 days = 1 }
+        }
+    }
+}
