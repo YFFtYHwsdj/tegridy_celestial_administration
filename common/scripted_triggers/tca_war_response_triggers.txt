@@ -1,0 +1,65 @@
+﻿# 正式游戏开启通用响应；CLI适配只覆盖本模组自有开关，默认关闭自动接入。
+tca_ws_automatic_response_allowed_trigger = { always = yes }
+
+# 战争作用域；逐个CB白名单，不从分组、目标存在或北疆局势推断。
+tca_ws_native_cb_trigger = {
+    OR = {
+        using_cb = county_conquest_cb
+        using_cb = duchy_conquest_cb
+        using_cb = ducal_conquest_cb
+        using_cb = individual_county_de_jure_cb
+        using_cb = individual_duchy_de_jure_cb
+        using_cb = de_jure_cb
+        using_cb = china_seize_county_cb
+        using_cb = china_hegemon_seize_county_cb
+        using_cb = china_seize_duchy_cb
+        using_cb = china_hegemon_seize_duchy_cb
+        using_cb = expansion_cb
+        using_cb = duchy_expansion_cb
+        using_cb = naval_expansion_cb
+        using_cb = naval_duchy_expansion_cb
+        using_cb = nomadic_conquest_cb
+        using_cb = nomadic_conquest_duchy_cb
+    }
+}
+# 县作用域；只收主防守者本人或其真实下属的实土，不扩大为其最高领主全国。
+# 通判等无地伯爵官署会进入法理树，但不是目标县；不能用title_province判断，其可能回退到持有人所在地。
+tca_ws_defender_county_trigger = {
+    tier = tier_county
+    is_landless_type_title = no
+    holder ?= { OR = { this = scope:tca_fs_defender is_vassal_or_below_of = scope:tca_fs_defender } }
+}
+
+# 地方官作用域；输入record与COUNTIES列表名。提刑查整路实际同国辖县，通判查绑定县。
+# 不使用官员所在地、最高领主全国领地或仅治所县代替正式辖区。
+tca_ws_office_in_counties_trigger = {
+    tca_is_celestial_governor_trigger = yes
+    trigger_if = {
+        limit = { tca_is_judicial_commissioner_trigger = yes }
+        primary_title.var:song_judicial_circuit = { save_temporary_scope_as = tca_ws_office_circuit }
+        scope:tca_fs_record = { any_in_list = {
+            variable = $COUNTIES$
+            target_is_de_jure_liege_or_above = scope:tca_ws_office_circuit
+            holder ?= { top_liege = scope:tca_fs_record.var:tca_fs_defender.top_liege }
+        } }
+    }
+    trigger_else_if = {
+        limit = { tca_is_tongpan_official_trigger = yes }
+        primary_title = {
+            tca_is_valid_tongpan_holder_trigger = yes
+            exists = var:tca_tongpan_county
+            scope:tca_fs_record = { is_target_in_variable_list = { name = $COUNTIES$ target = prev.var:tca_tongpan_county } }
+        }
+    }
+    trigger_else = { always = no }
+}
+
+# 承诺行作用域；C按原类别重查，D仅续接冻结资格或已履约参与者，不依赖已销毁的原战争。
+tca_ws_support_successor_valid_trigger = {
+    trigger_if = {
+        limit = { scope:tca_fs_record = { has_variable = tca_fs_closed } }
+        trigger_if = { limit = { var:tca_fd_eligible ?= yes } tca_fd_leader_valid_trigger = yes }
+        trigger_else = { var:tca_fs_person ?= { tca_fd_person_valid_trigger = { RECORD = scope:tca_fs_record } } }
+    }
+    trigger_else = { tca_fs_row_valid_trigger = yes }
+}

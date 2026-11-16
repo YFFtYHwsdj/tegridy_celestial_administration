@@ -1,0 +1,133 @@
+﻿# 专用独立WORLD：实际原版公国征服排除无地通判头衔，但保留真实官员为地方响应候选。
+# 防守链为合格天朝霸权，官署由正式县维护创建；不关闭维护或借空壳官署作反例。
+namespace = tca_war_response_native_office_test
+
+tca_war_response_native_office_test.122 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_war_response_native_office_test.122 tca_test_war_response_native_landless_office"
+        trigger_event = tca_war_response_native_office_test.2
+    }
+}
+
+tca_war_response_native_office_test.2 = {
+    type = character_event hidden = yes
+    immediate = {
+        remove_character_flag = tca_test_tca_war_response_native_office_test_case_failed
+        title:k_france.holder = { save_scope_as = tca_wno_base tca_test_protect_character_effect = yes }
+        title:h_china.holder = { save_scope_as = tca_wno_attacker tca_test_protect_character_effect = yes add_prestige = 10000 }
+        create_character = { age = 40 gender = male random_traits = no culture = scope:tca_wno_base.culture faith = scope:tca_wno_base.faith location = root.capital_province save_scope_as = tca_wno_upper }
+        create_character = { age = 35 gender = male random_traits = no culture = scope:tca_wno_base.culture faith = scope:tca_wno_base.faith location = root.capital_province save_scope_as = tca_wno_defender }
+        create_character = { age = 30 gender = male random_traits = no culture = scope:tca_wno_base.culture faith = scope:tca_wno_base.faith location = root.capital_province save_scope_as = tca_wno_child }
+        create_title_and_vassal_change = { type = granted save_scope_as = tca_wno_grant }
+        title:c_gloucestershire = { change_title_holder = { holder = scope:tca_wno_upper change = scope:tca_wno_grant government_base = scope:tca_wno_base } }
+        title:k_england = { change_title_holder = { holder = scope:tca_wno_upper change = scope:tca_wno_grant government_base = scope:tca_wno_base } }
+        title:d_york = { change_title_holder = { holder = scope:tca_wno_defender change = scope:tca_wno_grant government_base = scope:tca_wno_base } }
+        title:c_north_riding = { change_title_holder = { holder = scope:tca_wno_defender change = scope:tca_wno_grant government_base = scope:tca_wno_base take_baronies = yes } }
+        title:c_west_riding = { change_title_holder = { holder = scope:tca_wno_child change = scope:tca_wno_grant government_base = scope:tca_wno_base take_baronies = yes } }
+        resolve_title_and_vassal_change = scope:tca_wno_grant
+        scope:tca_wno_upper = {
+            tca_test_protect_character_effect = yes change_government = feudal_government
+            create_title_and_vassal_change = { type = independency save_scope_as = tca_wno_change }
+            becomes_independent = { change = scope:tca_wno_change }
+            resolve_title_and_vassal_change = scope:tca_wno_change
+        }
+        scope:tca_wno_defender = {
+            tca_test_protect_character_effect = yes change_government = feudal_government
+            create_title_and_vassal_change = { type = swear_fealty save_scope_as = tca_wno_change }
+            change_liege = { liege = scope:tca_wno_upper change = scope:tca_wno_change }
+            resolve_title_and_vassal_change = scope:tca_wno_change
+        }
+        scope:tca_wno_child = {
+            tca_test_protect_character_effect = yes change_government = feudal_government
+            create_title_and_vassal_change = { type = swear_fealty save_scope_as = tca_wno_change }
+            change_liege = { liege = scope:tca_wno_defender change = scope:tca_wno_change }
+            resolve_title_and_vassal_change = scope:tca_wno_change
+        }
+        create_dynamic_title = { tier = hegemony name = tca_test_arrest_office_name }
+        scope:new_title = { save_scope_as = tca_wno_country set_capital_county = title:c_gloucestershire set_landless_title = no }
+        create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_wno_grant }
+        scope:tca_wno_country = { change_title_holder = { holder = scope:tca_wno_upper change = scope:tca_wno_grant } }
+        resolve_title_and_vassal_change = scope:tca_wno_grant
+        scope:tca_wno_upper = { change_government = celestial_government add_realm_law_skip_effects = tca_tongpan_enabled_law }
+        scope:tca_wno_defender = { change_government = celestial_government }
+        scope:tca_wno_child = { change_government = celestial_government set_primary_title_to = title:c_west_riding }
+        title:c_west_riding = {
+            tca_refresh_tongpan_county_effect = yes
+            var:tca_tongpan_office ?= {
+                save_scope_as = tca_wno_office
+                holder ?= { save_scope_as = tca_wno_officer tca_test_protect_character_effect = yes }
+            }
+        }
+        scope:tca_wno_attacker = { set_variable = { name = tca_war_response_test_reporter value = root } }
+        trigger_event = { id = tca_war_response_native_office_test.3 days = 2 }
+    }
+}
+tca_war_response_native_office_test.3 = {
+    type = character_event hidden = yes
+    immediate = {
+        scope:tca_wno_defender = { save_scope_as = tca_fs_defender }
+        if = { limit = {
+            title:c_west_riding = { tca_is_tongpan_county_trigger = yes tca_ws_defender_county_trigger = yes }
+            exists = scope:tca_wno_office
+            scope:tca_wno_office ?= { is_landless_type_title = yes de_jure_liege = title:d_york tca_is_valid_tongpan_holder_trigger = yes NOT = { tca_ws_defender_county_trigger = yes } }
+            scope:tca_wno_officer ?= { tca_is_celestial_governor_trigger = yes is_landed = no }
+        } debug_log = "TCA_TEST CHECK_PASS tca_test_war_response_native_landless_office 1" }
+        else = { add_character_flag = tca_test_tca_war_response_native_office_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_war_response_native_landless_office 1" }
+        scope:tca_wno_attacker = { start_war = { cb = duchy_conquest_cb target = scope:tca_wno_defender target_title = title:d_york } }
+        # 原生声明延迟回调先完成，再在真实主防守者上下文中取样与结算。
+        trigger_event = { id = tca_war_response_native_office_test.4 days = 3 }
+    }
+}
+tca_war_response_native_office_test.4 = {
+    type = character_event hidden = yes
+    immediate = {
+        clear_saved_scope = tca_wno_war
+        scope:tca_wno_attacker = { every_character_war = {
+            limit = { primary_attacker = scope:tca_wno_attacker using_cb = duchy_conquest_cb casus_belli = { any_target_title = { this = title:d_york } } }
+            save_scope_as = tca_wno_war
+            var:tca_fs_record ?= { save_scope_as = tca_wno_record }
+        } }
+        # 天朝边境战争法保留地方主防守者；此专用路径不沿用原封建用例的最高主权断言。
+        if = { limit = {
+            exists = scope:tca_wno_war
+            scope:tca_wno_war ?= { primary_defender = scope:tca_wno_defender }
+            scope:tca_wno_office ?= { tca_is_valid_tongpan_holder_trigger = yes holder = scope:tca_wno_officer }
+            scope:tca_wno_record ?= {
+                var:tca_fs_defender = scope:tca_wno_defender
+                is_target_in_variable_list = { name = tca_fs_goals target = title:c_west_riding }
+                NOT = { is_target_in_variable_list = { name = tca_fs_goals target = scope:tca_wno_office } }
+                any_in_list = { variable = tca_fs_rows var:tca_fs_person = scope:tca_wno_officer var:tca_fs_kind = 1 }
+            }
+        } debug_log = "TCA_TEST CHECK_PASS tca_test_war_response_native_landless_office 2" }
+        else = { add_character_flag = tca_test_tca_war_response_native_office_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_war_response_native_landless_office 2" }
+        scope:tca_wno_war ?= { end_war = attacker }
+        if = { limit = {
+            exists = scope:tca_wno_record
+            scope:tca_wno_record ?= {
+                var:tca_ws_prepared ?= yes
+                var:tca_ws_defender_independent = no
+                is_target_in_variable_list = { name = tca_ws_resolution_goals target = title:c_west_riding }
+                NOT = { is_target_in_variable_list = { name = tca_ws_resolution_goals target = scope:tca_wno_office } }
+            }
+        } debug_log = "TCA_TEST CHECK_PASS tca_test_war_response_native_landless_office 3" }
+        else = { add_character_flag = tca_test_tca_war_response_native_office_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_war_response_native_landless_office 3" }
+        if = { limit = {
+            exists = scope:tca_wno_record
+            scope:tca_wno_record ?= {
+                NOT = { any_in_list = { variable = tca_fd_losses var:tca_fd_title = scope:tca_wno_office } }
+                any_in_list = { variable = tca_fd_losses var:tca_fd_title = title:c_west_riding var:tca_fd_holder = scope:tca_wno_child }
+            }
+            title:c_west_riding.holder ?= { top_liege = scope:tca_wno_attacker.top_liege }
+        } debug_log = "TCA_TEST CHECK_PASS tca_test_war_response_native_landless_office 4" }
+        else = { add_character_flag = tca_test_tca_war_response_native_office_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_war_response_native_landless_office 4" }
+        scope:tca_wno_record ?= { if = { limit = { var:tca_fd_state ?= 3 } var:tca_fd_war ?= { end_war = white_peace } } }
+        scope:tca_wno_attacker = { remove_variable = tca_war_response_test_reporter }
+        if = { limit = { has_character_flag = tca_test_tca_war_response_native_office_test_case_failed }
+            debug_log = "TCA_TEST FAIL tca_test_war_response_native_landless_office"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+        }
+        else = { debug_log = "TCA_TEST PASS tca_test_war_response_native_landless_office" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        tca_test_lane_end_effect = { GROUP = tca_war_response_native_office_test }
+    }
+}

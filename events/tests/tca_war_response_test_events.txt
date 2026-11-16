@@ -1,0 +1,410 @@
+﻿# 通用战争接入的独立WORLD；使用原版公国征服与实际结算，不建立北疆局势。
+# 回调观察仅用于确认原生时序；正式接入断言在实现前应失败。
+namespace = tca_war_response_test
+
+tca_war_response_test.1 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_war_response_test.1 tca_test_war_response_interfaces"
+        remove_character_flag = tca_test_tca_war_response_test_case_failed
+        save_scope_as = tca_war_response_test_reporter
+        title:h_china.holder = { save_scope_as = tca_war_response_test_attacker tca_test_protect_character_effect = yes }
+        create_character = { age = 35 gender = male random_traits = no culture = scope:tca_war_response_test_attacker.culture faith = scope:tca_war_response_test_attacker.faith location = root.capital_province save_scope_as = tca_war_response_test_defender }
+        scope:tca_war_response_test_defender = {
+            tca_test_protect_character_effect = yes
+            create_title_and_vassal_change = { type = granted save_scope_as = tca_war_response_test_grant }
+        }
+        title:c_lingzhou = { change_title_holder = { holder = scope:tca_war_response_test_defender change = scope:tca_war_response_test_grant take_baronies = yes } }
+        title:d_shuofang = { change_title_holder = { holder = scope:tca_war_response_test_defender change = scope:tca_war_response_test_grant } }
+        resolve_title_and_vassal_change = scope:tca_war_response_test_grant
+        scope:tca_war_response_test_defender = {
+            change_government = feudal_government
+            create_title_and_vassal_change = { type = independency save_scope_as = tca_war_response_test_independence }
+            becomes_independent = { change = scope:tca_war_response_test_independence }
+            resolve_title_and_vassal_change = scope:tca_war_response_test_independence
+        }
+        create_character = { age = 40 gender = male dynasty = scope:tca_war_response_test_attacker.dynasty random_traits = no culture = scope:tca_war_response_test_attacker.culture faith = scope:tca_war_response_test_attacker.faith location = root.capital_province save_scope_as = tca_war_response_test_supporter }
+        scope:tca_war_response_test_supporter = { tca_test_protect_character_effect = yes create_title_and_vassal_change = { type = granted save_scope_as = tca_war_response_test_grant } }
+        title:c_huaiyuan = { change_title_holder = { holder = scope:tca_war_response_test_supporter change = scope:tca_war_response_test_grant take_baronies = yes } }
+        resolve_title_and_vassal_change = scope:tca_war_response_test_grant
+        scope:tca_war_response_test_supporter = {
+            change_government = feudal_government
+            create_title_and_vassal_change = { type = swear_fealty save_scope_as = tca_war_response_test_fealty }
+            change_liege = { liege = scope:tca_war_response_test_defender change = scope:tca_war_response_test_fealty }
+            resolve_title_and_vassal_change = scope:tca_war_response_test_fealty
+        }
+        create_character = { age = 20 gender = male dynasty = scope:tca_war_response_test_supporter.dynasty father = scope:tca_war_response_test_supporter random_traits = no culture = scope:tca_war_response_test_attacker.culture faith = scope:tca_war_response_test_attacker.faith location = root.capital_province save_scope_as = tca_war_response_test_supporter_heir }
+        create_character = { age = 1 gender = male dynasty = scope:tca_war_response_test_supporter.dynasty father = scope:tca_war_response_test_supporter_heir random_traits = no culture = scope:tca_war_response_test_attacker.culture faith = scope:tca_war_response_test_attacker.faith location = root.capital_province save_scope_as = tca_war_response_test_supporter_grandson }
+        create_character = { age = 20 gender = male dynasty = scope:tca_war_response_test_attacker.dynasty father = scope:tca_war_response_test_defender random_traits = no culture = scope:tca_war_response_test_attacker.culture faith = scope:tca_war_response_test_attacker.faith location = root.capital_province save_scope_as = tca_war_response_test_defender_heir }
+        # 救援者的儿子预先持一块目标外邻县，自己也获得响应行；继承后须合并去重。
+        title:c_lingzhou = { random_neighboring_county = {
+            limit = { this != title:c_huaiyuan NOT = { target_is_de_jure_liege_or_above = title:d_shuofang } }
+            save_scope_as = tca_war_response_test_heir_county
+        } }
+        create_title_and_vassal_change = { type = granted save_scope_as = tca_war_response_test_grant }
+        scope:tca_war_response_test_heir_county ?= { change_title_holder = { holder = scope:tca_war_response_test_supporter_heir change = scope:tca_war_response_test_grant } }
+        resolve_title_and_vassal_change = scope:tca_war_response_test_grant
+        scope:tca_war_response_test_supporter_heir = {
+            change_government = feudal_government
+            create_title_and_vassal_change = { type = swear_fealty save_scope_as = tca_war_response_test_fealty }
+            change_liege = { liege = scope:tca_war_response_test_defender change = scope:tca_war_response_test_fealty }
+            resolve_title_and_vassal_change = scope:tca_war_response_test_fealty
+        }
+        trigger_event = { id = tca_war_response_test.2 days = 2 }
+    }
+}
+
+# 归还事务独立WORLD：手工准备已核实的改隶型失地行，直接调用正式归还事务。
+# 本例只证明两种归还动作，不声称原版CB的失地取样或自然收复开战已接入。
+tca_war_response_test.20 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_war_response_test.20 tca_test_war_response_return"
+        remove_character_flag = tca_test_tca_war_response_test_case_failed
+        title:h_china.holder = { save_scope_as = tca_war_response_test_attacker }
+        create_character = { age = 40 gender = male random_traits = no culture = root.culture faith = root.faith location = root.capital_province save_scope_as = tca_war_response_test_leader }
+        create_character = { age = 40 gender = male random_traits = no culture = root.culture faith = root.faith location = root.capital_province save_scope_as = tca_war_response_test_holder }
+        create_title_and_vassal_change = { type = granted save_scope_as = tca_war_response_test_grant }
+        title:k_xia = { change_title_holder = { holder = scope:tca_war_response_test_leader change = scope:tca_war_response_test_grant } }
+        title:c_hangzhou = { change_title_holder = { holder = scope:tca_war_response_test_leader change = scope:tca_war_response_test_grant } }
+        title:c_huaiyuan = { change_title_holder = { holder = scope:tca_war_response_test_holder change = scope:tca_war_response_test_grant take_baronies = yes } }
+        title:c_suzhou = { change_title_holder = { holder = scope:tca_war_response_test_holder change = scope:tca_war_response_test_grant } }
+        resolve_title_and_vassal_change = scope:tca_war_response_test_grant
+        scope:tca_war_response_test_leader = {
+            change_government = feudal_government
+            create_title_and_vassal_change = { type = independency save_scope_as = tca_war_response_test_independence }
+            becomes_independent = { change = scope:tca_war_response_test_independence }
+            resolve_title_and_vassal_change = scope:tca_war_response_test_independence
+            create_story = { type = tca_frontier_support_record save_scope_as = tca_fs_record }
+        }
+        scope:tca_war_response_test_holder = {
+            change_government = feudal_government
+            create_title_and_vassal_change = { type = swear_fealty save_scope_as = tca_war_response_test_fealty }
+            change_liege = { liege = scope:tca_war_response_test_attacker change = scope:tca_war_response_test_fealty }
+            resolve_title_and_vassal_change = scope:tca_war_response_test_fealty
+        }
+        scope:tca_war_response_test_leader = { create_story = { type = tca_frontier_recovery_loss save_scope_as = tca_war_response_test_loss } }
+        scope:tca_war_response_test_loss = {
+            set_variable = { name = tca_fd_parent value = scope:tca_fs_record }
+            set_variable = { name = tca_fd_title value = title:c_huaiyuan }
+            set_variable = { name = tca_fd_holder value = scope:tca_war_response_test_holder }
+            set_variable = { name = tca_fd_liege value = scope:tca_war_response_test_leader }
+            set_variable = { name = tca_fd_government value = scope:tca_war_response_test_holder.government_type }
+            set_variable = { name = tca_fd_transfer_kind value = 1 }
+        }
+        # 同案另一县已经在原国，不再属于有效失地；只能清除这一行，保留淮远归还。
+        scope:tca_war_response_test_leader = { create_story = { type = tca_frontier_recovery_loss save_scope_as = tca_war_response_test_invalid_loss } }
+        scope:tca_war_response_test_invalid_loss = {
+            set_variable = { name = tca_fd_parent value = scope:tca_fs_record }
+            set_variable = { name = tca_fd_title value = title:c_hangzhou }
+            set_variable = { name = tca_fd_holder value = scope:tca_war_response_test_leader }
+        }
+        scope:tca_fs_record = {
+            set_variable = { name = tca_ws_schema value = 2 }
+            set_variable = { name = tca_fs_closed value = 1 }
+            set_variable = { name = tca_fs_defender value = scope:tca_war_response_test_leader }
+            set_variable = { name = tca_fs_attacker value = scope:tca_war_response_test_attacker }
+            set_variable = { name = tca_fd_country value = title:k_xia }
+            set_variable = { name = tca_fd_attacker_country value = title:h_china }
+            set_variable = { name = tca_fd_leader value = scope:tca_war_response_test_leader }
+            set_variable = { name = tca_fd_active value = yes }
+            add_to_variable_list = { name = tca_fd_losses target = scope:tca_war_response_test_loss }
+            add_to_variable_list = { name = tca_fd_goals target = title:c_huaiyuan }
+            add_to_variable_list = { name = tca_fd_losses target = scope:tca_war_response_test_invalid_loss }
+            add_to_variable_list = { name = tca_fd_goals target = title:c_hangzhou }
+            tca_fd_return_losses_effect = yes
+        }
+        if = { limit = {
+            title:c_huaiyuan.holder = scope:tca_war_response_test_leader
+            title:c_suzhou.holder = scope:tca_war_response_test_holder
+            scope:tca_war_response_test_holder = { top_liege = scope:tca_war_response_test_attacker }
+            scope:tca_fs_record = { var:tca_fd_result = 3 }
+        } debug_log = "TCA_TEST CHECK_PASS tca_test_war_response_return 1" }
+        else = { add_character_flag = tca_test_tca_war_response_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_war_response_return 1" }
+        if = { limit = {
+            scope:tca_fs_record = { tca_fd_goal_count_value = 1 }
+            NOT = { exists = scope:tca_war_response_test_invalid_loss }
+            title:c_hangzhou.holder = scope:tca_war_response_test_leader
+        } debug_log = "TCA_TEST CHECK_PASS tca_test_war_response_return 3" }
+        else = { add_character_flag = tca_test_tca_war_response_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_war_response_return 3" }
+        # 第二个事务移除额外土地，原县主仍持失地，此时应连人恢复原隶属。
+        create_title_and_vassal_change = { type = granted save_scope_as = tca_war_response_test_grant }
+        title:c_huaiyuan = { change_title_holder = { holder = scope:tca_war_response_test_holder change = scope:tca_war_response_test_grant } }
+        title:c_suzhou = { change_title_holder = { holder = scope:tca_war_response_test_attacker change = scope:tca_war_response_test_grant } }
+        resolve_title_and_vassal_change = scope:tca_war_response_test_grant
+        scope:tca_war_response_test_holder = { change_government = feudal_government }
+        scope:tca_fs_record = { set_variable = { name = tca_fd_active value = yes } tca_fd_return_losses_effect = yes }
+        if = { limit = {
+            title:c_huaiyuan.holder = scope:tca_war_response_test_holder
+            title:c_suzhou.holder = scope:tca_war_response_test_attacker
+            scope:tca_war_response_test_holder = { liege = scope:tca_war_response_test_leader }
+            scope:tca_fs_record = { var:tca_fd_result = 3 }
+        } debug_log = "TCA_TEST CHECK_PASS tca_test_war_response_return 2" }
+        else = { add_character_flag = tca_test_tca_war_response_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_war_response_return 2" }
+        # 无合格牵头者的十一县组件：不冒充原版取样；完整保留县表，仍因没有承诺上级而取消。
+        scope:tca_fs_record = {
+            every_in_list = { variable = tca_fd_losses end_story = yes }
+            clear_variable_list = tca_fd_losses
+            clear_variable_list = tca_fd_goals
+            remove_variable = tca_fd_state
+            remove_variable = tca_fd_result
+        }
+        set_variable = { name = tca_war_response_test_capacity_count value = 0 }
+        scope:tca_war_response_test_attacker = { every_sub_realm_county = {
+            if = { limit = { root = { var:tca_war_response_test_capacity_count < 11 } }
+            save_scope_as = tca_war_response_test_capacity_county
+            root = { change_variable = { name = tca_war_response_test_capacity_count add = 1 } }
+            scope:tca_war_response_test_leader = { create_story = { type = tca_frontier_recovery_loss save_scope_as = tca_war_response_test_capacity_loss } }
+            scope:tca_war_response_test_capacity_loss = {
+                set_variable = { name = tca_fd_parent value = scope:tca_fs_record }
+                set_variable = { name = tca_fd_title value = scope:tca_war_response_test_capacity_county }
+                set_variable = { name = tca_fd_holder value = scope:tca_war_response_test_leader }
+            }
+            scope:tca_fs_record = {
+                add_to_variable_list = { name = tca_fd_losses target = scope:tca_war_response_test_capacity_loss }
+                add_to_variable_list = { name = tca_fd_goals target = scope:tca_war_response_test_capacity_county }
+            }
+            }
+        } }
+        scope:tca_fs_record = { tca_fd_begin_effect = yes }
+        if = { limit = {
+            var:tca_war_response_test_capacity_count = 11
+            scope:tca_fs_record = {
+                tca_fd_goal_count_value = 11 var:tca_fd_state = 4 var:tca_fd_result = 0
+                NOT = { has_variable = tca_fd_war }
+                NOT = { has_variable = tca_fd_active }
+            }
+        } debug_log = "TCA_TEST CHECK_PASS tca_test_war_response_return 4" }
+        else = { add_character_flag = tca_test_tca_war_response_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_war_response_return 4" }
+        remove_variable = tca_war_response_test_capacity_count
+        scope:tca_fs_record = { end_story = yes }
+        if = { limit = { has_character_flag = tca_test_tca_war_response_test_case_failed }
+            debug_log = "TCA_TEST FAIL tca_test_war_response_return"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+        }
+        else = {
+            debug_log = "TCA_TEST PASS tca_test_war_response_return"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } }
+        }
+        tca_test_lane_end_effect = { GROUP = tca_war_response_test }
+    }
+}
+tca_war_response_test.2 = {
+    type = character_event hidden = yes
+    immediate = {
+        scope:tca_war_response_test_attacker = {
+            set_variable = { name = tca_war_response_test_reporter value = scope:tca_war_response_test_reporter }
+            start_war = { cb = duchy_conquest_cb target = scope:tca_war_response_test_defender target_title = title:d_shuofang }
+            every_character_war = {
+                limit = { primary_attacker = scope:tca_war_response_test_attacker primary_defender = scope:tca_war_response_test_defender using_cb = duchy_conquest_cb }
+                save_scope_as = tca_war_response_test_war
+            }
+        }
+        trigger_event = { id = tca_war_response_test.3 days = 3 }
+    }
+}
+tca_war_response_test.3 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { has_variable = tca_war_response_test_started exists = scope:tca_war_response_test_war }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_war_response_interfaces 1"
+        }
+        else = { add_character_flag = tca_test_tca_war_response_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_war_response_interfaces 1" }
+        if = { limit = { scope:tca_war_response_test_war ?= { has_variable = tca_fs_record } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_war_response_interfaces 2"
+        }
+        else = { add_character_flag = tca_test_tca_war_response_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_war_response_interfaces 2" }
+        scope:tca_war_response_test_war ?= { var:tca_fs_record ?= { save_scope_as = tca_war_response_test_record } }
+        scope:tca_war_response_test_war ?= { tca_fs_start_effect = yes }
+        if = { limit = {
+            scope:tca_war_response_test_record ?= {
+                any_in_list = { variable = tca_fs_goals count = 1 this = title:c_lingzhou }
+                any_in_list = { variable = tca_fs_goals count = 1 this = title:c_huaiyuan }
+                NOT = { any_in_list = { variable = tca_fs_goals NOR = { this = title:c_lingzhou this = title:c_huaiyuan } } }
+            }
+            scope:tca_war_response_test_war ?= { var:tca_fs_record = scope:tca_war_response_test_record }
+            NOT = { exists = situation:tca_northern_frontier }
+        }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_war_response_interfaces 4"
+        }
+        else = { add_character_flag = tca_test_tca_war_response_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_war_response_interfaces 4" }
+        scope:tca_war_response_test_record ?= {
+            save_scope_as = tca_fs_record
+            every_in_list = { variable = tca_fs_rows limit = { var:tca_fs_person = scope:tca_war_response_test_supporter_heir }
+                save_scope_as = tca_fs_row
+                set_variable = { name = tca_fs_state value = 0 }
+                tca_fs_accept_effect = yes
+            }
+            every_in_list = { variable = tca_fs_rows limit = { var:tca_fs_person = scope:tca_war_response_test_supporter }
+                save_scope_as = tca_war_response_test_row
+                save_scope_as = tca_fs_row
+                set_variable = { name = tca_fs_state value = 0 }
+                tca_fs_accept_effect = yes
+                set_variable = { name = tca_war_response_test_committed_on value = var:tca_fs_committed_on }
+            }
+        }
+        if = { limit = { scope:tca_war_response_test_record ?= { any_in_list = { variable = tca_fs_rows count = 1 var:tca_fs_person = scope:tca_war_response_test_supporter_heir var:tca_fs_state = 1 } } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_war_response_interfaces 8"
+        }
+        else = { add_character_flag = tca_test_tca_war_response_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_war_response_interfaces 8" }
+        trigger_event = { id = tca_war_response_test.5 days = 10 }
+    }
+}
+
+# 接受后十日再发生双方继承；到期仍从原承诺日算，不能在死亡或接任时重置。
+tca_war_response_test.5 = {
+    type = character_event hidden = yes
+    immediate = {
+        scope:tca_war_response_test_supporter = { death = { death_reason = death_natural_causes } }
+        scope:tca_war_response_test_defender = { death = { death_reason = death_natural_causes } }
+        trigger_event = { id = tca_war_response_test.6 days = 3 }
+    }
+}
+tca_war_response_test.6 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = {
+            title:c_lingzhou.holder = scope:tca_war_response_test_defender_heir
+            title:c_huaiyuan.holder = scope:tca_war_response_test_supporter_heir
+            scope:tca_war_response_test_record ?= {
+                NOT = { has_variable = tca_fs_closed } var:tca_fs_defender = scope:tca_war_response_test_defender_heir
+                any_in_list = { variable = tca_fs_rows count = 1 var:tca_fs_person = scope:tca_war_response_test_supporter_heir }
+            }
+            scope:tca_war_response_test_row ?= { var:tca_fs_person = scope:tca_war_response_test_supporter_heir var:tca_fs_state = 1 has_variable = tca_fs_wait var:tca_fs_committed_on = var:tca_war_response_test_committed_on var:tca_fs_delay = 30 }
+        }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_war_response_interfaces 6"
+        }
+        else = { add_character_flag = tca_test_tca_war_response_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_war_response_interfaces 6" }
+        trigger_event = { id = tca_war_response_test.7 days = 18 }
+    }
+}
+tca_war_response_test.7 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { scope:tca_war_response_test_row ?= { var:tca_fs_state = 3 NOT = { has_variable = tca_fs_wait } } scope:tca_war_response_test_war ?= { is_defender = scope:tca_war_response_test_supporter_heir } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_war_response_interfaces 7"
+        }
+        else = { add_character_flag = tca_test_tca_war_response_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_war_response_interfaces 7" }
+        # 计时与合并验收完成后，让原生公国征服实际走封臣带地改隶分支。
+        create_title_and_vassal_change = { type = granted save_scope_as = tca_war_response_test_grant }
+        scope:tca_war_response_test_heir_county ?= { change_title_holder = { holder = scope:tca_war_response_test_defender_heir change = scope:tca_war_response_test_grant } }
+        resolve_title_and_vassal_change = scope:tca_war_response_test_grant
+        scope:tca_war_response_test_supporter_heir = { death = { death_reason = death_natural_causes } }
+        trigger_event = { id = tca_war_response_test.8 days = 3 }
+    }
+}
+tca_war_response_test.8 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = {
+            scope:tca_war_response_test_war ?= { is_defender = scope:tca_war_response_test_supporter_grandson }
+            scope:tca_war_response_test_row ?= { var:tca_fs_person = scope:tca_war_response_test_supporter_grandson var:tca_fs_state = 3 NOT = { has_variable = tca_fs_wait } }
+        } debug_log = "TCA_TEST CHECK_PASS tca_test_war_response_interfaces 10" }
+        else = { add_character_flag = tca_test_tca_war_response_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_war_response_interfaces 10" }
+        scope:tca_war_response_test_supporter_grandson = { set_variable = { name = tca_war_response_test_reporter value = root } }
+        scope:tca_war_response_test_war ?= { end_war = attacker }
+        debug_log = "TCA_WAR_RESPONSE_INTERFACE END_WAR_RETURNED"
+        trigger_event = { id = tca_war_response_test.4 days = 3 }
+    }
+}
+tca_war_response_test.4 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { has_variable = tca_war_response_test_victory title:c_lingzhou.holder = scope:tca_war_response_test_attacker }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_war_response_interfaces 3"
+        }
+        else = { add_character_flag = tca_test_tca_war_response_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_war_response_interfaces 3" }
+        if = { limit = { scope:tca_war_response_test_record ?= { var:tca_fs_closed = 1 NOT = { has_variable = tca_fd_active } } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_war_response_interfaces 5"
+        }
+        else = { add_character_flag = tca_test_tca_war_response_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_war_response_interfaces 5" }
+        if = { limit = { scope:tca_war_response_test_record ?= {
+            var:tca_ws_prepared = yes
+            any_in_list = { variable = tca_fd_losses var:tca_fd_title = title:c_lingzhou var:tca_fd_holder = scope:tca_war_response_test_defender_heir }
+            any_in_list = { variable = tca_fd_losses var:tca_fd_title = title:c_huaiyuan var:tca_fd_holder = scope:tca_war_response_test_supporter_grandson var:tca_fd_liege = scope:tca_war_response_test_defender_heir var:tca_fd_transfer_kind = 1 }
+        } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_war_response_interfaces 9"
+        }
+        else = { add_character_flag = tca_test_tca_war_response_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_war_response_interfaces 9" }
+        scope:tca_war_response_test_attacker = { remove_variable = tca_war_response_test_reporter }
+        scope:tca_war_response_test_supporter_grandson = { remove_variable = tca_war_response_test_reporter }
+        remove_variable = tca_war_response_test_started
+        remove_variable = tca_war_response_test_victory
+        if = { limit = { has_character_flag = tca_test_tca_war_response_test_case_failed }
+            debug_log = "TCA_TEST FAIL tca_test_war_response_interfaces"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+        }
+        else = {
+            debug_log = "TCA_TEST PASS tca_test_war_response_interfaces"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } }
+        }
+        tca_test_lane_end_effect = { GROUP = tca_war_response_test }
+    }
+}
+
+# 旧记录兼容：先建立真实原版战争，模拟缺新版本身份字段的旧记录，再立即正式结算。
+# 不给每日迁移worker抢先处理的机会，验证结束入口本身安全且不吞原版战果。
+tca_war_response_test.40 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_war_response_test.40 tca_test_war_response_legacy"
+        remove_character_flag = tca_test_tca_war_response_test_case_failed
+        title:h_china.holder = { save_scope_as = tca_war_response_test_attacker tca_test_protect_character_effect = yes set_variable = { name = tca_war_response_test_reporter value = root } }
+        create_character = { age = 35 gender = male random_traits = no culture = root.culture faith = root.faith location = root.capital_province save_scope_as = tca_war_response_test_defender }
+        create_title_and_vassal_change = { type = granted save_scope_as = tca_war_response_test_grant }
+        title:c_lingzhou = { change_title_holder = { holder = scope:tca_war_response_test_defender change = scope:tca_war_response_test_grant take_baronies = yes } }
+        title:d_shuofang = { change_title_holder = { holder = scope:tca_war_response_test_defender change = scope:tca_war_response_test_grant } }
+        resolve_title_and_vassal_change = scope:tca_war_response_test_grant
+        scope:tca_war_response_test_defender = {
+            tca_test_protect_character_effect = yes change_government = feudal_government
+            create_title_and_vassal_change = { type = independency save_scope_as = tca_war_response_test_independence }
+            becomes_independent = { change = scope:tca_war_response_test_independence }
+            resolve_title_and_vassal_change = scope:tca_war_response_test_independence
+        }
+        trigger_event = { id = tca_war_response_test.41 days = 2 }
+    }
+}
+tca_war_response_test.41 = {
+    type = character_event hidden = yes
+    immediate = {
+        scope:tca_war_response_test_attacker = { start_war = { cb = duchy_conquest_cb target = scope:tca_war_response_test_defender target_title = title:d_shuofang } }
+        trigger_event = { id = tca_war_response_test.42 days = 3 }
+    }
+}
+tca_war_response_test.42 = {
+    type = character_event hidden = yes
+    immediate = {
+        clear_saved_scope = tca_war_response_test_legacy_record
+        scope:tca_war_response_test_attacker = { every_character_war = {
+            limit = { using_cb = duchy_conquest_cb primary_attacker = scope:tca_war_response_test_attacker casus_belli = { any_target_title = { this = title:d_shuofang } } }
+            var:tca_fs_record = {
+                save_scope_as = tca_war_response_test_legacy_record
+                remove_variable = tca_ws_schema
+                remove_variable = tca_ws_country
+                remove_variable = tca_ws_attacker_country
+            }
+            end_war = attacker
+        } }
+        if = { limit = {
+            exists = scope:tca_war_response_test_legacy_record
+            scope:tca_war_response_test_legacy_record ?= {
+                var:tca_fs_closed = 4 has_variable = tca_fs_retention
+                NOT = { has_variable = tca_ws_prepared }
+                NOT = { has_variable = tca_fd_active }
+                NOT = { has_variable = tca_fs_war }
+            }
+            title:c_lingzhou.holder = { top_liege = scope:tca_war_response_test_attacker }
+        } debug_log = "TCA_TEST CHECK_PASS tca_test_war_response_legacy 1" }
+        else = { add_character_flag = tca_test_tca_war_response_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_war_response_legacy 1" }
+        if = { limit = { has_character_flag = tca_test_tca_war_response_test_case_failed }
+            debug_log = "TCA_TEST FAIL tca_test_war_response_legacy"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+        }
+        else = {
+            debug_log = "TCA_TEST PASS tca_test_war_response_legacy"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } }
+        }
+        scope:tca_war_response_test_attacker = { remove_variable = tca_war_response_test_reporter }
+        tca_test_lane_end_effect = { GROUP = tca_war_response_test }
+    }
+}

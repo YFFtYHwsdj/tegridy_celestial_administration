@@ -1,0 +1,168 @@
+﻿# 独立WORLD；借用并归还住所位置及一县法理，禁止在正常游玩存档运行。
+# 通过真实move_domicile迁移住所并核对候选离开及重入；脚本迁移不等同于自然旅行回调。
+# 每次迁移后每日观察真实同步完成，最长35天；无其他回调时由原on_monthly补漏，绝不直接调worker。
+# 法理改动复现原无主住所报错入口，日志由CLI核对。
+namespace = tca_church_domicile_test
+
+tca_church_domicile_test.1 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_church_domicile_test.1 tca_test_church_domicile"
+        remove_character_flag = tca_test_tca_church_domicile_test_case_failed
+        save_scope_as = tca_church_domicile_test_reporter
+        capital_province = { save_scope_as = tca_church_domicile_test_outside }
+        # 先等待启动同步，不以直接worker调用替代原接入。
+        trigger_event = { id = tca_church_domicile_test.2 days = 2 }
+    }
+}
+tca_church_domicile_test.2 = {
+    type = character_event hidden = yes
+    immediate = {
+        # 夹具选择只看真实头衔，不以被测桥名单／manual输出作为前置条件，避免把失败写成未执行。
+        religion:christianity_religion = { every_faith = { every_clerical_elector_title = {
+            limit = { exists = holder holder = { is_alive = yes } }
+            holder = { save_scope_as = tca_church_domicile_test_native }
+        } } }
+        random_domicile = {
+            limit = {
+                exists = owner exists = domicile_location
+                owner = {
+                    is_alive = yes
+                    NOR = { exists = clerical_elector_title any_held_title = { has_clerical_region = yes } }
+                }
+                situation:the_christian_church.situation_sub_region:core ?= { situation_sub_region_has_province = prev.domicile_location }
+            }
+            owner = { save_scope_as = tca_church_domicile_test_owner }
+        }
+        random_domicile = {
+            limit = { is_domicile_type = ecclesiastical_domicile NOT = { exists = owner } exists = domicile_location }
+            save_scope_as = tca_church_domicile_test_orphan
+            domicile_location = { save_scope_as = tca_church_domicile_test_orphan_location }
+        }
+        if = { limit = {
+            exists = situation:the_christian_church
+            exists = scope:tca_church_domicile_test_owner
+            exists = scope:tca_church_domicile_test_native
+            exists = scope:tca_church_domicile_test_orphan
+            exists = scope:tca_church_domicile_test_outside
+            situation:the_christian_church.situation_sub_region:core = { NOT = { situation_sub_region_has_province = scope:tca_church_domicile_test_outside } }
+            title:c_ile_de_france = { exists = holder exists = de_jure_liege NOT = { de_jure_liege = title:d_normandy } }
+        }
+            situation:the_christian_church = { set_variable = { name = tca_church_domicile_test_watch value = yes } }
+            if = { limit = {
+                situation:the_christian_church = {
+                    is_manual_participant = scope:tca_church_domicile_test_native
+                    NOT = { is_target_in_variable_list = { name = tca_church_domicile_owned target = scope:tca_church_domicile_test_native } }
+                }
+                NOT = { any_domicile = {
+                    exists = owner owner = { is_alive = yes } exists = domicile_location
+                    situation:the_christian_church.situation_sub_region:core = { situation_sub_region_has_province = prev.domicile_location }
+                    owner = { situation:the_christian_church = { NOT = { is_manual_participant = prev } } }
+                } }
+            } debug_log = "TCA_TEST CHECK_PASS tca_test_church_domicile 1" }
+            else = { add_character_flag = tca_test_tca_church_domicile_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_church_domicile 1" }
+            # 移动该人物的全部住所，避免有第二住所仍在core时错误期待退出。
+            # 每个位置存回各自住所，保证恢复时不把多个住所挤到同一省。
+            every_domicile = {
+                limit = { exists = owner owner = scope:tca_church_domicile_test_owner exists = domicile_location }
+                set_variable = { name = tca_church_domicile_test_original_location value = domicile_location }
+                add_to_list = tca_church_domicile_test_moved
+                move_domicile = scope:tca_church_domicile_test_outside
+            }
+            situation:the_christian_church = { remove_variable = tca_church_domicile_test_synced }
+            set_variable = { name = tca_church_domicile_test_wait_left value = 35 }
+            trigger_event = { id = tca_church_domicile_test.3 days = 1 }
+        }
+        else = {
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_church_domicile"
+            tca_test_lane_end_effect = { GROUP = tca_church_domicile_test }
+        }
+    }
+}
+tca_church_domicile_test.3 = {
+    type = character_event hidden = yes
+    immediate = {
+        change_variable = { name = tca_church_domicile_test_wait_left subtract = 1 }
+        if = { limit = {
+            situation:the_christian_church = { NOT = { has_variable = tca_church_domicile_test_synced } }
+            var:tca_church_domicile_test_wait_left > 0
+        }
+            trigger_event = { id = tca_church_domicile_test.3 days = 1 }
+        }
+        else = {
+            if = { limit = { situation:the_christian_church = {
+                has_variable = tca_church_domicile_test_synced
+                NOT = { is_manual_participant = scope:tca_church_domicile_test_owner }
+                NOT = { is_target_in_variable_list = { name = tca_church_domicile_owned target = scope:tca_church_domicile_test_owner } }
+                is_manual_participant = scope:tca_church_domicile_test_native
+                NOT = { is_target_in_variable_list = { name = tca_church_domicile_owned target = scope:tca_church_domicile_test_native } }
+            } } debug_log = "TCA_TEST CHECK_PASS tca_test_church_domicile 2" }
+            else = { add_character_flag = tca_test_tca_church_domicile_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_church_domicile 2" }
+            every_in_list = { list = tca_church_domicile_test_moved
+                move_domicile = var:tca_church_domicile_test_original_location
+                remove_variable = tca_church_domicile_test_original_location
+            }
+            situation:the_christian_church = { remove_variable = tca_church_domicile_test_synced }
+            set_variable = { name = tca_church_domicile_test_wait_left value = 35 }
+            trigger_event = { id = tca_church_domicile_test.4 days = 1 }
+        }
+    }
+}
+tca_church_domicile_test.4 = {
+    type = character_event hidden = yes
+    immediate = {
+        change_variable = { name = tca_church_domicile_test_wait_left subtract = 1 }
+        if = { limit = {
+            situation:the_christian_church = { NOT = { has_variable = tca_church_domicile_test_synced } }
+            var:tca_church_domicile_test_wait_left > 0
+        }
+            trigger_event = { id = tca_church_domicile_test.4 days = 1 }
+        }
+        else = {
+            if = { limit = { situation:the_christian_church = {
+                has_variable = tca_church_domicile_test_synced
+                is_manual_participant = scope:tca_church_domicile_test_owner
+                is_target_in_variable_list = { name = tca_church_domicile_owned target = scope:tca_church_domicile_test_owner }
+                is_manual_participant = scope:tca_church_domicile_test_native
+                NOT = { is_target_in_variable_list = { name = tca_church_domicile_owned target = scope:tca_church_domicile_test_native } }
+            } } debug_log = "TCA_TEST CHECK_PASS tca_test_church_domicile 3" }
+            else = { add_character_flag = tca_test_tca_church_domicile_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_church_domicile 3" }
+            # 实际改动再归还法理父级，两次都触发原生RecalculateRulers；不关闭Church或清空历史住所。
+            title:c_ile_de_france = {
+                de_jure_liege = { save_scope_as = tca_church_domicile_test_old_de_jure }
+                set_de_jure_liege_title = title:d_normandy
+                set_de_jure_liege_title = scope:tca_church_domicile_test_old_de_jure
+            }
+            trigger_event = { id = tca_church_domicile_test.5 days = 2 }
+        }
+    }
+}
+tca_church_domicile_test.5 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = {
+            exists = scope:tca_church_domicile_test_orphan
+            scope:tca_church_domicile_test_orphan = {
+                NOT = { exists = owner }
+                domicile_location = scope:tca_church_domicile_test_orphan_location
+            }
+            title:c_ile_de_france = { de_jure_liege = scope:tca_church_domicile_test_old_de_jure }
+        } debug_log = "TCA_TEST CHECK_PASS tca_test_church_domicile 4" }
+        else = { add_character_flag = tca_test_tca_church_domicile_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_church_domicile 4" }
+        if = { limit = { has_character_flag = tca_test_tca_church_domicile_test_case_failed }
+            debug_log = "TCA_TEST FAIL tca_test_church_domicile"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+        }
+        else = {
+            debug_log = "TCA_TEST PASS tca_test_church_domicile"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } }
+        }
+        remove_character_flag = tca_test_tca_church_domicile_test_case_failed
+        remove_variable = tca_church_domicile_test_wait_left
+        situation:the_christian_church = {
+            remove_variable = tca_church_domicile_test_watch
+            remove_variable = tca_church_domicile_test_synced
+        }
+        tca_test_lane_end_effect = { GROUP = tca_church_domicile_test }
+    }
+}

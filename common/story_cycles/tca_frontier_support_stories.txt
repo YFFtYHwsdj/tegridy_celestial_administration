@@ -1,10 +1,16 @@
-﻿# 一场战争一份记录：持有人死亡时转给尚存的原进攻者，并立即停止原防御任务。
+﻿# 一场战争一份记录：所有者死亡时暂托相关继任者或尚存进攻者，等原生继承更新战争。
 # end清理只访问自己的响应行及持有人索引，避免两场战争串案。
 tca_frontier_support_record = {
     on_owner_death = {
-        if = { limit = { var:tca_fs_attacker ?= { is_alive = yes } }
+        set_variable = { name = tca_ws_inheritance_grace value = yes days = 3 }
+        if = { limit = { var:tca_fs_defender_title.holder ?= { is_alive = yes this != prev.var:tca_fs_defender } }
+            make_story_owner = var:tca_fs_defender_title.holder
+        }
+        else_if = { limit = { var:tca_fs_attacker_title.holder ?= { is_alive = yes this != prev.var:tca_fs_defender } }
+            make_story_owner = var:tca_fs_attacker_title.holder
+        }
+        else_if = { limit = { var:tca_fs_attacker ?= { is_alive = yes } }
             make_story_owner = var:tca_fs_attacker
-            tca_fs_close_record_effect = { RESULT = 4 }
         }
         else = { end_story = yes }
     }
@@ -16,17 +22,37 @@ tca_frontier_support_record = {
                 remove_list_variable = { name = tca_fs_records target = scope:tca_fs_record }
             }
         }
-        every_in_list = { variable = tca_fs_rows end_story = yes }
+        every_in_list = { variable = tca_fs_rows
+            save_scope_as = tca_fs_row
+            tca_ws_unindex_support_row_effect = yes
+            end_story = yes
+        }
+        every_in_list = { variable = tca_ws_merged_rows end_story = yes }
+        var:tca_fs_defender_title ?= { remove_list_variable = { name = tca_ws_defender_records target = scope:tca_fs_record } }
+        var:tca_ws_leader_title ?= { remove_list_variable = { name = tca_ws_leading_records target = scope:tca_fs_record } }
         every_in_list = { variable = tca_fd_losses end_story = yes }
-        every_in_list = { variable = tca_fd_invites end_story = yes }
+        every_in_list = { variable = tca_ws_pre_losses end_story = yes }
+        every_in_list = { variable = tca_fd_invites
+            save_scope_as = tca_fd_invitation
+            var:tca_ws_invite_title ?= { remove_list_variable = { name = tca_ws_recovery_invites target = scope:tca_fd_invitation } }
+            end_story = yes
+        }
+        every_in_list = { variable = tca_ws_merged_invites end_story = yes }
     }
     effect_group = { days = 1 triggered_effect = { trigger = { always = yes } effect = { tca_fs_tick_effect = yes } } }
 }
 
 # 响应行独立持久化；所有者死亡时随战争记录迁移，保持结束快照的可读性。
 tca_frontier_support_row = {
+    on_end = { tca_ws_unindex_support_row_effect = yes }
     on_owner_death = {
-        if = { limit = { var:tca_fs_parent.var:tca_fs_attacker ?= { is_alive = yes } }
+        if = { limit = { var:tca_fs_parent.var:tca_fs_defender_title.holder ?= { is_alive = yes } }
+            make_story_owner = var:tca_fs_parent.var:tca_fs_defender_title.holder
+        }
+        else_if = { limit = { var:tca_fs_parent.var:tca_fs_attacker_title.holder ?= { is_alive = yes } }
+            make_story_owner = var:tca_fs_parent.var:tca_fs_attacker_title.holder
+        }
+        else_if = { limit = { var:tca_fs_parent.var:tca_fs_attacker ?= { is_alive = yes } }
             make_story_owner = var:tca_fs_parent.var:tca_fs_attacker
         }
         else = { end_story = yes }

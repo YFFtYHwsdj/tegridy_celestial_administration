@@ -191,9 +191,9 @@
 
 ## 追讨的独立宣战接点
 
-D使用独立`tca_frontier_recovery_cb`，没有同名覆盖原版CB。仅在失地记录的同步宣战内，通过发起者临时`tca_fd_authorized`变量授权；声明后战争保存记录引用，不依赖该人物变量继续存在。原C动员入口只识别B的四类CB，因此追讨不递归触发防御承诺或再次追讨。
+D使用独立`tca_frontier_recovery_cb`，没有同名覆盖原版CB。仅在失地记录的同步宣战内，通过发起者临时`tca_fd_authorized`变量授权；声明后战争保存记录引用，不依赖该人物变量继续存在。共享C动员入口只接入已登记原版白名单及原四类自定义消费者，不接入收复CB，因此收复不递归触发防御承诺或再次收复。通用边界见[通用战争页](war_response.md)。
 
-原版`ep3_laamp_events_8.txt`中`ep3_laamps.8106.a`把动态目标逐一传入`target_title`，分为1—10项分支。本批采用同样写法，不把十项解释为引擎硬限制；超过本实现容量整次取消，具体边界见[设计页](design.md#追讨目标的接口容量)。
+原版`ep3_laamp_events_8.txt`中`ep3_laamps.8106.a`把动态目标逐一传入`target_title`，分为1—10项分支。共享收复沿用逐项显式声明方式，不把原版示例的十项解释为引擎硬限制；当前容量及超限处理统一见[设计页](design.md#追讨目标的接口容量)。
 
 原版`on_declared_war`以`allowed_war_declaration_sans_truce_penalties`排除撕约处罚；`tgp_east_asia_interaction_events.txt`和`scheme_critical_moments.txt`有宣战前加、后移除的正式用例。D仅围住本次原生声明处理，原已存在该标记则不移除；既有停战保留，不跳过其他原生声明处理。定向断言核对威望未受撕约扣罚、停战仍在和临时授权／标记清理，不能据此推论所有普通外交限制被绕过。
 

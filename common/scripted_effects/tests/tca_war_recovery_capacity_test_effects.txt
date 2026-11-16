@@ -1,0 +1,43 @@
+﻿# 容量独立测试的失败定位；人物root与tca_fs_record输入，仅记录离散状态，不改正式记录。
+tca_war_recovery_capacity_test_diagnose_effect = {
+    if = { limit = { var:tca_war_recovery_capacity_test_size = 12 } debug_log = "TCA_CAPACITY PHASE_12" }
+    if = { limit = { var:tca_war_recovery_capacity_test_size = 128 } debug_log = "TCA_CAPACITY PHASE_128" }
+    if = { limit = { var:tca_war_recovery_capacity_test_size = 129 } debug_log = "TCA_CAPACITY PHASE_129" }
+    if = { limit = { var:tca_war_recovery_capacity_test_count = 0 } debug_log = "TCA_CAPACITY PREPARED_0" }
+    if = { limit = { scope:tca_fs_record = { tca_fd_goal_count_value = 0 } } debug_log = "TCA_CAPACITY GOALS_0" }
+    if = { limit = { var:tca_war_recovery_capacity_test_count = 12 } debug_log = "TCA_CAPACITY PREPARED_12" }
+    if = { limit = { scope:tca_fs_record = { tca_fd_goal_count_value = 12 } } debug_log = "TCA_CAPACITY GOALS_12" }
+    if = { limit = { var:tca_war_recovery_capacity_test_count = 128 } debug_log = "TCA_CAPACITY PREPARED_128" }
+    if = { limit = { scope:tca_fs_record = { tca_fd_goal_count_value = 128 } } debug_log = "TCA_CAPACITY GOALS_128" }
+    if = { limit = { var:tca_war_recovery_capacity_test_count = 129 } debug_log = "TCA_CAPACITY PREPARED_129" }
+    if = { limit = { scope:tca_fs_record = { tca_fd_goal_count_value = 129 } } debug_log = "TCA_CAPACITY GOALS_129" }
+    if = { limit = { scope:tca_fs_record = { var:tca_fd_state ?= 0 } } debug_log = "TCA_CAPACITY STATE_0" }
+    if = { limit = { scope:tca_fs_record = { var:tca_fd_state ?= 1 } } debug_log = "TCA_CAPACITY STATE_1" }
+    if = { limit = { scope:tca_fs_record = { var:tca_fd_state ?= 2 } } debug_log = "TCA_CAPACITY STATE_2" }
+    if = { limit = { scope:tca_fs_record = { var:tca_fd_state ?= 3 } } debug_log = "TCA_CAPACITY STATE_3" }
+    if = { limit = { scope:tca_fs_record = { var:tca_fd_state ?= 4 } } debug_log = "TCA_CAPACITY STATE_4" }
+    if = { limit = { scope:tca_fs_record = { var:tca_fd_result ?= 0 } } debug_log = "TCA_CAPACITY RESULT_0" }
+    if = { limit = { scope:tca_fs_record = { var:tca_fd_result ?= 1 } } debug_log = "TCA_CAPACITY RESULT_1" }
+    if = { limit = { scope:tca_fs_record = { var:tca_fd_result ?= 2 } } debug_log = "TCA_CAPACITY RESULT_2" }
+    if = { limit = { scope:tca_fs_record = { var:tca_fd_result ?= 3 } } debug_log = "TCA_CAPACITY RESULT_3" }
+    if = { limit = { scope:tca_fs_record = { var:tca_fd_result ?= 4 } } debug_log = "TCA_CAPACITY RESULT_4" }
+    # begin之前state尚未建立；外层可选比较先挡住，避免正式live谓词的必填state报错。
+    if = { limit = { scope:tca_fs_record = { var:tca_fd_state ?= 3 has_variable = tca_fd_war } }
+        if = { limit = { scope:tca_fs_record = { tca_fd_live_trigger = yes } } debug_log = "TCA_CAPACITY LIVE_YES" } else = { debug_log = "TCA_CAPACITY LIVE_NO" }
+    } else = { debug_log = "TCA_CAPACITY LIVE_NO" }
+    if = { limit = { scope:tca_fs_record = { has_variable = tca_fd_war } } debug_log = "TCA_CAPACITY WAR_EXISTS_YES" } else = { debug_log = "TCA_CAPACITY WAR_EXISTS_NO" }
+    if = { limit = { scope:tca_fd_goal_index ?= 128 } debug_log = "TCA_CAPACITY INDEX128_YES" } else = { debug_log = "TCA_CAPACITY INDEX128_NO" }
+    if = { limit = { exists = scope:tca_fd_target_128 } debug_log = "TCA_CAPACITY SLOT128_YES" } else = { debug_log = "TCA_CAPACITY SLOT128_NO" }
+    if = { limit = { scope:tca_fs_record.var:tca_fd_country.holder ?= scope:tca_war_recovery_capacity_test_leader } debug_log = "TCA_CAPACITY COUNTRY_SAME_YES" } else = { debug_log = "TCA_CAPACITY COUNTRY_SAME_NO" }
+    if = { limit = { scope:tca_fs_record.var:tca_fd_attacker_country.holder ?= scope:tca_war_recovery_capacity_test_enemy } debug_log = "TCA_CAPACITY ENEMY_COUNTRY_SAME_YES" } else = { debug_log = "TCA_CAPACITY ENEMY_COUNTRY_SAME_NO" }
+    if = { limit = { scope:tca_fs_record.var:tca_war_recovery_capacity_test_excluded ?= { holder = scope:tca_fs_record.var:tca_war_recovery_capacity_test_excluded_holder holder.top_liege = scope:tca_war_recovery_capacity_test_enemy } } debug_log = "TCA_CAPACITY EXCLUDED_SAME_YES" } else = { debug_log = "TCA_CAPACITY EXCLUDED_SAME_NO" }
+    if = { limit = { scope:tca_fs_record = { var:tca_fd_state ?= 3 has_variable = tca_fd_war } }
+        if = { limit = { scope:tca_fs_record.var:tca_fd_war = { casus_belli = { any_target_title = { count = 1 } } } } debug_log = "TCA_CAPACITY NATIVE_1" }
+        if = { limit = { scope:tca_fs_record.var:tca_fd_war = { casus_belli = { any_target_title = { count = 12 } } } } debug_log = "TCA_CAPACITY NATIVE_12" }
+        if = { limit = { scope:tca_fs_record.var:tca_fd_war = { casus_belli = { any_target_title = { count = 116 } } } } debug_log = "TCA_CAPACITY NATIVE_116" }
+        if = { limit = { scope:tca_fs_record.var:tca_fd_war = { casus_belli = { any_target_title = { count = 127 } } } } debug_log = "TCA_CAPACITY NATIVE_127" }
+        if = { limit = { scope:tca_fs_record.var:tca_fd_war = { casus_belli = { any_target_title = { count = 128 } } } } debug_log = "TCA_CAPACITY NATIVE_128" }
+        if = { limit = { scope:tca_fs_record.var:tca_fd_war = { casus_belli = { any_target_title = { count = 129 } } } } debug_log = "TCA_CAPACITY NATIVE_129" }
+        if = { limit = { scope:tca_fs_record.var:tca_fd_war = { casus_belli = { NOT = { any_target_title = { NOT = { scope:tca_fs_record = { is_target_in_variable_list = { name = tca_fd_goals target = prev } } } } } } } } debug_log = "TCA_CAPACITY SUBSET_YES" } else = { debug_log = "TCA_CAPACITY SUBSET_NO" }
+    }
+}

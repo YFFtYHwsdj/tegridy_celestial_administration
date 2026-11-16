@@ -12,7 +12,7 @@
 
 1. **原生继承优先**：正常继任完全由原生任命产生，本机制不介入。P1 只把"第一顺位不存活、是领主、或功绩等级不足"视为无效顺位，不改变原生评分与排序。
 2. **季度预清**：登记路仍由天朝封臣持有、没有有效继承顺位时，清除"只差近期受任冷却"的候选人的冷却，让原生继承继续选人。预清判据：`0 < appointment_timeout_days <= 1825`（5 年受任冷却全区间，含已衰减至 3 年以内的原版受任官员）；150 年辞谢、奉祠／致仕、原版 3 年辞官致仕（`ep3_renounced_governorship_merit`）、考试赶考与正在参与乡试／会试活动（`involved_activity`）均由排除清单挡住。
-3. **在任资格审计（P2，默认只记录）**：持有人变更（`tca_circuit_register_road_holder_gain_effect`）与季度维护的轻量同步循环都会审计在任者。只有官品低于头衔等级才记 `tca_circuit_incumbent_invalid = 1`，并用 `tca_circuit_audit_reported` 去重；恢复合法后清除。一人多路不判不合格，仅在可选诊断开关开启时记 `tca_circuit_multi_road_reported` 与 `INCUMBENT_MULTI_ROAD_INFO`。默认不写待处理、不收回、不改持有人。
+3. **在任资格审计（P2，默认只记录）**：正常持有人变更（`tca_circuit_register_road_holder_gain_effect`）只登记路、保留原类型并排队既有次日维护；次日与季度维护的轻量同步循环重新确认头衔当前由存活天朝封臣持有，再按当前持有人的最终契约同步类型并审计。原生嵌套转授的契约续接可能晚于取得头衔回调，此时提前补约会误触军事省数量上限；因此不在该回调里补约，也不保存旧接任者作为延迟目标。只有官品低于头衔等级才记 `tca_circuit_incumbent_invalid = 1`，并用 `tca_circuit_audit_reported` 去重；恢复合法后清除。一人多路不判不合格，仅在可选诊断开关开启时记 `tca_circuit_multi_road_reported` 与 `INCUMBENT_MULTI_ROAD_INFO`。默认不写待处理、不收回、不改持有人。
 4. **回落检测与待补授**：带类型标记的路由皇帝取得、且前任已死时写入 `tca_circuit_pending_appointment` 并排队次日维护。回落约 1 tick 内 AI 可能已把路授予他人，因此标记不在取得头衔时自动清除。
 5. **待补授结算（默认关闭）**：开关 `tca_circuit_self_grant_enabled` 存在时，维护按当前持有人分流——皇帝持有则按权重 `1 + 功绩等级` 选人自授；合格天朝封臣持有则接受并清标记；不合格天朝封臣持有则先以 `granted` 事务收回皇帝再自授；外部持有人保留标记等待下季度。默认关闭时只记录 `SELF_GRANT_DISABLED`，保留待补授标记与登记，不授予、不改持有人；合格现持有人的接受分支不受开关影响。
 6. **强制收回（P3，默认关闭，仅低品）**：全局变量 `tca_circuit_retract_unqualified_enabled` 存在时，审计才会为低品在任者写 `tca_circuit_incumbent_pending` 并排队；维护处理时还要求 `tca_circuit_self_grant_enabled` 同时存在才会真正收回。收回走回落收回效果，成功后补写待补授标记并按补授流水线处理。**没有多头衔收回分支**：一人多路不写待处理、不会被收回。

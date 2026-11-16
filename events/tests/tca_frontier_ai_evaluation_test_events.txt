@@ -82,7 +82,7 @@ tca_frontier_ai_evaluation_test.1 = {
         # AI观察者仍是独立测试局；自建进攻者只持一县，边界均交给同一自建防御链，避免穷举世界。
         scope:actor = { save_scope_as = tca_fe_test_original_actor }
         create_character = { age = 35 gender = male random_traits = no culture = scope:actor.culture faith = scope:actor.faith location = root.capital_province save_scope_as = tca_fe_test_attacker }
-        scope:tca_fe_test_attacker = { tca_test_protect_character_effect = yes add_prestige = 10000 create_title_and_vassal_change = { type = granted save_scope_as = tca_fe_test_actor_grant } }
+        scope:tca_fe_test_attacker = { tca_test_protect_character_effect = yes add_character_modifier = { modifier = tca_fe_test_native_war_isolation_modifier } add_prestige = 10000 create_title_and_vassal_change = { type = granted save_scope_as = tca_fe_test_actor_grant } }
         scope:tca_fe_test_border = { change_title_holder = { holder = scope:tca_fe_test_attacker change = scope:tca_fe_test_actor_grant take_baronies = yes } }
         title:d_xining = { change_title_holder = { holder = scope:tca_fe_test_attacker change = scope:tca_fe_test_actor_grant } }
         resolve_title_and_vassal_change = scope:tca_fe_test_actor_grant
@@ -102,11 +102,44 @@ tca_frontier_ai_evaluation_test.1 = {
             change_title_holder_include_vassals = { holder = scope:tca_fe_test_defender change = scope:tca_fe_test_neighbor_grant }
             resolve_title_and_vassal_change = scope:tca_fe_test_neighbor_grant
         } }
-        # 财力及质量夹具只用自建人物；不依赖正常世界其他人物的钱包或军备。
+        # 财力夹具只用自建人物；测量前现建真实付费军团，不依赖初始钱包或90日军备存续。
         scope:tca_fe_test_person = { create_title_and_vassal_change = { type = granted save_scope_as = tca_fe_test_finance_grant } }
-        title:c_putao = { change_title_holder = { holder = scope:tca_fe_test_person change = scope:tca_fe_test_finance_grant } }
+        # 原putao治所为部落地产，独立后原生AI会转部落并改用威望养兵；改借1066已有城堡的Angus。
+        title:c_angus = { change_title_holder = { holder = scope:tca_fe_test_person change = scope:tca_fe_test_finance_grant } }
         resolve_title_and_vassal_change = scope:tca_fe_test_finance_grant
-        scope:tca_fe_test_person = { tca_test_protect_character_effect = yes add_character_modifier = { modifier = tca_fe_test_quality_isolation_modifier } add_gold = 20 change_government = feudal_government create_maa_regiment = { type = light_footmen check_can_recruit = no size = 1 } every_maa_regiment = { limit = { regiment_owner = scope:tca_fe_test_person } change_maa_troops_count = 100000 } }
+        scope:tca_fe_test_person = { tca_test_protect_character_effect = yes add_character_modifier = { modifier = tca_fe_test_quality_isolation_modifier } add_gold = 20 change_government = feudal_government
+            # 质量对照必须脱离原天朝上级，避免月度政体转换改变征召数与兵士费用币种。
+            create_title_and_vassal_change = { type = independency save_scope_as = tca_fe_test_quality_independent }
+            becomes_independent = { change = scope:tca_fe_test_quality_independent }
+            resolve_title_and_vassal_change = scope:tca_fe_test_quality_independent
+            add_character_modifier = { modifier = tca_fe_test_native_war_isolation_modifier }
+        }
+        # 质量人物与财力人物分开；同年龄、技能、文化、信仰、政体，无随机特质。
+        # 原版法罗/设得兰各只有一个男爵领，不含寺庙租赁产生的额外征召兵；不借多地产县作纯兵种对照。
+        create_character = { age = 35 gender = male random_traits = no martial = { 10 10 } diplomacy = { 10 10 } stewardship = { 10 10 } learning = { 10 10 } intrigue = { 10 10 } prowess = { 10 10 } culture = root.culture faith = root.faith location = root.capital_province save_scope_as = tca_fe_test_quality_light }
+        scope:tca_fe_test_quality_light = { tca_test_protect_character_effect = yes create_title_and_vassal_change = { type = granted save_scope_as = tca_fe_test_quality_grant } }
+        title:c_faereyar = { change_title_holder = { holder = scope:tca_fe_test_quality_light change = scope:tca_fe_test_quality_grant take_baronies = yes } }
+        resolve_title_and_vassal_change = scope:tca_fe_test_quality_grant
+        scope:tca_fe_test_quality_light = {
+            change_government = feudal_government
+            create_title_and_vassal_change = { type = independency save_scope_as = tca_fe_test_quality_independent }
+            becomes_independent = { change = scope:tca_fe_test_quality_independent }
+            resolve_title_and_vassal_change = scope:tca_fe_test_quality_independent
+            add_character_modifier = { modifier = tca_fe_test_event_quality_isolation_modifier }
+            add_character_modifier = { modifier = tca_fe_test_native_war_isolation_modifier }
+        }
+        create_character = { age = 35 gender = male random_traits = no martial = { 10 10 } diplomacy = { 10 10 } stewardship = { 10 10 } learning = { 10 10 } intrigue = { 10 10 } prowess = { 10 10 } culture = root.culture faith = root.faith location = root.capital_province save_scope_as = tca_fe_test_quality_heavy }
+        scope:tca_fe_test_quality_heavy = { tca_test_protect_character_effect = yes create_title_and_vassal_change = { type = granted save_scope_as = tca_fe_test_quality_grant } }
+        title:c_shetland = { change_title_holder = { holder = scope:tca_fe_test_quality_heavy change = scope:tca_fe_test_quality_grant take_baronies = yes } }
+        resolve_title_and_vassal_change = scope:tca_fe_test_quality_grant
+        scope:tca_fe_test_quality_heavy = {
+            change_government = feudal_government
+            create_title_and_vassal_change = { type = independency save_scope_as = tca_fe_test_quality_independent }
+            becomes_independent = { change = scope:tca_fe_test_quality_independent }
+            resolve_title_and_vassal_change = scope:tca_fe_test_quality_independent
+            add_character_modifier = { modifier = tca_fe_test_event_quality_isolation_modifier }
+            add_character_modifier = { modifier = tca_fe_test_native_war_isolation_modifier }
+        }
         # 控制权探针独立于C防御链，避免行政人事变动改变候选夹具。
         create_character = { age = 35 gender = male random_traits = no culture = root.culture faith = root.faith location = root.capital_province save_scope_as = tca_fe_test_control_lower }
         create_character = { age = 35 gender = male random_traits = no culture = root.culture faith = root.faith location = root.capital_province save_scope_as = tca_fe_test_control_upper }
@@ -124,9 +157,7 @@ tca_frontier_ai_evaluation_test.1 = {
         resolve_title_and_vassal_change = scope:tca_fe_test_control_grant
         scope:tca_fe_test_control_upper = { change_government = administrative_government add_treasury = 20 create_title_and_vassal_change = { type = independency save_scope_as = tca_fe_test_independent } becomes_independent = { change = scope:tca_fe_test_independent } resolve_title_and_vassal_change = scope:tca_fe_test_independent }
         scope:tca_fe_test_control_lower = { change_government = administrative_government add_treasury = 20 create_title_and_vassal_change = { type = swear_fealty save_scope_as = tca_fe_test_fealty } change_liege = { liege = scope:tca_fe_test_control_upper change = scope:tca_fe_test_fealty } resolve_title_and_vassal_change = scope:tca_fe_test_fealty
-            create_maa_regiment = { type = armored_footmen title = scope:tca_fe_test_control_duchy check_can_recruit = no size = 1 }
         }
-        scope:tca_fe_test_control_duchy = { every_owned_title_maa_regiment = { limit = { regiment_owning_title = scope:tca_fe_test_control_duchy } change_maa_troops_count = 100000 save_scope_as = tca_fe_test_borrowed_regiment } }
         set_variable = { name = tca_fe_test_initial_wait value = 0 }
         trigger_event = { id = tca_frontier_ai_evaluation_test.2 days = 90 }
     }
@@ -136,7 +167,6 @@ tca_frontier_ai_evaluation_test.2 = {
     immediate = {
         # 自建人物的军力缓存尚未建立时，先等待再记录对照，避免把初始零值当作轻步兵战力。
         if = { limit = { var:tca_fe_test_initial_wait < 90 OR = {
-            scope:tca_fe_test_person = { military_power = 0 }
             scope:tca_fe_test_defender = { military_power = 0 }
             scope:tca_fe_test_upper = { military_power = 0 }
         } }
@@ -144,18 +174,65 @@ tca_frontier_ai_evaluation_test.2 = {
             trigger_event = { id = tca_frontier_ai_evaluation_test.2 days = 3 }
         }
         else = {
-        if = { limit = { scope:tca_fe_test_person = { monthly_character_men_at_arms_expense_gold > 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_ai_evaluation 4" }
-        else = { add_character_flag = tca_test_tca_frontier_ai_evaluation_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_ai_evaluation 4" }
-        scope:tca_fe_test_person = { remove_short_term_gold = gold add_gold = { value = monthly_character_men_at_arms_expense_gold multiply = 2 } }
+            scope:tca_fe_test_person = {
+                # 测量前现建真实付费军团，不以初始20金或早期军备存续作为前提。
+                every_maa_regiment = { limit = { regiment_owner = scope:tca_fe_test_person } destroy_maa_regiment = yes }
+                add_gold = 100
+                create_maa_regiment = { type = light_footmen check_can_recruit = no size = 1 }
+                every_maa_regiment = { limit = { regiment_owner = scope:tca_fe_test_person } change_maa_troops_count = 100000 save_scope_as = tca_fe_test_finance_regiment }
+            }
+            set_variable = { name = tca_fe_test_finance_waited value = 0 }
+            trigger_event = { id = tca_frontier_ai_evaluation_test.20 days = 1 }
+        }
+    }
+}
+# 财力只读真实付费军团，按真实原生费用与原团现员等待刷新；不与质量事件兵共享角色或钱包。
+tca_frontier_ai_evaluation_test.20 = {
+    type = character_event hidden = yes
+    immediate = {
+        # 只在原真实军团仍有现员、持有人仍为金币制且原生费用已刷新后测量；最多等一个完整月度。
+        if = { limit = { var:tca_fe_test_finance_waited < 35 NOT = { AND = {
+            scope:tca_fe_test_person = { has_government = feudal_government monthly_character_men_at_arms_expense_gold > 0 }
+            exists = scope:tca_fe_test_finance_regiment
+            scope:tca_fe_test_finance_regiment ?= { regiment_owner = scope:tca_fe_test_person maa_current_troops_count > 0 }
+        } } }
+            change_variable = { name = tca_fe_test_finance_waited add = 1 }
+            trigger_event = { id = tca_frontier_ai_evaluation_test.20 days = 1 }
+        }
+        else = {
+        remove_variable = tca_fe_test_finance_waited
+        if = { limit = {
+            scope:tca_fe_test_person = { has_government = feudal_government monthly_character_men_at_arms_expense_gold > 0 }
+            exists = scope:tca_fe_test_finance_regiment
+            scope:tca_fe_test_finance_regiment ?= { regiment_owner = scope:tca_fe_test_person maa_current_troops_count > 0 }
+        } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_ai_evaluation 4" }
+        else = {
+            add_character_flag = tca_test_tca_frontier_ai_evaluation_test_case_failed
+            scope:tca_fe_test_person = {
+                if = { limit = { has_government = feudal_government } debug_log = "TCA_FRONTIER_AI_DIAG FINANCE_STILL_FEUDAL" }
+                else = { debug_log = "TCA_FRONTIER_AI_DIAG FINANCE_GOVERNMENT_CHANGED" }
+                if = { limit = { monthly_character_men_at_arms_expense_gold > 0 } debug_log = "TCA_FRONTIER_AI_DIAG FINANCE_GOLD_FEE_POSITIVE" }
+                else = { debug_log = "TCA_FRONTIER_AI_DIAG FINANCE_GOLD_FEE_ZERO" }
+                if = { limit = { monthly_character_men_at_arms_expense_treasury > 0 } debug_log = "TCA_FRONTIER_AI_DIAG FINANCE_TREASURY_FEE_POSITIVE" }
+            }
+            if = { limit = { exists = scope:tca_fe_test_finance_regiment scope:tca_fe_test_finance_regiment ?= { maa_current_troops_count > 0 regiment_owner = scope:tca_fe_test_person } } debug_log = "TCA_FRONTIER_AI_DIAG FINANCE_ORIGINAL_REGIMENT_READY" }
+            else = { debug_log = "TCA_FRONTIER_AI_DIAG FINANCE_ORIGINAL_REGIMENT_MISSING_OR_EMPTY" }
+            debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_ai_evaluation 4"
+        }
+        scope:tca_fe_test_person = { remove_short_term_gold = gold add_gold = { value = monthly_character_men_at_arms_expense_gold multiply = 2 }
+        }
         if = { limit = { scope:tca_fe_test_person = { tca_fe_raid_weight_value = 65 tca_fe_conquest_weight_value = 35 tca_fe_will_do_value = 10 } } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_ai_evaluation 5" }
         else = { add_character_flag = tca_test_tca_frontier_ai_evaluation_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_ai_evaluation 5" }
-        scope:tca_fe_test_person = { remove_short_term_gold = gold add_gold = { value = monthly_character_men_at_arms_expense_gold multiply = 4 } }
+        scope:tca_fe_test_person = { remove_short_term_gold = gold add_gold = { value = monthly_character_men_at_arms_expense_gold multiply = 4 }
+        }
         if = { limit = { scope:tca_fe_test_person = { tca_fe_raid_weight_value = 60 tca_fe_conquest_weight_value = 40 tca_fe_will_do_value = 15 } } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_ai_evaluation 6" }
         else = { add_character_flag = tca_test_tca_frontier_ai_evaluation_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_ai_evaluation 6" }
-        scope:tca_fe_test_person = { remove_short_term_gold = gold add_gold = { value = monthly_character_men_at_arms_expense_gold multiply = 8 } }
+        scope:tca_fe_test_person = { remove_short_term_gold = gold add_gold = { value = monthly_character_men_at_arms_expense_gold multiply = 8 }
+        }
         if = { limit = { scope:tca_fe_test_person = { tca_fe_raid_weight_value = 50 tca_fe_conquest_weight_value = 50 tca_fe_will_do_value = 20 } } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_ai_evaluation 7" }
         else = { add_character_flag = tca_test_tca_frontier_ai_evaluation_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_ai_evaluation 7" }
-        scope:tca_fe_test_person = { remove_short_term_gold = gold add_gold = { value = monthly_character_men_at_arms_expense_gold multiply = 12 } }
+        scope:tca_fe_test_person = { remove_short_term_gold = gold add_gold = { value = monthly_character_men_at_arms_expense_gold multiply = 12 }
+        }
         if = { limit = { scope:tca_fe_test_person = { tca_fe_raid_weight_value = 50 tca_fe_conquest_weight_value = 65 tca_fe_will_do_value = 25 } } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_ai_evaluation 8" }
         else = { add_character_flag = tca_test_tca_frontier_ai_evaluation_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_ai_evaluation 8" }
         scope:tca_fe_test_person = {
@@ -163,26 +240,55 @@ tca_frontier_ai_evaluation_test.2 = {
         }
         if = { limit = { scope:tca_fe_test_person = { tca_fe_will_do_value = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_ai_evaluation 9" }
         else = { add_character_flag = tca_test_tca_frontier_ai_evaluation_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_ai_evaluation 9" }
-        # 跨日快照使用人物私有变量；不依赖子效果数值scope在后续事件中的生命周期。
-        scope:tca_fe_test_person = {
-            set_variable = { name = tca_fe_test_saved_light_strength value = current_military_strength }
-            set_variable = { name = tca_fe_test_saved_light_power value = military_power }
+        # 两组质量事件兵在同一事务建立并跨同一次刷新，不占付费人物的钱包和军备。
+        scope:tca_fe_test_quality_light = {
+            every_maa_regiment = { limit = { regiment_owner = scope:tca_fe_test_quality_light } destroy_maa_regiment = yes }
+            spawn_army = { name = tca_frontier_ai_test_army men_at_arms = { type = light_footmen men = 100 } location = capital_province uses_supply = no inheritable = no }
         }
-        scope:tca_fe_test_person = {
-            add_gold = 10
-            save_scope_value_as = { name = tca_fe_test_light_strength value = current_military_strength }
-            save_scope_value_as = { name = tca_fe_test_light_power value = military_power }
-            every_maa_regiment = { limit = { regiment_owner = scope:tca_fe_test_person } destroy_maa_regiment = yes }
-            create_maa_regiment = { type = armored_footmen check_can_recruit = no size = 1 }
-            every_maa_regiment = { limit = { regiment_owner = scope:tca_fe_test_person } change_maa_troops_count = 100000 }
+        scope:tca_fe_test_quality_heavy = {
+            every_maa_regiment = { limit = { regiment_owner = scope:tca_fe_test_quality_heavy } destroy_maa_regiment = yes }
+            spawn_army = { name = tca_frontier_ai_test_army men_at_arms = { type = armored_footmen men = 100 } location = capital_province uses_supply = no inheritable = no }
         }
+        # 控制权军团只在本即时事务中现建；早期现建后等90日会被原生预算AI自行解散。
+        # 两个人物均为本例自建，清掉等待期间自动招募的兵士，不借正常世界人物军队。
+        scope:tca_fe_test_control_lower = {
+            every_maa_regiment = { limit = { regiment_owner = scope:tca_fe_test_control_lower } destroy_maa_regiment = yes }
+            every_held_title = { every_owned_title_maa_regiment = { destroy_maa_regiment = yes } }
+        }
+        scope:tca_fe_test_control_upper = {
+            every_maa_regiment = { limit = { regiment_owner = scope:tca_fe_test_control_upper } destroy_maa_regiment = yes }
+            every_held_title = { every_owned_title_maa_regiment = { destroy_maa_regiment = yes } }
+        }
+        scope:tca_fe_test_control_lower = { create_maa_regiment = { type = armored_footmen title = scope:tca_fe_test_control_duchy check_can_recruit = no size = 1 } }
+        scope:tca_fe_test_control_duchy = { every_owned_title_maa_regiment = { limit = { regiment_owning_title = scope:tca_fe_test_control_duchy } change_maa_troops_count = 100000 save_scope_as = tca_fe_test_borrowed_regiment } }
+        # 同时调用军职AI正式兵士入口；夹具只有这支头衔军，可检出人物上误用头衔迭代器。
         set_variable = { name = tca_fe_test_before_control_valid value = no }
-        if = { limit = { scope:tca_fe_test_control_duchy = { any_controlled_title_maa_regiment = { this = scope:tca_fe_test_borrowed_regiment } }
+        if = { limit = {
+            scope:tca_fe_test_control_lower = { tca_court_task_has_controlled_maa_trigger = yes }
+            scope:tca_fe_test_control_upper = { tca_court_task_has_controlled_maa_trigger = no }
+            scope:tca_fe_test_control_duchy = { any_controlled_title_maa_regiment = { this = scope:tca_fe_test_borrowed_regiment } }
             scope:tca_fe_test_control_kingdom = { NOT = { any_controlled_title_maa_regiment = { this = scope:tca_fe_test_borrowed_regiment } } }
         } set_variable = { name = tca_fe_test_before_control_valid value = yes } }
         scope:tca_fe_test_control_duchy = { transfer_owned_maa_control = scope:tca_fe_test_control_kingdom }
+        # 转借事务立即核对所有权与controlled清单；后续原生AI可以召回，不把跨月状态当事务结果。
+        # 直接检查原生汇总所读的controlled清单：同一军团从旧头衔移出、仅在新头衔出现一次，所有权不变。
+        if = { limit = { var:tca_fe_test_before_control_valid = yes
+            scope:tca_fe_test_control_lower = { tca_court_task_has_controlled_maa_trigger = no }
+            scope:tca_fe_test_control_upper = { tca_court_task_has_controlled_maa_trigger = yes }
+            scope:tca_fe_test_borrowed_regiment = { regiment_controller = scope:tca_fe_test_control_upper regiment_owner = scope:tca_fe_test_control_lower }
+            scope:tca_fe_test_control_duchy = { NOT = { any_controlled_title_maa_regiment = { this = scope:tca_fe_test_borrowed_regiment } } }
+            scope:tca_fe_test_control_kingdom = { any_controlled_title_maa_regiment = { count = 1 this = scope:tca_fe_test_borrowed_regiment } }
+        } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_ai_evaluation 11" }
+        else = {
+            add_character_flag = tca_test_tca_frontier_ai_evaluation_test_case_failed
+            if = { limit = { exists = scope:tca_fe_test_borrowed_regiment } debug_log = "TCA_FRONTIER_AI_DIAG CONTROL_REGIMENT_EXISTS" scope:tca_fe_test_borrowed_regiment = { debug_log_scopes = yes } }
+            else = { debug_log = "TCA_FRONTIER_AI_DIAG CONTROL_REGIMENT_MISSING" }
+            scope:tca_fe_test_control_lower = { if = { limit = { tca_court_task_has_controlled_maa_trigger = yes } debug_log = "TCA_FRONTIER_AI_DIAG LOWER_HAS_CONTROLLED_MAA_AFTER_TRANSFER" } every_held_title = { debug_log_scopes = yes every_controlled_title_maa_regiment = { debug_log_scopes = yes } } }
+            scope:tca_fe_test_control_upper = { if = { limit = { tca_court_task_has_controlled_maa_trigger = yes } debug_log = "TCA_FRONTIER_AI_DIAG UPPER_HAS_CONTROLLED_MAA_AFTER_TRANSFER" } every_held_title = { debug_log_scopes = yes every_controlled_title_maa_regiment = { debug_log_scopes = yes } } }
+            debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_ai_evaluation 11"
+        }
         set_variable = { name = tca_fe_test_cache_waited value = 0 }
-        # 换军备和转借后跨过完整月度刷新，再核对原生缓存；不以本日旧读数作结论。
+        # 两组质量事件兵建军后共同跨过完整月度刷新，再核对原生缓存；不以建军当日旧读数作结论。
         trigger_event = { id = tca_frontier_ai_evaluation_test.3 days = 35 }
         }
     }
@@ -195,7 +301,8 @@ tca_frontier_ai_evaluation_test.3 = {
         scope:tca_fe_test_defender = { if = { limit = { is_landed = yes is_alive = yes } debug_log = "TCA_FRONTIER_AI_DIAG LOWER_LANDED_ALIVE" } else = { debug_log = "TCA_FRONTIER_AI_DIAG LOWER_NOT_LANDED_ALIVE" } }
         scope:tca_fe_test_upper = { if = { limit = { is_landed = yes is_alive = yes } debug_log = "TCA_FRONTIER_AI_DIAG UPPER_LANDED_ALIVE" } else = { debug_log = "TCA_FRONTIER_AI_DIAG UPPER_NOT_LANDED_ALIVE" } }
         if = { limit = { var:tca_fe_test_cache_waited < 45 OR = {
-            scope:tca_fe_test_person = { military_power = 0 }
+            scope:tca_fe_test_quality_light = { military_power = 0 }
+            scope:tca_fe_test_quality_heavy = { military_power = 0 }
             scope:tca_fe_test_upper = { military_power = 0 }
             scope:tca_fe_test_attacker = { military_power = 0 }
         } }
@@ -203,30 +310,51 @@ tca_frontier_ai_evaluation_test.3 = {
             trigger_event = { id = tca_frontier_ai_evaluation_test.3 days = 3 }
         }
         else = {
-        scope:tca_fe_test_person = {
-            save_scope_value_as = { name = tca_fe_test_heavy_strength value = current_military_strength }
-            save_scope_value_as = { name = tca_fe_test_heavy_power value = military_power }
+        scope:tca_fe_test_quality_light = {
+            if = { limit = { current_military_strength = 0 } debug_log = "TCA_FRONTIER_AI_DIAG QUALITY_LIGHT_ZERO_TROOPS" }
+            else_if = { limit = { current_military_strength = 100 } debug_log = "TCA_FRONTIER_AI_DIAG QUALITY_LIGHT_EXACT_100_TROOPS" }
+            else = { debug_log = "TCA_FRONTIER_AI_DIAG QUALITY_LIGHT_OTHER_TROOPS" }
+            if = { limit = { military_power > 0 } debug_log = "TCA_FRONTIER_AI_DIAG QUALITY_LIGHT_POSITIVE_POWER" }
+            else = { debug_log = "TCA_FRONTIER_AI_DIAG QUALITY_LIGHT_ZERO_POWER" }
         }
-        scope:tca_fe_test_person = {
-            save_scope_value_as = { name = tca_fe_test_persisted_light_strength value = var:tca_fe_test_saved_light_strength }
-            save_scope_value_as = { name = tca_fe_test_persisted_light_power value = var:tca_fe_test_saved_light_power }
+        scope:tca_fe_test_quality_heavy = {
+            if = { limit = { current_military_strength = 0 } debug_log = "TCA_FRONTIER_AI_DIAG QUALITY_HEAVY_ZERO_TROOPS" }
+            else_if = { limit = { current_military_strength = 100 } debug_log = "TCA_FRONTIER_AI_DIAG QUALITY_HEAVY_EXACT_100_TROOPS" }
+            else = { debug_log = "TCA_FRONTIER_AI_DIAG QUALITY_HEAVY_OTHER_TROOPS" }
+            if = { limit = { military_power > 0 } debug_log = "TCA_FRONTIER_AI_DIAG QUALITY_HEAVY_POSITIVE_POWER" }
+            else = { debug_log = "TCA_FRONTIER_AI_DIAG QUALITY_HEAVY_ZERO_POWER" }
         }
-        if = { limit = { scope:tca_fe_test_person = { current_military_strength = var:tca_fe_test_saved_light_strength military_power > var:tca_fe_test_saved_light_power } } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_ai_evaluation 10" }
-        else = { add_character_flag = tca_test_tca_frontier_ai_evaluation_test_case_failed debug_log_scopes = yes debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_ai_evaluation 10" }
-        # 上下级均有自主征募和借兵AI，跨月总战力变化不能单归因于本军团。
-        # 直接检查原生汇总所读的controlled清单：同一军团从旧头衔移出、仅在新头衔出现一次，所有权不变。
-        if = { limit = { var:tca_fe_test_before_control_valid = yes
-            scope:tca_fe_test_borrowed_regiment = { regiment_controller = scope:tca_fe_test_control_upper regiment_owner = scope:tca_fe_test_control_lower }
-            scope:tca_fe_test_control_duchy = { NOT = { any_controlled_title_maa_regiment = { this = scope:tca_fe_test_borrowed_regiment } } }
-            scope:tca_fe_test_control_kingdom = { any_controlled_title_maa_regiment = { count = 1 this = scope:tca_fe_test_borrowed_regiment } }
-        } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_ai_evaluation 11" }
-        else = { add_character_flag = tca_test_tca_frontier_ai_evaluation_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_ai_evaluation 11" }
+        if = { limit = { scope:tca_fe_test_quality_heavy = { military_power > scope:tca_fe_test_quality_light.military_power } } debug_log = "TCA_FRONTIER_AI_DIAG QUALITY_HEAVY_HIGHER_POWER" }
+        else = { debug_log = "TCA_FRONTIER_AI_DIAG QUALITY_HEAVY_NOT_HIGHER_POWER" }
+        if = { limit = {
+            scope:tca_fe_test_quality_light = { current_military_strength = 100 military_power > 0 has_government = feudal_government is_independent_ruler = yes }
+            scope:tca_fe_test_quality_heavy = { current_military_strength = scope:tca_fe_test_quality_light.current_military_strength military_power > scope:tca_fe_test_quality_light.military_power has_government = feudal_government is_independent_ruler = yes }
+        } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_ai_evaluation 10" }
+        else = { add_character_flag = tca_test_tca_frontier_ai_evaluation_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_ai_evaluation 10" }
         scope:tca_fe_test_defender = { save_scope_as = recipient }
         title:c_lingzhou = { save_scope_as = target }
         tca_fe_project_target_effect = yes
         scope:tca_fs_record = { save_scope_as = tca_fe_test_projection }
-        if = { limit = { scope:tca_fs_record = { any_in_list = { variable = tca_fs_goals count = 1 this = title:c_lingzhou } any_in_list = { variable = tca_fs_rows count = 2 var:tca_fs_kind = 2 } NOT = { any_in_list = { variable = tca_fs_rows var:tca_fs_kind = 3 OR = { var:tca_fs_person = scope:tca_fe_test_upper var:tca_fs_person = scope:tca_fe_test_king } } } NOT = { has_variable = tca_fs_war } } } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_ai_evaluation 12" }
-        else = { add_character_flag = tca_test_tca_frontier_ai_evaluation_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_ai_evaluation 12" }
+        if = { limit = { scope:tca_fs_record = { any_in_list = { variable = tca_fs_goals count = 1 this = title:c_lingzhou } any_in_list = { variable = tca_fs_rows count = 2 var:tca_fs_kind = 2 } NOT = { any_in_list = { variable = tca_fs_rows var:tca_fs_kind = 3 OR = { var:tca_fs_person = scope:tca_fe_test_upper var:tca_fs_person = scope:tca_fe_test_king } } } NOT = { has_variable = tca_fs_war } NOT = { any_in_list = { variable = tca_fs_rows has_variable_list = tca_ws_support_titles } } } } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_ai_evaluation 12" }
+        else = {
+            add_character_flag = tca_test_tca_frontier_ai_evaluation_test_case_failed
+            scope:tca_fs_record = {
+                every_in_list = { variable = tca_fs_rows
+                    if = { limit = { var:tca_fs_kind = 1 } debug_log = "TCA_FRONTIER_AI_DIAG CANDIDATE_KIND_THREATENED" }
+                    else_if = { limit = { var:tca_fs_kind = 2 } debug_log = "TCA_FRONTIER_AI_DIAG CANDIDATE_KIND_UPPER" }
+                    else = { debug_log = "TCA_FRONTIER_AI_DIAG CANDIDATE_KIND_NEIGHBOR" }
+                    var:tca_fs_person = {
+                        debug_log = "TCA_FRONTIER_AI_DIAG CANDIDATE_PERSON [THIS.Char.GetID]"
+                        top_liege = { debug_log = "TCA_FRONTIER_AI_DIAG CANDIDATE_COUNTRY [THIS.Char.GetID]" }
+                        if = { limit = { is_liege_or_above_of = scope:tca_fe_test_defender } debug_log = "TCA_FRONTIER_AI_DIAG CANDIDATE_IS_DEFENDER_UPPER" }
+                    }
+                }
+                if = { limit = { has_variable = tca_fs_war } debug_log = "TCA_FRONTIER_AI_DIAG PROJECTION_UNEXPECTED_WAR" }
+                if = { limit = { any_in_list = { variable = tca_fs_rows has_variable_list = tca_ws_support_titles } } debug_log = "TCA_FRONTIER_AI_DIAG PROJECTION_UNEXPECTED_SUPPORT_INDEX" }
+            }
+            scope:tca_fe_test_defender = { top_liege = { debug_log = "TCA_FRONTIER_AI_DIAG DEFENDER_COUNTRY [THIS.Char.GetID]" } every_liege_or_above = { debug_log = "TCA_FRONTIER_AI_DIAG DEFENDER_UPPER [THIS.Char.GetID]" } }
+            debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_ai_evaluation 12"
+        }
         scope:tca_fs_record = { every_in_list = { variable = tca_fs_rows limit = { var:tca_fs_kind = 2 var:tca_fs_person = scope:tca_fe_test_upper } save_scope_as = tca_fs_row } }
         scope:tca_fs_row = { set_variable = { name = tca_fs_delay value = 180 } }
         if = { limit = { scope:tca_fs_row = { tca_fe_delay_multiplier_value = 1 } } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_ai_evaluation 13" }
@@ -296,6 +424,8 @@ tca_frontier_ai_evaluation_test.4 = {
             save_scope_value_as = { name = tca_fe_test_actor_current_power value = military_power }
             if = { limit = { tca_fe_actor_trigger = yes } debug_log = "TCA_FRONTIER_AI_DIAG QUARTER_ELIGIBLE" }
             else = { debug_log = "TCA_FRONTIER_AI_DIAG QUARTER_INELIGIBLE" }
+            if = { limit = { top_liege = scope:tca_fe_test_defender.top_liege } debug_log = "TCA_FRONTIER_AI_DIAG FIXTURE_DEFENCE_CHAIN_ALREADY_SAME_COUNTRY" }
+            if = { limit = { any_character_war = { primary_attacker = prev NOT = { tca_fs_war_trigger = yes } } } debug_log = "TCA_FRONTIER_AI_DIAG FIXTURE_NATIVE_OFFENSIVE_WAR" }
             debug_log = "TCA_FRONTIER_AI_DIAG actor power [SCOPE.GetValue('tca_fe_test_actor_current_power')|2]"
         }
         scope:tca_fe_test_attacker = { every_character_war = { limit = { has_variable = tca_fe_origin primary_attacker = scope:tca_fe_test_attacker }
@@ -369,7 +499,7 @@ tca_frontier_ai_evaluation_test.7 = {
 tca_frontier_ai_evaluation_test.9 = {
     type = character_event hidden = yes
     immediate = {
-        scope:tca_fe_test_attacker = { remove_character_flag = tca_frontier_ai_enabled remove_character_flag = tca_frontier_border_war_enabled }
+        scope:tca_fe_test_attacker = { remove_character_flag = tca_frontier_ai_enabled remove_character_flag = tca_frontier_border_war_enabled remove_character_modifier = tca_fe_test_native_war_isolation_modifier }
         if = { limit = { NOT = { exists = scope:tca_fe_test_recovery_record } } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_ai_evaluation 26" }
         else = { add_character_flag = tca_test_tca_frontier_ai_evaluation_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_ai_evaluation 26" }
         if = { limit = { has_character_flag = tca_test_tca_frontier_ai_evaluation_test_case_failed }

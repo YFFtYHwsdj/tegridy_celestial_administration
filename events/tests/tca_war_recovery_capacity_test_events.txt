@@ -1,0 +1,183 @@
+﻿# 容量独立WORLD：12县胜利、129县拒绝、128县胜利顺次运行；每阶段自备原归属与已冻结上级承诺。
+# 失地行是受控组件夹具，不冒充原版战争取样；begin、选择、接受、声明与胜利均用正式入口。
+namespace = tca_war_recovery_capacity_test
+
+tca_war_recovery_capacity_test.1 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_war_recovery_capacity_test.1 tca_test_war_recovery_capacity"
+        remove_character_flag = tca_test_tca_war_recovery_capacity_test_case_failed
+        title:k_france.holder = { save_scope_as = tca_war_recovery_capacity_test_leader tca_test_protect_character_effect = yes }
+        title:h_china.holder = { save_scope_as = tca_war_recovery_capacity_test_enemy tca_test_protect_character_effect = yes }
+        create_character = { age = 40 gender = male random_traits = no culture = scope:tca_war_recovery_capacity_test_leader.culture faith = scope:tca_war_recovery_capacity_test_leader.faith location = scope:tca_war_recovery_capacity_test_leader.capital_province save_scope_as = tca_war_recovery_capacity_test_victim }
+        scope:tca_war_recovery_capacity_test_leader = { add_courtier = scope:tca_war_recovery_capacity_test_victim }
+        scope:tca_war_recovery_capacity_test_victim = { tca_test_protect_character_effect = yes }
+        set_variable = { name = tca_war_recovery_capacity_test_size value = 12 }
+        trigger_event = tca_war_recovery_capacity_test.10
+    }
+}
+
+# 每阶段新建完整记录；原主为仍在旧国的领袖，原防守者为其失地后无地的廷臣。
+# 使用敌国仍有持主的县，声明不会依赖同一公国或相邻关系。
+# 额外县与原持有人写在本阶段新record，避免延迟事件继承上阶段同名saved scope。
+tca_war_recovery_capacity_test.10 = {
+    type = character_event hidden = yes
+    immediate = {
+        scope:tca_war_recovery_capacity_test_victim = { create_story = { type = tca_frontier_support_record save_scope_as = tca_fs_record } }
+        scope:tca_fs_record = {
+            save_scope_as = tca_war_recovery_capacity_test_record
+            set_variable = { name = tca_ws_schema value = 2 }
+            set_variable = { name = tca_fs_closed value = 1 }
+            set_variable = { name = tca_fs_defender value = scope:tca_war_recovery_capacity_test_victim }
+            set_variable = { name = tca_fs_attacker value = scope:tca_war_recovery_capacity_test_enemy }
+            set_variable = { name = tca_fd_country value = scope:tca_war_recovery_capacity_test_leader.primary_title }
+            set_variable = { name = tca_fd_attacker_country value = scope:tca_war_recovery_capacity_test_enemy.primary_title }
+        }
+        scope:tca_war_recovery_capacity_test_victim = { create_story = { type = tca_frontier_support_row save_scope_as = tca_war_recovery_capacity_test_row } }
+        scope:tca_war_recovery_capacity_test_row = {
+            set_variable = { name = tca_fs_parent value = scope:tca_fs_record }
+            set_variable = { name = tca_fs_person value = scope:tca_war_recovery_capacity_test_leader }
+            set_variable = { name = tca_fs_kind value = 2 }
+            set_variable = { name = tca_fs_depth value = 1 }
+            set_variable = { name = tca_fs_accepted value = yes }
+            set_variable = { name = tca_fd_eligible value = yes }
+        }
+        scope:tca_fs_record = { add_to_variable_list = { name = tca_fs_rows target = scope:tca_war_recovery_capacity_test_row } }
+        set_variable = { name = tca_war_recovery_capacity_test_count value = 0 }
+        scope:tca_war_recovery_capacity_test_enemy = { every_sub_realm_county = {
+            if = { limit = { root = { var:tca_war_recovery_capacity_test_count < var:tca_war_recovery_capacity_test_size } }
+                save_scope_as = tca_war_recovery_capacity_test_county
+                root = { change_variable = { name = tca_war_recovery_capacity_test_count add = 1 } }
+                scope:tca_war_recovery_capacity_test_victim = { create_story = { type = tca_frontier_recovery_loss save_scope_as = tca_war_recovery_capacity_test_loss } }
+                scope:tca_war_recovery_capacity_test_loss = {
+                    set_variable = { name = tca_fd_parent value = scope:tca_fs_record }
+                    set_variable = { name = tca_fd_title value = scope:tca_war_recovery_capacity_test_county }
+                    set_variable = { name = tca_fd_holder value = scope:tca_war_recovery_capacity_test_leader }
+                    set_variable = { name = tca_fd_government value = scope:tca_war_recovery_capacity_test_leader.government_type }
+                    set_variable = { name = tca_fd_transfer_kind value = 0 }
+                }
+                scope:tca_fs_record = {
+                    add_to_variable_list = { name = tca_fd_losses target = scope:tca_war_recovery_capacity_test_loss }
+                    add_to_variable_list = { name = tca_fd_goals target = scope:tca_war_recovery_capacity_test_county }
+                }
+            }
+            else_if = { limit = { scope:tca_fs_record = { NOT = { has_variable = tca_war_recovery_capacity_test_excluded } } }
+                scope:tca_fs_record = { set_variable = { name = tca_war_recovery_capacity_test_excluded value = prev } }
+                holder = { scope:tca_fs_record = { set_variable = { name = tca_war_recovery_capacity_test_excluded_holder value = prev } } }
+            }
+        } }
+        debug_log = "TCA_CAPACITY BEFORE_BEGIN"
+        tca_war_recovery_capacity_test_diagnose_effect = yes
+        scope:tca_fs_record = { tca_fd_begin_effect = yes }
+        debug_log = "TCA_CAPACITY AFTER_BEGIN"
+        tca_war_recovery_capacity_test_diagnose_effect = yes
+        if = { limit = {
+            var:tca_war_recovery_capacity_test_count = var:tca_war_recovery_capacity_test_size
+            exists = scope:tca_fs_record.var:tca_war_recovery_capacity_test_excluded
+            scope:tca_fs_record = { tca_fd_goal_count_value = root.var:tca_war_recovery_capacity_test_size }
+            OR = {
+                AND = { var:tca_war_recovery_capacity_test_size <= 128 scope:tca_fs_record = { var:tca_fd_state ?= 1 var:tca_fd_pending ?= scope:tca_war_recovery_capacity_test_row } }
+                AND = { var:tca_war_recovery_capacity_test_size = 129 scope:tca_fs_record = { var:tca_fd_state ?= 4 var:tca_fd_result ?= 0 NOT = { has_variable = tca_fd_active } NOT = { has_variable = tca_fd_war } } }
+            }
+        }
+            if = { limit = { var:tca_war_recovery_capacity_test_size = 12 } debug_log = "TCA_TEST CHECK_PASS tca_test_war_recovery_capacity 1" }
+            if = { limit = { var:tca_war_recovery_capacity_test_size = 128 } debug_log = "TCA_TEST CHECK_PASS tca_test_war_recovery_capacity 4" }
+            if = { limit = { var:tca_war_recovery_capacity_test_size = 129 } debug_log = "TCA_TEST CHECK_PASS tca_test_war_recovery_capacity 7" }
+        }
+        else = {
+            add_character_flag = tca_test_tca_war_recovery_capacity_test_case_failed
+            if = { limit = { var:tca_war_recovery_capacity_test_size = 12 } debug_log = "TCA_TEST CHECK_FAIL tca_test_war_recovery_capacity 1" }
+            if = { limit = { var:tca_war_recovery_capacity_test_size = 128 } debug_log = "TCA_TEST CHECK_FAIL tca_test_war_recovery_capacity 4" }
+            if = { limit = { var:tca_war_recovery_capacity_test_size = 129 } debug_log = "TCA_TEST CHECK_FAIL tca_test_war_recovery_capacity 7" }
+        }
+        if = { limit = { var:tca_war_recovery_capacity_test_size <= 128 }
+            scope:tca_fs_record = {
+                var:tca_fd_pending ?= { save_scope_as = tca_fd_choice_row }
+                tca_fd_accept_effect = yes
+            }
+            debug_log = "TCA_CAPACITY AFTER_ACCEPT"
+            tca_war_recovery_capacity_test_diagnose_effect = yes
+            # 跨日等待真实started派发后才检查和议和，不留陈旧的开战回调。
+            trigger_event = { id = tca_war_recovery_capacity_test.20 days = 1 }
+        }
+        else = {
+            if = { limit = {
+                scope:tca_fs_record = { tca_fd_goal_count_value = 129 NOT = { any_in_list = { variable = tca_fd_goals NOT = { holder.top_liege = scope:tca_war_recovery_capacity_test_enemy } } } }
+                scope:tca_war_recovery_capacity_test_leader = { NOT = { has_variable = tca_fd_authorized } NOT = { any_character_war = { using_cb = tca_frontier_recovery_cb primary_attacker = scope:tca_war_recovery_capacity_test_leader } } }
+                scope:tca_fs_record.var:tca_war_recovery_capacity_test_excluded = { holder = scope:tca_fs_record.var:tca_war_recovery_capacity_test_excluded_holder holder.top_liege = scope:tca_war_recovery_capacity_test_enemy }
+            } debug_log = "TCA_TEST CHECK_PASS tca_test_war_recovery_capacity 8" }
+            else = { add_character_flag = tca_test_tca_war_recovery_capacity_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_war_recovery_capacity 8" }
+            # 先测129县拒绝，再消耗128县，避免真实胜利后敌国剩余县不足而漏测边界。
+            set_variable = { name = tca_war_recovery_capacity_test_size value = 128 }
+            trigger_event = { id = tca_war_recovery_capacity_test.10 days = 1 }
+        }
+    }
+}
+
+tca_war_recovery_capacity_test.20 = {
+    type = character_event hidden = yes
+    immediate = {
+        scope:tca_war_recovery_capacity_test_record = { save_scope_as = tca_fs_record }
+        debug_log = "TCA_CAPACITY AFTER_WAIT"
+        tca_war_recovery_capacity_test_diagnose_effect = yes
+        if = { limit = {
+            scope:tca_fs_record = { tca_fd_live_trigger = yes }
+            scope:tca_fs_record.var:tca_fd_war ?= { casus_belli = {
+                any_target_title = { count = root.var:tca_war_recovery_capacity_test_size }
+                NOT = { any_target_title = { NOT = { scope:tca_fs_record = { is_target_in_variable_list = { name = tca_fd_goals target = prev } } } } }
+                NOT = { any_target_title = { this = scope:tca_fs_record.var:tca_war_recovery_capacity_test_excluded } }
+            } }
+            scope:tca_fs_record = { NOT = { any_in_list = { variable = tca_fd_goals
+                save_temporary_scope_as = tca_war_recovery_capacity_test_checked
+                NOT = { scope:tca_fs_record.var:tca_fd_war ?= { casus_belli = { any_target_title = { this = scope:tca_war_recovery_capacity_test_checked } } } }
+            } } }
+            scope:tca_war_recovery_capacity_test_leader = { NOT = { has_variable = tca_fd_authorized } NOT = { has_character_flag = allowed_war_declaration_sans_truce_penalties } }
+        }
+            if = { limit = { var:tca_war_recovery_capacity_test_size = 12 } debug_log = "TCA_TEST CHECK_PASS tca_test_war_recovery_capacity 2" }
+            if = { limit = { var:tca_war_recovery_capacity_test_size = 128 } debug_log = "TCA_TEST CHECK_PASS tca_test_war_recovery_capacity 5" }
+        }
+        else = {
+            add_character_flag = tca_test_tca_war_recovery_capacity_test_case_failed
+            if = { limit = { var:tca_war_recovery_capacity_test_size = 12 } debug_log = "TCA_TEST CHECK_FAIL tca_test_war_recovery_capacity 2" }
+            if = { limit = { var:tca_war_recovery_capacity_test_size = 128 } debug_log = "TCA_TEST CHECK_FAIL tca_test_war_recovery_capacity 5" }
+        }
+        scope:tca_fs_record.var:tca_fd_war ?= { end_war = attacker }
+        debug_log = "TCA_CAPACITY AFTER_VICTORY"
+        tca_war_recovery_capacity_test_diagnose_effect = yes
+        if = { limit = {
+            scope:tca_fs_record = {
+                var:tca_fd_result ?= 3 tca_fd_goal_count_value = root.var:tca_war_recovery_capacity_test_size
+                NOT = { any_in_list = { variable = tca_fd_goals NOT = { holder = scope:tca_war_recovery_capacity_test_leader } } }
+            }
+            scope:tca_fs_record.var:tca_war_recovery_capacity_test_excluded = { holder = scope:tca_fs_record.var:tca_war_recovery_capacity_test_excluded_holder holder.top_liege = scope:tca_war_recovery_capacity_test_enemy }
+        }
+            if = { limit = { var:tca_war_recovery_capacity_test_size = 12 } debug_log = "TCA_TEST CHECK_PASS tca_test_war_recovery_capacity 3" }
+            if = { limit = { var:tca_war_recovery_capacity_test_size = 128 } debug_log = "TCA_TEST CHECK_PASS tca_test_war_recovery_capacity 6" }
+        }
+        else = {
+            add_character_flag = tca_test_tca_war_recovery_capacity_test_case_failed
+            if = { limit = { var:tca_war_recovery_capacity_test_size = 12 } debug_log = "TCA_TEST CHECK_FAIL tca_test_war_recovery_capacity 3" }
+            if = { limit = { var:tca_war_recovery_capacity_test_size = 128 } debug_log = "TCA_TEST CHECK_FAIL tca_test_war_recovery_capacity 6" }
+        }
+        if = { limit = { var:tca_war_recovery_capacity_test_size = 12 }
+            set_variable = { name = tca_war_recovery_capacity_test_size value = 129 }
+            trigger_event = { id = tca_war_recovery_capacity_test.10 days = 1 }
+        }
+        else = { trigger_event = tca_war_recovery_capacity_test.99 }
+    }
+}
+
+tca_war_recovery_capacity_test.99 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { has_character_flag = tca_test_tca_war_recovery_capacity_test_case_failed }
+            debug_log = "TCA_TEST FAIL tca_test_war_recovery_capacity"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+        }
+        else = {
+            debug_log = "TCA_TEST PASS tca_test_war_recovery_capacity"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } }
+        }
+        tca_test_lane_end_effect = { GROUP = tca_war_recovery_capacity_test }
+    }
+}

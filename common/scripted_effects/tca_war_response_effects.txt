@@ -1,0 +1,70 @@
+﻿# 战争作用域；输入tca_fs_record、tca_fs_defender、tca_fs_attacker及LIST输出列表名。
+# 按实际CB范围逐县去重；响应与结算前快照各用自己的列表，不把潜在目标记成实际失地。
+tca_ws_collect_goals_effect = {
+    if = { limit = { tca_ws_native_cb_trigger = yes }
+        # 全部法理战争的原生setup_de_jure_cb不传title，结算攻击方全部法理辖属。
+        if = { limit = { using_cb = de_jure_cb }
+            scope:tca_fs_defender = { every_sub_realm_county = {
+                limit = { any_this_title_or_de_jure_above = { holder ?= { OR = { this = scope:tca_fs_attacker is_vassal_or_below_of = scope:tca_fs_attacker } } } }
+                tca_ws_add_goal_effect = { LIST = $LIST$ }
+            } }
+        }
+        else_if = { limit = { NOT = { using_cb = ducal_conquest_cb } }
+            casus_belli = { every_target_title = {
+                if = { limit = { tier = tier_county tca_ws_defender_county_trigger = yes } tca_ws_add_goal_effect = { LIST = $LIST$ } }
+                else_if = { limit = { tier > tier_county }
+                    every_in_de_jure_hierarchy = { limit = { tca_ws_defender_county_trigger = yes } tca_ws_add_goal_effect = { LIST = $LIST$ } }
+                }
+            } }
+        }
+        # 天朝夺公国同时接收目标头衔真实封臣，不能只读取法理县。
+        if = { limit = { OR = { using_cb = china_seize_duchy_cb using_cb = china_hegemon_seize_duchy_cb } }
+            casus_belli = { every_target_title = {
+                every_in_de_facto_hierarchy = { limit = { tca_ws_defender_county_trigger = yes } tca_ws_add_goal_effect = { LIST = $LIST$ } }
+            } }
+        }
+        # ducal_conquest_cb的内联分支可直接转属县主，未使用普通征服的全领地在目标区检查。
+        if = { limit = { using_cb = ducal_conquest_cb }
+            casus_belli = { every_target_title = {
+                every_in_de_jure_hierarchy = {
+                    continue = {
+                        OR = {
+                            NOT = { exists = holder }
+                            NOT = { holder = { target_is_liege_or_above = scope:tca_fs_defender } }
+                            AND = {
+                                scope:tca_fs_attacker.faith = { faith_hostility_level_comparison = { prev.holder.faith <= scope:tca_fs_defender.faith } }
+                                holder = { OR = { this = scope:tca_fs_defender target_is_liege_or_above = scope:tca_fs_defender } }
+                            }
+                        }
+                        tier > tier_county
+                    }
+                    limit = { tca_ws_defender_county_trigger = yes }
+                    if = { limit = {
+                        OR = {
+                            scope:tca_fs_attacker.faith = { faith_hostility_level_comparison = { prev.holder.faith >= scope:tca_fs_defender.faith } }
+                            holder.primary_title.tier >= scope:tca_fs_attacker.primary_title.tier
+                        }
+                    } tca_ws_add_goal_effect = { LIST = $LIST$ } }
+                    else = { holder = { every_sub_realm_county = { limit = { tca_ws_defender_county_trigger = yes } tca_ws_add_goal_effect = { LIST = $LIST$ } } } }
+                }
+            } }
+        }
+    }
+    else = {
+        # 四类有限战争保留北疆与原防守者交集；消费者自己的地域约束不流入共享候选层。
+        casus_belli = { every_target_title = {
+            if = { limit = { tier = tier_county tca_frontier_border_war_county_trigger = { DEFENDER = scope:tca_fs_defender } } tca_ws_add_goal_effect = { LIST = $LIST$ } }
+            else_if = { limit = { tier = tier_duchy }
+                every_in_de_jure_hierarchy = { limit = { tca_frontier_border_war_county_trigger = { DEFENDER = scope:tca_fs_defender } } tca_ws_add_goal_effect = { LIST = $LIST$ } }
+            }
+        } }
+    }
+}
+# 县作用域；不覆盖人物saved scope，不依赖调用者的prev链。
+# 全部法理CB的sub_realm分支及有限消费者也统一排除无地官署；官员仍由正式候选入口单独收集。
+tca_ws_add_goal_effect = {
+    save_scope_as = tca_ws_goal
+    if = { limit = { is_landless_type_title = no NOT = { scope:tca_fs_record = { is_target_in_variable_list = { name = $LIST$ target = scope:tca_ws_goal } } } }
+        scope:tca_fs_record = { add_to_variable_list = { name = $LIST$ target = scope:tca_ws_goal } }
+    }
+}

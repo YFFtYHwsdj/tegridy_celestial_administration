@@ -1,0 +1,70 @@
+﻿# 基督教局势作用域；无参数。替代原生会把历史空缺住所的无效owner送入校验的候选收集。
+# 只枚举住所，不扫描全人物；按真实core省份收集全部有效owner，多住所按人物去重。
+# 原参与组资格及区域条件仍由add_manual_participant调用原生校验；不复制宗教或政体规则。
+# 持久输出仅tca_church_domicile_owned：本桥首次登记的manual候选；已有原生manual不接管。
+tca_church_sync_domicile_candidates_effect = {
+    save_scope_as = tca_church_situation
+    # 临时列表不跨事件保存；先清理同一调用链中上一次同步可能留下的内容。
+    every_in_list = { list = tca_church_domicile_candidates remove_from_list = tca_church_domicile_candidates }
+    every_in_list = { list = tca_church_domicile_released remove_from_list = tca_church_domicile_released }
+    every_domicile = {
+        limit = {
+            exists = owner
+            owner = { is_alive = yes }
+            exists = domicile_location
+            scope:tca_church_situation.situation_sub_region:core = {
+                situation_sub_region_has_province = prev.domicile_location
+            }
+        }
+        owner = {
+            if = { limit = { NOT = { is_in_list = tca_church_domicile_candidates } }
+                add_to_temporary_list = tca_church_domicile_candidates
+            }
+        }
+    }
+    every_in_list = {
+        variable = tca_church_domicile_owned
+        if = { limit = { OR = { exists = clerical_elector_title any_held_title = { has_clerical_region = yes } } }
+            # 后来获得原版枢机／教区登记来源时放弃所有权，保留其manual资格。
+            # 此条件与原版授职登记及失去最后教职后的清理条件一致。
+            add_to_temporary_list = tca_church_domicile_released
+        }
+        else_if = { limit = { NOT = { is_in_list = tca_church_domicile_candidates } }
+            scope:tca_church_situation = {
+                if = { limit = { is_manual_participant = prev } remove_manual_participant = prev }
+            }
+            add_to_temporary_list = tca_church_domicile_released
+        }
+    }
+    # 不在正在遍历的持久名单内删项；只处理本桥拥有的登记，不撤销已有原生manual。
+    every_in_list = { list = tca_church_domicile_released
+        scope:tca_church_situation = { remove_list_variable = { name = tca_church_domicile_owned target = prev } }
+    }
+    every_in_list = { list = tca_church_domicile_candidates
+        scope:tca_church_situation = {
+            if = { limit = { NOT = { is_manual_participant = prev } }
+                add_manual_participant = prev
+                if = { limit = { NOT = { is_target_in_variable_list = { name = tca_church_domicile_owned target = prev } } }
+                    add_to_variable_list = { name = tca_church_domicile_owned target = prev }
+                }
+            }
+        }
+    }
+    # 独立测试局才启用的观察标记；只记录真实入口完成，不派发或改变同步。
+    if = { limit = { has_variable = tca_church_domicile_test_watch }
+        set_variable = { name = tca_church_domicile_test_synced value = yes }
+    }
+}
+
+# 任意作用域；只排一个次日局势回调，不绑定可能死亡的住所主人。
+# 头衔／政体及自然旅行的住所移动回调约一日内同步；直接move_domicile脚本不发旅行回调，
+# 与其他未触发这些入口的变动一并由原局势月维护补漏。
+# 这是候选收集兼容桥，不承诺与原生逐帧重算等时；从不销毁、迁移或重建历史住所。
+tca_church_queue_domicile_sync_effect = {
+    situation:the_christian_church ?= {
+        if = { limit = { NOT = { has_variable = tca_church_domicile_pending } }
+            set_variable = { name = tca_church_domicile_pending value = yes days = 3 }
+            trigger_event = { on_action = tca_church_domicile_worker days = 1 }
+        }
+    }
+}

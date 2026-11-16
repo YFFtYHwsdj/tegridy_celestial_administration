@@ -415,7 +415,8 @@ tca_circuit_succession_test.8 = {
 }
 
 # 用例11：task-19 默认关闭自动补授 → 维护只保留 pending/登记，不授予、不改 holder。
-# day0：真实路交皇帝并 mark_lapsed；day+2 断言 holder 仍皇帝、pending 保留、登记/kind 不变。
+# day0：真实文官路交皇帝并mark_lapsed；另借军事路类型标记核对授予回调延后同步。
+# day+2：文官路仍由皇帝持有、pending保留；军事路按当前持有人最终契约恢复类型。
 tca_circuit_succession_test.11 = {
     type = character_event
     hidden = yes
@@ -426,13 +427,19 @@ tca_circuit_succession_test.11 = {
             limit = { debug_only = yes is_alive = yes root = { has_title = title:h_china } }
             if = { limit = { NOT = { has_global_variable_list = tca_circuit_titles } } tca_circuit_rebuild_registry_effect = yes }
             clear_saved_scope = tca_cs_road
+            clear_saved_scope = tca_cs_case11_military_road
+            random_in_global_list = {
+                variable = tca_circuit_titles
+                limit = { tca_circuit_has_celestial_vassal_holder_trigger = yes var:tca_circuit_kind = 2 NOT = { has_variable = tca_circuit_pending_appointment } holder = { vassal_contract_has_flag = celestial_province_military } }
+                save_scope_as = tca_cs_case11_military_road
+            }
             random_in_global_list = {
                 variable = tca_circuit_titles
                 limit = { NOT = { holder = root } has_variable = tca_circuit_kind var:tca_circuit_kind = 1 tca_circuit_has_celestial_vassal_holder_trigger = yes }
                 save_scope_as = tca_cs_road
             }
             if = {
-                limit = { exists = scope:tca_cs_road }
+                limit = { exists = scope:tca_cs_road exists = scope:tca_cs_case11_military_road }
                 scope:tca_cs_road.holder = { save_scope_as = tca_cs_original_holder }
                 scope:tca_cs_original_holder = {
                     create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_cs_change }
@@ -444,6 +451,18 @@ tca_circuit_succession_test.11 = {
                     set_variable = { name = tca_cs_case11_road value = scope:tca_cs_road }
                     set_variable = { name = tca_cs_case11_original_holder value = scope:tca_cs_original_holder }
                 }
+                # 借用已成型军事路的类型标记，制造回调时标记与最终契约不一致的瞬间；不改原生契约或军事数量。
+                # 正常授予入口只能登记并排队，跨日后须读当前持有人实际契约恢复kind=2。
+                set_variable = { name = tca_cs_case11_military_road value = scope:tca_cs_case11_military_road }
+                set_variable = { name = tca_cs_case11_military_holder value = scope:tca_cs_case11_military_road.holder }
+                scope:tca_cs_case11_military_road = {
+                    set_variable = { name = tca_circuit_kind value = 1 }
+                    tca_circuit_register_road_holder_gain_effect = yes
+                }
+                if = { limit = { scope:tca_cs_case11_military_road = { var:tca_circuit_kind = 1 } has_variable = tca_circuit_maintenance_pending }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_self_grant_disabled 5"
+                }
+                else = { add_character_flag = tca_test_tca_circuit_succession_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_self_grant_disabled 5" }
                 debug_log = "TCA_TEST WAIT tca_test_circuit_self_grant_disabled 2 days"
                 trigger_event = { id = tca_circuit_succession_test.1011 days = 2 }
             }
@@ -493,6 +512,19 @@ tca_circuit_succession_test.1011 = {
                 debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_self_grant_disabled 4"
             }
             else = { add_character_flag = tca_test_tca_circuit_succession_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_self_grant_disabled 4" }
+            if = { limit = {
+                var:tca_cs_case11_military_road = {
+                    holder = root.var:tca_cs_case11_military_holder
+                    var:tca_circuit_kind = 2
+                    holder = { vassal_contract_has_flag = celestial_province_military }
+                    is_target_in_global_variable_list = { name = tca_circuit_titles target = this }
+                }
+            } debug_log = "TCA_TEST CHECK_PASS tca_test_circuit_self_grant_disabled 6" }
+            else = { add_character_flag = tca_test_tca_circuit_succession_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_circuit_self_grant_disabled 6" }
+            # 精确还原借用的类型；此用例不写军事路的契约、领主或持有人。
+            var:tca_cs_case11_military_road = { set_variable = { name = tca_circuit_kind value = 2 } }
+            remove_variable = tca_cs_case11_military_road
+            remove_variable = tca_cs_case11_military_holder
             if = {
                 limit = { scope:tca_cs_road = { exists = holder NOT = { holder = scope:tca_cs_original_holder } } scope:tca_cs_original_holder = { is_alive = yes } }
                 scope:tca_cs_road.holder = { save_scope_as = tca_cs_from }

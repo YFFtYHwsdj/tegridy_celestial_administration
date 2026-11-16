@@ -1,4 +1,4 @@
-﻿# C阶段战争作用域入口；CB的on_declaration通过war进入。幂等：同场只建立一份story。
+﻿# 共享战争作用域入口；通用开战回调及有限CB声明均可进入，同场只建立一份story。
 # 输出tca_fs_record。目标县、上级链和响应行均归该记录；不写人物单一待援战争指针。
 tca_fs_start_effect = {
     if = { limit = { tca_fs_war_trigger = yes NOT = { has_variable = tca_fs_record } }
@@ -10,22 +10,16 @@ tca_fs_start_effect = {
             set_variable = { name = tca_fs_war value = scope:tca_fs_war }
             set_variable = { name = tca_fs_attacker value = scope:tca_fs_attacker }
             set_variable = { name = tca_fs_defender value = scope:tca_fs_defender }
+            set_variable = { name = tca_fs_attacker_title value = scope:tca_fs_attacker.primary_title }
+            set_variable = { name = tca_fs_defender_title value = scope:tca_fs_defender.primary_title }
+            set_variable = { name = tca_ws_country value = scope:tca_fs_defender.top_liege.primary_title }
+            set_variable = { name = tca_ws_attacker_country value = scope:tca_fs_attacker.top_liege.primary_title }
+            set_variable = { name = tca_ws_schema value = 2 }
             set_variable = { name = tca_fs_started_on value = current_date }
         }
         scope:tca_fs_defender = { add_to_variable_list = { name = tca_fs_records target = scope:tca_fs_record } }
-        casus_belli = {
-            every_target_title = {
-                if = { limit = { tier = tier_county tca_frontier_border_war_county_trigger = { DEFENDER = scope:tca_fs_defender } }
-                    scope:tca_fs_record = { add_to_variable_list = { name = tca_fs_goals target = prev } }
-                }
-                else_if = { limit = { tier = tier_duchy }
-                    every_in_de_jure_hierarchy = {
-                        limit = { tca_frontier_border_war_county_trigger = { DEFENDER = scope:tca_fs_defender } }
-                        scope:tca_fs_record = { add_to_variable_list = { name = tca_fs_goals target = prev } }
-                    }
-                }
-            }
-        }
+        scope:tca_fs_defender.primary_title = { add_to_variable_list = { name = tca_ws_defender_records target = scope:tca_fs_record } }
+        tca_ws_collect_goals_effect = { LIST = tca_fs_goals }
         tca_fs_collect_candidates_effect = yes
         # 等名单完全建立再发信，避免AI即时选择修改迭代中的候选表。
         scope:tca_fs_record = {
@@ -79,7 +73,7 @@ tca_fs_collect_candidates_effect = {
                 }
             }
         }
-        # 仅从现有地方官署注册表补候选，按绑定治所识别，不扫描全部人物。
+        # 仅从正式地方官署注册表补候选，按绑定辖区识别，不扫描全部人物。
         if = { limit = { has_global_variable_list = tca_tongpan_counties }
             every_in_global_list = { variable = tca_tongpan_counties var:tca_tongpan_office.holder ?= { tca_fs_add_office_effect = yes } }
         }
@@ -106,6 +100,10 @@ tca_fs_add_candidate_effect = {
             set_variable = { name = tca_fs_depth value = $DEPTH$ }
             set_variable = { name = tca_fs_state value = 0 }
         }
+        # E瞬时预测复用候选，但不持久登记继承索引，防止预测结束后留下无效story引用。
+        if = { limit = { scope:tca_fs_record = { has_variable = tca_fs_war } }
+            scope:tca_fs_candidate = { tca_ws_index_support_row_effect = yes }
+        }
         scope:tca_fs_candidate = { save_scope_value_as = { name = tca_fs_delay value = tca_fs_delay_value } }
         scope:tca_fs_row = { set_variable = { name = tca_fs_delay value = scope:tca_fs_delay } }
         scope:tca_fs_record = {
@@ -120,15 +118,14 @@ tca_fs_add_neighbor_effect = {
     if = { limit = { tca_fs_neighbor_trigger = yes } tca_fs_add_candidate_effect = { KIND = 3 DEPTH = 0 } }
 }
 tca_fs_add_office_effect = {
-    save_temporary_scope_as = tca_frontier_candidate
     save_scope_as = tca_fs_candidate
-    if = { limit = { tca_is_celestial_governor_trigger = yes tca_frontier_has_anchor_trigger = yes }
-        if = { limit = { scope:tca_fs_record = { is_target_in_variable_list = { name = tca_fs_goals target = scope:tca_frontier_anchor } } }
+    if = { limit = { tca_is_celestial_governor_trigger = yes }
+        if = { limit = { tca_ws_office_in_counties_trigger = { COUNTIES = tca_fs_goals } }
             tca_fs_add_candidate_effect = { KIND = 1 DEPTH = 0 }
         }
         else_if = { limit = {
             NOT = { is_liege_or_above_of = scope:tca_fs_defender }
-            scope:tca_fs_record = { is_target_in_variable_list = { name = tca_fs_neighbors target = scope:tca_frontier_anchor } }
+            tca_ws_office_in_counties_trigger = { COUNTIES = tca_fs_neighbors }
         } tca_fs_add_candidate_effect = { KIND = 3 DEPTH = 0 } }
     }
 }
@@ -175,11 +172,25 @@ tca_fs_refuse_effect = {
 # 战争记录作用域；局部story每日维护，仅遍历本战候选；不是全局寻敌或人物扫描。
 tca_fs_tick_effect = {
     save_scope_as = tca_fs_record
+    # 旧调试记录缺少继承身份与版本时安全关闭，不为旧战争补建新承诺。
+    if = { limit = { NOT = { var:tca_ws_schema ?= 2 } }
+        if = { limit = { has_variable = tca_fd_active } tca_fd_end_effect = { RESULT = 0 } }
+        tca_fs_close_record_effect = { RESULT = 4 }
+    }
+    if = { limit = { NOT = { has_variable = tca_fs_closed } }
+        tca_ws_refresh_parties_effect = yes
+    }
     if = { limit = { has_variable = tca_fs_closed }
         if = { limit = { has_variable = tca_fd_active } tca_fd_tick_effect = yes }
         else_if = { limit = { NOT = { has_variable = tca_fs_retention } } end_story = yes }
     }
     else_if = { limit = { tca_fs_live_trigger = yes }
+        # 先在继承完整落定后接续及合并行，再遍历正式响应表，避免删除重复行改变在途迭代。
+        every_in_list = { variable = tca_fs_rows
+            limit = { has_variable_list = tca_ws_successors }
+            save_scope_as = tca_fs_row
+            tca_ws_resolve_support_successor_effect = yes
+        }
         every_in_list = {
             variable = tca_fs_rows
             limit = { OR = { var:tca_fs_state = 0 var:tca_fs_state = 1 } }
@@ -192,21 +203,31 @@ tca_fs_tick_effect = {
                 set_variable = { name = tca_fs_state value = 3 }
                 remove_variable = tca_fs_wait
             }
-            else_if = { limit = { var:tca_fs_state = 1 NOT = { has_variable = tca_fs_wait } }
+            else_if = { limit = { var:tca_fs_state = 1 OR = {
+                NOT = { has_variable = tca_fs_wait }
+                any_in_list = { variable = tca_ws_wait_sources NOT = { has_variable = tca_fs_wait } }
+            } }
                 scope:tca_fs_record.var:tca_fs_war = { add_defender = scope:tca_fs_row.var:tca_fs_person }
                 set_variable = { name = tca_fs_state value = 3 }
             }
         }
     }
-    else = { tca_fs_close_record_effect = { RESULT = 4 } }
+    else_if = { limit = { NOT = { has_variable = tca_ws_inheritance_grace } } tca_fs_close_record_effect = { RESULT = 4 } }
 }
 
 # CB结束前的战争作用域；先冻结参战名单再停止旧任务，结果1胜利、2白和平、3失败、4失效。
 tca_fs_finish_effect = {
-    if = { limit = { has_variable = tca_fs_record }
+    if = { limit = { exists = var:tca_fs_record var:tca_fs_record = { NOT = { has_variable = tca_fs_closed } } }
         var:tca_fs_record = { save_scope_as = tca_fs_record }
         every_war_defender = { scope:tca_fs_record = { add_to_variable_list = { name = tca_fs_participants target = prev } } }
-        scope:tca_fs_record = { tca_fs_close_record_effect = { RESULT = $RESULT$ } }
+        scope:tca_fs_record = {
+            # 旧存档可能先结算、后到每日维护；缺版本记录不能进入依赖新身份快照的冻结事务。
+            if = { limit = { has_variable = tca_ws_schema var:tca_ws_schema ?= 2 }
+                if = { limit = { NOT = { has_variable = tca_ws_prepared } } tca_ws_freeze_commitments_effect = yes }
+                tca_fs_close_record_effect = { RESULT = $RESULT$ }
+            }
+            else = { tca_fs_close_record_effect = { RESULT = 4 } }
+        }
     }
 }
 

@@ -2,7 +2,7 @@
 # 不复用B征服结算，不发起C动员，不再次派生D。无额外威望费，胜利直接归还原主。
 tca_frontier_recovery_cb = {
     icon = county_conquest_cb
-    group = tca_frontier_probe
+    group = tca_frontier_recovery
     target_titles = all
     target_title_tier = county
     target_top_liege_if_outside_realm = no
@@ -10,13 +10,24 @@ tca_frontier_recovery_cb = {
     use_de_jure_wargoal_only = yes
     mutually_exclusive_titles = { always = no }
     allowed_for_character = { has_variable = tca_fd_authorized }
-    allowed_against_character = { scope:attacker.var:tca_fd_authorized ?= { var:tca_fs_attacker = scope:defender } }
+    allowed_against_character = { scope:attacker.var:tca_fd_authorized ?= { var:tca_fd_enemy = scope:defender } }
     valid_to_start = {
         scope:attacker.var:tca_fd_authorized ?= { is_target_in_variable_list = { name = tca_fd_goals target = scope:target } }
     }
-    should_invalidate = { NOT = { exists = war.var:tca_fd_record war.var:tca_fd_record ?= { tca_fd_land_valid_trigger = yes } } }
-    on_primary_attacker_death = invalidate
-    on_primary_defender_death = invalidate
+    should_invalidate = { NOT = { war = {
+        exists = var:tca_fd_record
+        OR = {
+            tca_ws_recovery_transition_trigger = yes
+            var:tca_fd_record ?= { OR = { has_variable = tca_ws_inheritance_grace tca_fd_land_valid_trigger = yes } }
+        }
+    } } }
+    on_primary_attacker_death = inherit
+    on_primary_defender_death = inherit
+    # 原版_casus_belli.info提供的继承校验开关：继承已有战争不重查一次性的声明授权。
+    # 原国、实际失地、敌我与身份仍由本战记录校验；新战争资格继续只接受临时声明授权。
+    check_attacker_inheritance_validity = no
+    check_defender_inheritance_validity = no
+    attacker_allies_inherit = yes
     truce_days = 1825
     cost = { prestige = 0 }
     attacker_ticking_warscore_delay = { months = 3 }

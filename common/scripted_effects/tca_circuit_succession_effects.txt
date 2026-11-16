@@ -275,7 +275,9 @@ tca_circuit_mark_lapsed_title_effect = {
 # 头衔作用域；天朝封臣取得带标记的路。
 # 待补授未结算：保留原类型标记，等维护判断持有人是否为合格落点（不合格则收回后自授）；
 # 回落时已排队，这里不重复排队。
-# 无待补授（正常授予/正常任命继任）：按新持有人契约同步类型并登记。
+# 无待补授（正常授予/正常任命继任）：只登记并排队次日同步，保留回调前类型。
+# 原生stepped_down可嵌套转授多路，on_title_gain早于最终契约续接；此刻补军事契约会因临时数量满额报错。
+# 次日维护重新检查头衔仍由存活天朝封臣持有，再按当前holder的最终契约同步和审计；不保存旧接任者。
 # 测试可直接在设置好 holder 后调用。
 tca_circuit_register_road_holder_gain_effect = {
     if = {
@@ -284,9 +286,8 @@ tca_circuit_register_road_holder_gain_effect = {
         debug_log = "TCA_CIRCUIT PENDING_GAIN_WAIT"
     }
     else = {
-        tca_circuit_sync_kind_effect = yes
-        # P2：正常授予/正常任命继任后审计在任资格（默认只记录，不收回）。
-        tca_circuit_audit_incumbent_effect = yes
+        tca_circuit_register_title_effect = yes
+        title:h_china.holder ?= { tca_circuit_queue_maintenance_effect = yes }
     }
 }
 

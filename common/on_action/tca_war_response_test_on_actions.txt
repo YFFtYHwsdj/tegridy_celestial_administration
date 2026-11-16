@@ -1,0 +1,47 @@
+﻿# 只读原生接口观察：仅独立测试显式标记的进攻者进入，不创建正式响应或改写战果。
+# 输入原版战争回调上下文；观察结果写回该用例报告者，不访问普通游玩记录。
+tca_war_response_test_started = {
+    trigger = { debug_only = yes scope:attacker ?= { has_variable = tca_war_response_test_reporter } }
+    effect = {
+        debug_log = "TCA_WAR_RESPONSE_INTERFACE STARTED"
+        debug_log_scopes = yes
+        if = { limit = { title:c_lingzhou.holder = scope:attacker }
+            debug_log = "TCA_WAR_RESPONSE_INTERFACE STARTED_AFTER_TRANSFER"
+        }
+        else = { debug_log = "TCA_WAR_RESPONSE_INTERFACE STARTED_BEFORE_TRANSFER" }
+        scope:attacker.var:tca_war_response_test_reporter = {
+            if = { limit = { has_variable = tca_war_response_native_test_mode } set_variable = { name = tca_war_response_native_test_started value = yes } }
+            else = { set_variable = { name = tca_war_response_test_started value = yes } }
+        }
+    }
+}
+tca_war_response_test_victory = {
+    trigger = { debug_only = yes scope:attacker ?= { has_variable = tca_war_response_test_reporter } }
+    effect = {
+        debug_log = "TCA_WAR_RESPONSE_INTERFACE VICTORY"
+        debug_log_scopes = yes
+        if = { limit = { title:c_lingzhou.holder = scope:attacker }
+            debug_log = "TCA_WAR_RESPONSE_INTERFACE VICTORY_AFTER_TRANSFER"
+        }
+        else = { debug_log = "TCA_WAR_RESPONSE_INTERFACE VICTORY_BEFORE_TRANSFER" }
+        scope:attacker.var:tca_war_response_test_reporter = { set_variable = { name = tca_war_response_test_victory value = yes } }
+    }
+}
+# 对比实际结算中的头衔、改隶、政体子回调上下文，查明能否构造精确增量快照。
+# 只打印证据，不更新正式快照、不根据未知上下文推断战争归属。
+on_government_change = { on_actions = { tca_war_response_test_government } }
+tca_war_response_test_title_gain = {
+    trigger = {
+        debug_only = yes has_variable = tca_war_response_test_reporter
+        scope:title = { OR = { this = title:c_lingzhou this = title:c_huaiyuan } }
+    }
+    effect = { debug_log = "TCA_WAR_RESPONSE_INTERFACE TITLE_GAIN" debug_log_scopes = yes }
+}
+tca_war_response_test_vassal_change = {
+    trigger = { debug_only = yes has_variable = tca_war_response_test_reporter }
+    effect = { debug_log = "TCA_WAR_RESPONSE_INTERFACE VASSAL_CHANGE" debug_log_scopes = yes }
+}
+tca_war_response_test_government = {
+    trigger = { debug_only = yes has_variable = tca_war_response_test_reporter }
+    effect = { debug_log = "TCA_WAR_RESPONSE_INTERFACE GOVERNMENT_CHANGE" debug_log_scopes = yes }
+}

@@ -1,0 +1,127 @@
+﻿# 记录作用域；实际结果前冻结有效且尚未参战的上级，不能由战果后的领主链倒推。
+tca_ws_freeze_commitments_effect = {
+    # 结算可以紧接继承发生，不依赖下一次每日维护才承接已经落定的承诺。
+    tca_ws_refresh_parties_effect = yes
+    every_in_list = { variable = tca_fs_rows limit = { has_variable_list = tca_ws_successors }
+        save_scope_as = tca_fs_row tca_ws_resolve_support_successor_effect = yes
+    }
+    set_variable = { name = tca_ws_defender_independent value = no }
+    if = { limit = { var:tca_fs_defender = { is_independent_ruler = yes } }
+        set_variable = { name = tca_ws_defender_independent value = yes }
+    }
+    # 有限战争从自己的战果前进入；原版从共同提示效果进入，均在领土变化前冻结。
+    every_in_list = { variable = tca_fs_rows
+        save_scope_as = tca_fs_row
+        set_variable = { name = tca_fd_eligible value = no }
+        if = { limit = {
+            var:tca_fs_kind = 2 has_variable = tca_fs_accepted var:tca_fs_accepted ?= yes
+            scope:tca_fs_record = { var:tca_ws_defender_independent = no }
+            tca_fs_row_valid_trigger = yes
+            var:tca_fs_state = 1
+            NOT = { scope:tca_fs_record.var:tca_fs_war = { is_defender = scope:tca_fs_row.var:tca_fs_person } }
+        } set_variable = { name = tca_fd_eligible value = yes } }
+    }
+}
+
+# 人物作用域；原版共同提示末尾调用，scope:war由原版提示查找保留。
+# 16个白名单CB在任何转地前先调用该提示，调用端与效果均登记上游基线。
+# 非本模组已登记战争无副作用；重复预览不执行游戏效果，其他实际调用会刷新快照，
+# 以真正结算的最后一次取样为准，不将较早调用冻结成最终归属。
+tca_ws_prepare_resolution_effect = {
+    if = { limit = {
+        exists = scope:war
+        scope:war = { tca_ws_native_cb_trigger = yes exists = var:tca_fs_record var:tca_fs_record = { NOT = { has_variable = tca_fs_closed } has_variable = tca_ws_schema var:tca_ws_schema ?= 2 } }
+    }
+        scope:war = { save_scope_as = tca_fs_war
+            primary_attacker = { save_scope_as = tca_fs_attacker }
+            primary_defender = { save_scope_as = tca_fs_defender }
+            var:tca_fs_record = { save_scope_as = tca_fs_record }
+        }
+        scope:tca_fs_record = {
+            tca_ws_refresh_parties_effect = yes
+            tca_ws_freeze_commitments_effect = yes
+            every_in_list = { variable = tca_ws_pre_losses end_story = yes }
+            clear_variable_list = tca_ws_pre_losses
+            clear_variable_list = tca_ws_resolution_goals
+            set_variable = { name = tca_fd_country value = var:tca_ws_country }
+            set_variable = { name = tca_fd_attacker_country value = var:tca_ws_attacker_country }
+            set_variable = { name = tca_ws_prepared value = yes }
+        }
+        scope:tca_fs_war = { tca_ws_collect_goals_effect = { LIST = tca_ws_resolution_goals } }
+        scope:tca_fs_record = {
+            every_in_list = { variable = tca_ws_resolution_goals
+                save_scope_as = tca_ws_pre_county
+                holder = { save_scope_as = tca_ws_pre_holder }
+                scope:tca_fs_record.var:tca_fs_defender = { create_story = { type = tca_frontier_recovery_loss save_scope_as = tca_ws_pre_loss } }
+                scope:tca_ws_pre_loss = {
+                    set_variable = { name = tca_fd_parent value = scope:tca_fs_record }
+                    set_variable = { name = tca_fd_title value = scope:tca_ws_pre_county }
+                    set_variable = { name = tca_fd_holder value = scope:tca_ws_pre_holder }
+                    set_variable = { name = tca_fd_government value = scope:tca_ws_pre_holder.government_type }
+                    scope:tca_ws_pre_holder.liege ?= { scope:tca_ws_pre_loss = { set_variable = { name = tca_fd_liege value = prev } } }
+                }
+                scope:tca_fs_record = { add_to_variable_list = { name = tca_ws_pre_losses target = scope:tca_ws_pre_loss } }
+            }
+        }
+        if = { limit = { scope:attacker ?= { has_variable = tca_war_response_test_reporter } }
+            debug_log = "TCA_WAR_RESPONSE_INTERFACE PRE_RESOLUTION_SNAPSHOT"
+        }
+    }
+}
+
+# 战争作用域；同步原生胜方回调仍可读取war，先确认实际失地再关闭C与承接D。
+# 只接纳本次原版事务前后确实从防守国家转入进攻国家的目标县。
+tca_ws_native_victory_effect = {
+    # 防止旧记录在每日迁移清理之前先收到实际胜利回调；保留原版战果，只取消旧额外任务。
+    if = { limit = { exists = var:tca_fs_record var:tca_fs_record = { NOT = { AND = { has_variable = tca_ws_schema var:tca_ws_schema ?= 2 } } } }
+        var:tca_fs_record = { save_scope_as = tca_fs_record tca_fs_close_record_effect = { RESULT = 4 } }
+    }
+    if = { limit = { exists = var:tca_fs_record var:tca_fs_record = { NOT = { has_variable = tca_fs_closed } } }
+        var:tca_fs_record = { save_scope_as = tca_fs_record }
+        scope:tca_fs_record = {
+            if = { limit = { has_variable = tca_ws_prepared }
+                every_in_list = { variable = tca_ws_pre_losses
+                    save_scope_as = tca_ws_pre_loss
+                    if = { limit = {
+                        var:tca_fd_title ?= { holder ?= { top_liege = scope:tca_fs_record.var:tca_fd_attacker_country.holder } }
+                    }
+                        set_variable = { name = tca_fd_transfer_kind value = 0 }
+                        if = { limit = { var:tca_fd_title.holder = var:tca_fd_holder }
+                            set_variable = { name = tca_fd_transfer_kind value = 1 }
+                        }
+                        else_if = { limit = { var:tca_fd_holder ?= { OR = {
+                            top_liege = scope:tca_fs_record.var:tca_fd_attacker_country.holder
+                            AND = { is_landed = no exists = liege_or_court_owner liege_or_court_owner ?= { top_liege = scope:tca_fs_record.var:tca_fd_attacker_country.holder } }
+                        } } }
+                            # 原主被本次战果同时转入敌方或安置到敌方宫廷，仍保留可恢复的原归属。
+                            # 与kind=1不同，这一县已换持有人；不能跳过后续授地事务。
+                            set_variable = { name = tca_fd_transfer_kind value = 2 }
+                        }
+                        scope:tca_fs_record = {
+                            add_to_variable_list = { name = tca_fd_losses target = scope:tca_ws_pre_loss }
+                            add_to_variable_list = { name = tca_fd_goals target = scope:tca_ws_pre_loss.var:tca_fd_title }
+                            if = { limit = { NOT = { is_target_in_variable_list = { name = tca_fd_victims target = scope:tca_ws_pre_loss.var:tca_fd_holder } } }
+                                add_to_variable_list = { name = tca_fd_victims target = scope:tca_ws_pre_loss.var:tca_fd_holder }
+                            }
+                        }
+                    }
+                    else = { end_story = yes }
+                }
+                clear_variable_list = tca_ws_pre_losses
+                # 若真实受益人不在原进攻者辖下，改向实际持有这些失地的敌国最高领主开战。
+                # 所有目标均已逐县核对同一敌国，不借原进攻者身份向无关领土宣战。
+                set_variable = { name = tca_fd_enemy value = var:tca_fs_attacker }
+                if = { limit = { any_in_list = { variable = tca_fd_losses var:tca_fd_title.holder = { NOR = { this = scope:tca_fs_record.var:tca_fs_attacker is_vassal_or_below_of = scope:tca_fs_record.var:tca_fs_attacker } } } }
+                    set_variable = { name = tca_fd_enemy value = var:tca_fd_attacker_country.holder }
+                }
+                set_variable = { name = tca_fd_enemy_title value = var:tca_fd_enemy.primary_title }
+            }
+        }
+        tca_fs_finish_effect = { RESULT = 1 }
+        scope:tca_fs_record = {
+            if = { limit = { has_variable_list = tca_fd_losses var:tca_ws_defender_independent = no }
+                tca_fd_begin_effect = yes
+            }
+        }
+    }
+}

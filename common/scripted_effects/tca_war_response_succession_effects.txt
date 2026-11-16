@@ -1,0 +1,157 @@
+﻿# 记录story作用域；从仍存续人物及其相关头衔现持有人的战争集合确认原战争。
+# 只在找到相同war对象后读取其主战双方；不直接解引用可能已销毁的保存war。
+tca_ws_refresh_parties_effect = {
+    var:tca_fs_attacker ?= { tca_ws_find_live_war_effect = yes }
+    var:tca_fs_defender ?= { tca_ws_find_live_war_effect = yes }
+    var:tca_fs_attacker_title.holder ?= { tca_ws_find_live_war_effect = yes }
+    var:tca_fs_defender_title.holder ?= { tca_ws_find_live_war_effect = yes }
+}
+# 人物作用域；输入record。继承后只更新主战人物与记录所有者，不更换战争或重建响应行。
+tca_ws_find_live_war_effect = {
+    if = { limit = { is_alive = yes scope:tca_fs_record = { NOT = { has_variable = tca_fs_closed } exists = var:tca_fs_war } }
+        every_character_war = {
+            limit = { this = scope:tca_fs_record.var:tca_fs_war }
+            primary_attacker = { save_scope_as = tca_ws_current_attacker }
+            primary_defender = { save_scope_as = tca_ws_current_defender }
+            scope:tca_fs_record = {
+                if = { limit = { OR = {
+                    AND = { var:tca_fs_defender != scope:tca_ws_current_defender var:tca_fs_defender ?= { is_alive = yes } }
+                    AND = { var:tca_fs_attacker != scope:tca_ws_current_attacker var:tca_fs_attacker ?= { is_alive = yes } }
+                } }
+                    # 同war转交给仍存旧主之外的人不是死亡继承，旧承诺不能随战争转接。
+                    tca_fs_close_record_effect = { RESULT = 4 }
+                }
+                else = {
+                if = { limit = { var:tca_fs_defender != scope:tca_ws_current_defender }
+                    var:tca_fs_defender ?= { if = { limit = { is_alive = yes } remove_list_variable = { name = tca_fs_records target = scope:tca_fs_record } } }
+                    set_variable = { name = tca_fs_defender value = scope:tca_ws_current_defender }
+                    scope:tca_ws_current_defender = {
+                        if = { limit = { NOT = { is_target_in_variable_list = { name = tca_fs_records target = scope:tca_fs_record } } }
+                            add_to_variable_list = { name = tca_fs_records target = scope:tca_fs_record }
+                        }
+                    }
+                    make_story_owner = scope:tca_ws_current_defender
+                }
+                set_variable = { name = tca_fs_attacker value = scope:tca_ws_current_attacker }
+                remove_variable = tca_ws_inheritance_grace
+                }
+            }
+        }
+    }
+}
+
+# 人物作用域；输入row。索引所有有地／官职头衔以覆盖分割继承；
+# 实际接续在完整继承落定后按原响应身份筛选，不把承诺复制给每个继承人。
+tca_ws_index_support_row_effect = {
+    every_held_title = {
+        limit = { tier >= tier_county is_noble_family_title = no }
+        save_scope_as = tca_ws_index_title
+        if = { limit = { NOT = { is_target_in_variable_list = { name = tca_ws_support_rows target = scope:tca_fs_row } } }
+            add_to_variable_list = { name = tca_ws_support_rows target = scope:tca_fs_row }
+            scope:tca_fs_row = { add_to_variable_list = { name = tca_ws_support_titles target = scope:tca_ws_index_title } }
+        }
+    }
+}
+# 原生继承回调的人物作用域；title/previous_holder由引擎给出。
+# 此时主战争及全部分割继承未必已落定，先收集实际继承者，由本记录的下一次维护核验。
+# 多次连续继承以同一头衔索引承接，不访问已故人物的变量，也不触碰原限时变量。
+tca_ws_inherit_support_effect = {
+    save_scope_as = tca_ws_successor
+    scope:title = { every_in_list = {
+        variable = tca_ws_support_rows
+        limit = {
+            OR = {
+                var:tca_fs_person = scope:previous_holder
+                is_target_in_variable_list = { name = tca_ws_successors target = scope:previous_holder }
+            }
+            has_variable = tca_fs_accepted var:tca_fs_accepted ?= yes
+            OR = { var:tca_fs_state = 1 var:tca_fs_state = 3 var:tca_fd_eligible ?= yes }
+            var:tca_fs_parent = { OR = { NOT = { has_variable = tca_fs_closed } has_variable = tca_fd_active } }
+            NOT = { is_target_in_variable_list = { name = tca_ws_successors target = scope:tca_ws_successor } }
+        }
+        add_to_variable_list = { name = tca_ws_successors target = scope:tca_ws_successor }
+    } }
+}
+# 响应行作用域；输入record/row。按原类别实际辖区选一位合格承接者，保留原行及到期点。
+# 同人已有另一行时合并成一行，旧计时器作为私有来源保留，任一原到期点到达即加入。
+tca_ws_resolve_support_successor_effect = {
+    if = { limit = { has_variable_list = tca_ws_successors var:tca_fs_person = { is_alive = no } }
+        set_variable = { name = tca_ws_previous_person value = var:tca_fs_person }
+        # 清除当前saved scope仍会暴露父事件同名目标；仅以本次重置的标量标记消费新选人。
+        save_scope_value_as = { name = tca_ws_support_successor_selected value = no }
+        ordered_in_list = { variable = tca_ws_successors order_by = highest_held_title_tier max = tca_ws_successor_count_value check_range_bounds = no
+            limit = { is_alive = yes }
+            if = { limit = { scope:tca_ws_support_successor_selected = no }
+                save_scope_as = tca_ws_successor
+                scope:tca_fs_row = {
+                    set_variable = { name = tca_fs_person value = scope:tca_ws_successor }
+                    if = { limit = { tca_ws_support_successor_valid_trigger = yes } scope:tca_ws_successor = { save_scope_as = tca_ws_chosen_successor save_scope_value_as = { name = tca_ws_support_successor_selected value = yes } } }
+                    set_variable = { name = tca_fs_person value = var:tca_ws_previous_person }
+                }
+            }
+        }
+        if = { limit = { scope:tca_ws_support_successor_selected = yes }
+            set_variable = { name = tca_fs_person value = scope:tca_ws_chosen_successor }
+            scope:tca_fs_record = {
+                every_in_list = { variable = tca_fs_rows
+                    limit = { this != scope:tca_fs_row var:tca_fs_person = scope:tca_ws_chosen_successor }
+                    save_scope_as = tca_ws_merged_row
+                    if = { limit = { var:tca_fs_state = 3 }
+                        # 继承人已履行原战承诺；合并后的唯一响应行不能保留另一条待援承诺的牵头资格。
+                        scope:tca_fs_row = { set_variable = { name = tca_fs_state value = 3 } set_variable = { name = tca_fd_eligible value = no } remove_variable = tca_fs_wait }
+                    }
+                    else_if = { limit = { var:tca_fs_state = 1 has_variable = tca_fs_accepted var:tca_fs_accepted ?= yes }
+                        scope:tca_fs_row = { add_to_variable_list = { name = tca_ws_wait_sources target = scope:tca_ws_merged_row } }
+                        every_in_list = { variable = tca_ws_wait_sources
+                            scope:tca_fs_row = { add_to_variable_list = { name = tca_ws_wait_sources target = prev } }
+                        }
+                    }
+                    if = { limit = { var:tca_fs_kind = 2 }
+                        scope:tca_fs_row = { set_variable = { name = tca_fs_kind value = 2 } set_variable = { name = tca_fs_depth value = scope:tca_ws_merged_row.var:tca_fs_depth } }
+                    }
+                    # 退出正式响应表但保留原定时器；父记录统一回收，不二次发信或加入。
+                    tca_ws_unindex_support_row_effect = yes
+                    set_variable = { name = tca_fs_state value = 4 }
+                    scope:tca_fs_record = {
+                        remove_list_variable = { name = tca_fs_rows target = scope:tca_ws_merged_row }
+                        add_to_variable_list = { name = tca_ws_merged_rows target = scope:tca_ws_merged_row }
+                    }
+                }
+                remove_list_variable = { name = tca_fs_people target = scope:tca_fs_row.var:tca_ws_previous_person }
+                remove_list_variable = { name = tca_fs_committed target = scope:tca_fs_row.var:tca_ws_previous_person }
+                if = { limit = { NOT = { is_target_in_variable_list = { name = tca_fs_people target = scope:tca_ws_chosen_successor } } }
+                    add_to_variable_list = { name = tca_fs_people target = scope:tca_ws_chosen_successor }
+                }
+                if = { limit = { NOT = { is_target_in_variable_list = { name = tca_fs_committed target = scope:tca_ws_chosen_successor } } }
+                    add_to_variable_list = { name = tca_fs_committed target = scope:tca_ws_chosen_successor }
+                }
+                if = { limit = { is_target_in_variable_list = { name = tca_fs_uppers target = scope:tca_fs_row.var:tca_ws_previous_person } }
+                    remove_list_variable = { name = tca_fs_uppers target = scope:tca_fs_row.var:tca_ws_previous_person }
+                    if = { limit = { NOT = { is_target_in_variable_list = { name = tca_fs_uppers target = scope:tca_ws_chosen_successor } } }
+                        add_to_variable_list = { name = tca_fs_uppers target = scope:tca_ws_chosen_successor }
+                    }
+                }
+            }
+            scope:tca_ws_chosen_successor = { tca_ws_index_support_row_effect = yes }
+            if = { limit = { var:tca_ws_died_participating ?= yes scope:tca_fs_record = { NOT = { has_variable = tca_fs_closed } } }
+                scope:tca_fs_record.var:tca_fs_war = {
+                    if = { limit = { NOT = { is_defender = scope:tca_ws_chosen_successor } } add_defender = scope:tca_ws_chosen_successor }
+                }
+                remove_variable = tca_ws_died_participating
+            }
+            else_if = { limit = { scope:tca_fs_record = { var:tca_fd_state ?= 1 var:tca_fd_pending ?= scope:tca_fs_row } }
+                save_scope_as = tca_fd_choice_row
+                scope:tca_fs_record.var:tca_fs_defender = { save_scope_as = tca_fd_sender }
+                scope:tca_ws_chosen_successor = { trigger_event = { id = tca_frontier_recovery.1 days = 1 } }
+            }
+        }
+        remove_variable = tca_ws_previous_person
+        clear_variable_list = tca_ws_successors
+    }
+}
+# 响应行作用域；输入其稳定头衔索引，输出移除索引但不结束story，供合并与统一清理复用。
+tca_ws_unindex_support_row_effect = {
+    save_scope_as = tca_ws_unindexed_row
+    every_in_list = { variable = tca_ws_support_titles remove_list_variable = { name = tca_ws_support_rows target = scope:tca_ws_unindexed_row } }
+    clear_variable_list = tca_ws_support_titles
+}

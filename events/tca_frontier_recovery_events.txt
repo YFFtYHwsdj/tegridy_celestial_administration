@@ -3,17 +3,17 @@ namespace = tca_frontier_recovery
 
 tca_frontier_recovery.1 = {
     type = letter_event
-    sender = scope:tca_fd_sender
+    sender = scope:tca_fs_record.var:tca_fs_defender
     opening = tca_frontier_recovery.opening
     desc = tca_frontier_recovery.1.desc
     trigger = {
         exists = scope:tca_fs_record
         exists = scope:tca_fd_choice_row
         scope:tca_fs_record = { var:tca_fd_state = 1 var:tca_fd_pending = scope:tca_fd_choice_row tca_fd_land_valid_trigger = yes }
-        scope:tca_fd_choice_row ?= { tca_fd_leader_valid_trigger = yes }
+        scope:tca_fd_choice_row ?= { var:tca_fs_person = root tca_fd_leader_valid_trigger = yes }
     }
     on_trigger_fail = {
-        scope:tca_fs_record ?= { if = { limit = { var:tca_fd_state = 1 var:tca_fd_pending = scope:tca_fd_choice_row } tca_fd_end_effect = { RESULT = 0 } } }
+        scope:tca_fs_record ?= { if = { limit = { var:tca_fd_state = 1 var:tca_fd_pending = scope:tca_fd_choice_row scope:tca_fd_choice_row ?= { var:tca_fs_person = root } } tca_fd_end_effect = { RESULT = 0 } } }
     }
     option = {
         name = tca_frontier_recovery.1.a
@@ -30,17 +30,17 @@ tca_frontier_recovery.1 = {
 }
 tca_frontier_recovery.2 = {
     type = letter_event
-    sender = scope:tca_fd_sender
+    sender = scope:tca_fs_record.var:tca_fd_leader
     opening = tca_frontier_recovery.opening
     desc = tca_frontier_recovery.2.desc
     trigger = {
         exists = scope:tca_fs_record
         exists = scope:tca_fd_invitation
         scope:tca_fs_record = { tca_fd_live_trigger = yes }
-        scope:tca_fd_invitation ?= { var:tca_fd_response = 0 }
-        tca_fd_person_valid_trigger = yes
+        scope:tca_fd_invitation ?= { var:tca_fd_response = 0 var:tca_fd_person = root }
+        tca_fd_person_valid_trigger = { RECORD = scope:tca_fs_record }
     }
-    on_trigger_fail = { scope:tca_fd_invitation ?= { if = { limit = { var:tca_fd_response = 0 } set_variable = { name = tca_fd_response value = 4 } } } }
+    on_trigger_fail = { scope:tca_fd_invitation ?= { if = { limit = { var:tca_fd_response = 0 var:tca_fd_person = root } set_variable = { name = tca_fd_response value = 4 } } } }
     option = {
         name = tca_frontier_recovery.2.a
         custom_tooltip = tca_frontier_recovery.2.a.tt

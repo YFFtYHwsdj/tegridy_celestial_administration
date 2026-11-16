@@ -1,0 +1,48 @@
+﻿# 原版通用战争回调的跨文件追加。普通游玩接入白名单；CLI测试仅在专用WORLD打开。
+# 有限战争的调试宣战门槛仍归它自己的互动和CB，本文件不授予宣战权限。
+on_war_white_peace = { on_actions = { tca_ws_white_peace } }
+on_war_invalidated = { on_actions = { tca_ws_invalidated } }
+on_title_gain_inheritance = { on_actions = { tca_ws_inherited_title } }
+on_join_war_as_secondary = { on_actions = { tca_ws_joined } }
+on_death = { on_actions = { tca_ws_participant_death } }
+tca_ws_participant_death = { effect = { tca_ws_participant_death_effect = yes } }
+# 原生自行加入立即停止重复待援，并保留曾参战状态，退出后也不能重新取得未兑现牵头资格。
+tca_ws_joined = {
+    trigger = { scope:war ?= { OR = {
+        AND = { exists = var:tca_fs_record is_defender = root }
+        AND = { exists = var:tca_fd_record is_attacker = root }
+    } } }
+    effect = {
+        save_scope_as = tca_ws_joiner
+        scope:war.var:tca_fs_record ?= { every_in_list = { variable = tca_fs_rows
+            limit = { var:tca_fs_person = scope:tca_ws_joiner }
+            set_variable = { name = tca_fs_state value = 3 }
+            remove_variable = tca_fs_wait
+        } }
+        # 收复也按真实加入立即锁定，不能等次日维护才发现；拒绝后原生自行加入同样已履约。
+        scope:war.var:tca_fd_record ?= { every_in_list = { variable = tca_fd_invites
+            limit = { var:tca_fd_person = scope:tca_ws_joiner }
+            set_variable = { name = tca_fd_response value = 3 }
+            remove_variable = tca_fd_wait
+        } }
+    }
+}
+tca_ws_inherited_title = {
+    trigger = { scope:title = { OR = { has_variable_list = tca_ws_support_rows has_variable_list = tca_ws_defender_records has_variable_list = tca_ws_leading_records has_variable_list = tca_ws_recovery_invites } } }
+    effect = { tca_ws_inherit_support_effect = yes tca_ws_inherit_recovery_effect = yes }
+}
+tca_ws_started = {
+    trigger = {
+        OR = {
+            tca_ws_automatic_response_allowed_trigger = yes
+            scope:attacker ?= { has_variable = tca_war_response_test_reporter }
+        }
+    }
+    effect = { scope:war = { tca_fs_start_effect = yes } }
+}
+# 胜方回调只将已经提前取得的快照与实际战果比较，不在战后补取旧归属。
+# 有限战争已由自己的结果effect冻结并关闭，幂等防护保留原记录。
+tca_ws_attacker_victory = { effect = { scope:war = { tca_ws_native_victory_effect = yes } } }
+tca_ws_defender_victory = { effect = { scope:war = { tca_fs_finish_effect = { RESULT = 3 } } } }
+tca_ws_white_peace = { effect = { scope:war = { tca_fs_finish_effect = { RESULT = 2 } } } }
+tca_ws_invalidated = { effect = { scope:war = { tca_fs_finish_effect = { RESULT = 4 } } } }

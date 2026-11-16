@@ -1,0 +1,189 @@
+﻿conquest_cb_title_transfer = {
+	save_scope_as = target_title # For the vassalization trigger.
+
+	# Compile a list of all counties in the kingdom we will take from the defender.
+	every_in_de_jure_hierarchy = {
+		continue = {
+			tier > tier_county
+		}
+		limit = {
+			tier = tier_county
+
+			# Current holder must be a (sub)vassal of the defender (no poaching titles from 3rd parties!)
+			holder ?= {
+				OR = {
+					this = scope:defender
+					target_is_liege_or_above = scope:defender
+				}
+			}
+		}
+		add_to_list = titles_taken
+	}
+
+	# If we can take the current holder of a title as a vassal instead of siezing their land directly, do so.
+	every_in_de_jure_hierarchy = {
+		limit = {
+			tier >= tier_county
+			trigger_if = {
+				limit = { $RELIGIOUS_WAR$ = yes }
+				religious_cb_holder_under_target_can_be_vassalized = yes
+			}
+			trigger_else = {
+				conquest_cb_holder_under_target_can_be_vassalized = yes
+			}
+		}
+
+		# Mark this vassal as being eligible to transfer from the defender to the attacker.
+		holder = {
+			if = {
+				limit = {
+					NOT = { is_in_list = potential_vassals}
+				}
+				add_to_list = potential_vassals
+			}
+		}
+	}
+	ordered_in_list = {
+		list = potential_vassals
+		order_by = highest_held_title_tier
+		max = 99
+		check_range_bounds = no
+
+		if = {
+			# If a liege has already been added to the vassalization list, skip us (we will remain our liege's vassal.)
+			limit = {
+				save_temporary_scope_as = this_vassal
+				any_in_list = {
+					list = vassals_taken
+					target_is_vassal_or_below = scope:this_vassal
+				}
+			}
+		}
+		else = {
+			# Flag this character to be vassalized instead of usurped.
+			add_to_list = vassals_taken
+
+			# Remove the counties this vassal holds from the seized title list (the vassal gets to keep their land when switching allegiance!)
+			every_sub_realm_county = {
+				remove_from_list = titles_taken
+			}
+		}
+	}
+}
+
+expansion_cb_title_transfer = {
+	save_scope_as = target_title # For the vassalization trigger.
+
+	# Compile a list of all counties in the target title we will take from the defender.
+	every_in_de_jure_hierarchy = {
+		continue = {
+			tier > tier_county
+		}
+		limit = {
+			tier = tier_county
+
+			# Current holder must be a (sub)vassal of the defender (no poaching titles from 3rd parties!)
+			holder ?= {
+				OR = {
+					this = scope:defender
+					target_is_liege_or_above = scope:defender
+				}
+			}
+		}
+		add_to_list = titles_taken
+	}
+
+	if = {
+		limit = {
+			save_temporary_scope_as = checked_title
+
+			tier >= scope:attacker.highest_held_title_tier
+			OR = {
+				AND = {
+					is_title_created = yes
+					holder = {
+						NOT = {
+							any_sub_realm_county = {
+								NOT = { target_is_de_jure_liege_or_above = scope:checked_title }
+							}
+						}
+					}
+				}
+				AND = {
+					is_title_created = no
+					any_de_jure_county = {
+						percent > 0.5
+						holder ?= {
+							OR = {
+								this = scope:defender
+								any_liege_or_above = { this = scope:defender }
+							}
+						}
+					}
+				}
+			}
+		}
+		add_to_list = target_title_taken
+	}
+
+	# If we can take the current holder of a title as a vassal instead of siezing their land directly, do so.
+	every_in_de_jure_hierarchy = {
+		limit = {
+			tier >= tier_county
+			conquest_cb_holder_under_target_can_be_vassalized = yes
+		}
+
+		# Mark this vassal as being eligible to transfer from the defender to the attacker.
+		holder = {
+			if = {
+				limit = {
+					NOT = { is_in_list = potential_vassals}
+				}
+				add_to_list = potential_vassals
+			}
+		}
+	}
+	ordered_in_list = {
+		list = potential_vassals
+		order_by = highest_held_title_tier
+		max = 99
+		check_range_bounds = no
+
+		if = {
+			# If a liege has already been added to the vassalization list, skip us (we will remain our liege's vassal.)
+			limit = {
+				save_temporary_scope_as = this_vassal
+				any_in_list = {
+					list = vassals_taken
+					target_is_vassal_or_below = scope:this_vassal
+				}
+			}
+		}
+		else = {
+			# Flag this character to be vassalized instead of usurped.
+			add_to_list = vassals_taken
+
+			# Remove the counties this vassal holds from the seized title list (the vassal gets to keep their land when switching allegiance!)
+			every_sub_realm_county = {
+				remove_from_list = titles_taken
+			}
+		}
+	}
+}
+
+conquest_cb_holder_under_target_can_be_vassalized = {
+	# If there is no holder they can't be vassalized!
+	holder ?= {
+		# We can only vassalize characters of a lower tier than us.
+		highest_held_title_tier < scope:attacker.highest_held_title_tier
+		# We can't vassalize Governors
+		NOT = { government_has_mechanic = administrative }
+		# Only (sub)vassals of the defender can be considered for transfer (no poaching vassals from 3rd parties without fighting them!)
+		target_is_liege_or_above = scope:defender
+		# *All* of a character's subrealm must be within the target area. If we're attacking for Jerusalem, we don't want to also be stealing parts of Egypt, Syria, etc.
+		any_sub_realm_county = {
+			count = all
+			target_is_de_jure_liege_or_above = scope:target_title
+		}
+	}
+}

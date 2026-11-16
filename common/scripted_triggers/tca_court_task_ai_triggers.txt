@@ -11,8 +11,11 @@ tca_court_task_has_beneficiary_holding_trigger = {
 # 雇主人物作用域；个人及头衔兵士均须有现员且由本人实际控制，借出与空兵团不计克制收益。
 # 原生regiment_controller返回控制者人物，不能以regiment_owner的财产权代替。
 tca_court_task_has_controlled_maa_trigger = {
+    # prev是原生全局链接，不能写prev.prev；先保存雇主供两层头衔军迭代明确比较。
+    save_temporary_scope_as = tca_court_task_checked_employer
     OR = {
-        any_maa_regiment = { maa_current_troops_count > 0 regiment_controller = prev }
-        any_controlled_title_maa_regiment = { maa_current_troops_count > 0 regiment_controller = prev }
+        any_maa_regiment = { maa_current_troops_count > 0 regiment_controller = scope:tca_court_task_checked_employer }
+        # 头衔兵士迭代器只接受头衔；仍排除控制权已经借出的军团。
+        any_held_title = { any_controlled_title_maa_regiment = { maa_current_troops_count > 0 regiment_controller = scope:tca_court_task_checked_employer } }
     }
 }

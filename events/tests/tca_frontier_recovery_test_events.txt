@@ -8,8 +8,9 @@ tca_frontier_recovery_test.1 = {
         remove_character_flag = tca_test_tca_frontier_recovery_test_case_failed
         tca_frontier_situation_start_effect = yes
         title:h_china.holder = { save_scope_as = actor tca_test_protect_character_effect = yes add_prestige = 10000 add_character_flag = tca_frontier_border_war_enabled }
+        # 自建失地者使用原生content阻止随机转为无地冒险者，使夹具稳定等待本次归还。
         create_character = { age = 35 gender = male random_traits = no culture = scope:actor.culture faith = scope:actor.faith location = root.capital_province save_scope_as = recipient }
-        scope:recipient = { tca_test_protect_character_effect = yes create_title_and_vassal_change = { type = granted save_scope_as = tca_frontier_recovery_test_grant } }
+        scope:recipient = { tca_test_protect_character_effect = yes add_trait = content create_title_and_vassal_change = { type = granted save_scope_as = tca_frontier_recovery_test_grant } }
         title:c_lingzhou = { change_title_holder = { holder = scope:recipient change = scope:tca_frontier_recovery_test_grant take_baronies = yes } }
         resolve_title_and_vassal_change = scope:tca_frontier_recovery_test_grant
         scope:recipient = {
@@ -26,20 +27,20 @@ tca_frontier_recovery_test.1 = {
             limit = { this != scope:tca_frontier_recovery_test_border this != title:c_huaiyuan title_province = { geographical_region = tca_frontier_region } }
             save_scope_as = tca_frontier_recovery_test_neighbor_county
         } }
-        create_character = { age = 40 gender = male random_traits = no culture = scope:actor.culture faith = scope:actor.faith location = root.capital_province save_scope_as = tca_frontier_recovery_test_upper }
+        create_character = { age = 40 gender = male dynasty = scope:actor.dynasty random_traits = no culture = scope:actor.culture faith = scope:actor.faith location = root.capital_province save_scope_as = tca_frontier_recovery_test_upper }
         scope:tca_frontier_recovery_test_upper = { tca_test_protect_character_effect = yes create_title_and_vassal_change = { type = granted save_scope_as = tca_frontier_recovery_test_grant } }
         title:c_hangzhou = { change_title_holder = { holder = scope:tca_frontier_recovery_test_upper change = scope:tca_frontier_recovery_test_grant } }
         title:k_xia = { change_title_holder = { holder = scope:tca_frontier_recovery_test_upper change = scope:tca_frontier_recovery_test_grant } }
         resolve_title_and_vassal_change = scope:tca_frontier_recovery_test_grant
         scope:tca_frontier_recovery_test_upper = { change_government = feudal_government }
-        create_character = { age = 40 gender = male random_traits = no culture = scope:actor.culture faith = scope:actor.faith location = root.capital_province save_scope_as = tca_frontier_recovery_test_king }
+        create_character = { age = 40 gender = male dynasty = scope:actor.dynasty random_traits = no culture = scope:actor.culture faith = scope:actor.faith location = root.capital_province save_scope_as = tca_frontier_recovery_test_king }
         scope:tca_frontier_recovery_test_king = { tca_test_protect_character_effect = yes create_title_and_vassal_change = { type = granted save_scope_as = tca_frontier_recovery_test_grant } }
         title:c_guangzhou = { change_title_holder = { holder = scope:tca_frontier_recovery_test_king change = scope:tca_frontier_recovery_test_grant } }
         title:e_tibet = { change_title_holder = { holder = scope:tca_frontier_recovery_test_king change = scope:tca_frontier_recovery_test_grant } }
         resolve_title_and_vassal_change = scope:tca_frontier_recovery_test_grant
         scope:tca_frontier_recovery_test_king = { change_government = feudal_government }
         create_character = { age = 40 gender = male random_traits = no culture = scope:actor.culture faith = scope:actor.faith location = root.capital_province save_scope_as = tca_frontier_recovery_test_threat }
-        scope:tca_frontier_recovery_test_threat = { tca_test_protect_character_effect = yes create_title_and_vassal_change = { type = granted save_scope_as = tca_frontier_recovery_test_grant } }
+        scope:tca_frontier_recovery_test_threat = { tca_test_protect_character_effect = yes add_trait = content create_title_and_vassal_change = { type = granted save_scope_as = tca_frontier_recovery_test_grant } }
         title:c_huaiyuan = { change_title_holder = { holder = scope:tca_frontier_recovery_test_threat change = scope:tca_frontier_recovery_test_grant } }
         resolve_title_and_vassal_change = scope:tca_frontier_recovery_test_grant
         scope:tca_frontier_recovery_test_threat = { change_government = feudal_government }
@@ -93,15 +94,14 @@ tca_frontier_recovery_test.3 = {
             debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_recovery 1"
         }
         else = { add_character_flag = tca_test_tca_frontier_recovery_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_recovery 1" }
-        if = { limit = { scope:tca_frontier_recovery_test_record = { tca_fd_goal_count_value = 2 var:tca_fd_state = 1 var:tca_fd_pending.var:tca_fs_person = scope:tca_frontier_recovery_test_king } } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_recovery 2" }
+        if = { limit = { scope:tca_frontier_recovery_test_record = { tca_fd_goal_count_value = 2 var:tca_fd_state = 1 var:tca_fd_pending.var:tca_fs_person = scope:tca_frontier_recovery_test_upper } } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_recovery 2" }
         else = { add_character_flag = tca_test_tca_frontier_recovery_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_recovery 2" }
-        # 封建上级拒绝不会约束封建下级；同一正式入口递级，旧书信次日自行失效。
-        scope:tca_frontier_recovery_test_record = {
-            save_scope_as = tca_fs_record
-            var:tca_fd_pending = { save_scope_as = tca_fd_choice_row }
-            tca_fd_refuse_effect = yes
-        }
-        if = { limit = { scope:tca_frontier_recovery_test_record = { var:tca_fd_state = 1 var:tca_fd_pending.var:tca_fs_person = scope:tca_frontier_recovery_test_upper } } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_recovery 3" }
+        # 最高上级已经真实加入旧战争，必须直接跳过；不能等待其拒绝才询问未到上级。
+        if = { limit = { scope:tca_frontier_recovery_test_record = {
+            var:tca_fd_state = 1 var:tca_fd_pending.var:tca_fs_person = scope:tca_frontier_recovery_test_upper
+            NOT = { any_in_list = { variable = tca_fs_rows var:tca_fs_person = scope:tca_frontier_recovery_test_king var:tca_fd_eligible ?= yes } }
+            any_in_list = { variable = tca_fs_rows var:tca_fs_person = scope:tca_frontier_recovery_test_upper var:tca_fd_eligible = yes }
+        } } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_recovery 3" }
         else = { add_character_flag = tca_test_tca_frontier_recovery_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_recovery 3" }
         # 参战者可能没有C候选行；继承的其他人物行不得带来上级身份加分。
         scope:tca_frontier_recovery_test_record = { every_in_list = { variable = tca_fs_rows
@@ -160,6 +160,16 @@ tca_frontier_recovery_test.6 = {
         scope:tca_frontier_recovery_test_record = { save_scope_as = tca_fs_record }
         if = { limit = { scope:tca_frontier_recovery_test_war ?= { is_attacker = scope:tca_frontier_recovery_test_king NOT = { is_attacker = scope:tca_frontier_recovery_test_neighbor } } scope:tca_frontier_recovery_test_record = { any_in_list = { variable = tca_fd_invites var:tca_fd_person = scope:tca_frontier_recovery_test_king var:tca_fd_response = 3 } } } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_recovery 7" }
         else = { add_character_flag = tca_test_tca_frontier_recovery_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_recovery 7" }
+        # 先保留上项拒绝且未参战的反例，再通过原生加入让同一人改变决定。
+        # 本tick尚未每日维护，邀请必须已经锁定为参战，防止同日退出／继承后重新等待。
+        scope:tca_frontier_recovery_test_war ?= { add_attacker = scope:tca_frontier_recovery_test_neighbor }
+        if = { limit = {
+            scope:tca_frontier_recovery_test_war ?= { is_attacker = scope:tca_frontier_recovery_test_neighbor }
+            scope:tca_frontier_recovery_test_record = { any_in_list = { variable = tca_fd_invites
+                var:tca_fd_person = scope:tca_frontier_recovery_test_neighbor var:tca_fd_response = 3 NOT = { has_variable = tca_fd_wait }
+            } }
+        } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_recovery 25" }
+        else = { add_character_flag = tca_test_tca_frontier_recovery_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_recovery 25" }
         scope:tca_frontier_recovery_test_war ?= { end_war = attacker }
         if = { limit = { title:c_lingzhou = { holder = scope:tca_frontier_recovery_test_defender } title:c_huaiyuan = { holder = scope:tca_frontier_recovery_test_threat } scope:tca_frontier_recovery_test_border = { holder = scope:actor } } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_recovery 8" }
         else = { add_character_flag = tca_test_tca_frontier_recovery_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_recovery 8" }
@@ -183,8 +193,12 @@ tca_frontier_recovery_test.6 = {
             set_variable = { name = tca_fs_defender value = scope:tca_frontier_recovery_test_threat }
             set_variable = { name = tca_fs_attacker value = scope:actor }
             set_variable = { name = tca_fs_closed value = 1 }
+            set_variable = { name = tca_ws_schema value = 2 }
             set_variable = { name = tca_fs_retention value = yes days = 30 }
             set_variable = { name = tca_fd_country value = title:e_tibet }
+            set_variable = { name = tca_fd_attacker_country value = scope:actor.top_liege.primary_title }
+            set_variable = { name = tca_fd_enemy value = scope:actor }
+            set_variable = { name = tca_fd_enemy_title value = scope:actor.primary_title }
             set_variable = { name = tca_fd_state value = 0 }
             set_variable = { name = tca_fd_active value = yes }
         }
@@ -195,6 +209,7 @@ tca_frontier_recovery_test.6 = {
             set_variable = { name = tca_fs_kind value = 2 }
             set_variable = { name = tca_fs_depth value = 3 }
             set_variable = { name = tca_fs_accepted value = yes }
+            set_variable = { name = tca_fd_eligible value = yes }
         }
         scope:tca_fs_record = { add_to_variable_list = { name = tca_fs_rows target = scope:tca_frontier_recovery_test_veto_row } }
         scope:tca_frontier_recovery_test_defender = { create_story = { type = tca_frontier_support_row save_scope_as = tca_frontier_recovery_test_veto_row } }
@@ -204,6 +219,7 @@ tca_frontier_recovery_test.6 = {
             set_variable = { name = tca_fs_kind value = 2 }
             set_variable = { name = tca_fs_depth value = 2 }
             set_variable = { name = tca_fs_accepted value = yes }
+            set_variable = { name = tca_fd_eligible value = yes }
         }
         scope:tca_fs_record = { add_to_variable_list = { name = tca_fs_rows target = scope:tca_frontier_recovery_test_veto_row } }
         scope:tca_frontier_recovery_test_defender = { create_story = { type = tca_frontier_support_row save_scope_as = tca_frontier_recovery_test_veto_row } }
@@ -213,6 +229,7 @@ tca_frontier_recovery_test.6 = {
             set_variable = { name = tca_fs_kind value = 2 }
             set_variable = { name = tca_fs_depth value = 1 }
             set_variable = { name = tca_fs_accepted value = yes }
+            set_variable = { name = tca_fd_eligible value = yes }
         }
         scope:tca_fs_record = { add_to_variable_list = { name = tca_fs_rows target = scope:tca_frontier_recovery_test_veto_row } }
         scope:tca_fs_record = {
@@ -289,7 +306,15 @@ tca_frontier_recovery_test.7 = {
             tca_fd_accept_effect = yes
         }
         if = { limit = { scope:tca_frontier_recovery_test_cancel_record ?= { tca_fd_live_trigger = yes tca_fd_goal_count_value = 1 } exists = scope:tca_frontier_recovery_test_cancel_record } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_recovery 14" }
-        else = { add_character_flag = tca_test_tca_frontier_recovery_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_recovery 14" }
+        else = { add_character_flag = tca_test_tca_frontier_recovery_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_recovery 14"
+            if = { limit = { exists = scope:tca_frontier_border_war } debug_log = "TCA_D_CANCEL WAR_SCOPE_EXISTS" }
+            scope:tca_frontier_recovery_test_cancel_record ?= {
+                if = { limit = { var:tca_fs_closed = 1 } debug_log = "TCA_D_CANCEL ORIGINAL_WON" }
+                if = { limit = { var:tca_fd_state ?= 4 } debug_log = "TCA_D_CANCEL ENDED" }
+                if = { limit = { tca_fd_land_valid_trigger = yes } debug_log = "TCA_D_CANCEL LAND_VALID" }
+                debug_log_scopes = yes
+            }
+        }
         # 原生on_war_started在下一tick派发，不能同tick销毁刚建立的war。
         trigger_event = { id = tca_frontier_recovery_test.8 days = 2 }
     }
@@ -310,6 +335,7 @@ tca_frontier_recovery_test.8 = {
             set_variable = { name = tca_fs_defender value = scope:tca_frontier_recovery_test_defender }
             set_variable = { name = tca_fs_attacker value = scope:actor }
             set_variable = { name = tca_fs_closed value = 1 }
+            set_variable = { name = tca_ws_schema value = 2 }
             set_variable = { name = tca_fs_retention value = yes days = 30 }
         }
         title:c_huaiyuan = { tca_fd_capture_county_effect = yes }
@@ -361,6 +387,7 @@ tca_frontier_recovery_test.9 = {
             set_variable = { name = tca_fs_defender value = scope:tca_frontier_recovery_test_neighbor }
             set_variable = { name = tca_fs_attacker value = scope:tca_frontier_recovery_test_switch_actor }
             set_variable = { name = tca_fs_closed value = 1 }
+            set_variable = { name = tca_ws_schema value = 2 }
             set_variable = { name = tca_fs_retention value = yes days = 30 }
             title:c_lingzhou = { tca_fd_capture_county_effect = yes }
             scope:tca_frontier_recovery_test_neighbor = { create_story = { type = tca_frontier_support_row save_scope_as = tca_fs_row } }
@@ -370,6 +397,7 @@ tca_frontier_recovery_test.9 = {
                 set_variable = { name = tca_fs_kind value = 2 }
                 set_variable = { name = tca_fs_depth value = 2 }
                 set_variable = { name = tca_fs_accepted value = yes }
+            set_variable = { name = tca_fd_eligible value = yes }
             }
             add_to_variable_list = { name = tca_fs_rows target = scope:tca_fs_row }
         }

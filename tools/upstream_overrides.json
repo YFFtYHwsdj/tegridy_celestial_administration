@@ -568,6 +568,20 @@
       "mod": "common/situation/situations/zz_tca_dynastic_cycle.txt",
       "baseline": "tools/baselines/tca_dynastic_cycle.txt",
       "reason": "原版未定立场组在领袖引用成立但成员变量尚未设置时直接读取movement_member，官署真实法理绑定引发参与者重算即报错。is_character_valid内联于Situation对象，无独立trigger或可合并子回调入口，故必要覆盖单个dynastic_cycle对象而非原版同路径整文件；仅对该读取加存在性条件及可选链接，缺失时仍不入组，其余逻辑保留原版。与修改同名局势的模组须合并；游戏更新必须审阅完整对象基线。"
+    },
+    {
+      "key": "show_pow_release_message_effect",
+      "vanilla": "common/scripted_effects/00_war_effects.txt",
+      "mod": "common/scripted_effects/zz_tca_war_response_pow.txt",
+      "baseline": "tools/baselines/tca_war_response_pow.txt",
+      "reason": "实测通用胜方回调在领土结算之后；原生改隶回调只有old_liege且无战争或转移原因，不能精确区分同日主动改隶与战果。白名单16个CB的on_victory第一步共用本效果，因此必要覆盖这一个小型共享效果，在原版主体之前保存本模组已登记战争的归属快照；主体逻辑原样保留，不覆盖CB或整文件。与同样覆盖本效果的模组须合并；16个调用端另登记依赖基线以审阅版本变化。"
+    },
+    {
+      "key": "the_christian_church",
+      "vanilla": "common/situation/situations/pam_christian_situation.txt",
+      "mod": "common/situation/situations/zz_tca_church_domicile.txt",
+      "baseline": "tools/baselines/tca_church_domicile.txt",
+      "reason": "原生住所候选扫描把历史空缺教区住所的无效owner送入TypedTrigger，在is_character_valid执行前报错，块内保护无效。auto_add_landless_rulers按子区域全部组汇总，必须关闭六组该入口；保留全部原资格和区域条件，用安全住所迭代及原manual候选接口等范围补入有效owner，不删除历史住所。该候选开关与启动/月维护内联于局势，无独立可追加定义，必要覆盖单个Church对象；头衔、政体、移动回调均另用跨文件追加。桥仅管理自己新增的manual候选并保留原版教职来源，通常次日同步、月维护补漏，不保证逐帧等时。与同名局势或未知手动候选来源修改需合并；更新需审阅整个对象及局部常量基线。"
     }
   ],
   "known_extensions": [
@@ -1037,6 +1051,90 @@
       "vanilla": "common/on_action/title_on_actions.txt",
       "mod": "common/on_action/tca_frontier_on_actions.txt",
       "reason": "北疆自然生命周期仅追加独立二级回调；开局延后初始化、休止期间年度补漏和相关头衔变化次日合并，不覆盖原版effect或文件。CLI默认在加载前关闭，仅专用独立WORLD启用。"
+    },
+    {
+      "key": "on_war_white_peace",
+      "vanilla": "common/on_action/war_on_actions.txt",
+      "mod": "common/on_action/tca_war_response_on_actions.txt",
+      "reason": "通过独立二级子回调关闭本模组白名单战争的响应记录；不改写原版战果、effect或整文件。"
+    },
+    {
+      "key": "on_war_invalidated",
+      "vanilla": "common/on_action/war_on_actions.txt",
+      "mod": "common/on_action/tca_war_response_on_actions.txt",
+      "reason": "通过独立二级子回调关闭本模组白名单战争的响应记录；不改写原版战果、effect或整文件。"
+    },
+    {
+      "key": "on_title_gain_inheritance",
+      "vanilla": "common/on_action/title_on_actions.txt",
+      "mod": "common/on_action/tca_war_response_on_actions.txt",
+      "reason": "通过独立二级回调按稳定头衔索引将已接受的支援行转给实际继承者，不重置原限时变量，不改写原版继承。"
+    },
+    {
+      "key": "on_join_war_as_secondary",
+      "vanilla": "common/on_action/war_on_actions.txt",
+      "mod": "common/on_action/tca_war_response_on_actions.txt",
+      "reason": "用独立子回调停止原生自行参战者的重复待援，保留曾参战状态，不干预原版参战或退战。"
+    },
+    {
+      "key": "on_government_change",
+      "vanilla": "common/on_action/government_on_actions.txt",
+      "mod": "common/on_action/tca_war_response_test_on_actions.txt",
+      "reason": "仅对独立接口用例显式标记人物记录原生旧政体上下文，不修改正式政体、快照或原版效果。"
+    },
+    {
+      "key": "on_death",
+      "vanilla": "common/on_action/death.txt",
+      "mod": "common/on_action/tca_war_response_on_actions.txt",
+      "reason": "原生死亡前只在本模组已登记战争内记录实际仍参战的履约者，继承后保留参战状态；不改变原版死亡或继承。"
+    },
+    {
+      "key": "on_game_start_after_lobby",
+      "vanilla": "common/on_action/game_start.txt",
+      "mod": "common/on_action/tca_church_domicile_on_actions.txt",
+      "reason": "仅追加二级回调，合并排队基督教局势有效住所候选同步；不覆盖父effect、不修改住所或原生手动候选。"
+    },
+    {
+      "key": "on_title_gain",
+      "vanilla": "common/on_action/title_on_actions.txt",
+      "mod": "common/on_action/tca_church_domicile_on_actions.txt",
+      "reason": "仅追加二级回调，合并排队基督教局势有效住所候选同步；不覆盖父effect、不修改住所或原生手动候选。"
+    },
+    {
+      "key": "on_title_lost",
+      "vanilla": "common/on_action/title_on_actions.txt",
+      "mod": "common/on_action/tca_church_domicile_on_actions.txt",
+      "reason": "仅追加二级回调，合并排队基督教局势有效住所候选同步；不覆盖父effect、不修改住所或原生手动候选。"
+    },
+    {
+      "key": "on_title_destroyed",
+      "vanilla": "common/on_action/title_on_actions.txt",
+      "mod": "common/on_action/tca_church_domicile_on_actions.txt",
+      "reason": "仅追加二级回调，合并排队基督教局势有效住所候选同步；不覆盖父effect、不修改住所或原生手动候选。"
+    },
+    {
+      "key": "on_government_change",
+      "vanilla": "common/on_action/government_on_actions.txt",
+      "mod": "common/on_action/tca_church_domicile_on_actions.txt",
+      "reason": "仅追加二级回调，合并排队基督教局势有效住所候选同步；不覆盖父effect、不修改住所或原生手动候选。"
+    },
+    {
+      "key": "on_domicile_moved",
+      "vanilla": "common/on_action/domicile_on_actions.txt",
+      "mod": "common/on_action/tca_church_domicile_on_actions.txt",
+      "reason": "仅追加二级回调，合并排队基督教局势有效住所候选同步；不覆盖父effect、不修改住所或原生手动候选。"
+    },
+    {
+      "key": "on_county_faith_change",
+      "vanilla": "common/on_action/county_on_actions.txt",
+      "mod": "common/on_action/tca_church_domicile_on_actions.txt",
+      "reason": "原生县信仰／封臣变化后只合并排队有效住所候选同步，减少动态core及辖区变化的等待；追加二级回调，不覆盖父effect。"
+    },
+    {
+      "key": "on_vassal_change",
+      "vanilla": "common/on_action/title_on_actions.txt",
+      "mod": "common/on_action/tca_church_domicile_on_actions.txt",
+      "reason": "原生县信仰／封臣变化后只合并排队有效住所候选同步，减少动态core及辖区变化的等待；追加二级回调，不覆盖父effect。"
     }
   ],
   "localization_overrides": [
@@ -1738,6 +1836,206 @@
       "mod": "common/situation/situations/zz_tca_dynastic_cycle.txt",
       "baseline": "tools/baselines/tca_dynastic_cycle.txt",
       "reason": "dynastic_cycle必要单对象兼容覆盖所引用的原版文件局部常量；局部变量不参与全局对象覆盖查漏，故另行登记原值漂移检查，防止只比较对象正文漏掉数值变化。"
+    },
+    {
+      "key": "expansion_cb",
+      "mod_key": "tca_ws_prepare_resolution_effect",
+      "vanilla": "common/casus_belli_types/07_ep3_admin_cbs.txt",
+      "mod": "common/scripted_effects/tca_war_response_resolution_effects.txt",
+      "baseline": "tools/baselines/tca_war_response_cbs.txt",
+      "reason": "审阅此CB目标与战果分支，并核实on_victory第一步调用共同show_pow_release_message_effect，作为结算前快照唯一接点；不覆盖CB定义，原版更新须复核调用顺序和战果范围。"
+    },
+    {
+      "key": "duchy_expansion_cb",
+      "mod_key": "tca_ws_prepare_resolution_effect",
+      "vanilla": "common/casus_belli_types/07_ep3_admin_cbs.txt",
+      "mod": "common/scripted_effects/tca_war_response_resolution_effects.txt",
+      "baseline": "tools/baselines/tca_war_response_cbs.txt",
+      "reason": "审阅此CB目标与战果分支，并核实on_victory第一步调用共同show_pow_release_message_effect，作为结算前快照唯一接点；不覆盖CB定义，原版更新须复核调用顺序和战果范围。"
+    },
+    {
+      "key": "naval_expansion_cb",
+      "mod_key": "tca_ws_prepare_resolution_effect",
+      "vanilla": "common/casus_belli_types/07_ep3_admin_cbs.txt",
+      "mod": "common/scripted_effects/tca_war_response_resolution_effects.txt",
+      "baseline": "tools/baselines/tca_war_response_cbs.txt",
+      "reason": "审阅此CB目标与战果分支，并核实on_victory第一步调用共同show_pow_release_message_effect，作为结算前快照唯一接点；不覆盖CB定义，原版更新须复核调用顺序和战果范围。"
+    },
+    {
+      "key": "naval_duchy_expansion_cb",
+      "mod_key": "tca_ws_prepare_resolution_effect",
+      "vanilla": "common/casus_belli_types/07_ep3_admin_cbs.txt",
+      "mod": "common/scripted_effects/tca_war_response_resolution_effects.txt",
+      "baseline": "tools/baselines/tca_war_response_cbs.txt",
+      "reason": "审阅此CB目标与战果分支，并核实on_victory第一步调用共同show_pow_release_message_effect，作为结算前快照唯一接点；不覆盖CB定义，原版更新须复核调用顺序和战果范围。"
+    },
+    {
+      "key": "china_seize_county_cb",
+      "mod_key": "tca_ws_prepare_resolution_effect",
+      "vanilla": "common/casus_belli_types/10_tgp_china_wars.txt",
+      "mod": "common/scripted_effects/tca_war_response_resolution_effects.txt",
+      "baseline": "tools/baselines/tca_war_response_cbs.txt",
+      "reason": "审阅此CB目标与战果分支，并核实on_victory第一步调用共同show_pow_release_message_effect，作为结算前快照唯一接点；不覆盖CB定义，原版更新须复核调用顺序和战果范围。"
+    },
+    {
+      "key": "china_hegemon_seize_county_cb",
+      "mod_key": "tca_ws_prepare_resolution_effect",
+      "vanilla": "common/casus_belli_types/10_tgp_china_wars.txt",
+      "mod": "common/scripted_effects/tca_war_response_resolution_effects.txt",
+      "baseline": "tools/baselines/tca_war_response_cbs.txt",
+      "reason": "审阅此CB目标与战果分支，并核实on_victory第一步调用共同show_pow_release_message_effect，作为结算前快照唯一接点；不覆盖CB定义，原版更新须复核调用顺序和战果范围。"
+    },
+    {
+      "key": "china_seize_duchy_cb",
+      "mod_key": "tca_ws_prepare_resolution_effect",
+      "vanilla": "common/casus_belli_types/10_tgp_china_wars.txt",
+      "mod": "common/scripted_effects/tca_war_response_resolution_effects.txt",
+      "baseline": "tools/baselines/tca_war_response_cbs.txt",
+      "reason": "审阅此CB目标与战果分支，并核实on_victory第一步调用共同show_pow_release_message_effect，作为结算前快照唯一接点；不覆盖CB定义，原版更新须复核调用顺序和战果范围。"
+    },
+    {
+      "key": "china_hegemon_seize_duchy_cb",
+      "mod_key": "tca_ws_prepare_resolution_effect",
+      "vanilla": "common/casus_belli_types/10_tgp_china_wars.txt",
+      "mod": "common/scripted_effects/tca_war_response_resolution_effects.txt",
+      "baseline": "tools/baselines/tca_war_response_cbs.txt",
+      "reason": "审阅此CB目标与战果分支，并核实on_victory第一步调用共同show_pow_release_message_effect，作为结算前快照唯一接点；不覆盖CB定义，原版更新须复核调用顺序和战果范围。"
+    },
+    {
+      "key": "individual_county_de_jure_cb",
+      "mod_key": "tca_ws_prepare_resolution_effect",
+      "vanilla": "common/casus_belli_types/00_dejure_war.txt",
+      "mod": "common/scripted_effects/tca_war_response_resolution_effects.txt",
+      "baseline": "tools/baselines/tca_war_response_cbs.txt",
+      "reason": "审阅此CB目标与战果分支，并核实on_victory第一步调用共同show_pow_release_message_effect，作为结算前快照唯一接点；不覆盖CB定义，原版更新须复核调用顺序和战果范围。"
+    },
+    {
+      "key": "individual_duchy_de_jure_cb",
+      "mod_key": "tca_ws_prepare_resolution_effect",
+      "vanilla": "common/casus_belli_types/00_dejure_war.txt",
+      "mod": "common/scripted_effects/tca_war_response_resolution_effects.txt",
+      "baseline": "tools/baselines/tca_war_response_cbs.txt",
+      "reason": "审阅此CB目标与战果分支，并核实on_victory第一步调用共同show_pow_release_message_effect，作为结算前快照唯一接点；不覆盖CB定义，原版更新须复核调用顺序和战果范围。"
+    },
+    {
+      "key": "de_jure_cb",
+      "mod_key": "tca_ws_prepare_resolution_effect",
+      "vanilla": "common/casus_belli_types/00_dejure_war.txt",
+      "mod": "common/scripted_effects/tca_war_response_resolution_effects.txt",
+      "baseline": "tools/baselines/tca_war_response_cbs.txt",
+      "reason": "审阅此CB目标与战果分支，并核实on_victory第一步调用共同show_pow_release_message_effect，作为结算前快照唯一接点；不覆盖CB定义，原版更新须复核调用顺序和战果范围。"
+    },
+    {
+      "key": "county_conquest_cb",
+      "mod_key": "tca_ws_prepare_resolution_effect",
+      "vanilla": "common/casus_belli_types/00_conquest.txt",
+      "mod": "common/scripted_effects/tca_war_response_resolution_effects.txt",
+      "baseline": "tools/baselines/tca_war_response_cbs.txt",
+      "reason": "审阅此CB目标与战果分支，并核实on_victory第一步调用共同show_pow_release_message_effect，作为结算前快照唯一接点；不覆盖CB定义，原版更新须复核调用顺序和战果范围。"
+    },
+    {
+      "key": "duchy_conquest_cb",
+      "mod_key": "tca_ws_prepare_resolution_effect",
+      "vanilla": "common/casus_belli_types/00_conquest.txt",
+      "mod": "common/scripted_effects/tca_war_response_resolution_effects.txt",
+      "baseline": "tools/baselines/tca_war_response_cbs.txt",
+      "reason": "审阅此CB目标与战果分支，并核实on_victory第一步调用共同show_pow_release_message_effect，作为结算前快照唯一接点；不覆盖CB定义，原版更新须复核调用顺序和战果范围。"
+    },
+    {
+      "key": "ducal_conquest_cb",
+      "mod_key": "tca_ws_prepare_resolution_effect",
+      "vanilla": "common/casus_belli_types/00_conquest.txt",
+      "mod": "common/scripted_effects/tca_war_response_resolution_effects.txt",
+      "baseline": "tools/baselines/tca_war_response_cbs.txt",
+      "reason": "审阅此CB目标与战果分支，并核实on_victory第一步调用共同show_pow_release_message_effect，作为结算前快照唯一接点；不覆盖CB定义，原版更新须复核调用顺序和战果范围。"
+    },
+    {
+      "key": "nomadic_conquest_cb",
+      "mod_key": "tca_ws_prepare_resolution_effect",
+      "vanilla": "common/casus_belli_types/00_nomadic_conquest.txt",
+      "mod": "common/scripted_effects/tca_war_response_resolution_effects.txt",
+      "baseline": "tools/baselines/tca_war_response_cbs.txt",
+      "reason": "审阅此CB目标与战果分支，并核实on_victory第一步调用共同show_pow_release_message_effect，作为结算前快照唯一接点；不覆盖CB定义，原版更新须复核调用顺序和战果范围。"
+    },
+    {
+      "key": "nomadic_conquest_duchy_cb",
+      "mod_key": "tca_ws_prepare_resolution_effect",
+      "vanilla": "common/casus_belli_types/00_nomadic_conquest.txt",
+      "mod": "common/scripted_effects/tca_war_response_resolution_effects.txt",
+      "baseline": "tools/baselines/tca_war_response_cbs.txt",
+      "reason": "审阅此CB目标与战果分支，并核实on_victory第一步调用共同show_pow_release_message_effect，作为结算前快照唯一接点；不覆盖CB定义，原版更新须复核调用顺序和战果范围。"
+    },
+    {
+      "key": "conquest_cb_title_transfer",
+      "mod_key": "tca_ws_collect_goals_effect",
+      "vanilla": "common/scripted_effects/00_war_effects.txt",
+      "mod": "common/scripted_effects/tca_war_response_effects.txt",
+      "baseline": "tools/baselines/tca_war_response_transfer.txt",
+      "reason": "通用目标适配依据：普通／游牧公国征服和行政扩张只可带走全领地位于目标内的可转属封臣；上游改变遍历或转属资格时须重新审阅县集合，不覆盖这些原版对象。"
+    },
+    {
+      "key": "expansion_cb_title_transfer",
+      "mod_key": "tca_ws_collect_goals_effect",
+      "vanilla": "common/scripted_effects/00_war_effects.txt",
+      "mod": "common/scripted_effects/tca_war_response_effects.txt",
+      "baseline": "tools/baselines/tca_war_response_transfer.txt",
+      "reason": "通用目标适配依据：普通／游牧公国征服和行政扩张只可带走全领地位于目标内的可转属封臣；上游改变遍历或转属资格时须重新审阅县集合，不覆盖这些原版对象。"
+    },
+    {
+      "key": "conquest_cb_holder_under_target_can_be_vassalized",
+      "mod_key": "tca_ws_collect_goals_effect",
+      "vanilla": "common/scripted_triggers/00_war_and_peace_triggers.txt",
+      "mod": "common/scripted_effects/tca_war_response_effects.txt",
+      "baseline": "tools/baselines/tca_war_response_transfer.txt",
+      "reason": "通用目标适配依据：普通／游牧公国征服和行政扩张只可带走全领地位于目标内的可转属封臣；上游改变遍历或转属资格时须重新审阅县集合，不覆盖这些原版对象。"
+    },
+    {
+      "key": "@saeculum_obscurum_points",
+      "vanilla": "common/situation/situations/pam_christian_situation.txt",
+      "mod": "common/situation/situations/zz_tca_church_domicile.txt",
+      "baseline": "tools/baselines/tca_church_domicile.txt",
+      "reason": "Church单对象兼容覆盖所引用的原版局部常量；单独监测原值漂移，不能仅比较对象正文。",
+      "mod_key": "@saeculum_obscurum_points"
+    },
+    {
+      "key": "@conversion_phase_points",
+      "vanilla": "common/situation/situations/pam_christian_situation.txt",
+      "mod": "common/situation/situations/zz_tca_church_domicile.txt",
+      "baseline": "tools/baselines/tca_church_domicile.txt",
+      "reason": "Church单对象兼容覆盖所引用的原版局部常量；单独监测原值漂移，不能仅比较对象正文。",
+      "mod_key": "@conversion_phase_points"
+    },
+    {
+      "key": "@reform_phase_points",
+      "vanilla": "common/situation/situations/pam_christian_situation.txt",
+      "mod": "common/situation/situations/zz_tca_church_domicile.txt",
+      "baseline": "tools/baselines/tca_church_domicile.txt",
+      "reason": "Church单对象兼容覆盖所引用的原版局部常量；单独监测原值漂移，不能仅比较对象正文。",
+      "mod_key": "@reform_phase_points"
+    },
+    {
+      "key": "@investiture_crisis_points",
+      "vanilla": "common/situation/situations/pam_christian_situation.txt",
+      "mod": "common/situation/situations/zz_tca_church_domicile.txt",
+      "baseline": "tools/baselines/tca_church_domicile.txt",
+      "reason": "Church单对象兼容覆盖所引用的原版局部常量；单独监测原值漂移，不能仅比较对象正文。",
+      "mod_key": "@investiture_crisis_points"
+    },
+    {
+      "key": "@crusade_phase_points",
+      "vanilla": "common/situation/situations/pam_christian_situation.txt",
+      "mod": "common/situation/situations/zz_tca_church_domicile.txt",
+      "baseline": "tools/baselines/tca_church_domicile.txt",
+      "reason": "Church单对象兼容覆盖所引用的原版局部常量；单独监测原值漂移，不能仅比较对象正文。",
+      "mod_key": "@crusade_phase_points"
+    },
+    {
+      "key": "@investiture_council_outcome_points",
+      "vanilla": "common/situation/situations/pam_christian_situation.txt",
+      "mod": "common/situation/situations/zz_tca_church_domicile.txt",
+      "baseline": "tools/baselines/tca_church_domicile.txt",
+      "reason": "Church单对象兼容覆盖所引用的原版局部常量；单独监测原值漂移，不能仅比较对象正文。",
+      "mod_key": "@investiture_council_outcome_points"
     }
   ]
 }

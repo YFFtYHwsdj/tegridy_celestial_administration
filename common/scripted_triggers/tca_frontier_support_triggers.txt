@@ -1,6 +1,8 @@
-﻿# C阶段独立入口；战争作用域，只识别B阶段四类CB，不接入原版战争或旧P0。
+﻿# 共享响应入口；战争作用域，开战时排除同国，保留四类有限战争并接具体原版白名单。
 tca_fs_war_trigger = {
+    primary_attacker.top_liege != primary_defender.top_liege
     OR = {
+        tca_ws_native_cb_trigger = yes
         using_cb = tca_frontier_county_raid_cb
         using_cb = tca_frontier_duchy_raid_cb
         using_cb = tca_frontier_county_conquest_cb
@@ -12,6 +14,11 @@ tca_fs_war_trigger = {
 tca_fs_live_trigger = {
     NOT = { has_variable = tca_fs_closed }
     exists = var:tca_fs_war
+    var:tca_ws_country.holder ?= { is_independent_ruler = yes primary_title = scope:tca_fs_record.var:tca_ws_country }
+    var:tca_ws_attacker_country.holder ?= { is_independent_ruler = yes primary_title = scope:tca_fs_record.var:tca_ws_attacker_country }
+    var:tca_fs_defender.top_liege = var:tca_ws_country.holder
+    var:tca_fs_attacker.top_liege = var:tca_ws_attacker_country.holder
+    var:tca_ws_country.holder != var:tca_ws_attacker_country.holder
     var:tca_fs_attacker ?= {
         is_alive = yes
         any_character_war = {
@@ -63,22 +70,15 @@ tca_fs_row_valid_trigger = {
             limit = { scope:tca_fs_row = { var:tca_fs_kind = 1 } }
             OR = {
                 scope:tca_fs_record = { any_in_list = { variable = tca_fs_goals holder ?= { OR = { this = scope:tca_fs_checked_person is_vassal_or_below_of = scope:tca_fs_checked_person } } } }
-                AND = {
-                    tca_is_celestial_governor_trigger = yes
-                    tca_frontier_has_anchor_trigger = yes
-                    scope:tca_fs_record = { is_target_in_variable_list = { name = tca_fs_goals target = scope:tca_frontier_anchor } }
-                }
+                tca_ws_office_in_counties_trigger = { COUNTIES = tca_fs_goals }
             }
         }
         trigger_else = {
             OR = {
                 tca_fs_neighbor_trigger = yes
                 AND = {
-                    tca_is_celestial_governor_trigger = yes
                     NOT = { is_liege_or_above_of = scope:tca_fs_record.var:tca_fs_defender }
-                    save_temporary_scope_as = tca_frontier_candidate
-                    tca_frontier_has_anchor_trigger = yes
-                    scope:tca_fs_record = { is_target_in_variable_list = { name = tca_fs_neighbors target = scope:tca_frontier_anchor } }
+                    tca_ws_office_in_counties_trigger = { COUNTIES = tca_fs_neighbors }
                 }
             }
         }
