@@ -1,0 +1,177 @@
+﻿# 世族家主与普通候选共池竞争、转属留属及邀请事务；复用军事GROUP借还夹具。
+namespace = tca_court_family_test
+
+tca_court_family_test.1 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_court_family_test.1 tca_test_court_family_flow"
+        remove_character_flag = tca_test_tca_court_family_test_case_failed
+        tca_test_military_council_prepare_effect = { MILITARY_ONLY = no }
+        if = { limit = { scope:tca_mcp_borrow_ready = 1 }
+            scope:tca_mcp_governor = { vassal_contract_set_obligation_level = { type = celestial_provinces level = celestial_province_standard } save_scope_as = target_liege }
+            scope:tca_mcp_officer = {
+                remove_trait = education_martial_3 add_trait = education_stewardship_3
+                create_dynasty = { spread_to_descendants = yes }
+                give_noble_family_title = { name = noble_family_name tier = county article = DEFAULT_TITLE_NAME_ARTICLE government = celestial_government save_scope_as = tca_court_family_test_title }
+                create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_court_family_test_change }
+                change_liege = { liege = root change = scope:tca_court_family_test_change }
+                resolve_title_and_vassal_change = scope:tca_court_family_test_change
+            }
+            scope:tca_mcp_backup = { remove_trait = education_martial_3 add_trait = education_stewardship_3 set_merit_level = 1 }
+            if = { limit = { scope:tca_mcp_officer = { tca_court_person_eligible_trigger = yes tca_court_current_importance = 0 liege = root } } debug_log = "TCA_TEST CHECK_PASS tca_test_court_family_flow 1" }
+            else = { add_character_flag = tca_test_tca_court_family_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_family_flow 1" }
+            scope:tca_mcp_officer = { set_merit_level = 0 }
+            if = { limit = { scope:tca_mcp_officer = { tca_court_person_eligible_trigger = no } } debug_log = "TCA_TEST CHECK_PASS tca_test_court_family_flow 2" }
+            else = { add_character_flag = tca_test_tca_court_family_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_family_flow 2" }
+            scope:tca_mcp_officer = { set_merit_level = 1 }
+            # 目标等级检查只读取真实县主，不改其头衔、宫廷或人物状态。
+            random_vassal_or_below = { limit = { is_landed = yes highest_held_title_tier = tier_county } save_scope_as = tca_court_family_test_count }
+            if = { limit = { exists = scope:tca_court_family_test_count scope:tca_court_family_test_count = { highest_held_title_tier = tier_county } scope:tca_mcp_officer = { NOT = { tca_court_target_rank_trigger = { OWNER = scope:tca_court_family_test_count } } } } debug_log = "TCA_TEST CHECK_PASS tca_test_court_family_flow 3" }
+            else = { add_character_flag = tca_test_tca_court_family_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_family_flow 3" }
+            create_character = { age = 30 gender_female_chance = 0 random_traits = no dynasty = none employer = scope:tca_mcp_governor culture = root.culture faith = root.faith rite = root.rite stewardship = { 20 20 } diplomacy = { 20 20 } learning = { 20 20 } martial = { 20 20 } save_scope_as = tca_court_family_test_competitor }
+            scope:tca_court_family_test_competitor = { add_trait = education_stewardship_3 add_trait = diligent set_merit_level = 1 tca_merit_initialize_character_effect = yes }
+            every_in_list = { list = tca_court_candidates remove_from_list = tca_court_candidates }
+            scope:tca_mcp_officer = { tca_court_collect_officer_effect = yes }
+            scope:tca_court_family_test_competitor = { tca_court_collect_officer_effect = yes }
+            # 与正式选优保持相同雇主上下文；读数只存于本例自建人物，不复制业务规则。
+            scope:tca_mcp_governor = {
+                tca_court_selection_context_effect = { BASE = tca_court_importance_rank_3 BIAS = 1 ADMISSION = 1 }
+                scope:tca_mcp_officer = { set_variable = { name = tca_court_family_test_score value = { value = aptitude:tca_transport_manager_court_position multiply = 20 add = tca_court_personal_selection_value } } }
+                scope:tca_court_family_test_competitor = { set_variable = { name = tca_court_family_test_score value = { value = aptitude:tca_transport_manager_court_position multiply = 20 add = tca_court_personal_selection_value } } }
+            }
+            if = { limit = { list_size:tca_court_candidates = 2 scope:tca_mcp_officer = { tca_court_selectable_person_trigger = { POSITION = tca_transport_manager_court_position SKILL = stewardship } } scope:tca_court_family_test_competitor = { is_ruler = no tca_court_selectable_person_trigger = { POSITION = tca_transport_manager_court_position SKILL = stewardship } } scope:tca_court_family_test_competitor.var:tca_court_family_test_score > scope:tca_mcp_officer.var:tca_court_family_test_score } debug_log = "TCA_TEST CHECK_PASS tca_test_court_family_flow 4" }
+            else = { add_character_flag = tca_test_tca_court_family_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_family_flow 4" }
+            scope:tca_mcp_governor = { tca_court_fill_position_effect = { POSITION = tca_transport_manager_court_position BASE = tca_court_importance_rank_3 BIAS = 1 ADMISSION = 1 SKILL = stewardship OFFICE = tca_transport_office_valid_trigger KEEP_CURRENT = tca_court_no_council_precedence_trigger } }
+            if = { limit = { scope:tca_court_family_test_competitor = { has_court_position = tca_transport_manager_court_position } scope:tca_mcp_officer = { NOT = { has_court_position = tca_transport_manager_court_position } liege = root } } debug_log = "TCA_TEST CHECK_PASS tca_test_court_family_flow 5" }
+            else = { add_character_flag = tca_test_tca_court_family_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_family_flow 5" }
+            scope:tca_mcp_governor = {
+                if = { limit = { employs_court_position = tca_transport_manager_court_position }
+                    court_position:tca_transport_manager_court_position = { save_scope_as = tca_court_family_test_first_winner }
+                    add_character_flag = free_revoke_cost
+                    revoke_court_position = { recipient = scope:tca_court_family_test_first_winner court_position = tca_transport_manager_court_position }
+                    remove_character_flag = free_revoke_cost
+                }
+            }
+            every_in_list = { list = tca_court_candidates remove_from_list = tca_court_candidates }
+            # 双方原生档位与当前品级相同；第一轮普通候选勤勉，第二轮改为家主勤勉，仍共池竞选。
+            scope:tca_mcp_officer = { add_trait = diligent tca_court_collect_officer_effect = yes }
+            scope:tca_mcp_backup = { tca_court_collect_officer_effect = yes }
+            scope:tca_mcp_governor = { tca_court_fill_position_effect = { POSITION = tca_transport_manager_court_position BASE = tca_court_importance_rank_3 BIAS = 1 ADMISSION = 1 SKILL = stewardship OFFICE = tca_transport_office_valid_trigger KEEP_CURRENT = tca_court_no_council_precedence_trigger } }
+            save_scope_value_as = { name = tca_court_family_test_expected_importance value = { value = tca_court_importance_rank_3 add = scope:tca_mcp_governor.tca_court_civil_office_weight } }
+            if = { limit = { scope:tca_mcp_officer = { has_court_position = tca_transport_manager_court_position liege = scope:tca_mcp_governor has_council_position = councillor_steward tca_court_current_importance = scope:tca_court_family_test_expected_importance has_character_flag = tca_military_appointment_cooldown tca_experience_clerical_eligible_trigger = { OWNER = scope:tca_mcp_governor } } } debug_log = "TCA_TEST CHECK_PASS tca_test_court_family_flow 6" }
+            else = { add_character_flag = tca_test_tca_court_family_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_family_flow 6" }
+            every_in_list = { list = tca_court_candidates remove_from_list = tca_court_candidates }
+            scope:tca_mcp_officer = { tca_court_collect_officer_effect = yes }
+            if = { limit = { list_size:tca_court_candidates = 0 } debug_log = "TCA_TEST CHECK_PASS tca_test_court_family_flow 7" }
+            else = { add_character_flag = tca_test_tca_court_family_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_family_flow 7" }
+            scope:tca_mcp_governor = { add_character_flag = free_revoke_cost revoke_court_position = { recipient = scope:tca_mcp_officer court_position = tca_transport_manager_court_position } remove_character_flag = free_revoke_cost }
+            if = { limit = { scope:tca_mcp_officer = { liege = scope:tca_mcp_governor tca_court_current_importance = 0 is_councillor = no NOT = { has_variable = tca_military_council_lock_owner } } } debug_log = "TCA_TEST CHECK_PASS tca_test_court_family_flow 8" }
+            else = { add_character_flag = tca_test_tca_court_family_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_family_flow 8" }
+            scope:tca_mcp_officer = {
+                tca_court_record_offer_effect = { POSITION = tca_transport_manager_court_position }
+                tca_court_decline_offer_effect = yes
+                tca_court_collect_officer_effect = yes
+            }
+            if = { limit = { list_size:tca_court_candidates = 0 scope:tca_mcp_officer = { has_character_flag = tca_court_offer_declined NOT = { has_variable = tca_court_offer_owner } liege = scope:tca_mcp_governor } } debug_log = "TCA_TEST CHECK_PASS tca_test_court_family_flow 9" }
+            else = { add_character_flag = tca_test_tca_court_family_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_family_flow 9" }
+            scope:tca_mcp_officer = {
+                remove_character_flag = tca_court_offer_declined
+                tca_court_record_offer_effect = { POSITION = tca_transport_manager_court_position }
+                tca_court_accept_offer_effect = yes
+            }
+            if = { limit = { scope:tca_mcp_officer = { has_court_position = tca_transport_manager_court_position NOT = { has_variable = tca_court_offer_owner } } } debug_log = "TCA_TEST CHECK_PASS tca_test_court_family_flow 10" }
+            else = { add_character_flag = tca_test_tca_court_family_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_family_flow 10" }
+            scope:tca_mcp_officer = { tca_court_record_offer_effect = { POSITION = tca_transport_manager_court_position } tca_court_accept_offer_effect = yes }
+            if = { limit = { scope:tca_mcp_officer = { has_court_position = tca_transport_manager_court_position NOT = { has_variable = tca_court_offer_owner } } } debug_log = "TCA_TEST CHECK_PASS tca_test_court_family_flow 11" }
+            else = { add_character_flag = tca_test_tca_court_family_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_family_flow 11" }
+            # 旧书信凭据不能拒绝后来邀请；失效请求不改变既有任职和领属。
+            scope:tca_mcp_officer = {
+                tca_court_record_offer_effect = { POSITION = tca_transport_manager_court_position }
+                save_scope_value_as = { name = tca_court_family_test_old_token value = scope:tca_court_offer_token }
+                tca_court_record_offer_effect = { POSITION = tca_transport_secretary_court_position }
+                save_scope_value_as = { name = tca_court_offer_token value = scope:tca_court_family_test_old_token }
+                tca_court_decline_offer_effect = yes
+            }
+            if = { limit = { scope:tca_mcp_officer = { has_variable = tca_court_offer_owner NOT = { has_character_flag = tca_court_offer_declined } } } debug_log = "TCA_TEST CHECK_PASS tca_test_court_family_flow 12" }
+            else = { add_character_flag = tca_test_tca_court_family_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_family_flow 12" }
+            scope:tca_mcp_officer = {
+                save_scope_value_as = { name = tca_court_offer_token value = var:tca_court_offer_serial }
+                set_variable = { name = tca_court_offer_title value = scope:tca_court_family_test_title }
+                tca_court_accept_offer_effect = yes
+            }
+            if = { limit = { scope:tca_mcp_officer = { has_court_position = tca_transport_manager_court_position NOT = { has_variable = tca_court_offer_owner } liege = scope:tca_mcp_governor } } debug_log = "TCA_TEST CHECK_PASS tca_test_court_family_flow 13" }
+            else = { add_character_flag = tca_test_tca_court_family_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_family_flow 13" }
+            # 取得非家门头衔后退出共用差遣资格；不以is_ruler分类代替实际持有头衔检查。
+            create_dynamic_title = { tier = duchy name = tca_test_arrest_office_name }
+            scope:new_title = { save_scope_as = tca_court_family_test_office_title set_capital_county = root.capital_county set_landless_title = yes }
+            create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_court_family_test_change }
+            scope:tca_court_family_test_office_title = { change_title_holder = { holder = scope:tca_mcp_officer change = scope:tca_court_family_test_change } }
+            resolve_title_and_vassal_change = scope:tca_court_family_test_change
+            if = { limit = { scope:tca_mcp_officer = { tca_court_person_eligible_trigger = no NOT = { tca_court_member_of_office_trigger = { OWNER = scope:tca_mcp_governor } } } } debug_log = "TCA_TEST CHECK_PASS tca_test_court_family_flow 14" }
+            else = { add_character_flag = tca_test_tca_court_family_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_family_flow 14" }
+            scope:tca_mcp_officer = { destroy_title = scope:tca_court_family_test_office_title }
+            every_in_list = { list = tca_court_candidates remove_from_list = tca_court_candidates }
+            scope:tca_mcp_officer = { destroy_title = scope:tca_court_family_test_title }
+            scope:tca_mcp_officer = { remove_variable = tca_court_family_test_score }
+            scope:tca_court_family_test_competitor = { remove_variable = tca_court_family_test_score death = { death_reason = death_natural_causes } }
+            tca_test_military_council_cleanup_effect = yes
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_court_family_flow" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } }
+        if = { limit = { scope:tca_mcp_borrow_ready = 1 }
+        if = { limit = { has_character_flag = tca_test_tca_court_family_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_court_family_flow" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+        else = { debug_log = "TCA_TEST PASS tca_test_court_family_flow" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        }
+        remove_character_flag = tca_test_tca_court_family_test_case_failed
+    }
+}
+
+# 私有人物验证真实延迟事件保存各自token；不借官署、不改世界已有任职。
+tca_court_family_test.2 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_court_family_test.2 tca_test_court_family_offer_timeout"
+        remove_character_flag = tca_test_tca_court_family_test_timeout_failed
+        save_scope_as = target_liege
+        create_character = { age = 30 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_court_family_test_timeout_actor }
+        scope:tca_court_family_test_timeout_actor = {
+            create_dynasty = { spread_to_descendants = yes }
+            give_noble_family_title = { name = noble_family_name tier = county article = DEFAULT_TITLE_NAME_ARTICLE government = celestial_government save_scope_as = tca_court_family_test_timeout_title }
+            tca_court_move_to_office_effect = { OWNER = root }
+            tca_test_protect_character_effect = yes
+            # 未入品阻止等待期间自然铨选，不改变被测邀请凭据与超时事务。
+            set_merit_level = 0
+            tca_court_record_offer_effect = { POSITION = royal_architect_court_position }
+            trigger_event = { id = tca_court_offer.2 days = 10 }
+            tca_court_record_offer_effect = { POSITION = fire_dragon_engineer_court_position }
+            trigger_event = { id = tca_court_offer.2 days = 30 }
+        }
+        trigger_event = { id = tca_court_family_test.1001 days = 11 }
+    }
+}
+tca_court_family_test.1001 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { scope:tca_court_family_test_timeout_actor = { has_variable = tca_court_offer_owner var:tca_court_offer_position = flag:fire_dragon_engineer_court_position liege = root } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_court_family_offer_timeout 1"
+        }
+        else = { add_character_flag = tca_test_tca_court_family_test_timeout_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_family_offer_timeout 1" }
+        trigger_event = { id = tca_court_family_test.1002 days = 20 }
+    }
+}
+tca_court_family_test.1002 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { scope:tca_court_family_test_timeout_actor = { NOT = { has_variable = tca_court_offer_owner } NOT = { has_variable = tca_court_offer_position } NOT = { has_character_flag = tca_court_offer_declined } liege = root } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_court_family_offer_timeout 2"
+        }
+        else = { add_character_flag = tca_test_tca_court_family_test_timeout_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_family_offer_timeout 2" }
+        scope:tca_court_family_test_timeout_actor = { destroy_title = scope:tca_court_family_test_timeout_title death = { death_reason = death_natural_causes } }
+        if = { limit = { has_character_flag = tca_test_tca_court_family_test_timeout_failed }
+            debug_log = "TCA_TEST FAIL tca_test_court_family_offer_timeout"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+        }
+        else = { debug_log = "TCA_TEST PASS tca_test_court_family_offer_timeout" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        remove_character_flag = tca_test_tca_court_family_test_timeout_failed
+        tca_test_lane_end_effect = { GROUP = tca_military_court_positions_test }
+    }
+}
