@@ -1,0 +1,79 @@
+﻿# 差遣赴任与玩家书信事务；不维护候选分数或另建选优流程。
+# 人物作用域；OWNER为目标雇主，调用者已复验身份／等级。转属事务只在需要时执行。
+# 不撤销家门，也不在正常离任时恢复旧领主；普通廷臣继续使用原生迁廷。
+tca_court_move_to_office_effect = {
+    if = { limit = { tca_court_family_holder_trigger = yes }
+        if = { limit = { NOT = { liege = $OWNER$ } }
+            create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_court_fealty_change }
+            change_liege = { liege = $OWNER$ change = scope:tca_court_fealty_change }
+            resolve_title_and_vassal_change = scope:tca_court_fealty_change
+        }
+    }
+    else_if = { limit = { NOT = { is_courtier_of = $OWNER$ } } $OWNER$ = { add_courtier = prev } }
+}
+# 人物作用域；必需target_liege，POSITION来自目录。仅记录邀请，不撤旧职、不转属。
+# serial永久递增，旧书信和超时事件不能消费后来邀请；当前凭据随原生事件scope保存。
+tca_court_record_offer_effect = {
+    if = { limit = { NOT = { has_variable = tca_court_offer_serial } } set_variable = { name = tca_court_offer_serial value = 0 } }
+    change_variable = { name = tca_court_offer_serial add = 1 }
+    save_scope_value_as = { name = tca_court_offer_token value = var:tca_court_offer_serial }
+    set_variable = { name = tca_court_offer_owner value = scope:target_liege }
+    set_variable = { name = tca_court_offer_title value = scope:target_liege.primary_title }
+    # 重复记录同职时保留职位值；凭据与雇主仍按本次请求更新。
+    if = { limit = { NOT = { var:tca_court_offer_position ?= flag:$POSITION$ } }
+        set_variable = { name = tca_court_offer_position value = flag:$POSITION$ }
+    }
+    # 职名随事件保存；超时清理人物变量后，旧书信仍可正常显示。
+    save_scope_value_as = { name = tca_court_offer_position_label value = flag:$POSITION$ }
+}
+# 人物作用域；仅清理当前请求，不回收递增凭据、不改变任期或领属。
+tca_court_clear_offer_effect = {
+    remove_variable = tca_court_offer_owner
+    remove_variable = tca_court_offer_title
+    remove_variable = tca_court_offer_position
+}
+# 人物作用域；必需本封书信保存的token。拒绝一年免邀，过期仅结案，不冒认新邀请。
+tca_court_decline_offer_effect = {
+    if = { limit = { tca_court_offer_current_trigger = yes }
+        tca_court_clear_offer_effect = yes
+        add_character_flag = { flag = tca_court_offer_declined days = 365 }
+    }
+}
+# 人物作用域；本封书信的token必需。目录只匹配原职位，复验后调用即时任命的同一事务。
+# 不再竞争、不换职位；失效时直接结案。结果scope供书信显示失效通知，调用后不留人物状态。
+tca_court_accept_offer_effect = {
+    save_scope_value_as = { name = tca_court_offer_accepted value = 0 }
+    if = { limit = { tca_court_offer_current_trigger = yes }
+        if = { limit = { exists = var:tca_court_offer_owner exists = var:tca_court_offer_title }
+            save_scope_as = tca_chosen_officer
+            var:tca_court_offer_owner = {
+                save_scope_as = target_liege
+                tca_court_visit_positions_effect = { VISITOR = tca_court_accept_catalog_offer_effect }
+            }
+        }
+        tca_court_clear_offer_effect = yes
+    }
+}
+# 雇主作用域；目录静态参数，必需tca_chosen_officer、target_liege和原书信token。
+# 官署主头衔与持有人须保持原样；正式任官、退休、入狱、改制、任期及空缺变化均会使邀请失效。
+tca_court_accept_catalog_offer_effect = {
+    tca_court_metadata_contract_effect = { POSITION = $POSITION$ BASE = $BASE$ BIAS = $BIAS$ ADMISSION = $ADMISSION$ SKILL = $SKILL$ OFFICE = $OFFICE$ KEEP_CURRENT = $KEEP_CURRENT$ }
+    if = { limit = {
+        scope:tca_chosen_officer = {
+            tca_court_offer_current_trigger = yes
+            var:tca_court_offer_position = flag:$POSITION$
+            var:tca_court_offer_title = scope:target_liege.primary_title
+            var:tca_court_offer_title.holder = scope:target_liege
+        }
+        is_alive = yes $OFFICE$ = yes NOT = { employs_court_position = $POSITION$ }
+        tca_court_available_for_$POSITION$_trigger = yes
+    }
+        tca_court_selection_context_effect = { BASE = $BASE$ BIAS = $BIAS$ ADMISSION = $ADMISSION$ }
+        if = { limit = { scope:tca_chosen_officer = { tca_court_family_holder_trigger = yes tca_court_selectable_person_trigger = { POSITION = $POSITION$ SKILL = $SKILL$ } } }
+            tca_court_appoint_selected_effect = { POSITION = $POSITION$ }
+            if = { limit = { scope:tca_chosen_officer = { has_court_position = $POSITION$ tca_court_member_of_office_trigger = { OWNER = scope:target_liege } } }
+                save_scope_value_as = { name = tca_court_offer_accepted value = 1 }
+            }
+        }
+    }
+}

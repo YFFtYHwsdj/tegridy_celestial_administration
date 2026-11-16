@@ -201,6 +201,53 @@ tca_military_court_positions_test.17 = {
                     remove_character_flag = free_revoke_cost
                 }
             }
+            # 同一对官署复验纯家门持职者与普通内阁跨署，沿用正式选优与迁转事务。
+            scope:tca_mcp_governor = { add_courtier = scope:tca_mcp_officer }
+            scope:tca_mcp_officer = {
+                create_dynasty = { spread_to_descendants = yes }
+                give_noble_family_title = { name = noble_family_name tier = county article = DEFAULT_TITLE_NAME_ARTICLE government = celestial_government save_scope_as = tca_military_court_positions_test_family_title }
+                tca_court_move_to_office_effect = { OWNER = scope:tca_mcp_governor }
+                add_character_flag = tca_military_appointment_allowed
+            }
+            scope:tca_mcp_governor = { appoint_court_position = { recipient = scope:tca_mcp_officer court_position = tca_military_inspector_court_position } }
+            scope:tca_mcp_officer = { remove_character_flag = tca_military_appointment_allowed remove_character_flag = tca_military_appointment_cooldown }
+            if = { limit = {
+                scope:tca_mcp_officer = { tca_court_family_holder_trigger = yes liege = scope:tca_mcp_governor has_court_position = tca_military_inspector_court_position has_council_position = councillor_marshal is_councillor_of = scope:tca_mcp_governor var:tca_military_council_lock_owner = scope:tca_mcp_governor }
+                scope:tca_mcp_governor = { court_position:tca_military_inspector_court_position = scope:tca_mcp_officer }
+            } debug_log = "TCA_TEST CHECK_PASS tca_test_court_positions_same_office_transfer 6" }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_positions_same_office_transfer 6" }
+            every_in_list = { list = tca_court_candidates remove_from_list = tca_court_candidates }
+            scope:tca_mcp_officer = { tca_court_collect_officer_effect = yes }
+            scope:tca_military_court_positions_test_destination = {
+                save_scope_as = target_liege
+                tca_court_fill_position_effect = { POSITION = tca_military_inspector_court_position BASE = 300 BIAS = 2 ADMISSION = 0 SKILL = martial OFFICE = tca_military_inspector_office_valid_trigger KEEP_CURRENT = tca_military_marshal_higher_than_inspector_trigger }
+            }
+            if = { limit = {
+                scope:tca_mcp_officer = { liege = scope:tca_military_court_positions_test_destination has_court_position = tca_military_inspector_court_position has_council_position = councillor_marshal var:tca_military_council_lock_owner = scope:tca_military_court_positions_test_destination has_character_flag = tca_military_appointment_cooldown }
+                scope:tca_mcp_governor = { NOT = { employs_court_position = tca_military_inspector_court_position } NOT = { cp:councillor_marshal ?= scope:tca_mcp_officer } }
+            } debug_log = "TCA_TEST CHECK_PASS tca_test_court_positions_same_office_transfer 7" }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_positions_same_office_transfer 7" }
+            scope:tca_military_court_positions_test_destination = { add_character_flag = free_revoke_cost revoke_court_position = { recipient = scope:tca_mcp_officer court_position = tca_military_inspector_court_position } remove_character_flag = free_revoke_cost }
+            scope:tca_mcp_officer = { tca_court_move_to_office_effect = { OWNER = scope:tca_mcp_governor } }
+            scope:tca_mcp_governor = { assign_councillor_type = { type = councillor_chancellor target = scope:tca_mcp_officer fire_on_actions = yes } }
+            if = { limit = {
+                scope:tca_mcp_officer = { tca_court_family_holder_trigger = yes liege = scope:tca_mcp_governor is_councillor_of = scope:tca_mcp_governor has_council_position = councillor_chancellor tca_court_holds_position_trigger = no tca_court_current_importance = 0 }
+                scope:tca_mcp_governor = { cp:councillor_chancellor = scope:tca_mcp_officer }
+            } debug_log = "TCA_TEST CHECK_PASS tca_test_court_positions_same_office_transfer 8" }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_positions_same_office_transfer 8" }
+            every_in_list = { list = tca_court_candidates remove_from_list = tca_court_candidates }
+            scope:tca_mcp_officer = { tca_court_collect_officer_effect = yes }
+            scope:tca_military_court_positions_test_destination = {
+                save_scope_as = target_liege
+                tca_court_fill_position_effect = { POSITION = tca_military_inspector_court_position BASE = 300 BIAS = 2 ADMISSION = 0 SKILL = martial OFFICE = tca_military_inspector_office_valid_trigger KEEP_CURRENT = tca_military_marshal_higher_than_inspector_trigger }
+            }
+            if = { limit = {
+                scope:tca_mcp_officer = { liege = scope:tca_military_court_positions_test_destination has_court_position = tca_military_inspector_court_position has_council_position = councillor_marshal NOT = { has_council_position = councillor_chancellor } NOT = { has_character_flag = tca_court_unlinked_council_transfer } }
+                scope:tca_mcp_governor = { NOT = { cp:councillor_chancellor ?= scope:tca_mcp_officer } }
+            } debug_log = "TCA_TEST CHECK_PASS tca_test_court_positions_same_office_transfer 9" }
+            else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_positions_same_office_transfer 9" }
+            scope:tca_military_court_positions_test_destination = { add_character_flag = free_revoke_cost revoke_court_position = { recipient = scope:tca_mcp_officer court_position = tca_military_inspector_court_position } remove_character_flag = free_revoke_cost }
+            scope:tca_mcp_officer = { destroy_title = scope:tca_military_court_positions_test_family_title }
             scope:tca_mcp_governor = { if = { limit = { scope:tca_mcp_officer = { NOT = { is_courtier_of = scope:tca_mcp_governor } } } add_courtier = scope:tca_mcp_officer } }
             create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_military_court_positions_test_restore_county }
             scope:tca_military_court_positions_test_target_county = { change_title_holder = { holder = scope:tca_military_court_positions_test_target_county_old_owner change = scope:tca_military_court_positions_test_restore_county take_baronies = no } }

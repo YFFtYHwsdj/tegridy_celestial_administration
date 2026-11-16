@@ -1,0 +1,37 @@
+﻿# 玩家家主差遣邀请；同一凭据的接受、拒绝及超时共用事务，不影响普通AI即时授职。
+namespace = tca_court_offer
+
+tca_court_offer.1 = {
+    type = letter_event
+    opening = { desc = tca_court_offer.1.opening }
+    desc = tca_court_offer.1.desc
+    sender = scope:target_liege
+    option = {
+        name = tca_court_offer.1.accept
+        trigger = { tca_court_offer_current_trigger = yes }
+        custom_tooltip = tca_court_offer.1.accept_tt
+        hidden_effect = {
+            tca_court_accept_offer_effect = yes
+            if = { limit = { scope:tca_court_offer_accepted = 0 } trigger_event = tca_court_offer.3 }
+        }
+    }
+    option = {
+        name = tca_court_offer.1.decline
+        trigger = { tca_court_offer_current_trigger = yes }
+        custom_tooltip = tca_court_offer.1.decline_tt
+        hidden_effect = { tca_court_decline_offer_effect = yes }
+    }
+    option = { name = tca_court_offer.1.expired trigger = { tca_court_offer_current_trigger = no } }
+}
+# 30日后仅清理对应请求；不恢复旧领主，不撤销人物后来取得的差遣或正式官职。
+tca_court_offer.2 = {
+    type = character_event hidden = yes
+    immediate = { if = { limit = { tca_court_offer_current_trigger = yes } tca_court_clear_offer_effect = yes } }
+}
+tca_court_offer.3 = {
+    type = character_event
+    title = tca_court_offer.3.t
+    desc = tca_court_offer.3.desc
+    theme = administrative
+    option = { name = tca_court_offer.1.expired }
+}
