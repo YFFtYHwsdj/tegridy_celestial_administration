@@ -1,0 +1,68 @@
+﻿# 行贿身份与交易校验；除标明互动上下文者外均为当前人物／头衔作用域，只读。
+# 头衔作用域；中央真实官职可为无地，退休、世族、营地不提供头衔加价。
+tca_bribery_priced_title_trigger = {
+    tier >= tier_county
+    is_noble_family_title = no
+    NOT = { has_variable = tca_retirement_title }
+    OR = {
+        is_landless_type_title = no
+        has_variable = tca_judicial_title
+        has_variable = tca_tongpan_title
+        tgp_is_minister_title = yes
+    }
+}
+# 人物作用域；地方身份使用含无地官署的共用入口；中央和宫廷差遣另行补足。
+tca_bribery_has_office_trigger = {
+    OR = {
+        tgp_is_any_minister = yes
+        tca_is_celestial_governor_trigger = yes
+        has_any_court_position = yes
+        AND = { is_councillor = yes liege_or_court_owner = { government_has_flag = government_is_celestial } }
+    }
+}
+tca_bribery_recipient_trigger = {
+    is_alive = yes is_adult = yes
+    government_has_flag = government_is_celestial
+    OR = { merit_level >= 1 tca_bribery_has_office_trigger = yes }
+}
+# 人物作用域；六部／三大臣按真实官职头衔，不按任意内阁席位推定。
+tca_bribery_senior_minister_trigger = {
+    OR = { has_title = title:e_minister_chancellor has_title = title:e_minister_censor has_title = title:e_minister_grand_marshal }
+}
+tca_bribery_six_minister_trigger = {
+    OR = {
+        has_title = title:e_minister_of_personnel has_title = title:e_minister_of_revenue
+        has_title = title:e_minister_of_rites has_title = title:e_minister_of_war
+        has_title = title:e_minister_of_justice has_title = title:e_minister_of_works
+    }
+}
+# 互动上下文需要actor/recipient；三年名单只在成交写入，双向查询防止反向重买。
+tca_bribery_no_cooldown_trigger = {
+    scope:actor = { NOT = { is_target_in_variable_list = { name = tca_bribery_recent_partners target = scope:recipient } } }
+    scope:recipient = { NOT = { is_target_in_variable_list = { name = tca_bribery_recent_partners target = scope:actor } } }
+}
+tca_bribery_basic_valid_trigger = {
+    scope:actor = { is_alive = yes is_adult = yes is_imprisoned = no is_incapable = no NOT = { has_hook = scope:recipient } }
+    scope:recipient = { tca_bribery_recipient_trigger = yes is_imprisoned = no }
+    scope:actor != scope:recipient
+    tca_bribery_no_cooldown_trigger = yes
+    scope:recipient.tca_bribery_base_price_value > 0
+}
+# 互动上下文；仅AI硬门槛，玩家可向最高领主行贿，也不受AI储蓄限制。
+tca_bribery_ai_ready_trigger = {
+    tca_bribery_basic_valid_trigger = yes
+    scope:actor = { government_has_flag = government_is_celestial tca_bribery_finance_tier_value >= 2 }
+    scope:actor.top_liege = scope:recipient.top_liege
+    scope:recipient != scope:actor.top_liege
+    tca_bribery_selected_tier_value = tca_bribery_cheapest_tier_value
+    tca_bribery_cheapest_tier_value > 0
+    scope:actor.gold >= { value = tca_bribery_price_value multiply = 4 }
+    scope:actor.gold >= { value = tca_bribery_price_value add = 50 }
+}
+# 互动回复上下文；报价由on_send保存，失效不退款（此前没有扣钱），不授牵制。
+tca_bribery_reply_valid_trigger = {
+    tca_bribery_basic_valid_trigger = yes
+    exists = scope:tca_bribery_quote
+    tca_bribery_price_value = scope:tca_bribery_quote
+    scope:actor.gold >= scope:tca_bribery_quote
+}
