@@ -1,0 +1,90 @@
+﻿# 输入actor、recipient、target及tca_frontier_raid选项；最终重查，只有创建成功才收费。
+# 输出scope:tca_frontier_border_war；无持久待宣战变量；成功开战后的C1/C2记录由CB声明回调建立，不创建追讨任务。
+tca_frontier_border_war_start_effect = {
+    clear_saved_scope = tca_frontier_border_war
+    if = { limit = {
+        tca_frontier_border_war_parties_trigger = { ACTOR = scope:actor DEFENDER = scope:recipient }
+        scope:target = { tca_frontier_border_war_target_trigger = { ACTOR = scope:actor DEFENDER = scope:recipient } }
+        scope:actor = { prestige >= tca_frontier_border_war_cost_value }
+    }
+        save_scope_value_as = { name = tca_fe_added_authorization value = no }
+        scope:actor = {
+            if = { limit = { NOT = { has_character_flag = tca_frontier_scripted_war_authorized } }
+                add_character_flag = tca_frontier_scripted_war_authorized
+                save_scope_value_as = { name = tca_fe_added_authorization value = yes }
+            }
+        }
+        scope:actor = {
+            if = { limit = { scope:target = { tier = tier_county } }
+                if = { limit = { scope:tca_frontier_raid = yes }
+                    start_war = { cb = tca_frontier_county_raid_cb target = scope:recipient target_title = scope:target }
+                }
+                else = { start_war = { cb = tca_frontier_county_conquest_cb target = scope:recipient target_title = scope:target } }
+            }
+            else = {
+                if = { limit = { scope:tca_frontier_raid = yes }
+                    start_war = { cb = tca_frontier_duchy_raid_cb target = scope:recipient target_title = scope:target }
+                }
+                else = { start_war = { cb = tca_frontier_duchy_conquest_cb target = scope:recipient target_title = scope:target } }
+            }
+            every_character_war = {
+                limit = { primary_attacker = scope:actor primary_defender = scope:recipient
+                    OR = { using_cb = tca_frontier_county_raid_cb using_cb = tca_frontier_duchy_raid_cb using_cb = tca_frontier_county_conquest_cb using_cb = tca_frontier_duchy_conquest_cb }
+                }
+                save_scope_as = tca_frontier_border_war
+            }
+            if = { limit = { exists = scope:tca_frontier_border_war }
+                add_prestige = { value = tca_frontier_border_war_cost_value multiply = -1 }
+            }
+        }
+        if = { limit = { scope:tca_fe_added_authorization = yes } scope:actor = { remove_character_flag = tca_frontier_scripted_war_authorized } }
+
+    }
+}
+
+# 伯爵领作用域；破坏前读数，每县只结算一次；金币不从领主钱包扣除。
+# 与原版边境劫掠一致，修正只加在县title_province，期限5年；不毁建筑、不另扣控制力。
+tca_frontier_border_war_raid_county_effect = {
+    save_scope_value_as = { name = tca_frontier_raid_gold value = { value = development_level multiply = 5 } }
+    scope:attacker = { add_gold = scope:tca_frontier_raid_gold }
+    if = { limit = { development_level > 0 } change_development_level = -1 }
+    title_province = { add_province_modifier = { modifier = recently_looted_modifier years = 5 } }
+}
+
+# CB结果作用域；target_titles为原生目标清单。逐县重查当前归属和区域，排除第三方。
+# RAID=yes时不转地；否则统一头衔事务直接夺县，不把原县级及以上领主纳为封臣；保留原基层男爵。
+tca_frontier_border_war_victory_effect = {
+    if = { limit = { always = $RAID$ }
+        every_in_list = { list = target_titles
+            if = { limit = { tier = tier_county tca_frontier_border_war_county_trigger = { DEFENDER = scope:defender } }
+                tca_frontier_border_war_raid_county_effect = yes
+            }
+            else_if = { limit = { tier = tier_duchy }
+                every_in_de_jure_hierarchy = {
+                    limit = { tca_frontier_border_war_county_trigger = { DEFENDER = scope:defender } }
+                    tca_frontier_border_war_raid_county_effect = yes
+                }
+            }
+        }
+    }
+    else = {
+        create_title_and_vassal_change = { type = conquest save_scope_as = tca_frontier_border_change add_claim_on_loss = yes }
+        every_in_list = { list = target_titles
+            if = { limit = { tier = tier_county tca_frontier_border_war_county_trigger = { DEFENDER = scope:defender } }
+                # 只在县头衔上转移附属关系，保留基层持有人；不转公爵头衔，也不接纳原县级及以上领主。
+                tca_fd_capture_county_effect = yes
+                change_title_holder_include_vassals = { holder = scope:attacker change = scope:tca_frontier_border_change }
+            }
+            else_if = { limit = { tier = tier_duchy }
+                every_in_de_jure_hierarchy = {
+                    limit = { tca_frontier_border_war_county_trigger = { DEFENDER = scope:defender } }
+                    # 只在县头衔上转移附属关系，保留基层持有人；不转公爵头衔，也不接纳原县级及以上领主。
+                    tca_fd_capture_county_effect = yes
+                    change_title_holder_include_vassals = { holder = scope:attacker change = scope:tca_frontier_border_change }
+                }
+            }
+        }
+        resolve_title_and_vassal_change = scope:tca_frontier_border_change
+        scope:tca_fs_record ?= { tca_fd_begin_effect = yes }
+    }
+}

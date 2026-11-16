@@ -1,0 +1,48 @@
+﻿# B阶段独立入口；ACTOR、DEFENDER为人物。只允许显式调试授权，普通游玩与自然AI尚未开放。
+# 首版发动者为有领土者；无地官署仍可参与其他防御身份，不在此授予进攻辖权。
+tca_frontier_border_war_parties_trigger = {
+    debug_only = yes
+    exists = situation:tca_northern_frontier
+    $ACTOR$ = {
+        has_character_flag = tca_frontier_border_war_enabled
+        is_alive = yes is_landed = yes is_imprisoned = no is_in_debt = no
+        tca_frontier_realm_has_land_trigger = yes
+        NOT = { is_at_war_with = $DEFENDER$ }
+        NOT = { is_allied_to = $DEFENDER$ }
+        NOT = { is_allied_in_war = $DEFENDER$ }
+        NOT = { is_tributary_of_suzerain_or_above = $DEFENDER$ }
+    }
+    $DEFENDER$ = {
+        is_alive = yes is_landed = yes
+        tca_frontier_realm_has_land_trigger = yes
+        top_liege != $ACTOR$.top_liege
+        NOT = { is_imprisoned_by = $ACTOR$ }
+        NOT = { is_tributary_of_suzerain_or_above = $ACTOR$ }
+    }
+}
+
+# 伯爵领作用域；只读战果交集，不向上扩大到防守者国家，不要求每个县分别接壤。
+tca_frontier_border_war_county_trigger = {
+    tier = tier_county
+    title_province = { geographical_region = tca_frontier_region }
+    holder ?= { OR = { this = $DEFENDER$ is_vassal_or_below_of = $DEFENDER$ } }
+}
+
+# 目标头衔作用域；至少一个交集县与进攻者本人辖下领土陆地相邻。
+# 先筛实际交集再查边境，不能借公国内第三方的县形成接壤。
+tca_frontier_border_war_target_trigger = {
+    trigger_if = {
+        limit = { tier = tier_county }
+        tca_frontier_border_war_county_trigger = { DEFENDER = $DEFENDER$ }
+        any_neighboring_county = { holder ?= { OR = { this = $ACTOR$ is_vassal_or_below_of = $ACTOR$ } } }
+    }
+    trigger_else = {
+        tier = tier_duchy
+        $ACTOR$ = { highest_held_title_tier >= tier_duchy }
+        any_in_de_jure_hierarchy = {
+            tier = tier_county
+            tca_frontier_border_war_county_trigger = { DEFENDER = $DEFENDER$ }
+            any_neighboring_county = { holder ?= { OR = { this = $ACTOR$ is_vassal_or_below_of = $ACTOR$ } } }
+        }
+    }
+}

@@ -1,0 +1,163 @@
+﻿# 输入actor/recipient/target；建立与C相同候选的瞬时预测story，输出tca_fs_record。
+# 调用者必须在本次事务末end_story；不发信、不建立承诺，不写原防御方的C记录索引。
+tca_fe_project_target_effect = {
+    scope:actor = { create_story = { type = tca_frontier_ai_projection save_scope_as = tca_fs_record } save_scope_as = tca_fs_attacker }
+    scope:recipient = { save_scope_as = tca_fs_defender }
+    scope:tca_fs_record = {
+        set_variable = { name = tca_fs_attacker value = scope:actor }
+        set_variable = { name = tca_fs_defender value = scope:recipient }
+        set_variable = { name = tca_fe_defence value = scope:recipient.military_power }
+    }
+    scope:target = {
+        if = { limit = { tier = tier_county exists = holder tca_frontier_border_war_county_trigger = { DEFENDER = scope:recipient } }
+            scope:tca_fs_record = { add_to_variable_list = { name = tca_fs_goals target = prev } }
+        }
+        else_if = { limit = { tier = tier_duchy }
+            every_in_de_jure_hierarchy = { limit = { exists = holder tca_frontier_border_war_county_trigger = { DEFENDER = scope:recipient } }
+                scope:tca_fs_record = { add_to_variable_list = { name = tca_fs_goals target = prev } }
+            }
+        }
+    }
+    tca_fs_collect_candidates_effect = yes
+    scope:tca_fs_record = {
+        every_in_list = { variable = tca_fs_rows
+            save_scope_as = tca_fs_row
+            var:tca_fs_person = { save_scope_value_as = { name = tca_fe_person_power value = tca_fe_expected_reinforcement_value } }
+            scope:tca_fs_record = { change_variable = { name = tca_fe_defence add = scope:tca_fe_person_power } }
+        }
+    }
+}
+# 县作用域；仅对本方陆地边境建候选，清单归本次会话，绝不扫描全国人物。
+tca_fe_add_border_effect = {
+    if = { limit = { exists = holder tier = tier_county title_province = { geographical_region = tca_frontier_region }
+        holder.top_liege != scope:actor.top_liege
+        NOT = { scope:tca_fe_session = { is_target_in_variable_list = { name = tca_fe_border_counties target = prev } } }
+    }
+        scope:tca_fe_session = { add_to_variable_list = { name = tca_fe_border_counties target = prev } }
+        holder = {
+            tca_fe_add_recipient_effect = yes
+            every_liege_or_above = { tca_fe_add_recipient_effect = yes }
+        }
+    }
+}
+# 人物作用域；一位外国接壤持有人及其真实上级只登记一次。
+tca_fe_add_recipient_effect = {
+    save_scope_as = tca_fe_candidate_recipient
+    if = { limit = { tca_frontier_border_war_parties_trigger = { ACTOR = scope:actor DEFENDER = scope:tca_fe_candidate_recipient }
+        NOT = { scope:tca_fe_session = { is_target_in_variable_list = { name = tca_fe_recipients target = prev } } }
+    }
+        scope:tca_fe_session = { add_to_variable_list = { name = tca_fe_recipients target = prev } }
+    }
+}
+# 目标头衔作用域；每个主防守者分别去重。两种类型各自保存最佳目标，不混算金币和土地分。
+tca_fe_consider_target_effect = {
+    if = { limit = { tca_frontier_border_war_target_trigger = { ACTOR = scope:actor DEFENDER = scope:recipient }
+        NOT = { scope:tca_fe_session = { is_target_in_variable_list = { name = tca_fe_seen_targets target = prev } } }
+    }
+        save_scope_as = target
+        scope:tca_fe_session = { add_to_variable_list = { name = tca_fe_seen_targets target = scope:target } }
+        tca_fe_project_target_effect = yes
+        scope:tca_fs_record = {
+            if = { limit = { tca_fe_power_sufficient_trigger = yes }
+                save_scope_value_as = { name = tca_frontier_raid value = yes }
+                if = { limit = { scope:actor = { prestige >= tca_frontier_border_war_cost_value } }
+                    save_scope_value_as = { name = tca_fe_score value = { value = tca_fe_raid_gain_value divide = tca_frontier_border_war_cost_value multiply = tca_fe_advantage_value } }
+                    if = { limit = { OR = { scope:tca_fe_session = { NOT = { has_variable = tca_fe_raid_target } } scope:tca_fe_score > scope:tca_fe_session.var:tca_fe_best_raid_score } }
+                        scope:tca_fe_session = {
+                            set_variable = { name = tca_fe_best_raid_score value = scope:tca_fe_score }
+                            set_variable = { name = tca_fe_raid_target value = scope:target }
+                            set_variable = { name = tca_fe_raid_recipient value = scope:recipient }
+                        }
+                    }
+                }
+                save_scope_value_as = { name = tca_frontier_raid value = no }
+                if = { limit = { scope:actor = { prestige >= tca_frontier_border_war_cost_value } }
+                    save_scope_value_as = { name = tca_fe_score value = { value = tca_fe_conquest_gain_value divide = tca_frontier_border_war_cost_value multiply = tca_fe_advantage_value } }
+                    if = { limit = { OR = { scope:tca_fe_session = { NOT = { has_variable = tca_fe_conquest_target } } scope:tca_fe_score > scope:tca_fe_session.var:tca_fe_best_conquest_score } }
+                        scope:tca_fe_session = {
+                            set_variable = { name = tca_fe_best_conquest_score value = scope:tca_fe_score }
+                            set_variable = { name = tca_fe_conquest_target value = scope:target }
+                            set_variable = { name = tca_fe_conquest_recipient value = scope:recipient }
+                        }
+                    }
+                }
+            }
+            end_story = yes
+        }
+    }
+}
+# 人物作用域；输出瞬时session及两个类型的最高分目标，调用者必须结束session。
+tca_fe_find_targets_effect = {
+    save_scope_as = actor
+    create_story = { type = tca_frontier_ai_session save_scope_as = tca_fe_session }
+    scope:tca_fe_session = {
+        set_variable = { name = tca_fe_best_raid_score value = 0 }
+        set_variable = { name = tca_fe_best_conquest_score value = 0 }
+    }
+    every_sub_realm_county = { every_neighboring_county = { tca_fe_add_border_effect = yes } }
+    scope:tca_fe_session = {
+        every_in_list = { variable = tca_fe_recipients
+            save_scope_as = recipient
+            scope:tca_fe_session = {
+                clear_variable_list = tca_fe_seen_targets
+                every_in_list = { variable = tca_fe_border_counties
+                    limit = { holder = { OR = { this = scope:recipient is_vassal_or_below_of = scope:recipient } } }
+                    tca_fe_consider_target_effect = yes
+                    de_jure_liege ?= { if = { limit = { tier = tier_duchy } tca_fe_consider_target_effect = yes } }
+                }
+            }
+        }
+    }
+}
+# 决议原生每3个月调度；先确保有合格目标，再掷一次总体意愿及一次类型权重。
+# 原始入口不接受测试强制概率；AI季度与可控选择函数分开，便于证据区分。
+tca_fe_evaluate_effect = {
+    if = { limit = { tca_fe_actor_trigger = yes }
+        debug_log = "TCA_FRONTIER_AI QUARTERLY_EVALUATION"
+        tca_fe_find_targets_effect = yes
+        if = { limit = { scope:tca_fe_session = { OR = { has_variable = tca_fe_raid_target has_variable = tca_fe_conquest_target } } }
+            random = { chance = tca_fe_will_do_value tca_fe_choose_type_effect = yes }
+        }
+        scope:tca_fe_session = { end_story = yes }
+    }
+}
+# 人物作用域；只对存在合格目标的类型抽一次，不随机挑低分目标。
+tca_fe_choose_type_effect = {
+    random_list = {
+        0 = {
+            trigger = { scope:tca_fe_session = { has_variable = tca_fe_raid_target } }
+            modifier = { add = tca_fe_raid_weight_value }
+            scope:tca_fe_session.var:tca_fe_raid_target = { save_scope_as = target }
+            scope:tca_fe_session.var:tca_fe_raid_recipient = { save_scope_as = recipient }
+            save_scope_value_as = { name = tca_frontier_raid value = yes }
+            tca_fe_launch_effect = yes
+        }
+        0 = {
+            trigger = { scope:tca_fe_session = { has_variable = tca_fe_conquest_target } }
+            modifier = { add = tca_fe_conquest_weight_value }
+            scope:tca_fe_session.var:tca_fe_conquest_target = { save_scope_as = target }
+            scope:tca_fe_session.var:tca_fe_conquest_recipient = { save_scope_as = recipient }
+            save_scope_value_as = { name = tca_frontier_raid value = no }
+            tca_fe_launch_effect = yes
+        }
+    }
+}
+# 输入actor/recipient/target/raid；最后再预测一次，失效则本轮放弃，不能重抽或扣费。
+tca_fe_launch_effect = {
+    if = { limit = { tca_fe_actor_trigger = yes tca_frontier_border_war_parties_trigger = { ACTOR = scope:actor DEFENDER = scope:recipient }
+        scope:target = { tca_frontier_border_war_target_trigger = { ACTOR = scope:actor DEFENDER = scope:recipient } }
+    }
+        tca_fe_project_target_effect = yes
+        scope:tca_fs_record = { save_scope_value_as = { name = tca_fe_can_start value = no }
+            if = { limit = { tca_fe_power_sufficient_trigger = yes } save_scope_value_as = { name = tca_fe_can_start value = yes } }
+            end_story = yes
+        }
+        if = { limit = { scope:tca_fe_can_start = yes }
+            tca_frontier_border_war_start_effect = yes
+            scope:tca_frontier_border_war ?= {
+                set_variable = { name = tca_fe_origin value = yes }
+                debug_log = "TCA_FRONTIER_AI DECLARED_QUARTERLY_BORDER_WAR"
+            }
+        }
+    }
+}

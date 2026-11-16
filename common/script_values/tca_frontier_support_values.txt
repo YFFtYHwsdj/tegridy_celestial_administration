@@ -1,0 +1,80 @@
+﻿# C阶段延迟：人物作用域，输入tca_fs_row；上级看关系层数，邻近看最高头衔。
+tca_fs_delay_value = {
+    value = 30
+    if = { limit = { scope:tca_fs_row = { var:tca_fs_kind = 2 } }
+        value = 720
+        if = { limit = { scope:tca_fs_row = { var:tca_fs_depth = 1 } } value = 180 }
+        else_if = { limit = { scope:tca_fs_row = { var:tca_fs_depth = 2 } } value = 360 }
+    }
+    else_if = { limit = { scope:tca_fs_row = { var:tca_fs_kind = 3 } }
+        value = 90
+        if = { limit = { highest_held_title_tier >= tier_empire } value = 720 }
+        else_if = { limit = { highest_held_title_tier = tier_kingdom } value = 360 }
+        else_if = { limit = { highest_held_title_tier = tier_duchy } value = 180 }
+    }
+}
+
+# 人物作用域；零费用跳过，赤字与低储备互斥；只比较实际支付兵士费用的币种。
+tca_fs_gold_reserve_value = {
+    value = 0
+    if = { limit = { gold < 0 } value = -40 }
+    else_if = { limit = { monthly_character_men_at_arms_expense_gold > 0 }
+        value = 10
+        if = { limit = { gold < { value = monthly_character_men_at_arms_expense_gold multiply = 3 } } value = -30 }
+        else_if = { limit = { gold < { value = monthly_character_men_at_arms_expense_gold multiply = 6 } } value = -15 }
+        else_if = { limit = { gold < { value = monthly_character_men_at_arms_expense_gold multiply = 12 } } value = 0 }
+    }
+}
+tca_fs_treasury_reserve_value = {
+    value = 0
+    if = { limit = { treasury < 0 } value = -40 }
+    else_if = { limit = { monthly_character_men_at_arms_expense_treasury > 0 }
+        value = 10
+        if = { limit = { treasury < { value = monthly_character_men_at_arms_expense_treasury multiply = 3 } } value = -30 }
+        else_if = { limit = { treasury < { value = monthly_character_men_at_arms_expense_treasury multiply = 6 } } value = -15 }
+        else_if = { limit = { treasury < { value = monthly_character_men_at_arms_expense_treasury multiply = 12 } } value = 0 }
+    }
+}
+tca_fs_finance_value = {
+    value = tca_fs_gold_reserve_value
+    if = { limit = { has_treasury = yes monthly_character_men_at_arms_expense_treasury > 0 }
+        if = { limit = { monthly_character_men_at_arms_expense_gold > 0 } max = tca_fs_treasury_reserve_value }
+        else = { value = tca_fs_treasury_reserve_value }
+    }
+    # 任一实际存在的钱包已经负债时，沿用单一赤字惩罚；零维护费不掩盖已有赤字。
+    if = { limit = { OR = { gold < 0 AND = { has_treasury = yes treasury < 0 } } } value = -40 }
+}
+
+# 人物作用域；ai_chance与测试共用的接受权重。tca_fs_record／row由书信带入。
+# 好感双向分开，上级才读下属对自己的好感／忠顺；亲密及敌对关系同组取最高档。
+tca_fs_accept_weight_value = {
+    value = 50
+    if = { limit = { scope:tca_fs_row = { var:tca_fs_kind = 1 } } add = 50 }
+    else_if = { limit = { scope:tca_fs_row = { var:tca_fs_kind = 2 } } add = 25 }
+    add = tca_fs_finance_value
+    if = { limit = { any_character_war = { trigger_if = { limit = { exists = scope:tca_fs_record.var:tca_fs_war } this != scope:tca_fs_record.var:tca_fs_war } is_defender = prev } } subtract = 30 }
+    else_if = { limit = { any_character_war = { trigger_if = { limit = { exists = scope:tca_fs_record.var:tca_fs_war } this != scope:tca_fs_record.var:tca_fs_war } } } subtract = 15 }
+    if = { limit = { has_trait = brave } add = 15 }
+    if = { limit = { has_trait = craven } subtract = 15 }
+    # 数值好感控制在小幅修正，避免与特殊关系叠加后完全压过财力和身份。
+    if = { limit = { opinion = { target = scope:tca_fs_record.var:tca_fs_defender value >= 50 } } add = 10 }
+    else_if = { limit = { opinion = { target = scope:tca_fs_record.var:tca_fs_defender value <= -50 } } subtract = 10 }
+    if = { limit = { has_relation_best_friend = scope:tca_fs_record.var:tca_fs_defender } add = 30 }
+    else_if = { limit = { has_relation_friend = scope:tca_fs_record.var:tca_fs_defender } add = 20 }
+    if = { limit = { has_relation_nemesis = scope:tca_fs_record.var:tca_fs_defender } subtract = 30 }
+    else_if = { limit = { has_relation_rival = scope:tca_fs_record.var:tca_fs_defender } subtract = 20 }
+    if = { limit = { scope:tca_fs_row = { var:tca_fs_kind = 2 } }
+        if = { limit = { reverse_opinion = { target = scope:tca_fs_record.var:tca_fs_defender value >= 50 } } add = 10 }
+        else_if = { limit = { reverse_opinion = { target = scope:tca_fs_record.var:tca_fs_defender value <= -50 } } subtract = 10 }
+        if = { limit = { scope:tca_fs_record.var:tca_fs_defender = { is_obedient_to = scope:tca_fs_row.var:tca_fs_person } } add = 20 }
+        if = { limit = { OR = {
+            AND = { has_government = celestial_government scope:tca_fs_record.var:tca_fs_defender = { has_government = celestial_government } }
+            AND = { has_government = meritocratic_government scope:tca_fs_record.var:tca_fs_defender = { has_government = meritocratic_government } }
+            AND = { has_government = steppe_admin_government scope:tca_fs_record.var:tca_fs_defender = { has_government = steppe_admin_government } }
+        } } add = 20 }
+    }
+    min = 1
+}
+
+# 限时变量的天数字段使用原生script value，避免把var重定向当作静态命名值。
+tca_fs_wait_days_value = { value = var:tca_fs_delay }

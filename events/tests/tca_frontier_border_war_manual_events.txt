@@ -1,0 +1,48 @@
+﻿# 仅独立可丢弃debug玩家局；先接管宋君，再event tca_frontier_border_war_test.20。
+# run_interaction没有目标头衔参数，原生窗口由本入口打开，人工选择与发送不伪装为自动断言。
+namespace = tca_frontier_border_war_test
+
+tca_frontier_border_war_test.20 = {
+    orphan = yes
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_BORDER_MANUAL PREPARING"
+        tca_frontier_situation_start_effect = yes
+        title:h_china.holder = { save_scope_as = actor tca_test_protect_character_effect = yes add_prestige = 10000 add_character_flag = tca_frontier_border_war_enabled }
+        create_character = { age = 35 gender = male random_traits = no culture = title:k_france.holder.culture faith = title:k_france.holder.faith location = root.capital_province save_scope_as = recipient }
+        scope:recipient = { create_title_and_vassal_change = { type = granted save_scope_as = tca_frontier_border_war_test_grant } }
+        title:c_lingzhou = { change_title_holder = { holder = scope:recipient change = scope:tca_frontier_border_war_test_grant take_baronies = yes } }
+        title:c_huaiyuan = { change_title_holder = { holder = scope:recipient change = scope:tca_frontier_border_war_test_grant take_baronies = yes } }
+        resolve_title_and_vassal_change = scope:tca_frontier_border_war_test_grant
+        scope:recipient = {
+            change_government = feudal_government
+            tca_test_protect_character_effect = yes
+            if = { limit = { is_independent_ruler = no }
+                create_title_and_vassal_change = { type = independency save_scope_as = tca_frontier_border_war_test_independent }
+                becomes_independent = { change = scope:tca_frontier_border_war_test_independent }
+                resolve_title_and_vassal_change = scope:tca_frontier_border_war_test_independent
+            }
+        }
+        # 明确准备与目标接壤的进攻者辖区，不依赖当局随机AI任免。
+        title:c_lingzhou = { random_neighboring_county = { limit = { this != title:c_huaiyuan } save_scope_as = tca_frontier_border_war_test_border } }
+        scope:actor = { create_title_and_vassal_change = { type = granted save_scope_as = tca_frontier_border_war_test_border_grant } }
+        scope:tca_frontier_border_war_test_border = { change_title_holder = { holder = scope:actor change = scope:tca_frontier_border_war_test_border_grant } }
+        resolve_title_and_vassal_change = scope:tca_frontier_border_war_test_border_grant
+        title:c_hangzhou.holder = { save_scope_as = tca_frontier_border_war_test_outside_owner }
+        title:c_lingzhou = { every_direct_de_jure_vassal_title = {
+            limit = { tier = tier_barony is_capital_barony = no exists = holder }
+            set_variable = { name = tca_frontier_border_war_test_original_baron value = holder }
+        } }
+        trigger_event = { id = tca_frontier_border_war_test.21 days = 2 }
+    }
+}
+
+tca_frontier_border_war_test.21 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { scope:actor = { is_ai = no } }
+            open_interaction_window = { interaction = tca_frontier_border_war_interaction actor = scope:actor recipient = scope:recipient redirect = no target_title = title:c_lingzhou }
+        }
+        else = { debug_log = "TCA_BORDER_MANUAL REQUIRE_PLAYER_ACTOR" }
+    }
+}

@@ -1,0 +1,80 @@
+﻿# E人物作用域；财力档直接读C共享值，不维护第二套储备与币种口径。
+tca_fe_finance_multiplier_value = {
+    value = 1
+    if = { limit = { tca_fs_finance_value = -30 } value = 0.5 }
+    else_if = { limit = { tca_fs_finance_value = -15 } value = 0.75 }
+    else_if = { limit = { tca_fs_finance_value = 10 } value = 1.25 }
+    else_if = { limit = { tca_fs_finance_value < -30 } value = 0 }
+}
+tca_fe_will_do_value = {
+    value = 20
+    if = { limit = { has_trait = brave } add = 10 }
+    if = { limit = { has_trait = craven } subtract = 10 }
+    if = { limit = { has_trait = ambitious } add = 10 }
+    if = { limit = { has_trait = content } subtract = 10 }
+    multiply = tca_fe_finance_multiplier_value
+    if = { limit = { any_character_war = { is_defender = prev } } multiply = 0.25 }
+    else_if = { limit = { is_at_war = yes } multiply = 0.5 }
+    min = 0
+    max = 50
+}
+tca_fe_raid_weight_value = {
+    value = 50
+    if = { limit = { has_trait = greedy } add = 30 }
+    if = { limit = { has_trait = generous } subtract = 20 }
+    if = { limit = { tca_fs_finance_value = -30 } add = 15 }
+    else_if = { limit = { tca_fs_finance_value = -15 } add = 10 }
+    min = 1
+}
+tca_fe_conquest_weight_value = {
+    value = 50
+    if = { limit = { has_trait = ambitious } add = 30 }
+    if = { limit = { has_trait = content } subtract = 20 }
+    if = { limit = { tca_fs_finance_value = -30 } subtract = 15 }
+    else_if = { limit = { tca_fs_finance_value = -15 } subtract = 10 }
+    else_if = { limit = { tca_fs_finance_value = 10 } add = 15 }
+    min = 1
+}
+# C响应行作用域；对现有30/90/180/360/720日及未来更远到期均定义边界。
+tca_fe_delay_multiplier_value = {
+    value = 1
+    if = { limit = { var:tca_fs_delay > 720 } value = 0.25 }
+    else_if = { limit = { var:tca_fs_delay > 360 } value = 0.5 }
+    else_if = { limit = { var:tca_fs_delay > 180 } value = 0.75 }
+}
+# 候选人物作用域，输入tca_fs_record/row；玩家不预测真人选择，首版按一半计。
+tca_fe_accept_probability_value = {
+    value = 0.5
+    if = { limit = { is_ai = yes }
+        value = tca_fs_accept_weight_value
+        divide = { value = tca_fs_accept_weight_value add = 50 }
+    }
+}
+tca_fe_expected_reinforcement_value = {
+    value = military_power
+    multiply = tca_fe_accept_probability_value
+    multiply = { value = scope:tca_fs_row.tca_fe_delay_multiplier_value }
+}
+# 预测story作用域；仅统计B有效县交集，男爵领须真正已有地产，不读取当前持有人收入。
+tca_fe_raid_gain_value = {
+    value = 0
+    every_in_list = { variable = tca_fs_goals add = { value = development_level multiply = 5 } }
+}
+tca_fe_conquest_gain_value = {
+    value = 0
+    every_in_list = { variable = tca_fs_goals
+        add = 10
+        every_in_de_jure_hierarchy = {
+            limit = { tier = tier_barony exists = title_province title_province = { has_holding = yes } }
+            add = 2
+        }
+    }
+}
+tca_fe_advantage_value = {
+    value = 2
+    if = { limit = { var:tca_fe_defence > 0 }
+        value = scope:actor.military_power
+        divide = var:tca_fe_defence
+        max = 2
+    }
+}

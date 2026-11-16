@@ -1,0 +1,53 @@
+﻿# 有限边境战争伯爵CB候选：阶段A仅显式调试授权可用，复用脚本专用组，不开放普通游戏。
+# 输入标准attacker／defender与单县target_titles；胜利转县，其他结果无额外效果。
+# 目标分数采用首版参数；原版原型CB不改，保留俘虏满分对照。
+tca_frontier_limited_county_cb = {
+    icon = county_conquest_cb
+    group = tca_frontier_probe
+    target_titles = all
+    target_title_tier = county
+    target_top_liege_if_outside_realm = no
+    combine_into_one = yes
+    mutually_exclusive_titles = { always = yes }
+    allowed_for_character = { debug_only = yes has_character_flag = tca_frontier_limited_war_test_authorized has_variable = tca_frontier_probe_target }
+    allowed_against_character = { this = scope:attacker.var:tca_frontier_probe_target }
+    valid_to_start = { scope:target = { holder = scope:defender } }
+    should_invalidate = { NOT = { any_in_list = { list = target_titles holder = scope:defender } } }
+    on_primary_attacker_death = invalidate
+    on_primary_defender_death = invalidate
+    # 当前只验分数；正式费用、外交资格与停战在原生互动接入时启用。
+    truce_days = 1095
+    cost = { prestige = 0 }
+    attacker_ticking_warscore_delay = { months = 3 }
+    defender_ticking_warscore_delay = { months = 6 }
+    attacker_ticking_warscore = 0.5
+    defender_ticking_warscore = 0.2
+    max_attacker_score_from_battles = 20
+    max_defender_score_from_battles = 40
+    # 占领与战斗合计最高80分；俘虏领袖保留原生满分例外，仍允许自愿议和。
+    max_attacker_score_from_occupation = 60
+    max_defender_score_from_occupation = 40
+    full_occupation_by_attacker_gives_victory = no
+    full_occupation_by_defender_gives_victory = no
+    # 不禁用俘虏计分：原版开关未阻止本CB主防守者被俘满分，按已确认设计保留原生行为。
+    attacker_capital_gives_war_score = no
+    defender_capital_gives_war_score = no
+    attacker_wargoal_percentage = 1.0
+    defender_wargoal_percentage = 1.0
+    on_declaration = { debug_log = "TCA_LIMITED_CB DECLARED" }
+    on_victory_desc = tca_frontier_probe_cb_victory
+    on_victory = {
+        debug_log = "TCA_LIMITED_CB ATTACKER_VICTORY"
+        create_title_and_vassal_change = { type = conquest save_scope_as = tca_frontier_probe_change add_claim_on_loss = yes }
+        every_in_list = { list = target_titles change_title_holder = { holder = scope:attacker change = scope:tca_frontier_probe_change } }
+        resolve_title_and_vassal_change = scope:tca_frontier_probe_change
+    }
+    on_white_peace_desc = tca_frontier_probe_cb_white_peace
+    on_white_peace = { debug_log = "TCA_LIMITED_CB WHITE_PEACE" }
+    on_defeat_desc = tca_frontier_probe_cb_defeat
+    on_defeat = { debug_log = "TCA_LIMITED_CB DEFENDER_VICTORY" }
+    on_invalidated_desc = tca_frontier_probe_cb_invalidated
+    on_invalidated = { debug_log = "TCA_LIMITED_CB INVALIDATED" }
+    war_name = tca_frontier_probe_war_name
+    cb_name = tca_frontier_probe_county_cb
+}

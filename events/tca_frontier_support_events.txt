@@ -1,0 +1,37 @@
+﻿# 原生书信只选择一次；root为候选人，record／row由投递上下文带入并随存档保存。
+namespace = tca_frontier_support
+
+tca_frontier_support.1 = {
+    type = letter_event
+    sender = scope:tca_fs_letter_sender
+    opening = tca_frontier_support.1.opening
+    desc = tca_frontier_support.1.desc
+    trigger = {
+        exists = scope:tca_fs_record
+        exists = scope:tca_fs_row
+        scope:tca_fs_row = { var:tca_fs_state = 0 tca_fs_row_valid_trigger = yes }
+    }
+    on_trigger_fail = { scope:tca_fs_row ?= { if = { limit = { var:tca_fs_state = 0 } set_variable = { name = tca_fs_state value = 4 } } } }
+    option = {
+        name = tca_frontier_support.1.a
+        trigger = { scope:tca_fs_row = { var:tca_fs_state = 0 tca_fs_row_valid_trigger = yes } }
+        custom_tooltip = tca_frontier_support.1.delay
+        hidden_effect = { scope:tca_fs_row = { tca_fs_accept_effect = yes } }
+        ai_chance = { base = 0 modifier = { add = tca_fs_accept_weight_value } }
+    }
+    option = {
+        name = tca_frontier_support.1.b
+        timeout_option = yes
+        hidden_effect = { scope:tca_fs_row = { tca_fs_refuse_effect = yes } }
+        ai_chance = { base = 50 }
+    }
+}
+
+# 上级拒绝后的逐人回信；只告知结果，不触发新的选择或再次征询。
+tca_frontier_support.2 = {
+    type = letter_event
+    sender = scope:tca_fs_reply_sender
+    opening = tca_frontier_support.1.opening
+    desc = tca_frontier_support.2.desc
+    option = { name = tca_frontier_support.2.a }
+}

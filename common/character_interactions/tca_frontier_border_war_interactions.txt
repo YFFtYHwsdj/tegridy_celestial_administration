@@ -1,0 +1,41 @@
+﻿# 原生头衔选择；接收者固定为主防守者，县／公国选项按目标头衔层级区分。
+# 仅显式调试标记人物可见，互动AI关闭；季度AI使用独立调试开关，普通游玩尚未开放。
+tca_frontier_border_war_interaction = {
+    category = interaction_category_diplomacy
+    common_interaction = yes
+    interface_priority = 79
+    icon = declare_war_interaction
+    desc = tca_frontier_border_war_interaction_desc
+    target_type = title
+    target_filter = recipient_de_jure_titles
+    show_all_targets = no
+    auto_accept = yes
+    is_available = { debug_only = yes has_character_flag = tca_frontier_border_war_enabled }
+    is_shown = { scope:actor != scope:recipient scope:recipient = { is_landed = yes } }
+    is_valid_showing_failures_only = { tca_frontier_border_war_parties_trigger = { ACTOR = scope:actor DEFENDER = scope:recipient } }
+    can_be_picked_title = { scope:target = { tca_frontier_border_war_target_trigger = { ACTOR = scope:actor DEFENDER = scope:recipient } } }
+    can_send = {
+        tca_frontier_border_war_parties_trigger = { ACTOR = scope:actor DEFENDER = scope:recipient }
+        exists = scope:target
+        scope:target = { tca_frontier_border_war_target_trigger = { ACTOR = scope:actor DEFENDER = scope:recipient } }
+        scope:actor = { prestige >= tca_frontier_border_war_cost_value }
+    }
+    send_options_exclusive = yes
+    send_option = { flag = tca_frontier_conquest localization = tca_frontier_conquest_option starts_enabled = { always = yes } }
+    send_option = { flag = tca_frontier_raid localization = tca_frontier_raid_option }
+    # 原生确认窗显式预览费用；实际扣费只由成功开战入口执行。
+    on_send = {
+        show_as_tooltip = {
+            scope:actor = { add_prestige = { value = tca_frontier_border_war_cost_value multiply = -1 } }
+            if = { limit = { scope:actor = { has_truce = scope:recipient } }
+                custom_tooltip = tca_frontier_border_break_truce_tt
+            }
+            if = { limit = { scope:tca_frontier_raid = yes } custom_tooltip = tca_frontier_raid_victory }
+            else = { custom_tooltip = tca_frontier_conquest_victory }
+        }
+    }
+    on_accept = { tca_frontier_border_war_start_effect = yes }
+    ai_targets = { ai_recipients = neighboring_rulers max = 1 }
+    ai_frequency = 0
+    ai_will_do = { base = 0 }
+}

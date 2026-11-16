@@ -1,0 +1,87 @@
+﻿# D记录story作用域；原受攻击者即使失去全部土地，仍按战前国家代表头衔识别国别。
+# 输入tca_fs_record；只核对实际失地，不向第三方索地，不追讨已经归还的土地。
+tca_fd_land_valid_trigger = {
+    save_temporary_scope_as = tca_fd_checked_land
+    exists = var:tca_fs_defender
+    exists = var:tca_fs_attacker
+    exists = var:tca_fd_country.holder
+    var:tca_fs_defender = { is_alive = yes }
+    # 以代表头衔当前持有人承接正常继位；不沿其新top_liege追随改隶或国家被兼并。
+    # 旧调试记录缺少快照时取消，不能用当前归属补写并掩盖已经发生的改隶。
+    exists = var:tca_fd_attacker_country.holder
+    var:tca_fd_attacker_country ?= { holder ?= { is_alive = yes is_independent_ruler = yes } }
+    var:tca_fs_attacker = {
+        is_alive = yes
+        top_liege = scope:tca_fd_checked_land.var:tca_fd_attacker_country.holder
+    }
+    var:tca_fd_country ?= { holder ?= { is_alive = yes is_landed = yes NOT = { top_liege = scope:tca_fd_checked_land.var:tca_fs_attacker.top_liege } } }
+    any_in_list = { variable = tca_fd_losses always = yes }
+    NOT = { any_in_list = { variable = tca_fd_losses
+        NOT = {
+            exists = var:tca_fd_title.holder
+            exists = var:tca_fd_holder
+            var:tca_fd_title ?= { holder = scope:tca_fd_checked_land.var:tca_fs_attacker }
+            var:tca_fd_holder ?= {
+                is_alive = yes
+                OR = {
+                    AND = {
+                        is_landed = no
+                        NOT = { tca_is_celestial_governor_trigger = yes }
+                        OR = {
+                            NOT = { exists = liege_or_court_owner }
+                            liege_or_court_owner ?= { top_liege = scope:tca_fd_checked_land.var:tca_fd_country.holder.top_liege }
+                        }
+                    }
+                    top_liege = scope:tca_fd_checked_land.var:tca_fd_country.holder.top_liege
+                }
+            }
+        }
+    } }
+}
+# 人物作用域；共享国别和敌对检查。无地地方主官仍由正式身份入口纳入。
+tca_fd_person_valid_trigger = {
+    exists = scope:tca_fs_record.var:tca_fd_country.holder
+    is_alive = yes
+    is_imprisoned = no
+    OR = { is_landed = yes tca_is_celestial_governor_trigger = yes }
+    top_liege = scope:tca_fs_record.var:tca_fd_country.holder.top_liege
+    this != scope:tca_fs_record.var:tca_fs_attacker
+    NOT = { is_allied_in_war = scope:tca_fs_record.var:tca_fs_attacker }
+    NOT = { is_at_war_with = scope:tca_fs_record.var:tca_fs_defender }
+}
+# C承诺行作用域；只有真实上级且明确承诺者可牵头。仍有地的受攻击者须保留实际上级关系。
+tca_fd_leader_valid_trigger = {
+    var:tca_fs_kind = 2
+    var:tca_fs_accepted = yes
+    exists = var:tca_fs_person
+    var:tca_fs_person = {
+        tca_fd_person_valid_trigger = yes
+        OR = {
+            scope:tca_fs_record.var:tca_fs_defender = { is_landed = no }
+            is_liege_or_above_of = scope:tca_fs_record.var:tca_fs_defender
+        }
+        NOT = { is_allied_to = scope:tca_fs_record.var:tca_fs_attacker }
+        NOT = { is_at_war_with = scope:tca_fs_record.var:tca_fs_attacker }
+    }
+}
+# C行作用域；只有指定四政体的拒绝才能约束同政体下级。
+tca_fd_vetoed_trigger = {
+    OR = {
+        AND = { scope:tca_fs_record = { has_variable = tca_fd_veto_celestial } var:tca_fs_person = { has_government = celestial_government } }
+        AND = { scope:tca_fs_record = { has_variable = tca_fd_veto_meritocratic } var:tca_fs_person = { has_government = meritocratic_government } }
+        AND = { scope:tca_fs_record = { has_variable = tca_fd_veto_steppe } var:tca_fs_person = { has_government = steppe_admin_government } }
+        AND = { scope:tca_fs_record = { has_variable = tca_fd_veto_administrative } var:tca_fs_person = { has_government = administrative_government } }
+    }
+}
+# D记录作用域；先确认新战争仍在当前主战双方集合内，才解引用war。
+tca_fd_live_trigger = {
+    var:tca_fd_state = 3
+    exists = var:tca_fd_leader
+    exists = var:tca_fd_war
+    var:tca_fd_leader = { is_alive = yes any_character_war = {
+        this = scope:tca_fs_record.var:tca_fd_war
+        primary_attacker = scope:tca_fs_record.var:tca_fd_leader
+        primary_defender = scope:tca_fs_record.var:tca_fs_attacker
+        using_cb = tca_frontier_recovery_cb
+    } }
+}

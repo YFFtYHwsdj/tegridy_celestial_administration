@@ -1,0 +1,227 @@
+﻿# C阶段战争作用域入口；CB的on_declaration通过war进入。幂等：同场只建立一份story。
+# 输出tca_fs_record。目标县、上级链和响应行均归该记录；不写人物单一待援战争指针。
+tca_fs_start_effect = {
+    if = { limit = { tca_fs_war_trigger = yes NOT = { has_variable = tca_fs_record } }
+        save_scope_as = tca_fs_war
+        primary_attacker = { save_scope_as = tca_fs_attacker }
+        primary_defender = { save_scope_as = tca_fs_defender create_story = { type = tca_frontier_support_record save_scope_as = tca_fs_record } }
+        set_variable = { name = tca_fs_record value = scope:tca_fs_record }
+        scope:tca_fs_record = {
+            set_variable = { name = tca_fs_war value = scope:tca_fs_war }
+            set_variable = { name = tca_fs_attacker value = scope:tca_fs_attacker }
+            set_variable = { name = tca_fs_defender value = scope:tca_fs_defender }
+            set_variable = { name = tca_fs_started_on value = current_date }
+        }
+        scope:tca_fs_defender = { add_to_variable_list = { name = tca_fs_records target = scope:tca_fs_record } }
+        casus_belli = {
+            every_target_title = {
+                if = { limit = { tier = tier_county tca_frontier_border_war_county_trigger = { DEFENDER = scope:tca_fs_defender } }
+                    scope:tca_fs_record = { add_to_variable_list = { name = tca_fs_goals target = prev } }
+                }
+                else_if = { limit = { tier = tier_duchy }
+                    every_in_de_jure_hierarchy = {
+                        limit = { tca_frontier_border_war_county_trigger = { DEFENDER = scope:tca_fs_defender } }
+                        scope:tca_fs_record = { add_to_variable_list = { name = tca_fs_goals target = prev } }
+                    }
+                }
+            }
+        }
+        tca_fs_collect_candidates_effect = yes
+        # 等名单完全建立再发信，避免AI即时选择修改迭代中的候选表。
+        scope:tca_fs_record = {
+            every_in_list = {
+                variable = tca_fs_rows
+                save_scope_as = tca_fs_row
+                scope:tca_fs_record.var:tca_fs_defender = { save_scope_as = tca_fs_letter_sender }
+                scope:tca_fs_record.var:tca_fs_attacker = { save_scope_as = tca_fs_letter_attacker }
+                save_scope_value_as = { name = tca_fs_letter_delay value = var:tca_fs_delay }
+                var:tca_fs_person = { trigger_event = { id = tca_frontier_support.1 } }
+            }
+        }
+    }
+}
+
+# 共享候选收集：输入record、defender、attacker和record内已建立的goals；输出rows/people/uppers/neighbors。
+# C实际战争与E瞬时预测共用；只收集、不发信、不承诺。原战争存在时排除其已参战者。
+tca_fs_collect_candidates_effect = {
+        # 先收集真实上级，响应类别不会被后面的邻近或目标县命中改写。
+        scope:tca_fs_defender = { save_scope_as = tca_fs_chain }
+        save_scope_value_as = { name = tca_fs_depth value = 0 }
+        while = {
+            limit = { scope:tca_fs_chain = { is_independent_ruler = no exists = liege } }
+            scope:tca_fs_chain.liege = { save_scope_as = tca_fs_chain }
+            save_scope_value_as = { name = tca_fs_depth value = { value = scope:tca_fs_depth add = 1 } }
+            scope:tca_fs_record = { add_to_variable_list = { name = tca_fs_uppers target = scope:tca_fs_chain } }
+            scope:tca_fs_chain = { tca_fs_add_candidate_effect = { KIND = 2 DEPTH = scope:tca_fs_depth } }
+        }
+        scope:tca_fs_record = {
+            every_in_list = {
+                variable = tca_fs_goals
+                holder ?= {
+                    tca_fs_add_candidate_effect = { KIND = 1 DEPTH = 0 }
+                    every_liege_or_above = {
+                        limit = { is_vassal_or_below_of = scope:tca_fs_defender }
+                        tca_fs_add_candidate_effect = { KIND = 1 DEPTH = 0 }
+                    }
+                }
+                every_neighboring_county = {
+                    limit = { NOT = { scope:tca_fs_record = { is_target_in_variable_list = { name = tca_fs_goals target = prev } } } }
+                    if = { limit = { NOT = { scope:tca_fs_record = { is_target_in_variable_list = { name = tca_fs_neighbors target = prev } } } }
+                        scope:tca_fs_record = { add_to_variable_list = { name = tca_fs_neighbors target = prev } }
+                    }
+                }
+            }
+            every_in_list = {
+                variable = tca_fs_neighbors
+                holder ?= {
+                    tca_fs_add_neighbor_effect = yes
+                    every_liege_or_above = { tca_fs_add_neighbor_effect = yes }
+                }
+            }
+        }
+        # 仅从现有地方官署注册表补候选，按绑定治所识别，不扫描全部人物。
+        if = { limit = { has_global_variable_list = tca_tongpan_counties }
+            every_in_global_list = { variable = tca_tongpan_counties var:tca_tongpan_office.holder ?= { tca_fs_add_office_effect = yes } }
+        }
+        if = { limit = { has_global_variable_list = tca_judicial_circuits }
+            every_in_global_list = { variable = tca_judicial_circuits var:song_judicial_title.holder ?= { tca_fs_add_office_effect = yes } }
+        }
+}
+
+# 人物作用域，输入tca_fs_record；KIND=1受威胁、2上级、3邻近，DEPTH仅上级有效。
+# 行号无全局计数；同一人物在该记录的people列表中只能出现一次。
+tca_fs_add_candidate_effect = {
+    save_scope_as = tca_fs_candidate
+    if = { limit = {
+        tca_fs_candidate_trigger = yes
+        NOT = { scope:tca_fs_record = { is_target_in_variable_list = { name = tca_fs_people target = prev } } }
+        NOT = { scope:tca_fs_record = { has_variable = tca_fs_war var:tca_fs_war ?= { any_war_participant = { this = scope:tca_fs_candidate } } } }
+    }
+        save_scope_as = tca_fs_candidate
+        scope:tca_fs_defender = { create_story = { type = tca_frontier_support_row save_scope_as = tca_fs_row } }
+        scope:tca_fs_row = {
+            set_variable = { name = tca_fs_parent value = scope:tca_fs_record }
+            set_variable = { name = tca_fs_person value = scope:tca_fs_candidate }
+            set_variable = { name = tca_fs_kind value = $KIND$ }
+            set_variable = { name = tca_fs_depth value = $DEPTH$ }
+            set_variable = { name = tca_fs_state value = 0 }
+        }
+        scope:tca_fs_candidate = { save_scope_value_as = { name = tca_fs_delay value = tca_fs_delay_value } }
+        scope:tca_fs_row = { set_variable = { name = tca_fs_delay value = scope:tca_fs_delay } }
+        scope:tca_fs_record = {
+            add_to_variable_list = { name = tca_fs_people target = scope:tca_fs_candidate }
+            add_to_variable_list = { name = tca_fs_rows target = scope:tca_fs_row }
+        }
+    }
+}
+tca_fs_add_neighbor_effect = {
+    save_temporary_scope_as = tca_fs_checked_person
+    save_scope_as = tca_fs_candidate
+    if = { limit = { tca_fs_neighbor_trigger = yes } tca_fs_add_candidate_effect = { KIND = 3 DEPTH = 0 } }
+}
+tca_fs_add_office_effect = {
+    save_temporary_scope_as = tca_frontier_candidate
+    save_scope_as = tca_fs_candidate
+    if = { limit = { tca_is_celestial_governor_trigger = yes tca_frontier_has_anchor_trigger = yes }
+        if = { limit = { scope:tca_fs_record = { is_target_in_variable_list = { name = tca_fs_goals target = scope:tca_frontier_anchor } } }
+            tca_fs_add_candidate_effect = { KIND = 1 DEPTH = 0 }
+        }
+        else_if = { limit = {
+            NOT = { is_liege_or_above_of = scope:tca_fs_defender }
+            scope:tca_fs_record = { is_target_in_variable_list = { name = tca_fs_neighbors target = scope:tca_frontier_anchor } }
+        } tca_fs_add_candidate_effect = { KIND = 3 DEPTH = 0 } }
+    }
+}
+
+# 承诺行作用域；输入record／row。唯一接受事务：立即记承诺，原生限时变量保存到期点。
+# committed_on与delay共同定义预计到达日，不用current_day（月内日）冒充绝对日期。
+tca_fs_accept_effect = {
+    if = { limit = { var:tca_fs_state = 0 tca_fs_row_valid_trigger = yes }
+        set_variable = { name = tca_fs_state value = 1 }
+        set_variable = { name = tca_fs_accepted value = yes }
+        set_variable = { name = tca_fs_committed_on value = current_date }
+        set_variable = { name = tca_fs_wait value = yes days = tca_fs_wait_days_value }
+        scope:tca_fs_record = {
+            if = { limit = { NOT = { is_target_in_variable_list = { name = tca_fs_committed target = scope:tca_fs_row.var:tca_fs_person } } }
+                add_to_variable_list = { name = tca_fs_committed target = scope:tca_fs_row.var:tca_fs_person }
+            }
+        }
+        if = { limit = { var:tca_fs_kind = 3 }
+            var:tca_fs_person = { save_scope_as = tca_fs_notice_person }
+            save_scope_value_as = { name = tca_fs_notice_delay value = var:tca_fs_delay }
+            if = { limit = { var:tca_fs_person = { highest_held_title_tier >= tier_duchy } }
+                scope:tca_fs_record.var:tca_fs_defender = {
+                    send_interface_toast = { type = event_toast_text_good title = tca_frontier_support_pledged_title desc = tca_frontier_support_pledged_desc left_icon = scope:tca_fs_notice_person }
+                }
+            }
+            else = {
+                scope:tca_fs_record.var:tca_fs_defender = {
+                    send_interface_message = { type = event_generic_good_text title = tca_frontier_support_pledged_title desc = tca_frontier_support_pledged_desc left_icon = scope:tca_fs_notice_person }
+                }
+            }
+        }
+    }
+}
+tca_fs_refuse_effect = {
+    if = { limit = { var:tca_fs_state = 0 }
+        set_variable = { name = tca_fs_state value = 2 }
+        if = { limit = { var:tca_fs_kind = 2 }
+            var:tca_fs_person = { save_scope_as = tca_fs_reply_sender }
+            scope:tca_fs_record.var:tca_fs_defender ?= { trigger_event = { id = tca_frontier_support.2 } }
+        }
+    }
+}
+
+# 战争记录作用域；局部story每日维护，仅遍历本战候选；不是全局寻敌或人物扫描。
+tca_fs_tick_effect = {
+    save_scope_as = tca_fs_record
+    if = { limit = { has_variable = tca_fs_closed }
+        if = { limit = { has_variable = tca_fd_active } tca_fd_tick_effect = yes }
+        else_if = { limit = { NOT = { has_variable = tca_fs_retention } } end_story = yes }
+    }
+    else_if = { limit = { tca_fs_live_trigger = yes }
+        every_in_list = {
+            variable = tca_fs_rows
+            limit = { OR = { var:tca_fs_state = 0 var:tca_fs_state = 1 } }
+            save_scope_as = tca_fs_row
+            if = { limit = { NOT = { tca_fs_row_valid_trigger = yes } }
+                set_variable = { name = tca_fs_state value = 4 }
+                remove_variable = tca_fs_wait
+            }
+            else_if = { limit = { scope:tca_fs_record.var:tca_fs_war = { is_defender = scope:tca_fs_row.var:tca_fs_person } }
+                set_variable = { name = tca_fs_state value = 3 }
+                remove_variable = tca_fs_wait
+            }
+            else_if = { limit = { var:tca_fs_state = 1 NOT = { has_variable = tca_fs_wait } }
+                scope:tca_fs_record.var:tca_fs_war = { add_defender = scope:tca_fs_row.var:tca_fs_person }
+                set_variable = { name = tca_fs_state value = 3 }
+            }
+        }
+    }
+    else = { tca_fs_close_record_effect = { RESULT = 4 } }
+}
+
+# CB结束前的战争作用域；先冻结参战名单再停止旧任务，结果1胜利、2白和平、3失败、4失效。
+tca_fs_finish_effect = {
+    if = { limit = { has_variable = tca_fs_record }
+        var:tca_fs_record = { save_scope_as = tca_fs_record }
+        every_war_defender = { scope:tca_fs_record = { add_to_variable_list = { name = tca_fs_participants target = prev } } }
+        scope:tca_fs_record = { tca_fs_close_record_effect = { RESULT = $RESULT$ } }
+    }
+}
+
+# 记录作用域；不再解引用原war。结束快照保留30日，供D领用；未领用自动回收。
+# D在征服转地后领用并延长记录生命；旧承诺永不自动转入新战争。
+tca_fs_close_record_effect = {
+    if = { limit = { NOT = { has_variable = tca_fs_closed } }
+        set_variable = { name = tca_fs_closed value = $RESULT$ }
+        set_variable = { name = tca_fs_closed_on value = current_date }
+        set_variable = { name = tca_fs_retention value = yes days = 30 }
+        every_in_list = {
+            variable = tca_fs_rows
+            remove_variable = tca_fs_wait
+            if = { limit = { OR = { var:tca_fs_state = 0 var:tca_fs_state = 1 } } set_variable = { name = tca_fs_state value = 4 } }
+        }
+        remove_variable = tca_fs_war
+    }
+}

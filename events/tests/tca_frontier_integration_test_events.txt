@@ -1,0 +1,177 @@
+﻿# F独立整合：可控正式开战与承诺，真实等待、围城及AI议和；不写占领、分数或强制原战争结果。
+namespace = tca_frontier_integration_test
+
+tca_frontier_integration_test.1 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_frontier_integration_test.1 tca_test_frontier_integration"
+        remove_character_flag = tca_test_tca_frontier_integration_test_case_failed
+        tca_frontier_situation_start_effect = yes
+        create_character = { age = 35 gender = male random_traits = no culture = root.culture faith = root.faith location = root.capital_province save_scope_as = tca_ff_attacker }
+        create_character = { age = 35 gender = male random_traits = no culture = root.culture faith = root.faith location = root.capital_province save_scope_as = tca_ff_defender }
+        create_character = { age = 40 gender = male random_traits = no culture = root.culture faith = root.faith location = root.capital_province save_scope_as = tca_ff_upper }
+        title:k_xia = { save_scope_as = tca_ff_upper_title }
+        scope:tca_ff_defender = { create_title_and_vassal_change = { type = granted save_scope_as = tca_ff_grant } }
+        title:c_lingzhou = { change_title_holder = { holder = scope:tca_ff_defender change = scope:tca_ff_grant take_baronies = yes } }
+        resolve_title_and_vassal_change = scope:tca_ff_grant
+        scope:tca_ff_upper = { create_title_and_vassal_change = { type = granted save_scope_as = tca_ff_grant } }
+        title:c_hangzhou = { change_title_holder = { holder = scope:tca_ff_upper change = scope:tca_ff_grant take_baronies = yes } }
+        scope:tca_ff_upper_title = { change_title_holder = { holder = scope:tca_ff_upper change = scope:tca_ff_grant } }
+        resolve_title_and_vassal_change = scope:tca_ff_grant
+        title:c_lingzhou = { random_neighboring_county = { save_scope_as = tca_ff_border } }
+        scope:tca_ff_attacker = { create_title_and_vassal_change = { type = granted save_scope_as = tca_ff_grant } }
+        scope:tca_ff_border = { change_title_holder = { holder = scope:tca_ff_attacker change = scope:tca_ff_grant take_baronies = yes } }
+        resolve_title_and_vassal_change = scope:tca_ff_grant
+        # 进攻者只持接壤县；上级复用D已验证的夏国头衔链，避免新造头衔夹具干扰。
+        scope:tca_ff_attacker = {
+            tca_test_protect_character_effect = yes change_government = feudal_government add_prestige = 10000 add_gold = 20 add_trait = ambitious
+            add_character_flag = tca_frontier_border_war_enabled
+            if = { limit = { is_independent_ruler = no } create_title_and_vassal_change = { type = independency save_scope_as = tca_ff_independent } becomes_independent = { change = scope:tca_ff_independent } resolve_title_and_vassal_change = scope:tca_ff_independent }
+            save_scope_as = actor
+        }
+        scope:tca_ff_upper = {
+            tca_test_protect_character_effect = yes change_government = feudal_government add_gold = 500 add_trait = brave
+            if = { limit = { is_independent_ruler = no } create_title_and_vassal_change = { type = independency save_scope_as = tca_ff_independent } becomes_independent = { change = scope:tca_ff_independent } resolve_title_and_vassal_change = scope:tca_ff_independent }
+            create_maa_regiment = { type = armored_footmen check_can_recruit = no size = 1 }
+            every_maa_regiment = { limit = { regiment_owner = scope:tca_ff_upper } change_maa_troops_count = 100000 }
+        }
+        scope:tca_ff_defender = {
+            tca_test_protect_character_effect = yes change_government = feudal_government add_gold = 20
+            create_title_and_vassal_change = { type = swear_fealty save_scope_as = tca_ff_fealty }
+            change_liege = { liege = scope:tca_ff_upper change = scope:tca_ff_fealty }
+            resolve_title_and_vassal_change = scope:tca_ff_fealty
+            save_scope_as = recipient
+        }
+        # 先让新领地与军备完成初始化；普通游戏从不触发此测试入口。
+        trigger_event = { id = tca_frontier_integration_test.2 days = 90 }
+    }
+}
+tca_frontier_integration_test.2 = {
+    type = character_event hidden = yes
+    immediate = {
+        scope:tca_ff_attacker = { save_scope_as = actor }
+        scope:tca_ff_defender = { save_scope_as = recipient }
+        title:c_lingzhou = { save_scope_as = target }
+        save_scope_value_as = { name = tca_frontier_raid value = no }
+        tca_frontier_border_war_start_effect = yes
+        scope:tca_frontier_border_war ?= { save_scope_as = tca_ff_war var:tca_fs_record = { save_scope_as = tca_ff_record } }
+        if = { limit = { exists = scope:tca_ff_war scope:tca_ff_war = { using_cb = tca_frontier_county_conquest_cb primary_attacker = scope:tca_ff_attacker primary_defender = scope:tca_ff_defender } exists = scope:tca_ff_record }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_integration 1"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_integration_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_integration 1" }
+        trigger_event = { id = tca_frontier_integration_test.3 days = 3 }
+    }
+}
+tca_frontier_integration_test.3 = {
+    type = character_event hidden = yes
+    immediate = {
+        # 唯一上级用正式接受事务准备承诺；原始书信选择已由E覆盖，本例只隔离真实180日到达。
+        scope:tca_ff_record ?= {
+            save_scope_as = tca_fs_record
+            every_in_list = { variable = tca_fs_rows limit = { var:tca_fs_kind = 2 var:tca_fs_person = scope:tca_ff_upper }
+                save_scope_as = tca_fs_row save_scope_as = tca_ff_row
+                set_variable = { name = tca_fs_state value = 0 }
+                tca_fs_accept_effect = yes
+            }
+        }
+        if = { limit = { scope:tca_ff_row ?= { var:tca_fs_state = 1 var:tca_fs_delay = 180 } exists = scope:tca_ff_row }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_integration 2"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_integration_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_integration 2" }
+        trigger_event = { id = tca_frontier_integration_test.4 days = 179 }
+    }
+}
+tca_frontier_integration_test.4 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { exists = scope:tca_ff_war scope:tca_ff_row ?= { var:tca_fs_state = 1 } scope:tca_ff_war ?= { NOT = { any_war_defender = { this = scope:tca_ff_upper } } } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_integration 3"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_integration_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_integration 3" }
+        trigger_event = { id = tca_frontier_integration_test.5 days = 3 }
+    }
+}
+tca_frontier_integration_test.5 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { exists = scope:tca_ff_war scope:tca_ff_row ?= { var:tca_fs_state = 3 } scope:tca_ff_war ?= { any_war_defender = { this = scope:tca_ff_upper } } scope:tca_ff_upper = { military_power > 0 } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_integration 4"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_integration_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_integration 4" }
+        if = { limit = { scope:tca_ff_upper = { any_army = { army_size > 0 } } } debug_log = "TCA_FRONTIER_INTEGRATION UPPER_HAS_RAISED_ARMY" }
+        else = { debug_log = "TCA_FRONTIER_INTEGRATION UPPER_NOT_YET_RAISED" }
+        # 仅造围城军，不改占领和分数。首府慢于其他地产，便于采到围城后的占领状态。
+        if = { limit = { exists = scope:tca_ff_war }
+            title:c_lingzhou = { every_direct_de_jure_vassal_title = {
+                limit = { tier = tier_barony title_province = { has_holding = yes } }
+                title_province = { save_scope_as = tca_ff_siege }
+                save_scope_value_as = { name = tca_ff_siege_men value = 1000 }
+                if = { limit = { is_capital_barony = yes } save_scope_value_as = { name = tca_ff_siege_men value = 100 } }
+                scope:tca_ff_attacker = { spawn_army = { name = tca_frontier_ai_test_army levies = 5000 men_at_arms = { type = trebuchet men = scope:tca_ff_siege_men } location = scope:tca_ff_siege war = scope:tca_ff_war uses_supply = no inheritable = no } }
+            } }
+        }
+        set_variable = { name = tca_ff_elapsed value = 0 }
+        set_variable = { name = tca_ff_occupied value = no }
+        set_variable = { name = tca_ff_peak_score value = 0 }
+        trigger_event = { id = tca_frontier_integration_test.6 days = 7 }
+    }
+}
+tca_frontier_integration_test.6 = {
+    type = character_event hidden = yes
+    immediate = {
+        change_variable = { name = tca_ff_elapsed add = 7 }
+        if = { limit = { title:c_lingzhou = { any_direct_de_jure_vassal_title = { title_province = { is_occupied = yes } } } } set_variable = { name = tca_ff_occupied value = yes } }
+        scope:tca_ff_war ?= { save_scope_value_as = { name = tca_ff_score value = attacker_war_score } }
+        if = { limit = { exists = scope:tca_ff_war scope:tca_ff_score > var:tca_ff_peak_score } set_variable = { name = tca_ff_peak_score value = scope:tca_ff_score } }
+        if = { limit = { NOT = { exists = scope:tca_ff_war } }
+            debug_log = "TCA_FRONTIER_INTEGRATION NATURAL_END siege_days=[THIS.Char.MakeScope.Var('tca_ff_elapsed').GetValue] peak_sample=[THIS.Char.MakeScope.Var('tca_ff_peak_score').GetValue]"
+            if = { limit = { var:tca_ff_occupied = yes scope:tca_ff_record ?= { var:tca_fs_closed = 1 has_variable_list = tca_fd_losses } title:c_lingzhou = { holder = scope:tca_ff_attacker } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_integration 5"
+            }
+            else = { add_character_flag = tca_test_tca_frontier_integration_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_integration 5" }
+            trigger_event = { id = tca_frontier_integration_test.7 days = 7 }
+        }
+        else_if = { limit = { var:tca_ff_elapsed < 1095 }
+            trigger_event = { id = tca_frontier_integration_test.6 days = 7 }
+        }
+        else = {
+            add_character_flag = tca_test_tca_frontier_integration_test_case_failed
+            debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_integration 5"
+            debug_log = "TCA_FRONTIER_INTEGRATION NATURAL_END_TIMEOUT peak_sample=[THIS.Char.MakeScope.Var('tca_ff_peak_score').GetValue]"
+            trigger_event = { id = tca_frontier_integration_test.7 }
+        }
+    }
+}
+tca_frontier_integration_test.7 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { scope:tca_ff_record ?= { OR = { var:tca_fd_state = 3 var:tca_fd_state = 4 } any_in_list = { variable = tca_fs_rows var:tca_fs_kind = 2 has_variable = tca_fd_choice OR = { var:tca_fd_choice = 1 var:tca_fd_choice = 2 } } } exists = scope:tca_ff_record }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_integration 6"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_integration_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_integration 6" }
+        # D胜利归还已有独立事务证据；此处只观察自然选择，随后白和平收尾，不冒充自然追讨结果。
+        scope:tca_ff_record ?= { if = { limit = { var:tca_fd_state = 3 } debug_log = "TCA_FRONTIER_INTEGRATION RECOVERY_ACCEPTED" var:tca_fd_war = { end_war = white_peace } } else = { debug_log = "TCA_FRONTIER_INTEGRATION RECOVERY_REFUSED_OR_ENDED" } }
+        scope:tca_ff_war ?= { end_war = white_peace }
+        trigger_event = { id = tca_frontier_integration_test.8 days = 35 }
+    }
+}
+tca_frontier_integration_test.8 = {
+    type = character_event hidden = yes
+    immediate = {
+        scope:tca_ff_attacker = { remove_character_flag = tca_frontier_border_war_enabled }
+        if = { limit = { NOT = { exists = scope:tca_ff_record } NOT = { exists = scope:tca_ff_war } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_integration 7"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_integration_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_integration 7" }
+        if = { limit = { has_character_flag = tca_test_tca_frontier_integration_test_case_failed }
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+            debug_log = "TCA_TEST FAIL tca_test_frontier_integration"
+        }
+        else = {
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } }
+            debug_log = "TCA_TEST PASS tca_test_frontier_integration"
+        }
+        remove_character_flag = tca_test_tca_frontier_integration_test_case_failed
+        tca_test_lane_end_effect = { GROUP = tca_frontier_integration_test }
+    }
+}

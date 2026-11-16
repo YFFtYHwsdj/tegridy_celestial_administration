@@ -150,17 +150,29 @@
 
 `game/common/character_interactions/pam_interactions.txt`的`ecclesiastic_incite_claim_war_interaction`使用`target_type = title`、`target_filter = realm_titles`、`target_source = recipient`，以`populate_recipient_list`生成第二人物候选，并以`can_be_picked_title`过滤目标。`send_option`承载参战、资助等选择；`game/common/scripted_effects/pam_effects.txt`的`pam_incite_claim_war_effect`最终调用`start_war`和`claim_cb`。这是原生互动选择后脚本开战的依据，不是普通宣战窗口绕过封臣保护的依据；该原版互动明确要求收件人独立，资格也不能照搬到天朝。
 
+### 原生书信与即时响应
+
+`game/events/_events.info`提供`type = letter_event`，要求`sender`，并以`opening`、`desc`及`option`承载称呼、正文与选择；选项可用`ai_chance`或`ai_will_select`决定AI响应。`game/events/war_events/war_events.txt`的`war_event.2004`是接受／拒绝请求的实际书信用例，`game/gui/event_windows/letter_event.gui`使用`EventOption.Select`执行选项。因此支援书信可以直接承载承诺事务，不需要自制窗口，也不必先投递可搁置的外交互动请求。
+
+原版HUD区分`IsPausedByEvent`与`IsManuallyPaused`；`game/localization/simp_chinese/gui/ingame_main_l_simp_chinese.yml`的`PAUSED_BY_EVENT_TT`说明事件关闭后恢复时间，`core_l_simp_chinese.yml`的`CURRENT_DATE_TOOLTIP`在事件暂停时不显示继续时间操作提示。这是单机收到书信后先选择、再恢复时间的源码依据，尚未实际弹出书信并按空格核验，不能写成已通过人工验收。`_events.info`中的`should_pause_time`位于宫廷事件专用`court_scene`块，不能当作书信的通用暂停字段。
+
+多人模式另有`game/common/defines/00_defines.txt`的`NGame.MULTIPLAYER_EVENT_TIME_OUT`，书信GUI也仅在多人条件下显示相应超时选项提示；不能宣称多人同样必须答复才能推进时间。本轮只核查原版源码，未改窗口、事件或全局定义，未验证即时投递的引擎调度时刻及AI处理时序。玩法采用[响应规则](design.md#响应与议和)，后续以最小范围确认原始投递和玩家时间控制。
+
 ### 战争分数
 
-`game/common/casus_belli_types/_casus_belli.info`定义`full_occupation_by_attacker_gives_victory`、`max_attacker_score_from_occupation`、`max_attacker_score_from_battles`、`imprisonment_by_attacker_give_war_score`、`defender_capital_gives_war_score`及目标持续分数、延迟和控制比例字段。可配置取消完全占领自动满分、俘虏分数并限制战斗与占领来源；分数合计、全部目标失守、俘虏首领及持续控制后的真实读数须在独立局核验。字段存在不证明组合效果，也不证明实际议和路径。
+`game/common/casus_belli_types/_casus_belli.info`定义`full_occupation_by_attacker_gives_victory`、`max_attacker_score_from_occupation`、`max_attacker_score_from_battles`、`imprisonment_by_attacker_give_war_score`、`defender_capital_gives_war_score`及目标持续分数、延迟和控制比例字段。可配置取消完全占领自动满分并限制战斗与占领来源；俘虏字段不保证关闭战争领袖满分；分数合计、全部目标失守、俘虏首领及持续控制后的真实读数须在独立局核验。字段存在不证明组合效果，也不证明实际议和路径。阶段A已出现重要反例：新人物第一场普通伯爵候选战争中，该俘虏开关未阻止主防守者被捕满分；中立羁押隔离后全占领可限制为40分。旧失败及现行例外见[验证页](verification.md#有限边境战争新方案的验证状态)。
 
 ### 议和AI与低于满分的结算
 
 `game/common/character_interactions/00_war.txt`的`end_war_attacker_victory_interaction`分别定义`is_available`、`ai_will_do`、`ai_accept`与`auto_accept`。提议门槛有100、90、80、70分等分支，涉及和平缔造者、游牧宗族传承、首级威慑及征服者；不能把所有低于满分的分支都称作强制接受。接受基础为-99，再计分数和加成；自动接受另有满分、向进攻者投降及征服者军力分支。仅降低战争分数上限不能证明必须控制目标后才能结算，也不能靠调整`ai_accept`覆盖`auto_accept`。
 
-白和平的`end_war_attacker_white_peace_interaction`也分别维护提议与接受逻辑；接受值考虑战争分数、持续时间、债务、其他战争及性格等。后续须分别核对地方AI主动投降、接受胜利要求、提议和接受白和平，保留玩家自愿投降，不以全面禁议和代替援军判断。
+白和平的`end_war_attacker_white_peace_interaction`也分别维护提议与接受逻辑；接受值考虑战争分数、持续时间、债务、其他战争及性格等。另须区分进攻方要求胜利与防守方主动投降：本机原版`end_war_attacker_victory_interaction.ai_will_do`中，防守方主动投降分支要求进攻方已达100分并维持180天；不能仅添加接受减分就声称已影响满分前的主动投降。
 
-目前已查CB说明未提供独立的议和AI修正字段；上述互动内也未发现预留给本模组援军承诺的追加入口。精确接入可能需要覆盖必要的顶层互动对象，但尚未确认不存在免覆盖替代，故当前不新增覆盖、不改评分。若最终必须覆盖，保留原版逻辑，仅对指定CB及正确一方添加条件，并登记上游清单与基线；不得同路径覆盖整份`00_war.txt`。
+目前已查CB说明未提供独立的议和AI修正字段；上述互动内也未发现预留给本模组援军承诺的追加入口。将承诺援军接入预计涉及`end_war_attacker_victory_interaction`与`end_war_attacker_white_peace_interaction`两个完整顶层对象：新增计算可放模组独立脚本，但兼容维护仍按整个被覆盖对象承担，不能把少量接入行描述为局部追加。若以后确有必要接入，应先排除免覆盖替代，保留其他战争行为并登记上游清单与基线，不得同路径覆盖整份`00_war.txt`。
+
+军力方面，`game/common/script_values/00_war_values.txt`的`war_attacker_total_current_strength_value`与`war_defender_total_current_strength_value`按参战人物累加`current_military_strength`，天朝求援互动也采用这类估计。原版`06_ep3_interactions.txt`同时按`every_controlled_title_maa_regiment`及`regiment_controlling_title`区分借用军团和原属头衔；不能直接把人物总军力与头衔兵士人数再相加。人物总军力是否已扣除借出兵力、上下级同时计入是否重叠，尚无专项引擎证据；已有单上级集结验证不能替代这一口径验证。
+
+当前决定暂缓原C3：承诺援军不额外参与议和评分，白和平、投降、自动接受及玩家自愿投降均沿用原版，不新增议和互动覆盖。上述研究保留为以后重启的边界，不作为当前C1/C2交付门槛。
 
 ### 追讨结算与停战
 
@@ -169,3 +181,33 @@
 原生`on_war_won_attacker`已有成功事务入口，但战争／CB作用域短命；本模块已知二级回调和瞬时结束的时序限制仍适用。承诺名单须以持久载体保存，不能将待追讨任务挂在销毁中的战争上。此轮未找到主动替换主防守者的通用脚本用例，继承字段不能作为移交接口证据；新方案无需依赖该接口。
 
 追讨必须另查原进攻者已交地、失去全部土地、已有战争、盟友、死亡及改隶。原进攻者与现持有人不一致时，既定的反向攻守身份与目标有效性可能冲突，属于设计待决，不可由测试偷偷替换防守者。
+
+### 公国目标与指定防守者的交集
+
+原版`common/casus_belli_types/00_conquest.txt`的`duchy_conquest_cb`采用`target_title_tier = duchy`及`target_de_jure_regions_above = yes`，失效检查要求目标法理范围内仍有防守者或其下属持有的县。胜利调用`common/scripted_effects/00_war_effects.txt`中的`conquest_cb_title_transfer`：先遍历目标的法理县，只收集持有人为`scope:defender`或其封臣的县，再分别处理可转属封臣与直接夺取头衔。这支持“既定防守者辖下领土与法理公国取交集”的脚本组织方式，不要求防守者本人持有该公国头衔。
+
+本模组已确定互动接收者为主防守者，公国只定义目标地理范围；选择接收者的外交资格另行判断。原版上述结算还包含封臣转属，不能直接等同于所有目标县都转为进攻者直辖；北疆区域过滤、非最高领主作为接收者、跨区封臣及最终转地范围须在B阶段接入时核验。B阶段已实现县级直接转移并保留基层持有人随县转属；实际验收及原生窗口限制见[互动与战果验证](verification.md#b阶段互动与战果验证)。
+
+
+## 追讨的独立宣战接点
+
+D使用独立`tca_frontier_recovery_cb`，没有同名覆盖原版CB。仅在失地记录的同步宣战内，通过发起者临时`tca_fd_authorized`变量授权；声明后战争保存记录引用，不依赖该人物变量继续存在。原C动员入口只识别B的四类CB，因此追讨不递归触发防御承诺或再次追讨。
+
+原版`ep3_laamp_events_8.txt`中`ep3_laamps.8106.a`把动态目标逐一传入`target_title`，分为1—10项分支。本批采用同样写法，不把十项解释为引擎硬限制；超过本实现容量整次取消，具体边界见[设计页](design.md#追讨目标的接口容量)。
+
+原版`on_declared_war`以`allowed_war_declaration_sans_truce_penalties`排除撕约处罚；`tgp_east_asia_interaction_events.txt`和`scheme_critical_moments.txt`有宣战前加、后移除的正式用例。D仅围住本次原生声明处理，原已存在该标记则不移除；既有停战保留，不跳过其他原生声明处理。定向断言核对威望未受撕约扣罚、停战仍在和临时授权／标记清理，不能据此推论所有普通外交限制被绕过。
+
+归还使用原生头衔事务。`change_title_holder_include_vassals`支持`government_base`，无地原主先以原国家代表为授地参照，再恢复保存的原政体；不使用敌方政体作为恢复依据。原生可能在失去最后县时销毁公国，因此只在爵位仍允许时恢复原直属上级，否则归原国家代表，不额外重建高阶头衔。无地转国通过原生`liege_or_court_owner`及正式无地方官署身份检查；无所属宫廷的流亡者仍按原国家处理。
+
+
+## E季度评估的军力与调度口径
+
+本机原版1.20.1.2公开的`military_power`数值入口与`current_military_strength`不同：前者连接人物当前战力缓存，后者是人数。原生战力按兵种基础伤害与坚韧乘当前人数，骑士采用预设平均勇武估计；本机可执行文件的`CMilitaryPowerTrigger`→`GetCurrentMilitaryPower`及`NMilitaryStrength::CalculateMilitaryStrengthData`调用链与[官方开发日志156](https://store.steampowered.com/news/posts/?appids=1158310&enddate=1727356181&feed=steam_community_announcements)的接口区别一致。不将其等同于完整驻扎、克制、将领与地形计算。
+
+原生行政头衔兵士按当前控制头衔汇总：`FindAllAdminTitles`只取本人持有的合格头衔，人物汇总使用controlled清单；`TransferTitleRegimentControl`先从旧清单移除，再加进新清单。天朝与行政均为administrative机制类型；征召兵另有上缴份额分属处理。静态路径支持按人物当前战力累加，不另加全国影响力征调估计。E探针直接检查转借前后的controlled清单与所有权；双方跨月仍会自行征募与征调，不能将总战力变化单独归因于本军团。没有声称逐项隔离了所有政体、征召份额与复杂编成。
+
+原生带选项头衔互动按最高`ai_will_do`组合挑选，不能承载已定的劫掠／征服一次随机权重。因此E复用本模组原生AI决议每3个月调度，由本次瞬时session收集实际陆地边界目标，两个类型各取最高分后抽选一次；没有全局on_action或永久评分账本。预测story与C共用候选收集和接受值，不发信、不留承诺，完成后立即结束。
+
+当前调试入口需要发起者同时有`tca_frontier_border_war_enabled`和`tca_frontier_ai_enabled`。共用CB组设置`can_only_start_via_script = yes`，不向普通宣战窗口提供入口。B四个自有CB对AI另要求正式开战入口内部临时授权，防止原生普通宣战AI绕过E费用、概率及1.25倍门槛；玩家原生互动不因此增加军力门槛。成功战争保存`tca_fe_origin`用于辨别原始季度路径；不维护人物上次评估日期来替代原生调度。
+
+原版`common/decisions/_decisions.info`明确`ai_check_interval`单位为月，因此季度入口设为3，冷却也为3个月。

@@ -1,0 +1,86 @@
+﻿# C阶段独立入口；战争作用域，只识别B阶段四类CB，不接入原版战争或旧P0。
+tca_fs_war_trigger = {
+    OR = {
+        using_cb = tca_frontier_county_raid_cb
+        using_cb = tca_frontier_duchy_raid_cb
+        using_cb = tca_frontier_county_conquest_cb
+        using_cb = tca_frontier_duchy_conquest_cb
+    }
+}
+
+# 战争记录story作用域；先从原进攻者的现存战争集合确认引用，才允许访问war内部。
+tca_fs_live_trigger = {
+    NOT = { has_variable = tca_fs_closed }
+    exists = var:tca_fs_war
+    var:tca_fs_attacker ?= {
+        is_alive = yes
+        any_character_war = {
+            this = scope:tca_fs_record.var:tca_fs_war
+            primary_attacker = scope:tca_fs_record.var:tca_fs_attacker
+            primary_defender = scope:tca_fs_record.var:tca_fs_defender
+        }
+    }
+    var:tca_fs_defender ?= { is_alive = yes }
+}
+
+# 人物作用域；候选必须同国且具正式统治身份。不得以is_landed漏掉登记无地主官。
+# 输入tca_fs_record；不向家门、普通廷臣或已经站在敌方的人发邀请。
+tca_fs_candidate_trigger = {
+    is_alive = yes
+    is_imprisoned = no
+    this != scope:tca_fs_record.var:tca_fs_defender
+    top_liege = scope:tca_fs_record.var:tca_fs_defender.top_liege
+    OR = { is_landed = yes tca_is_celestial_governor_trigger = yes }
+    primary_title ?= { is_noble_family_title = no }
+    NOT = { is_at_war_with = scope:tca_fs_record.var:tca_fs_defender }
+    NOT = { is_allied_in_war = scope:tca_fs_record.var:tca_fs_attacker }
+}
+
+# 候选人物作用域；仅查看冻结目标向外一层邻县的当前持有人及其领主链。
+# 上级链与邻近名单严格互斥，即使上级有邻接直辖也不走邻近响应。
+tca_fs_neighbor_trigger = {
+    NOT = { is_liege_or_above_of = scope:tca_fs_record.var:tca_fs_defender }
+    scope:tca_fs_record = {
+        any_in_list = {
+            variable = tca_fs_neighbors
+            holder ?= { OR = { this = scope:tca_fs_checked_person is_vassal_or_below_of = scope:tca_fs_checked_person } }
+        }
+    }
+}
+
+# 承诺行story作用域；由记录提供活战争检查。按原类别重查，不重新归类或改到达日。
+tca_fs_row_valid_trigger = {
+    scope:tca_fs_record = { tca_fs_live_trigger = yes }
+    var:tca_fs_person ?= {
+        save_temporary_scope_as = tca_fs_checked_person
+        save_temporary_scope_as = tca_frontier_candidate
+        tca_fs_candidate_trigger = yes
+        trigger_if = {
+            limit = { scope:tca_fs_row = { var:tca_fs_kind = 2 } }
+            is_liege_or_above_of = scope:tca_fs_record.var:tca_fs_defender
+        }
+        trigger_else_if = {
+            limit = { scope:tca_fs_row = { var:tca_fs_kind = 1 } }
+            OR = {
+                scope:tca_fs_record = { any_in_list = { variable = tca_fs_goals holder ?= { OR = { this = scope:tca_fs_checked_person is_vassal_or_below_of = scope:tca_fs_checked_person } } } }
+                AND = {
+                    tca_is_celestial_governor_trigger = yes
+                    tca_frontier_has_anchor_trigger = yes
+                    scope:tca_fs_record = { is_target_in_variable_list = { name = tca_fs_goals target = scope:tca_frontier_anchor } }
+                }
+            }
+        }
+        trigger_else = {
+            OR = {
+                tca_fs_neighbor_trigger = yes
+                AND = {
+                    tca_is_celestial_governor_trigger = yes
+                    NOT = { is_liege_or_above_of = scope:tca_fs_record.var:tca_fs_defender }
+                    save_temporary_scope_as = tca_frontier_candidate
+                    tca_frontier_has_anchor_trigger = yes
+                    scope:tca_fs_record = { is_target_in_variable_list = { name = tca_fs_neighbors target = scope:tca_frontier_anchor } }
+                }
+            }
+        }
+    }
+}

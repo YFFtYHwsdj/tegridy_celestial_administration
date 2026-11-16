@@ -1,0 +1,320 @@
+﻿# 伯爵领作用域，紧邻B征服事务的转地调用；输入tca_fs_record由结束回调提供。
+# 只保存实际将转移的县及原主、原直属上级；无C记录的旧探针不建立追讨。
+tca_fd_capture_county_effect = {
+    if = { limit = { exists = scope:tca_fs_record scope:tca_fs_record = { var:tca_fs_closed = 1 } }
+        save_scope_as = tca_fd_county
+        holder = { save_scope_as = tca_fd_old_holder }
+        scope:tca_fs_record.var:tca_fs_defender = { create_story = { type = tca_frontier_recovery_loss save_scope_as = tca_fd_loss } }
+        scope:tca_fd_loss = {
+            set_variable = { name = tca_fd_parent value = scope:tca_fs_record }
+            set_variable = { name = tca_fd_title value = scope:tca_fd_county }
+            set_variable = { name = tca_fd_holder value = scope:tca_fd_old_holder }
+            set_variable = { name = tca_fd_government value = scope:tca_fd_old_holder.government_type }
+            scope:tca_fd_old_holder.liege ?= { scope:tca_fd_loss = { set_variable = { name = tca_fd_liege value = prev } } }
+        }
+        scope:tca_fs_record = {
+            # 国家代表在转地前冻结，避免原防御方全失地后改按其廷臣身份判断。
+            if = { limit = { NOT = { has_variable = tca_fd_country } }
+                set_variable = { name = tca_fd_country value = var:tca_fs_defender.top_liege.primary_title }
+            }
+            # 同时冻结征服方国家代表；后续改隶不得把追讨带入第三国。
+            if = { limit = { NOT = { has_variable = tca_fd_attacker_country } }
+                set_variable = { name = tca_fd_attacker_country value = var:tca_fs_attacker.top_liege.primary_title }
+            }
+            add_to_variable_list = { name = tca_fd_losses target = scope:tca_fd_loss }
+            add_to_variable_list = { name = tca_fd_goals target = scope:tca_fd_county }
+            if = { limit = { NOT = { is_target_in_variable_list = { name = tca_fd_victims target = scope:tca_fd_old_holder } } }
+                add_to_variable_list = { name = tca_fd_victims target = scope:tca_fd_old_holder }
+            }
+        }
+    }
+}
+# 记录作用域；转地事务已经完成后调用。超过本实现十目标容量整案取消，绝不截断或扩大目标。
+tca_fd_begin_effect = {
+    save_scope_as = tca_fs_record
+    if = { limit = { has_variable_list = tca_fd_losses NOT = { has_variable = tca_fd_state } }
+        set_variable = { name = tca_fd_state value = 0 }
+        set_variable = { name = tca_fd_active value = yes }
+        if = { limit = { tca_fd_land_valid_trigger = yes tca_fd_goal_count_value <= 10 }
+            tca_fd_choose_effect = yes
+        }
+        else = { tca_fd_end_effect = { RESULT = 0 } }
+    }
+}
+# 记录作用域；最高未决定上级优先，先排除四政体否决行，再投递一封书信。
+# 状态0寻找、1等选择、2启动中、3战争中、4结束；待定不是允许玩家延期的选项。
+tca_fd_choose_effect = {
+    save_scope_as = tca_fs_record
+    every_in_list = { variable = tca_fs_rows limit = { var:tca_fs_kind = 2 NOT = { has_variable = tca_fd_choice } tca_fd_vetoed_trigger = yes }
+        set_variable = { name = tca_fd_choice value = 3 }
+    }
+    # 原生清除只清顶层saved scope；同事件继承上下文仍可能留旧行，选择后须再核对未决定状态。
+    clear_saved_scope = tca_fd_choice_row
+    ordered_in_list = { variable = tca_fs_rows order_by = var:tca_fs_depth max = 1 check_range_bounds = no
+        limit = { var:tca_fs_kind = 2 var:tca_fs_accepted = yes NOT = { has_variable = tca_fd_choice } }
+        save_scope_as = tca_fd_choice_row
+    }
+    if = { limit = { exists = scope:tca_fd_choice_row scope:tca_fd_choice_row = { NOT = { has_variable = tca_fd_choice } tca_fd_leader_valid_trigger = yes } }
+        set_variable = { name = tca_fd_pending value = scope:tca_fd_choice_row }
+        set_variable = { name = tca_fd_state value = 1 }
+        scope:tca_fd_choice_row = { save_scope_as = tca_fs_row }
+        scope:tca_fd_choice_row = { set_variable = { name = tca_fd_choice value = 0 } }
+        var:tca_fs_defender = { save_scope_as = tca_fd_sender }
+        scope:tca_fd_choice_row.var:tca_fs_person = { trigger_event = { id = tca_frontier_recovery.1 days = 1 } }
+    }
+    else = { tca_fd_end_effect = { RESULT = 0 } }
+}
+# 记录作用域，输入tca_fd_choice_row；重复或过期选择无副作用。
+tca_fd_refuse_effect = {
+    if = { limit = { var:tca_fd_state = 1 var:tca_fd_pending = scope:tca_fd_choice_row }
+        scope:tca_fd_choice_row = { set_variable = { name = tca_fd_choice value = 2 } }
+        scope:tca_fd_choice_row.var:tca_fs_person = {
+            if = { limit = { has_government = celestial_government } scope:tca_fs_record = { set_variable = { name = tca_fd_veto_celestial value = yes } } }
+            else_if = { limit = { has_government = meritocratic_government } scope:tca_fs_record = { set_variable = { name = tca_fd_veto_meritocratic value = yes } } }
+            else_if = { limit = { has_government = steppe_admin_government } scope:tca_fs_record = { set_variable = { name = tca_fd_veto_steppe value = yes } } }
+            else_if = { limit = { has_government = administrative_government } scope:tca_fs_record = { set_variable = { name = tca_fd_veto_administrative value = yes } } }
+        }
+        remove_variable = tca_fd_pending
+        set_variable = { name = tca_fd_state value = 0 }
+        tca_fd_choose_effect = yes
+    }
+}
+# 记录作用域，输入choice_row；最后重查所有目标与人物，再同步启动独立CB。
+tca_fd_accept_effect = {
+    save_scope_as = tca_fs_record
+    if = { limit = { var:tca_fd_state = 1 var:tca_fd_pending = scope:tca_fd_choice_row }
+        if = { limit = { tca_fd_land_valid_trigger = yes scope:tca_fd_choice_row = { tca_fd_leader_valid_trigger = yes } }
+            scope:tca_fd_choice_row = { set_variable = { name = tca_fd_choice value = 1 } }
+            set_variable = { name = tca_fd_leader value = scope:tca_fd_choice_row.var:tca_fs_person }
+            set_variable = { name = tca_fd_state value = 2 }
+            tca_fd_start_war_effect = yes
+            if = { limit = { tca_fd_live_trigger = yes }
+                tca_fd_notice_effect = { RESULT = 1 }
+                every_in_list = { variable = tca_fs_participants tca_fd_invite_effect = yes }
+                every_in_list = { variable = tca_fs_committed tca_fd_invite_effect = yes }
+            }
+            else = { tca_fd_end_effect = { RESULT = 0 } }
+        }
+        else = { tca_fd_end_effect = { RESULT = 0 } }
+    }
+}
+# 记录作用域；宣战书信接受后只执行一次。原版同类动态多目标宣战使用固定1—10分支。
+tca_fd_start_war_effect = {
+    save_scope_value_as = { name = tca_fd_goal_index value = 0 }
+    clear_saved_scope = tca_fd_target_1
+    clear_saved_scope = tca_fd_target_2
+    clear_saved_scope = tca_fd_target_3
+    clear_saved_scope = tca_fd_target_4
+    clear_saved_scope = tca_fd_target_5
+    clear_saved_scope = tca_fd_target_6
+    clear_saved_scope = tca_fd_target_7
+    clear_saved_scope = tca_fd_target_8
+    clear_saved_scope = tca_fd_target_9
+    clear_saved_scope = tca_fd_target_10
+    every_in_list = { variable = tca_fd_goals
+        save_scope_value_as = { name = tca_fd_goal_index value = { value = scope:tca_fd_goal_index add = 1 } }
+        if = { limit = { scope:tca_fd_goal_index = 1 } save_scope_as = tca_fd_target_1 }
+        else_if = { limit = { scope:tca_fd_goal_index = 2 } save_scope_as = tca_fd_target_2 }
+        else_if = { limit = { scope:tca_fd_goal_index = 3 } save_scope_as = tca_fd_target_3 }
+        else_if = { limit = { scope:tca_fd_goal_index = 4 } save_scope_as = tca_fd_target_4 }
+        else_if = { limit = { scope:tca_fd_goal_index = 5 } save_scope_as = tca_fd_target_5 }
+        else_if = { limit = { scope:tca_fd_goal_index = 6 } save_scope_as = tca_fd_target_6 }
+        else_if = { limit = { scope:tca_fd_goal_index = 7 } save_scope_as = tca_fd_target_7 }
+        else_if = { limit = { scope:tca_fd_goal_index = 8 } save_scope_as = tca_fd_target_8 }
+        else_if = { limit = { scope:tca_fd_goal_index = 9 } save_scope_as = tca_fd_target_9 }
+        else_if = { limit = { scope:tca_fd_goal_index = 10 } save_scope_as = tca_fd_target_10 }
+    }
+    scope:tca_fs_record.var:tca_fd_leader = {
+        set_variable = { name = tca_fd_authorized value = scope:tca_fs_record }
+        if = { limit = { scope:tca_fd_goal_index = 10 }
+            start_war = { cb = tca_frontier_recovery_cb target = scope:tca_fs_record.var:tca_fs_attacker target_title = scope:tca_fd_target_1 target_title = scope:tca_fd_target_2 target_title = scope:tca_fd_target_3 target_title = scope:tca_fd_target_4 target_title = scope:tca_fd_target_5 target_title = scope:tca_fd_target_6 target_title = scope:tca_fd_target_7 target_title = scope:tca_fd_target_8 target_title = scope:tca_fd_target_9 target_title = scope:tca_fd_target_10 }
+        }
+        else_if = { limit = { scope:tca_fd_goal_index = 9 }
+            start_war = { cb = tca_frontier_recovery_cb target = scope:tca_fs_record.var:tca_fs_attacker target_title = scope:tca_fd_target_1 target_title = scope:tca_fd_target_2 target_title = scope:tca_fd_target_3 target_title = scope:tca_fd_target_4 target_title = scope:tca_fd_target_5 target_title = scope:tca_fd_target_6 target_title = scope:tca_fd_target_7 target_title = scope:tca_fd_target_8 target_title = scope:tca_fd_target_9 }
+        }
+        else_if = { limit = { scope:tca_fd_goal_index = 8 }
+            start_war = { cb = tca_frontier_recovery_cb target = scope:tca_fs_record.var:tca_fs_attacker target_title = scope:tca_fd_target_1 target_title = scope:tca_fd_target_2 target_title = scope:tca_fd_target_3 target_title = scope:tca_fd_target_4 target_title = scope:tca_fd_target_5 target_title = scope:tca_fd_target_6 target_title = scope:tca_fd_target_7 target_title = scope:tca_fd_target_8 }
+        }
+        else_if = { limit = { scope:tca_fd_goal_index = 7 }
+            start_war = { cb = tca_frontier_recovery_cb target = scope:tca_fs_record.var:tca_fs_attacker target_title = scope:tca_fd_target_1 target_title = scope:tca_fd_target_2 target_title = scope:tca_fd_target_3 target_title = scope:tca_fd_target_4 target_title = scope:tca_fd_target_5 target_title = scope:tca_fd_target_6 target_title = scope:tca_fd_target_7 }
+        }
+        else_if = { limit = { scope:tca_fd_goal_index = 6 }
+            start_war = { cb = tca_frontier_recovery_cb target = scope:tca_fs_record.var:tca_fs_attacker target_title = scope:tca_fd_target_1 target_title = scope:tca_fd_target_2 target_title = scope:tca_fd_target_3 target_title = scope:tca_fd_target_4 target_title = scope:tca_fd_target_5 target_title = scope:tca_fd_target_6 }
+        }
+        else_if = { limit = { scope:tca_fd_goal_index = 5 }
+            start_war = { cb = tca_frontier_recovery_cb target = scope:tca_fs_record.var:tca_fs_attacker target_title = scope:tca_fd_target_1 target_title = scope:tca_fd_target_2 target_title = scope:tca_fd_target_3 target_title = scope:tca_fd_target_4 target_title = scope:tca_fd_target_5 }
+        }
+        else_if = { limit = { scope:tca_fd_goal_index = 4 }
+            start_war = { cb = tca_frontier_recovery_cb target = scope:tca_fs_record.var:tca_fs_attacker target_title = scope:tca_fd_target_1 target_title = scope:tca_fd_target_2 target_title = scope:tca_fd_target_3 target_title = scope:tca_fd_target_4 }
+        }
+        else_if = { limit = { scope:tca_fd_goal_index = 3 }
+            start_war = { cb = tca_frontier_recovery_cb target = scope:tca_fs_record.var:tca_fs_attacker target_title = scope:tca_fd_target_1 target_title = scope:tca_fd_target_2 target_title = scope:tca_fd_target_3 }
+        }
+        else_if = { limit = { scope:tca_fd_goal_index = 2 }
+            start_war = { cb = tca_frontier_recovery_cb target = scope:tca_fs_record.var:tca_fs_attacker target_title = scope:tca_fd_target_1 target_title = scope:tca_fd_target_2 }
+        }
+        else_if = { limit = { scope:tca_fd_goal_index = 1 }
+            start_war = { cb = tca_frontier_recovery_cb target = scope:tca_fs_record.var:tca_fs_attacker target_title = scope:tca_fd_target_1 }
+        }
+        remove_variable = tca_fd_authorized
+    }
+}
+# CB声明作用域；只在当前脚本宣战内部授权。临时豁免撕约罚，不删停战，也不跳过其他原生声明逻辑。
+tca_fd_declaration_effect = {
+    scope:attacker.var:tca_fd_authorized = { save_scope_as = tca_fs_record }
+    save_scope_value_as = { name = tca_fd_added_truce_flag value = no }
+    scope:attacker = {
+        if = { limit = { NOT = { has_character_flag = allowed_war_declaration_sans_truce_penalties } }
+            add_character_flag = allowed_war_declaration_sans_truce_penalties
+            save_scope_value_as = { name = tca_fd_added_truce_flag value = yes }
+        }
+    }
+    on_declared_war = yes
+    if = { limit = { scope:tca_fd_added_truce_flag = yes } scope:attacker = { remove_character_flag = allowed_war_declaration_sans_truce_penalties } }
+    war = {
+        save_scope_as = tca_fd_war
+        set_variable = { name = tca_fd_record value = scope:tca_fs_record }
+    }
+    scope:tca_fs_record = {
+        set_variable = { name = tca_fd_war value = scope:tca_fd_war }
+        set_variable = { name = tca_fd_state value = 3 }
+    }
+}
+# 人物作用域；原参与者和承诺者合并去重，一人一信，旧承诺不等于新战争接受。
+tca_fd_invite_effect = {
+    if = { limit = { tca_fd_person_valid_trigger = yes this != scope:tca_fs_record.var:tca_fd_leader
+        NOT = { scope:tca_fs_record = { is_target_in_variable_list = { name = tca_fd_invited target = prev } } }
+    }
+        save_scope_as = tca_fd_invitee
+        scope:tca_fs_record.var:tca_fs_defender = { create_story = { type = tca_frontier_recovery_invitation save_scope_as = tca_fd_invitation } }
+        scope:tca_fd_invitation = {
+            set_variable = { name = tca_fd_parent value = scope:tca_fs_record }
+            set_variable = { name = tca_fd_person value = scope:tca_fd_invitee }
+            set_variable = { name = tca_fd_response value = 0 }
+        }
+        scope:tca_fs_record = {
+            add_to_variable_list = { name = tca_fd_invites target = scope:tca_fd_invitation }
+            add_to_variable_list = { name = tca_fd_invited target = scope:tca_fd_invitee }
+        }
+        clear_saved_scope = tca_fs_row
+        scope:tca_fs_record = { every_in_list = { variable = tca_fs_rows limit = { var:tca_fs_person = scope:tca_fd_invitee } save_scope_as = tca_fs_row } }
+        scope:tca_fs_record.var:tca_fd_leader = { save_scope_as = tca_fd_sender }
+        trigger_event = { id = tca_frontier_recovery.2 days = 1 }
+    }
+}
+# 邀请story作用域；响应独立计时七日，不继承旧战争到达日。
+tca_fd_join_accept_effect = {
+    if = { limit = { var:tca_fd_response = 0 scope:tca_fs_record = { tca_fd_live_trigger = yes } var:tca_fd_person = { tca_fd_person_valid_trigger = yes } }
+        set_variable = { name = tca_fd_response value = 1 }
+        set_variable = { name = tca_fd_wait value = yes days = 7 }
+    }
+}
+# 邀请story作用域；拒绝只处理待决定行，不覆写已经接受、到达或取消的响应。
+tca_fd_join_refuse_effect = {
+    if = { limit = { var:tca_fd_response = 0 } set_variable = { name = tca_fd_response value = 2 } }
+}
+# D记录作用域；仅本记录每日维护，战争结束或目标/人物失效立即停止待加入任务。
+tca_fd_tick_effect = {
+    save_scope_as = tca_fs_record
+    if = { limit = { NOT = { tca_fd_land_valid_trigger = yes } }
+        if = { limit = { tca_fd_live_trigger = yes } var:tca_fd_war = { end_war = invalidated } }
+        else = { tca_fd_end_effect = { RESULT = 0 } }
+    }
+    else_if = { limit = { var:tca_fd_state = 1 }
+        if = { limit = { var:tca_fd_pending = { NOT = { tca_fd_leader_valid_trigger = yes } } } tca_fd_end_effect = { RESULT = 0 } }
+    }
+    else_if = { limit = { var:tca_fd_state = 3 }
+        if = { limit = { tca_fd_live_trigger = yes }
+            every_in_list = { variable = tca_fd_invites limit = { OR = { var:tca_fd_response = 0 var:tca_fd_response = 1 } }
+                if = { limit = { var:tca_fd_person = { NOT = { tca_fd_person_valid_trigger = yes } } }
+                    set_variable = { name = tca_fd_response value = 4 }
+                    remove_variable = tca_fd_wait
+                }
+                else_if = { limit = { scope:tca_fs_record.var:tca_fd_war = { is_attacker = prev.var:tca_fd_person } }
+                    set_variable = { name = tca_fd_response value = 3 }
+                    remove_variable = tca_fd_wait
+                }
+                else_if = { limit = { var:tca_fd_response = 1 NOT = { has_variable = tca_fd_wait } }
+                    scope:tca_fs_record.var:tca_fd_war = { add_attacker = prev.var:tca_fd_person }
+                    set_variable = { name = tca_fd_response value = 3 }
+                }
+            }
+        }
+        else = { tca_fd_end_effect = { RESULT = 2 } }
+    }
+}
+# CB结果作用域；先返回县与附属男爵，再恢复原直属隶属，不经过征服后的分配选择。
+tca_fd_victory_effect = {
+    if = { limit = { exists = war.var:tca_fd_record }
+    war.var:tca_fd_record = { save_scope_as = tca_fs_record }
+    if = { limit = { scope:tca_fs_record = { tca_fd_land_valid_trigger = yes } }
+        create_title_and_vassal_change = { type = granted save_scope_as = tca_fd_return_change }
+        scope:tca_fs_record = {
+            every_in_list = { variable = tca_fd_losses
+                if = { limit = { var:tca_fd_holder = { is_landed = no } } set_variable = { name = tca_fd_restore_government value = yes } }
+                var:tca_fd_title = { change_title_holder_include_vassals = { holder = prev.var:tca_fd_holder change = scope:tca_fd_return_change government_base = scope:tca_fs_record.var:tca_fd_country.holder } }
+            }
+        }
+        resolve_title_and_vassal_change = scope:tca_fd_return_change
+        scope:tca_fs_record = {
+            every_in_list = { variable = tca_fd_losses
+                save_scope_as = tca_fd_restoring_loss
+                var:tca_fd_holder = {
+                    # 原主全失地时原生授地会复制授予方政体；恢复其失地前政体，避免把敌方制度一并带回。
+                    if = { limit = { scope:tca_fd_restoring_loss = { has_variable = tca_fd_restore_government } }
+                        change_government = scope:tca_fd_restoring_loss.var:tca_fd_government
+                    }
+                    if = { limit = { this != scope:tca_fs_record.var:tca_fd_country.holder }
+                        create_title_and_vassal_change = { type = swear_fealty save_scope_as = tca_fd_fealty_change }
+                        if = { limit = { scope:tca_fd_restoring_loss.var:tca_fd_liege ?= { is_alive = yes highest_held_title_tier > prev.highest_held_title_tier top_liege = scope:tca_fs_record.var:tca_fd_country.holder.top_liege } }
+                            change_liege = { liege = scope:tca_fd_restoring_loss.var:tca_fd_liege change = scope:tca_fd_fealty_change }
+                        }
+                        else = { change_liege = { liege = scope:tca_fs_record.var:tca_fd_country.holder change = scope:tca_fd_fealty_change } }
+                        resolve_title_and_vassal_change = scope:tca_fd_fealty_change
+                    }
+                }
+            }
+            tca_fd_end_effect = { RESULT = 3 }
+        }
+    }
+    else = { scope:tca_fs_record = { tca_fd_end_effect = { RESULT = 2 } } }
+    }
+}
+# CB结束作用域；白和平、战败、失效不返地，只有胜利走上面的正式事务。
+tca_fd_failed_effect = {
+    war.var:tca_fd_record ?= { save_scope_as = tca_fs_record tca_fd_end_effect = { RESULT = 2 } }
+}
+# 记录作用域；RESULT=0未组织、1已组织、2未夺回、3已经归还。一次结果通知，原受攻击者与失地者去重。
+tca_fd_notice_effect = {
+    save_scope_value_as = { name = tca_fd_notice_result value = $RESULT$ }
+    var:tca_fs_attacker ?= { save_scope_as = tca_fd_notice_sender }
+    var:tca_fs_defender ?= { if = { limit = { is_alive = yes } save_scope_as = tca_fd_notice_sender } }
+    var:tca_fd_leader ?= { if = { limit = { is_alive = yes } save_scope_as = tca_fd_notice_sender } }
+    clear_variable_list = tca_fd_notice_people
+    add_to_variable_list = { name = tca_fd_notice_people target = var:tca_fs_defender }
+    every_in_list = { variable = tca_fd_victims
+        if = { limit = { NOT = { scope:tca_fs_record = { is_target_in_variable_list = { name = tca_fd_notice_people target = prev } } } }
+            scope:tca_fs_record = { add_to_variable_list = { name = tca_fd_notice_people target = prev } }
+        }
+    }
+    every_in_list = { variable = tca_fd_notice_people limit = { is_alive = yes }
+        trigger_event = { id = tca_frontier_recovery.3 }
+    }
+    clear_variable_list = tca_fd_notice_people
+}
+# 记录作用域；保留最终快照30日，所有未到者停止，不清旧停战或重入原战争。
+tca_fd_end_effect = {
+    if = { limit = { has_variable = tca_fd_active }
+        set_variable = { name = tca_fd_state value = 4 }
+        set_variable = { name = tca_fd_result value = $RESULT$ }
+        remove_variable = tca_fd_active
+        remove_variable = tca_fd_pending
+        remove_variable = tca_fd_war
+        set_variable = { name = tca_fs_retention value = yes days = 30 }
+        every_in_list = { variable = tca_fd_invites
+            remove_variable = tca_fd_wait
+            if = { limit = { OR = { var:tca_fd_response = 0 var:tca_fd_response = 1 } } set_variable = { name = tca_fd_response value = 4 } }
+        }
+        tca_fd_notice_effect = { RESULT = $RESULT$ }
+    }
+}

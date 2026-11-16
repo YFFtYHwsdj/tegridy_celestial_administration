@@ -1,0 +1,71 @@
+﻿# 原生书信：收到即接受或拒绝，无延期选项。排队次日投递不构成选择期限。
+namespace = tca_frontier_recovery
+
+tca_frontier_recovery.1 = {
+    type = letter_event
+    sender = scope:tca_fd_sender
+    opening = tca_frontier_recovery.opening
+    desc = tca_frontier_recovery.1.desc
+    trigger = {
+        exists = scope:tca_fs_record
+        exists = scope:tca_fd_choice_row
+        scope:tca_fs_record = { var:tca_fd_state = 1 var:tca_fd_pending = scope:tca_fd_choice_row tca_fd_land_valid_trigger = yes }
+        scope:tca_fd_choice_row ?= { tca_fd_leader_valid_trigger = yes }
+    }
+    on_trigger_fail = {
+        scope:tca_fs_record ?= { if = { limit = { var:tca_fd_state = 1 var:tca_fd_pending = scope:tca_fd_choice_row } tca_fd_end_effect = { RESULT = 0 } } }
+    }
+    option = {
+        name = tca_frontier_recovery.1.a
+        custom_tooltip = tca_frontier_recovery.1.a.tt
+        hidden_effect = { scope:tca_fs_record = { tca_fd_accept_effect = yes } }
+        ai_chance = { base = 0 modifier = { add = tca_fd_accept_weight_value } }
+    }
+    option = {
+        name = tca_frontier_recovery.1.b
+        timeout_option = yes
+        hidden_effect = { scope:tca_fs_record = { tca_fd_refuse_effect = yes } }
+        ai_chance = { base = 50 }
+    }
+}
+tca_frontier_recovery.2 = {
+    type = letter_event
+    sender = scope:tca_fd_sender
+    opening = tca_frontier_recovery.opening
+    desc = tca_frontier_recovery.2.desc
+    trigger = {
+        exists = scope:tca_fs_record
+        exists = scope:tca_fd_invitation
+        scope:tca_fs_record = { tca_fd_live_trigger = yes }
+        scope:tca_fd_invitation ?= { var:tca_fd_response = 0 }
+        tca_fd_person_valid_trigger = yes
+    }
+    on_trigger_fail = { scope:tca_fd_invitation ?= { if = { limit = { var:tca_fd_response = 0 } set_variable = { name = tca_fd_response value = 4 } } } }
+    option = {
+        name = tca_frontier_recovery.2.a
+        custom_tooltip = tca_frontier_recovery.2.a.tt
+        hidden_effect = { scope:tca_fd_invitation = { tca_fd_join_accept_effect = yes } }
+        ai_chance = { base = 0 modifier = { add = tca_fd_accept_weight_value } }
+    }
+    option = {
+        name = tca_frontier_recovery.2.b
+        timeout_option = yes
+        hidden_effect = { scope:tca_fd_invitation = { tca_fd_join_refuse_effect = yes } }
+        ai_chance = { base = 50 }
+    }
+}
+# 结果信不再附带决定；由牵头者或原防御方报告。
+tca_frontier_recovery.3 = {
+    type = letter_event
+    sender = scope:tca_fd_notice_sender
+    opening = tca_frontier_recovery.notice.opening
+    desc = {
+        first_valid = {
+            triggered_desc = { trigger = { scope:tca_fd_notice_result = 0 } desc = tca_frontier_recovery.3.none }
+            triggered_desc = { trigger = { scope:tca_fd_notice_result = 1 } desc = tca_frontier_recovery.3.started }
+            triggered_desc = { trigger = { scope:tca_fd_notice_result = 2 } desc = tca_frontier_recovery.3.failed }
+            desc = tca_frontier_recovery.3.returned
+        }
+    }
+    option = { name = tca_frontier_recovery.3.a }
+}

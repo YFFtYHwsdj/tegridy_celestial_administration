@@ -1,0 +1,33 @@
+﻿# 记录作用域；只计实际失地，本实现的宣战分支支持最多十项目标。
+tca_fd_goal_count_value = { value = 0 every_in_list = { variable = tca_fd_goals add = 1 } }
+# 人物作用域；沿用C首版各项权重，追讨投递时旧战争已结束，故现有战事均计为其他战争。
+# 输入tca_fs_record与本人原C行tca_fs_row；原参战但非C候选者不加身份分。
+# 必须再核对行内人物，防止继承上下文残留别人的行而误加身份及忠顺分。
+tca_fd_accept_weight_value = {
+    value = 50
+    if = { limit = { exists = scope:tca_fs_row scope:tca_fs_row = { var:tca_fs_kind = 1 var:tca_fs_person = prev } } add = 50 }
+    else_if = { limit = { exists = scope:tca_fs_row scope:tca_fs_row = { var:tca_fs_kind = 2 var:tca_fs_person = prev } } add = 25 }
+    add = tca_fs_finance_value
+    if = { limit = { any_character_war = { is_defender = prev } } subtract = 30 }
+    else_if = { limit = { any_character_war = { } } subtract = 15 }
+    if = { limit = { has_trait = brave } add = 15 }
+    if = { limit = { has_trait = craven } subtract = 15 }
+    # 数值好感控制在小幅修正，避免与特殊关系叠加后完全压过财力和身份。
+    if = { limit = { opinion = { target = scope:tca_fs_record.var:tca_fs_defender value >= 50 } } add = 10 }
+    else_if = { limit = { opinion = { target = scope:tca_fs_record.var:tca_fs_defender value <= -50 } } subtract = 10 }
+    if = { limit = { has_relation_best_friend = scope:tca_fs_record.var:tca_fs_defender } add = 30 }
+    else_if = { limit = { has_relation_friend = scope:tca_fs_record.var:tca_fs_defender } add = 20 }
+    if = { limit = { has_relation_nemesis = scope:tca_fs_record.var:tca_fs_defender } subtract = 30 }
+    else_if = { limit = { has_relation_rival = scope:tca_fs_record.var:tca_fs_defender } subtract = 20 }
+    if = { limit = { exists = scope:tca_fs_row scope:tca_fs_row = { var:tca_fs_kind = 2 var:tca_fs_person = prev } }
+        if = { limit = { reverse_opinion = { target = scope:tca_fs_record.var:tca_fs_defender value >= 50 } } add = 10 }
+        else_if = { limit = { reverse_opinion = { target = scope:tca_fs_record.var:tca_fs_defender value <= -50 } } subtract = 10 }
+        if = { limit = { scope:tca_fs_record.var:tca_fs_defender = { is_obedient_to = scope:tca_fs_row.var:tca_fs_person } } add = 20 }
+        if = { limit = { OR = {
+            AND = { has_government = celestial_government scope:tca_fs_record.var:tca_fs_defender = { has_government = celestial_government } }
+            AND = { has_government = meritocratic_government scope:tca_fs_record.var:tca_fs_defender = { has_government = meritocratic_government } }
+            AND = { has_government = steppe_admin_government scope:tca_fs_record.var:tca_fs_defender = { has_government = steppe_admin_government } }
+        } } add = 20 }
+    }
+    min = 1
+}

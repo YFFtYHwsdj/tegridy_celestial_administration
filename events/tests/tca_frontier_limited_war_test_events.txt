@@ -1,0 +1,243 @@
+﻿# 有限战争分数独立局：借宋君作为进攻者、自建持灵州的防守者，以新人物第一场战争测候选CB俘虏分数，再测旧CB对照。
+# 真实围城与跨日分数由引擎计算，不写战争分数；借人、借地和造军要求整局丢弃并独占。
+namespace = tca_frontier_limited_war_test
+
+tca_frontier_limited_war_test.1 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_frontier_limited_war_test.1 tca_test_frontier_limited_score"
+        remove_character_flag = tca_test_tca_frontier_limited_war_test_case_failed
+        title:h_china.holder = { save_scope_as = tca_frontier_limited_war_test_attacker }
+        create_character = { age = 35 gender = male random_traits = no culture = title:k_france.holder.culture faith = title:k_france.holder.faith location = root.capital_province save_scope_as = tca_frontier_limited_war_test_defender }
+        # 不另造中国地方官继任场景；只借已有进攻者，自建单县敌人。
+        scope:tca_frontier_limited_war_test_defender = { create_title_and_vassal_change = { type = granted save_scope_as = tca_frontier_limited_war_test_grant_defender } }
+        title:c_lingzhou = { save_scope_as = tca_frontier_limited_war_test_target change_title_holder = { holder = scope:tca_frontier_limited_war_test_defender change = scope:tca_frontier_limited_war_test_grant_defender } }
+        resolve_title_and_vassal_change = scope:tca_frontier_limited_war_test_grant_defender
+        scope:tca_frontier_limited_war_test_attacker = {
+            tca_test_protect_character_effect = yes
+            set_variable = { name = tca_frontier_probe_target value = scope:tca_frontier_limited_war_test_defender }
+            add_character_flag = tca_frontier_limited_war_test_authorized
+        }
+        scope:tca_frontier_limited_war_test_defender = {
+            tca_test_protect_character_effect = yes
+            change_government = feudal_government
+            add_gold = 10000
+            if = { limit = { is_independent_ruler = no }
+                create_title_and_vassal_change = { type = independency save_scope_as = tca_frontier_limited_war_test_independent }
+                becomes_independent = { change = scope:tca_frontier_limited_war_test_independent }
+                resolve_title_and_vassal_change = scope:tca_frontier_limited_war_test_independent
+            }
+        }
+        trigger_event = { id = tca_frontier_limited_war_test.2 days = 2 }
+    }
+}
+
+tca_frontier_limited_war_test.2 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = {
+            scope:tca_frontier_limited_war_test_attacker = { is_independent_ruler = yes is_at_war = no }
+            scope:tca_frontier_limited_war_test_defender = { is_independent_ruler = yes is_at_war = no is_imprisoned = no }
+            scope:tca_frontier_limited_war_test_target = { holder = scope:tca_frontier_limited_war_test_defender }
+        }
+            scope:tca_frontier_limited_war_test_attacker = {
+                start_war = { cb = tca_frontier_limited_county_cb target = scope:tca_frontier_limited_war_test_defender target_title = scope:tca_frontier_limited_war_test_target }
+            }
+            trigger_event = { id = tca_frontier_limited_war_test.6 days = 1 }
+        }
+        else = {
+            if = { limit = { scope:tca_frontier_limited_war_test_attacker = { is_independent_ruler = no } } debug_log = "TCA_LIMITED_FIXTURE ATTACKER_NOT_INDEPENDENT" }
+            if = { limit = { scope:tca_frontier_limited_war_test_defender = { is_independent_ruler = no } } debug_log = "TCA_LIMITED_FIXTURE DEFENDER_NOT_INDEPENDENT" }
+            if = { limit = { scope:tca_frontier_limited_war_test_attacker = { is_landed = no } } debug_log = "TCA_LIMITED_FIXTURE ATTACKER_NOT_LANDED" }
+            if = { limit = { scope:tca_frontier_limited_war_test_defender = { is_at_war = yes } } debug_log = "TCA_LIMITED_FIXTURE DEFENDER_ALREADY_AT_WAR" }
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_frontier_limited_score"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+            tca_test_lane_end_effect = { GROUP = tca_frontier_limited_war_test }
+        }
+    }
+}
+
+tca_frontier_limited_war_test.3 = {
+    type = character_event hidden = yes
+    immediate = {
+        scope:tca_frontier_limited_war_test_attacker = {
+            every_character_war = { limit = { using_cb = tca_frontier_probe_county_cb } save_scope_as = tca_frontier_limited_war_test_control }
+            imprison = { target = scope:tca_frontier_limited_war_test_defender type = dungeon }
+        }
+        trigger_event = { id = tca_frontier_limited_war_test.4 days = 1 }
+    }
+}
+
+tca_frontier_limited_war_test.4 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { exists = scope:tca_frontier_limited_war_test_control scope:tca_frontier_limited_war_test_control = { attacker_war_score >= 100 } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_limited_score 1"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_limited_war_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_limited_score 1" }
+        scope:tca_frontier_limited_war_test_control ?= { end_war = white_peace }
+        scope:tca_frontier_limited_war_test_defender = { release_from_prison = yes }
+        trigger_event = { id = tca_frontier_limited_war_test.5 days = 2 }
+    }
+}
+
+tca_frontier_limited_war_test.5 = {
+    type = character_event hidden = yes
+    immediate = {
+        scope:tca_frontier_limited_war_test_attacker = {
+            start_war = { cb = tca_frontier_limited_county_cb target = scope:tca_frontier_limited_war_test_defender target_title = scope:tca_frontier_limited_war_test_target }
+        }
+        trigger_event = { id = tca_frontier_limited_war_test.22 days = 1 }
+    }
+}
+
+tca_frontier_limited_war_test.6 = {
+    type = character_event hidden = yes
+    immediate = {
+        scope:tca_frontier_limited_war_test_attacker = {
+            every_character_war = { limit = { using_cb = tca_frontier_limited_county_cb } save_scope_as = tca_frontier_limited_war_test_war }
+            imprison = { target = scope:tca_frontier_limited_war_test_defender type = dungeon }
+        }
+        trigger_event = { id = tca_frontier_limited_war_test.7 days = 2 }
+    }
+}
+
+tca_frontier_limited_war_test.7 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { exists = scope:tca_frontier_limited_war_test_war }
+            set_variable = { name = tca_frontier_limited_war_test_score value = scope:tca_frontier_limited_war_test_war.attacker_war_score }
+            debug_log = "TCA_LIMITED_SCORE CAPTURE score=[THIS.Char.MakeScope.Var('tca_frontier_limited_war_test_score').GetValue]"
+        }
+        else = { debug_log = "TCA_LIMITED_SCORE CAPTURE_WAR_GONE" }
+        if = { limit = { scope:tca_frontier_limited_war_test_defender = { is_imprisoned_by = scope:tca_frontier_limited_war_test_attacker } } debug_log = "TCA_LIMITED_SCORE STILL_PRISONER" }
+        else = { debug_log = "TCA_LIMITED_SCORE NOT_PRISONER" }
+        # 用户确认保留俘虏领袖满分，断言随规则修订；旧禁用开关的失败仍记录于验证文档。
+        if = { limit = { exists = scope:tca_frontier_limited_war_test_war scope:tca_frontier_limited_war_test_war = { attacker_war_score >= 100 } scope:tca_frontier_limited_war_test_defender = { is_imprisoned_by = scope:tca_frontier_limited_war_test_attacker } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_limited_score 2"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_limited_war_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_limited_score 2" }
+        scope:tca_frontier_limited_war_test_war ?= { end_war = white_peace }
+        scope:tca_frontier_limited_war_test_defender = { if = { limit = { is_imprisoned = yes } release_from_prison = yes } }
+        trigger_event = { id = tca_frontier_limited_war_test.21 days = 2 }
+    }
+}
+
+# 第二场才使用旧CB作正对照，不修改其既有配置。
+tca_frontier_limited_war_test.21 = {
+    type = character_event hidden = yes
+    immediate = {
+        scope:tca_frontier_limited_war_test_attacker = {
+            start_war = { cb = tca_frontier_probe_county_cb target = scope:tca_frontier_limited_war_test_defender target_title = scope:tca_frontier_limited_war_test_target }
+        }
+        trigger_event = { id = tca_frontier_limited_war_test.3 days = 1 }
+    }
+}
+
+# 第三场候选战争只测占领，主防守者从未被该战争的进攻方羁押。
+tca_frontier_limited_war_test.22 = {
+    type = character_event hidden = yes
+    immediate = {
+        clear_saved_scope = tca_frontier_limited_war_test_war
+        scope:tca_frontier_limited_war_test_attacker = {
+            every_character_war = { limit = { using_cb = tca_frontier_limited_county_cb } save_scope_as = tca_frontier_limited_war_test_war }
+        }
+        # 后续由中立法国羁押，避免围城再次捕获首领污染占领测量。
+        scope:tca_frontier_limited_war_test_defender = { if = { limit = { is_imprisoned = yes } release_from_prison = yes } }
+        title:k_france.holder = { imprison = { target = scope:tca_frontier_limited_war_test_defender type = dungeon } }
+        if = { limit = { exists = scope:tca_frontier_limited_war_test_war }
+            # 每处有地产生独立围城军，仅夹具造军，正式战争不造兵。
+            scope:tca_frontier_limited_war_test_target = {
+                every_direct_de_jure_vassal_title = {
+                    limit = { tier = tier_barony title_province = { has_holding = yes } }
+                    title_province = { save_scope_as = tca_frontier_limited_war_test_siege }
+                    scope:tca_frontier_limited_war_test_attacker = {
+                        spawn_army = { name = tca_frontier_limited_war_test_army levies = 5000 men_at_arms = { type = trebuchet men = 1000 } location = scope:tca_frontier_limited_war_test_siege war = scope:tca_frontier_limited_war_test_war uses_supply = no inheritable = no }
+                    }
+                }
+            }
+            set_variable = { name = tca_frontier_limited_war_test_polls value = 0 }
+            trigger_event = { id = tca_frontier_limited_war_test.8 days = 7 }
+        }
+        else = {
+            debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_limited_score 3"
+            debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_limited_score 4"
+            debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_limited_score 5"
+            trigger_event = tca_frontier_limited_war_test.99
+        }
+    }
+}
+
+tca_frontier_limited_war_test.8 = {
+    type = character_event hidden = yes
+    immediate = {
+        change_variable = { name = tca_frontier_limited_war_test_polls add = 1 }
+        if = { limit = {
+            exists = scope:tca_frontier_limited_war_test_war
+            scope:tca_frontier_limited_war_test_target = {
+                title_province = { is_occupied = yes barony = { barony_controller = scope:tca_frontier_limited_war_test_attacker } }
+                NOT = { any_direct_de_jure_vassal_title = { tier = tier_barony title_province = { has_holding = yes OR = { is_occupied = no barony = { NOT = { barony_controller = scope:tca_frontier_limited_war_test_attacker } } } } } }
+            }
+        }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_limited_score 3"
+            set_variable = { name = tca_frontier_limited_war_test_score value = scope:tca_frontier_limited_war_test_war.attacker_war_score }
+            debug_log = "TCA_LIMITED_SCORE OCCUPIED score=[THIS.Char.MakeScope.Var('tca_frontier_limited_war_test_score').GetValue]"
+            if = { limit = { scope:tca_frontier_limited_war_test_defender = { is_imprisoned_by = title:k_france.holder } } debug_log = "TCA_LIMITED_SCORE NEUTRAL_PRISONER" }
+            else = { debug_log = "TCA_LIMITED_SCORE NEUTRAL_CUSTODY_LOST" }
+            if = { limit = { scope:tca_frontier_limited_war_test_war = { attacker_war_score < 100 } }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_limited_score 4"
+            }
+            else = { add_character_flag = tca_test_tca_frontier_limited_war_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_limited_score 4" }
+            set_variable = { name = tca_frontier_limited_war_test_initial_score value = scope:tca_frontier_limited_war_test_war.attacker_war_score }
+            # 跨过宣战后3个月延迟，保留真实等待，观察原生目标进度。
+            trigger_event = { id = tca_frontier_limited_war_test.9 days = 60 }
+        }
+        else_if = { limit = { exists = scope:tca_frontier_limited_war_test_war var:tca_frontier_limited_war_test_polls < 26 }
+            trigger_event = { id = tca_frontier_limited_war_test.8 days = 7 }
+        }
+        else = {
+            add_character_flag = tca_test_tca_frontier_limited_war_test_case_failed
+            debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_limited_score 3"
+            debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_limited_score 4"
+            debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_limited_score 5"
+            trigger_event = tca_frontier_limited_war_test.99
+        }
+    }
+}
+
+tca_frontier_limited_war_test.9 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { exists = scope:tca_frontier_limited_war_test_war }
+            set_variable = { name = tca_frontier_limited_war_test_score value = scope:tca_frontier_limited_war_test_war.attacker_war_score }
+            debug_log = "TCA_LIMITED_SCORE HELD_60_DAYS score=[THIS.Char.MakeScope.Var('tca_frontier_limited_war_test_score').GetValue]"
+        }
+        if = { limit = { exists = scope:tca_frontier_limited_war_test_war scope:tca_frontier_limited_war_test_war = { attacker_war_score > root.var:tca_frontier_limited_war_test_initial_score attacker_war_score < 100 } }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_limited_score 5"
+        }
+        else = { add_character_flag = tca_test_tca_frontier_limited_war_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_limited_score 5" }
+        trigger_event = tca_frontier_limited_war_test.99
+    }
+}
+
+tca_frontier_limited_war_test.99 = {
+    type = character_event hidden = yes
+    immediate = {
+        scope:tca_frontier_limited_war_test_war ?= { end_war = white_peace }
+        scope:tca_frontier_limited_war_test_defender = { if = { limit = { is_imprisoned = yes } release_from_prison = yes } tca_test_restore_character_effect = yes }
+        scope:tca_frontier_limited_war_test_attacker = { remove_character_flag = tca_frontier_limited_war_test_authorized remove_variable = tca_frontier_probe_target tca_test_restore_character_effect = yes }
+        if = { limit = { has_character_flag = tca_test_tca_frontier_limited_war_test_case_failed }
+            debug_log = "TCA_TEST FAIL tca_test_frontier_limited_score"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+        }
+        else = {
+            debug_log = "TCA_TEST PASS tca_test_frontier_limited_score"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } }
+        }
+        remove_character_flag = tca_test_tca_frontier_limited_war_test_case_failed
+        remove_variable = tca_frontier_limited_war_test_score
+        remove_variable = tca_frontier_limited_war_test_polls
+        remove_variable = tca_frontier_limited_war_test_initial_score
+        tca_test_lane_end_effect = { GROUP = tca_frontier_limited_war_test }
+    }
+}
