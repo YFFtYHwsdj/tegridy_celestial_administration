@@ -314,5 +314,15 @@ class UpstreamCheckTests(unittest.TestCase):
                 )
 
 
+class EventLocalizationKeys(unittest.TestCase):
+    def test_event_option_keys_with_dots(self):
+        import tempfile
+        from check_upstream_overrides import localization_values
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "events.yml"
+            path.write_text('l_english:\n scheme_critical_moments.1202.c: "Try to erase the records."\n', encoding="utf-8-sig")
+            self.assertEqual(localization_values(path), {"scheme_critical_moments.1202.c": "Try to erase the records."})
+
+
 if __name__ == "__main__":
     unittest.main()

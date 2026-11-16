@@ -1,0 +1,123 @@
+﻿scheme_critical_moments.1202 = {
+	type = character_event
+	title = scheme_critical_moments.1202.t
+	desc = {
+		desc = scheme_critical_moments.1202.desc
+		triggered_desc = {
+			trigger = { exists = scope:scheme_discovered }
+			desc = scheme_critical_moments.1202.desc_discovered
+		}
+	}
+	theme = stewardship
+	left_portrait = {
+		character = root
+		animation = personality_greedy
+	}
+	right_portrait = {
+		trigger = { exists = scope:scheme_discovered }
+		character = scope:target.holder
+		animation = rage
+	}
+
+	option = {
+		name = scheme_critical_moments.1202.a
+		trigger = { NOT = { exists = scope:scheme_discovered } }
+		scope:scheme = {
+			change_variable = {
+				name = embezzlement_stake
+				add = var:embezzlement_stake_initial
+			}
+		}
+		if = {
+			limit = {
+				scope:scheme.var:siphon_destination ?= flag:treasury
+				has_treasury = yes
+			}
+			add_treasury = scope:scheme.var:embezzlement_stake_initial
+		}
+		else = {
+			add_gold = scope:scheme.var:embezzlement_stake_initial
+		}
+		scope:target.holder = {
+			remove_treasury = scope:scheme.var:embezzlement_stake_initial
+		}
+		if = {
+			limit = {
+				NOT = { exists = scope:scheme_discovered }
+			}
+			add_secret = {
+				type = secret_siphoned_treasury
+				target = scope:target.holder
+			}
+			random_secret = {
+				limit = {
+					secret_type = secret_siphoned_treasury
+					secret_target = scope:target.holder
+				}
+				set_variable = {
+					name = embezzlement_stake
+					value = scope:scheme.var:embezzlement_stake
+				}
+			}
+		}
+		else_if = {
+			limit = {
+				scope:target.holder != scope:owner
+			}
+			scope:target.holder = {
+				add_opinion = {
+					target = scope:owner
+					modifier = siphoned_treasury_crime
+				}
+			}
+		}
+	}
+
+	option = {
+		name = scheme_critical_moments.1202.b
+		if = {
+			limit = {
+				NOT = { exists = scope:scheme_discovered }
+			}
+			add_secret = {
+				type = secret_siphoned_treasury
+				target = scope:target.holder
+			}
+			random_secret = {
+				limit = {
+					secret_type = secret_siphoned_treasury
+					secret_target = scope:target.holder
+				}
+				set_variable = {
+					name = embezzlement_stake
+					value = scope:scheme.var:embezzlement_stake
+				}
+			}
+		}
+		else_if = {
+			limit = {
+				scope:target.holder != scope:owner
+			}
+			scope:target.holder = {
+				add_opinion = {
+					target = scope:owner
+					modifier = siphoned_treasury_crime
+				}
+			}
+		}
+	}
+
+	option = {
+		name = scheme_critical_moments.1202.c
+		trigger = {
+			scope:scheme.scheme_secrecy = 100
+		}
+	}
+
+	after = {
+		custom_tooltip = celestial_siphon_treasury_interaction.total_value
+		scope:scheme = {
+			end_scheme = yes
+		}
+	}
+}

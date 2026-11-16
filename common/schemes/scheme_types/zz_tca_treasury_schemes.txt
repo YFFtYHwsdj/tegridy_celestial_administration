@@ -1,0 +1,393 @@
+﻿# 侵吞国库单对象覆盖；仅失效秘密结算接入共享入口，其余原版逻辑保留。
+celestial_siphon_treasury = {
+	skill = intrigue
+	desc = "celestial_siphon_treasury_desc_general"
+	success_desc = "celestial_siphon_treasury_SUCCESS_DESC"
+	discovery_desc = "celestial_siphon_treasury_DISCOVERY_DESC"
+	icon = intrigue
+	illustration = "gfx/interface/illustrations/event_scenes/corridor.dds"
+	category = hostile
+	target_type = title
+	cooldown = { years = 5 }
+
+	speed_per_skill_point = t2_spsp_owner_value
+	speed_per_target_skill_point = t2_spsp_target_value
+	spymaster_speed_per_skill_point = t2_spsp_owner_spy_value
+	target_spymaster_speed_per_skill_point = t2_spsp_target_spy_value
+	tier_speed = 1
+	base_progress_goal = t3_base_phase_length_value
+	maximum_secrecy = 95
+	base_maximum_success = t2_base_max_success_value
+	phases_per_agent_charge = 1
+	success_chance_growth_per_skill_point = t3_scgpsp_value
+
+	is_secret = yes
+	maximum_breaches = 5
+
+	allow = {
+		is_adult = yes
+		is_imprisoned = no
+		has_treasury = yes
+		scope:target = {
+			holder ?= {
+				has_treasury = yes
+				OR = {
+					is_landed = yes
+					tgp_is_any_minister = yes
+				}
+				top_liege = scope:owner.top_liege
+			}
+		}
+	}
+
+	valid = {
+		scope:owner = {
+			has_treasury = yes
+		}
+		scope:target = {
+			holder ?= {
+				has_treasury = yes
+				OR = {
+					is_landed = yes
+					tgp_is_any_minister = yes
+				}
+				top_liege = scope:owner.top_liege
+			}
+		}
+	}
+
+	agent_leave_threshold = -25
+	agent_join_chance = {
+		base = 0
+		ai_agent_join_chance_basic_suite_modifier = yes
+		modifier = {
+			add = -50
+			scope:recipient.house ?= scope:target.holder.house
+			scope:owner.house != scope:target.holder.house
+			desc = TARGET_IS_MY_HOUSE_MEMBER
+		}
+	}
+
+	valid_agent = {
+		is_valid_agent_standard_trigger = yes
+		title_scheme_valid_agent_trigger = yes
+	}
+	agent_groups_owner_perspective = { courtiers councillors scripted_relations puppets }
+
+	odds_prediction = {
+		add = hostile_scheme_base_odds_prediction_target_is_title_value
+		add = odds_skill_contribution_intrigue_value
+		add = agent_groups_owner_perspective_value
+		add = odds_celestial_siphon_treasury_scheme_misc_value
+		min = 0
+	}
+
+	base_success_chance = {
+		base = 0
+		scheme_type_skill_success_chance_modifier = { SKILL = STEWARDSHIP }
+		hostile_scheme_title_base_chance_modifier = yes
+
+		modifier = {
+			add = -30
+			desc = "SCHEME_VS_SPIRITUAL_HOF_HOLDER"
+			scope:target.holder.faith ?= {
+				this = scope:owner.faith
+				has_doctrine = doctrine_spiritual_head
+				religious_head ?= scope:target.holder
+			}
+		}
+		house_feud_title_hostile_scheme_success_modifier = yes
+		diarch_scheming_title_within_realm_bonus_modifier = yes
+		modifier = {
+			scope:target.holder.domicile.domicile_location.county ?= {
+				county_held_or_vassal_to_target_trigger = { TARGET = scope:owner }
+			}
+			desc = celestial_siphon_treasury_IN_SUBREALM_DESC
+			add = 10
+		}
+		modifier = {
+			exists = scope:target.holder.house
+			scope:actor.top_liege.house ?= scope:target.holder.house
+			scope:owner != scope:target.holder
+			desc = celestial_siphon_treasury_TOP_LIEGE_DESC
+			add = -25
+		}
+		political_scheme_title_admin_base_chance_modifier = yes
+		modifier = {
+			add = 10
+			desc = eparch_scheme_bonus_with_value_desc
+			scope:owner = { has_court_position = eparch_court_position }
+			scope:target.holder ?= {
+				domicile ?= { domicile_location = owner.top_liege.capital_province }
+			}
+		}
+		modifier = { # Minister of Revenue
+			add = 50
+			desc = minister_of_revenue_desc_with_value
+			scope:owner = {
+				has_title = title:e_minister_of_revenue
+				liege = {
+					tgp_has_access_to_ministry_trigger = yes
+				}
+			}
+		}
+		modifier = { # Christian Situation Instability bonus
+			add = 20
+			desc = CHRISTIAN_CHURCH_PHASE_REASON
+			situation:the_christian_church ?= {
+				OR = {
+					situation_participant_group:christian_regular_main_power_rulers = {
+						participant_group_has_character = scope:owner
+						has_participant_group_parameter = the_christian_church_better_siphon_treasury
+					}
+					situation_participant_group:christian_regular_secondary_powers_rulers = {
+						participant_group_has_character = scope:owner
+						has_participant_group_parameter = the_christian_church_better_siphon_treasury
+					}
+				}
+			}
+		}
+		modifier = {
+			add = improved_siphon_treasury_scheme_3_value
+			desc = family_attribute_desc_with_value
+			scope:owner ?= {
+				house ?= {
+					has_house_aspiration_parameter = improved_siphon_treasury_scheme_3
+				}
+			}
+		}
+		modifier = {
+			add = improved_siphon_treasury_scheme_2_value
+			desc = family_attribute_desc_with_value
+			scope:owner ?= {
+				house ?= {
+					has_house_aspiration_parameter = improved_siphon_treasury_scheme_2
+				}
+			}
+		}
+		modifier = {
+			add = improved_siphon_treasury_scheme_1_value
+			desc = family_attribute_desc_with_value
+			scope:owner ?= {
+				house ?= {
+					has_house_aspiration_parameter = improved_siphon_treasury_scheme_1
+				}
+			}
+		}
+	}
+	base_secrecy = {
+		add = secrecy_base_value
+		add = countermeasure_apply_secrecy_maluses_value
+		add = eparch_scheme_secrecy_bonus_value
+		if = {
+			limit = { # Minister of Revenue
+				scope:owner ?= {
+					has_title = title:e_minister_of_revenue
+					liege = {
+						tgp_has_access_to_ministry_trigger = yes
+					}
+				}
+			}
+			add = {
+				value = 10
+				desc = minister_of_revenue_desc
+			}
+		}
+		scope:owner ?= {
+			if = {
+				limit = {
+					exists = house
+				}
+				house = {
+					add = {
+						value = 0
+						if = {
+							limit = {
+								has_house_aspiration_parameter = improved_siphon_treasury_scheme_3
+							}
+							add = improved_siphon_treasury_scheme_3_value
+						}
+						else_if = {
+							limit = {
+								has_house_aspiration_parameter = improved_siphon_treasury_scheme_2
+							}
+							add = improved_siphon_treasury_scheme_2_value
+						}
+						else_if = {
+							limit = {
+								has_house_aspiration_parameter = improved_siphon_treasury_scheme_1
+							}
+							add = improved_siphon_treasury_scheme_1_value
+						}
+						desc = family_attribute_desc
+					}
+				}
+			}
+		}
+	}
+
+	on_start = {
+		set_variable = {
+			name = apply_countermeasures
+			value = flag:calculating
+		}
+		add_scheme_starting_opportunities_intrigue_effect = yes
+		if = {
+			limit = {
+				scheme_owner = {
+					NOT = { has_variable = agents_added }
+				}
+			}
+			add_agent_slot = agent_scout
+			add_agent_slot = agent_scout
+			add_agent_slot = agent_muscle
+			add_agent_slot = agent_infiltrator
+			add_agent_slot = agent_lookout
+		}
+		if = {
+			limit = {
+				scheme_owner != scheme_target_title.holder
+			}
+			scheme_owner = {
+				trigger_event = tgp_interaction_event.0020
+			}
+		}
+	}
+	on_phase_completed = {
+		suppress_scheme_follow_up_event_till_input_given_effect = yes
+		celestial_siphon_treasury_prep_effect = yes
+		cap_schemes_and_fire_reminders_effect = yes
+		scope:scheme.scheme_target_title.holder = {
+			save_scope_as = recipient
+		}
+		scheme_owner = {
+			duel = {
+				skills = { stewardship intrigue }
+				value = medium_skill_rating
+				50 = {
+					compare_modifier = {
+						value = scope:duel_value
+						multiplier = 3.5
+					}
+					send_interface_message = {
+						type = siphon_scheme_good_message
+						title = celestial_siphon_treasury_interaction.tt.success
+						left_icon = scope:scheme.scheme_target_title
+						scope:scheme = {
+							change_variable = {
+								name = embezzlement_stake
+								add = var:embezzlement_stake_initial
+							}
+							add_scheme_modifier = { type = tgp_monthly_siphon_treasury_failure_scheme_modifier }
+						}
+						save_scope_value_as = {
+							name = embezzlement_stake_tooltip
+							value = scope:scheme.var:embezzlement_stake_initial
+						}
+						if = {
+							limit = {
+								scope:scheme.var:siphon_destination ?= flag:treasury
+							}
+							custom_tooltip = celestial_siphon_treasury_gained_treasury_tt
+							hidden_effect = {
+								add_treasury = scope:scheme.var:embezzlement_stake_initial
+							}
+						}
+						else = {
+							custom_tooltip = celestial_siphon_treasury_gained_gold_tt
+							hidden_effect = {
+								add_gold = scope:scheme.var:embezzlement_stake_initial
+							}
+						}
+						pam_the_christian_church_clergy_embezzled_treasury_catalyst_effect = yes
+						hidden_effect = {
+							scope:recipient = {
+								remove_treasury = scope:scheme.var:embezzlement_stake_initial
+							}
+						}
+					}
+					scope:recipient = {
+						if = {
+							limit = {
+								this != scope:scheme.scheme_owner
+							}
+							send_interface_message = {
+								type = siphon_scheme_bad_message
+								title = celestial_siphon_treasury_interaction.tt.suspicion
+								left_icon = scope:scheme.scheme_target_title
+								show_as_tooltip = {
+									remove_treasury = scope:scheme.var:embezzlement_stake_initial
+								}
+							}
+						}
+					}
+				}
+				50 = {
+					compare_modifier = {
+						value = scope:duel_value
+						multiplier = -3.5
+					}
+					send_interface_message = {
+						type = siphon_scheme_bad_message
+						title = celestial_siphon_treasury_interaction.tt.failure
+						left_icon = scope:scheme.scheme_target_title
+						scope:scheme = {
+							add_scheme_modifier = { type = tgp_monthly_siphon_treasury_scheme_modifier }
+						}
+					}
+				}
+				50 = {
+				}
+			}
+		}
+	}
+	on_hud_click  = { celestial_siphon_treasury_prep_effect = yes }
+	on_semiyearly = {
+		if = {
+			limit = {
+				scheme_owner = { is_ai = yes }
+			}
+			celestial_siphon_treasury_prep_effect = yes
+		}
+	}
+	on_monthly = {
+		hostile_scheme_monthly_discovery_chance_effect = yes
+	}
+
+	on_invalidated = {
+		scheme_target_title = {
+			holder = { save_scope_as = target }
+		}
+		scheme_owner = {
+			save_scope_as = owner
+			send_interface_toast = {
+				type = event_toast_effect_neutral
+				title = celestial_siphon_treasury_invalidated_title
+				left_icon = scope:target
+				if = {
+					limit = {
+						has_treasury = no
+					}
+					custom_tooltip = celestial_siphon_treasury_invalidated_owner
+				}
+				else_if = {
+					limit = {
+						scope:target = {
+							has_treasury = no
+						}
+					}
+					custom_tooltip = celestial_siphon_treasury_invalidated_target
+				}
+				if = {
+					limit = {
+						scope:scheme.var:embezzlement_stake > 0
+						is_alive = yes
+					}
+					scope:scheme = {
+						tca_treasury_resolve_secret_effect = { TARGET = scope:target }
+					}
+				}
+			}
+		}
+	}
+}
