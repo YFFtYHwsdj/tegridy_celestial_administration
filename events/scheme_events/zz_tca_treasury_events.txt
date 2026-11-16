@@ -1,0 +1,186 @@
+﻿# 侵吞收尾覆盖：成功、失败与抹记录均经过同一留证判定；当场败露沿用原版。
+namespace = scheme_critical_moments
+
+scheme_critical_moments.1202 = {
+	id_override_priority = 1
+	type = character_event
+	title = scheme_critical_moments.1202.t
+	desc = {
+		desc = scheme_critical_moments.1202.desc
+		triggered_desc = {
+			trigger = { exists = scope:scheme_discovered }
+			desc = scheme_critical_moments.1202.desc_discovered
+		}
+	}
+	theme = stewardship
+	left_portrait = {
+		character = root
+		animation = personality_greedy
+	}
+	right_portrait = {
+		trigger = { exists = scope:scheme_discovered }
+		character = scope:target.holder
+		animation = rage
+	}
+
+	immediate = {
+        # 当场败露即结束留证判定，不能等玩家关闭事件后才阻止失效回调。
+        if = {
+            limit = { exists = scope:scheme_discovered }
+            scope:scheme = { set_variable = { name = tca_treasury_secret_resolved value = yes } }
+        }
+	}
+
+	option = {
+		name = scheme_critical_moments.1202.a
+		trigger = { NOT = { exists = scope:scheme_discovered } }
+		scope:scheme = {
+			change_variable = {
+				name = embezzlement_stake
+				add = var:embezzlement_stake_initial
+			}
+		}
+		if = {
+			limit = {
+				scope:scheme.var:siphon_destination ?= flag:treasury
+				has_treasury = yes
+			}
+			add_treasury = scope:scheme.var:embezzlement_stake_initial
+		}
+		else = {
+			add_gold = scope:scheme.var:embezzlement_stake_initial
+		}
+		scope:target.holder = {
+			remove_treasury = scope:scheme.var:embezzlement_stake_initial
+		}
+		if = {
+			limit = {
+				NOT = { exists = scope:scheme_discovered }
+			}
+			scope:scheme = {
+				tca_treasury_resolve_secret_effect = { TARGET = scope:target.holder }
+			}
+		}
+		else_if = {
+			limit = {
+				scope:target.holder != scope:owner
+			}
+			scope:target.holder = {
+				add_opinion = {
+					target = scope:owner
+					modifier = siphoned_treasury_crime
+				}
+			}
+		}
+	}
+
+	option = {
+		name = scheme_critical_moments.1202.b
+		if = {
+			limit = {
+				NOT = { exists = scope:scheme_discovered }
+			}
+			scope:scheme = {
+				tca_treasury_resolve_secret_effect = { TARGET = scope:target.holder }
+			}
+		}
+		else_if = {
+			limit = {
+				scope:target.holder != scope:owner
+			}
+			scope:target.holder = {
+				add_opinion = {
+					target = scope:owner
+					modifier = siphoned_treasury_crime
+				}
+			}
+		}
+	}
+
+	option = {
+		name = scheme_critical_moments.1202.c
+		scope:scheme = { tca_treasury_resolve_secret_effect = { TARGET = scope:target.holder } }
+		trigger = {
+			scope:scheme.scheme_secrecy = 100
+		}
+	}
+
+	after = {
+		custom_tooltip = celestial_siphon_treasury_interaction.total_value
+		scope:scheme = {
+			set_variable = { name = tca_treasury_secret_resolved value = yes }
+			end_scheme = yes
+		}
+	}
+}
+
+scheme_critical_moments.1203 = {
+	id_override_priority = 1
+	type = character_event
+	title = scheme_critical_moments.1203.t
+	desc = {
+		triggered_desc = {
+			trigger = { NOT = { exists = scope:scheme_discovered } }
+			desc = scheme_critical_moments.1203.desc_secret
+		}
+		triggered_desc = {
+			trigger = { exists = scope:scheme_discovered }
+			desc = scheme_critical_moments.1203.desc_discovered
+		}
+	}
+	theme = stewardship
+	left_portrait = {
+		character = root
+		animation = anger
+	}
+
+	immediate = {
+        # 当场败露即结束留证判定，不能等玩家关闭事件后才阻止失效回调。
+        if = {
+            limit = { exists = scope:scheme_discovered }
+            scope:scheme = { set_variable = { name = tca_treasury_secret_resolved value = yes } }
+        }
+
+		if = {
+			limit = {
+				scope:target.holder = {
+					has_title = title:h_china
+				}
+			}
+			tgp_activate_catalyst_against_hegemon_effect = {
+				HEGEMON = scope:target.holder
+				CATALYST = catalyst_governor_embezzlement
+			}
+		}
+		else_if = {
+			limit = {
+				has_title = title:h_china
+			}
+			add_legitimacy_effect = { LEGITIMACY = medium_legitimacy_loss }
+		}
+		if = {
+			limit = {
+				exists = scope:scheme_discovered
+			}
+			scope:target.holder = {
+				add_opinion = {
+					target = scope:owner
+					modifier = siphoned_treasury_crime
+				}
+			}
+		}
+		else = {
+			scope:scheme = {
+				tca_treasury_resolve_secret_effect = { TARGET = scope:target.holder }
+			}
+		}
+	}
+
+	option = {
+		name = scheme_critical_moments.1203.a
+		scope:scheme = {
+			set_variable = { name = tca_treasury_secret_resolved value = yes }
+			end_scheme = yes
+		}
+	}
+}

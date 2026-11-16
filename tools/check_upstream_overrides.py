@@ -206,7 +206,7 @@ def localization_values(path):
     """读取带引号的本地化条目，保留字面转义供漂移检查。"""
     result = {}
     for line in path.read_text(encoding="utf-8-sig").splitlines():
-        match = re.match(r'^\s*([A-Za-z0-9_]+):(?:\d+)?\s*"((?:\\.|[^"\\])*)"\s*(?:#.*)?$', line)
+        match = re.match(r'^\s*([A-Za-z0-9_.]+):(?:\d+)?\s*"((?:\\.|[^"\\])*)"\s*(?:#.*)?$', line)
         if match:
             if match[1] in result:
                 raise ValueError(f"duplicate localization key {match[1]} in {path}")
