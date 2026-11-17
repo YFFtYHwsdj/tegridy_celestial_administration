@@ -1,0 +1,292 @@
+﻿# 独立可丢弃世界；实际天朝地方官开战，先核对原始声明回调，不直接伪造自动奏报。
+namespace = tca_frontier_ceasefire_test
+
+tca_frontier_ceasefire_test.1 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_frontier_ceasefire_test.1 tca_test_frontier_ceasefire"
+        remove_character_flag = tca_test_tca_frontier_ceasefire_test_case_failed
+        tca_frontier_situation_start_effect = yes
+        title:h_china.holder = { save_scope_as = tca_frontier_ceasefire_test_top tca_test_protect_character_effect = yes }
+        scope:tca_frontier_ceasefire_test_top = { random_vassal_or_below = {
+            limit = { tca_is_landed_celestial_governor_trigger = yes is_adult = yes is_imprisoned = no highest_held_title_tier = tier_kingdom any_held_title = { is_noble_family_title = yes } }
+            save_scope_as = actor tca_test_protect_character_effect = yes add_prestige = 10000 add_character_flag = tca_frontier_border_war_enabled
+            # 串行复用目标只验交涉，不强迫无合法性类型的地方官触发原版撕约legitimacy分支。
+            add_character_flag = allowed_war_declaration_sans_truce_penalties
+            add_character_modifier = { modifier = tca_fw_test_income }
+        } }
+        create_character = { age = 35 gender = male random_traits = no culture = scope:actor.culture faith = scope:actor.faith location = scope:actor.capital_province save_scope_as = recipient }
+        scope:recipient = { tca_test_protect_character_effect = yes add_trait = content create_title_and_vassal_change = { type = granted save_scope_as = tca_frontier_ceasefire_test_grant } }
+        title:c_lingzhou = { change_title_holder = { holder = scope:recipient change = scope:tca_frontier_ceasefire_test_grant take_baronies = yes } }
+        resolve_title_and_vassal_change = scope:tca_frontier_ceasefire_test_grant
+        scope:recipient = { change_government = feudal_government
+            create_title_and_vassal_change = { type = independency save_scope_as = tca_frontier_ceasefire_test_independent }
+            becomes_independent = { change = scope:tca_frontier_ceasefire_test_independent }
+            resolve_title_and_vassal_change = scope:tca_frontier_ceasefire_test_independent
+        }
+        title:c_lingzhou = { random_neighboring_county = { limit = { this != title:c_huaiyuan } save_scope_as = tca_frontier_ceasefire_test_border } }
+        scope:actor = { create_title_and_vassal_change = { type = granted save_scope_as = tca_frontier_ceasefire_test_grant } }
+        scope:tca_frontier_ceasefire_test_border = { change_title_holder = { holder = scope:actor change = scope:tca_frontier_ceasefire_test_grant } }
+        resolve_title_and_vassal_change = scope:tca_frontier_ceasefire_test_grant
+        # 第二个独立目标用于两场真实战争的隔离，不把同战私有记录当作多战争证据。
+        create_character = { age = 35 gender = male random_traits = no culture = scope:actor.culture faith = scope:actor.faith location = scope:actor.capital_province save_scope_as = tca_frontier_ceasefire_test_second_recipient }
+        scope:tca_frontier_ceasefire_test_second_recipient = { tca_test_protect_character_effect = yes add_trait = content create_title_and_vassal_change = { type = granted save_scope_as = tca_frontier_ceasefire_test_grant } }
+        title:c_huaiyuan = { change_title_holder = { holder = scope:tca_frontier_ceasefire_test_second_recipient change = scope:tca_frontier_ceasefire_test_grant take_baronies = yes } }
+        resolve_title_and_vassal_change = scope:tca_frontier_ceasefire_test_grant
+        scope:tca_frontier_ceasefire_test_second_recipient = { change_government = feudal_government create_title_and_vassal_change = { type = independency save_scope_as = tca_frontier_ceasefire_test_independent } becomes_independent = { change = scope:tca_frontier_ceasefire_test_independent } resolve_title_and_vassal_change = scope:tca_frontier_ceasefire_test_independent }
+        title:c_huaiyuan = { random_neighboring_county = { limit = { this != title:c_lingzhou this != scope:tca_frontier_ceasefire_test_border } save_scope_as = tca_frontier_ceasefire_test_second_border } }
+        scope:actor = { create_title_and_vassal_change = { type = granted save_scope_as = tca_frontier_ceasefire_test_grant } }
+        scope:tca_frontier_ceasefire_test_second_border = { change_title_holder = { holder = scope:actor change = scope:tca_frontier_ceasefire_test_grant } }
+        resolve_title_and_vassal_change = scope:tca_frontier_ceasefire_test_grant
+        trigger_event = { id = tca_frontier_ceasefire_test.2 days = 3 }
+    }
+}
+tca_frontier_ceasefire_test.2 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { scope:actor = { tca_is_landed_celestial_governor_trigger = yes top_liege = scope:tca_frontier_ceasefire_test_top } }
+            title:c_lingzhou = { save_scope_as = target }
+            save_scope_value_as = { name = tca_frontier_raid value = yes }
+            tca_frontier_border_war_start_effect = yes
+            # 显式零初值仅声明本探针读取的新变量，不冒充已经奏报；正式入口须写yes。
+            scope:tca_frontier_border_war ?= { if = { limit = { NOT = { has_variable = tca_fw_reported } } set_variable = { name = tca_fw_reported value = no } } }
+            if = { limit = { exists = scope:tca_frontier_border_war } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_ceasefire 1" }
+            else = { add_character_flag = tca_test_tca_frontier_ceasefire_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_ceasefire 1" }
+        if = { limit = { scope:tca_frontier_border_war ?= { var:tca_fw_reported ?= yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_ceasefire 2" }
+        else = { add_character_flag = tca_test_tca_frontier_ceasefire_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_ceasefire 2" }
+            scope:tca_frontier_border_war ?= { var:tca_fw_record ?= { end_story = yes } }
+            trigger_event = { id = tca_frontier_ceasefire_test.3 days = 2 }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_frontier_ceasefire" tca_test_lane_end_effect = { GROUP = tca_frontier_ceasefire_test } }
+    }
+}
+tca_frontier_ceasefire_test.3 = {
+    type = character_event hidden = yes
+    immediate = {
+        scope:actor = { add_character_modifier = { modifier = tca_fw_test_income } change_merit_no_experience = { value = 10000 subtract = merit } }
+        tca_fw_test_record_effect = yes
+        scope:tca_frontier_ceasefire_test_record = {
+            tca_fw_order_effect = { ORDER = yes }
+            tca_fw_request_compensation_effect = yes
+            tca_fw_compensation_effect = { ACCEPT = no }
+            tca_fw_request_compensation_effect = yes
+            tca_fw_refuse_effect = yes
+        }
+        if = { limit = { scope:tca_frontier_ceasefire_test_record = { var:tca_fw_state = 4 has_variable = tca_fw_compensation } scope:actor = { is_at_war_with = scope:recipient } } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_ceasefire 3" }
+        else = { add_character_flag = tca_test_tca_frontier_ceasefire_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_ceasefire 3" }
+
+        scope:actor = { set_variable = { name = tca_frontier_ceasefire_test_merit value = merit } set_variable = { name = tca_frontier_ceasefire_test_gold value = gold } set_variable = { name = tca_frontier_ceasefire_test_treasury value = treasury } }
+        scope:tca_frontier_ceasefire_test_record = { tca_fw_punish_effect = { LEVEL = 1 } }
+        scope:tca_frontier_ceasefire_test_record ?= { tca_fw_punish_effect = { LEVEL = 3 } }
+        if = { limit = { scope:actor = { merit = { value = var:tca_frontier_ceasefire_test_merit subtract = 100 } gold = var:tca_frontier_ceasefire_test_gold treasury = var:tca_frontier_ceasefire_test_treasury is_landed = yes is_at_war_with = scope:recipient } } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_ceasefire 4" }
+        else = { add_character_flag = tca_test_tca_frontier_ceasefire_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_ceasefire 4" }
+
+        # 有足额金币时按原生月金币收入计算三个月，国库不代付。
+        tca_fw_test_refusal_effect = yes
+        scope:actor = { tca_fw_test_set_gold_effect = { VALUE = 10000 } set_variable = { name = tca_frontier_ceasefire_test_gold value = { value = gold subtract = { value = monthly_character_income multiply = 3 } } } set_variable = { name = tca_frontier_ceasefire_test_merit value = merit } }
+        scope:tca_frontier_ceasefire_test_record = { tca_fw_punish_effect = { LEVEL = 2 } }
+        if = { limit = { scope:actor = { gold = var:tca_frontier_ceasefire_test_gold treasury = var:tca_frontier_ceasefire_test_treasury merit = { value = var:tca_frontier_ceasefire_test_merit subtract = 300 } is_landed = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_ceasefire 5" }
+        else = { add_character_flag = tca_test_tca_frontier_ceasefire_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_ceasefire 5" }
+        tca_fw_test_refusal_effect = yes
+        scope:actor = { tca_fw_test_set_gold_effect = { VALUE = 1 } }
+        scope:tca_frontier_ceasefire_test_record = { tca_fw_punish_effect = { LEVEL = 2 } }
+        if = { limit = { scope:actor = { gold = 0 treasury = var:tca_frontier_ceasefire_test_treasury } } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_ceasefire 6" }
+        else = { add_character_flag = tca_test_tca_frontier_ceasefire_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_ceasefire 6" }
+        tca_fw_test_refusal_effect = yes
+        scope:actor = { tca_fw_test_set_gold_effect = { VALUE = 0 } }
+        scope:tca_frontier_ceasefire_test_record = { tca_fw_punish_effect = { LEVEL = 2 } }
+        if = { limit = { scope:actor = { gold = 0 treasury = var:tca_frontier_ceasefire_test_treasury } } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_ceasefire 7" }
+        else = { add_character_flag = tca_test_tca_frontier_ceasefire_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_ceasefire 7" }
+        tca_fw_test_refusal_effect = yes
+        scope:actor = { tca_fw_test_set_gold_effect = { VALUE = -5 } }
+        scope:tca_frontier_ceasefire_test_record = { tca_fw_punish_effect = { LEVEL = 2 } }
+        if = { limit = { scope:actor = { gold = -5 treasury = var:tca_frontier_ceasefire_test_treasury } } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_ceasefire 8" }
+        else = { add_character_flag = tca_test_tca_frontier_ceasefire_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_ceasefire 8" }
+        # 已结束战争的问责组件使用另一个无战事官员，不要求war引用仍有效。
+        scope:actor = { tca_fw_test_set_gold_effect = { VALUE = 1000 } }
+        scope:tca_frontier_ceasefire_test_top = { random_vassal_or_below = {
+            limit = { this != scope:actor tca_is_landed_celestial_governor_trigger = yes is_adult = yes NOT = { is_at_war = yes } }
+            save_scope_as = tca_frontier_ceasefire_test_postwar_actor
+            tca_test_protect_character_effect = yes
+            tca_fw_test_set_gold_effect = { VALUE = 100 }
+            create_story = { type = tca_frontier_ceasefire save_scope_as = tca_frontier_ceasefire_test_record }
+        } }
+        scope:tca_frontier_ceasefire_test_record = {
+            set_variable = { name = tca_fw_state value = 4 }
+            set_variable = { name = tca_fw_officer value = scope:tca_frontier_ceasefire_test_postwar_actor }
+            set_variable = { name = tca_fw_sovereign value = scope:tca_frontier_ceasefire_test_top }
+            set_variable = { name = tca_fw_country value = scope:tca_frontier_ceasefire_test_top.primary_title }
+        }
+        trigger_event = { id = tca_frontier_ceasefire_test.30 days = 2 }
+    }
+}
+tca_frontier_ceasefire_test.30 = {
+    type = character_event hidden = yes
+    immediate = {
+        scope:tca_frontier_ceasefire_test_postwar_actor = {
+            set_variable = { name = tca_frontier_ceasefire_test_gold value = gold }
+            set_variable = { name = tca_frontier_ceasefire_test_income value = monthly_character_income }
+            debug_log = "TCA_CEASEFIRE_DIAG POSTWAR income=[THIS.Char.MakeScope.Var('tca_frontier_ceasefire_test_income').GetValue] gold=[THIS.Char.MakeScope.Var('tca_frontier_ceasefire_test_gold').GetValue]"
+        }
+        scope:tca_frontier_ceasefire_test_postwar_actor = {
+            set_variable = { name = tca_frontier_ceasefire_test_expected_gold value = { value = gold subtract = { value = var:tca_frontier_ceasefire_test_income min = 0 multiply = 3 max = { value = gold min = 0 } } } }
+        }
+        scope:tca_frontier_ceasefire_test_record = { tca_fw_punish_effect = { LEVEL = 2 } }
+        if = { limit = { scope:tca_frontier_ceasefire_test_postwar_actor = { gold = var:tca_frontier_ceasefire_test_expected_gold NOT = { is_at_war = yes } } } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_ceasefire 9" }
+        else = { add_character_flag = tca_test_tca_frontier_ceasefire_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_ceasefire 9" }
+        trigger_event = { id = tca_frontier_ceasefire_test.31 days = 2 }
+    }
+}
+tca_frontier_ceasefire_test.31 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_fw_test_refusal_effect = yes
+        scope:actor = { set_variable = { name = tca_frontier_ceasefire_test_merit value = merit } set_variable = { name = tca_frontier_ceasefire_test_gold value = gold } }
+        scope:tca_frontier_ceasefire_test_record = { tca_fw_punish_effect = { LEVEL = 0 } }
+        if = { limit = { scope:actor = { merit = var:tca_frontier_ceasefire_test_merit gold = var:tca_frontier_ceasefire_test_gold is_at_war_with = scope:recipient } } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_ceasefire 10" }
+        else = { add_character_flag = tca_test_tca_frontier_ceasefire_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_ceasefire 10" }
+
+        # 待选状态由组件准备，不发送会在保存前被AI消费的选择；原始书信AI另有实际路径。
+        tca_fw_test_record_effect = yes
+        scope:tca_frontier_ceasefire_test_record = { set_variable = { name = tca_fw_state value = 4 } save_scope_as = tca_frontier_ceasefire_test_saved_refusal }
+        scope:tca_frontier_border_war = { save_scope_as = tca_frontier_ceasefire_test_first_war }
+        scope:recipient = { save_scope_as = tca_frontier_ceasefire_test_first_recipient }
+        scope:tca_frontier_ceasefire_test_second_recipient = { save_scope_as = recipient }
+        title:c_huaiyuan = { save_scope_as = target }
+        save_scope_value_as = { name = tca_frontier_raid value = yes }
+        tca_frontier_border_war_start_effect = yes
+        scope:tca_frontier_border_war ?= {
+            save_scope_as = tca_frontier_ceasefire_test_second_war
+            var:tca_fw_record ?= { end_story = yes }
+            tca_fw_create_record_effect = yes
+        }
+        scope:tca_fw_record = { set_variable = { name = tca_fw_state value = 1 } save_scope_as = tca_frontier_ceasefire_test_saved_order }
+        scope:tca_frontier_ceasefire_test_first_war = { save_scope_as = tca_frontier_border_war }
+        scope:tca_frontier_ceasefire_test_first_recipient = { save_scope_as = recipient }
+        if = { limit = { scope:actor = { is_at_war_with = scope:recipient } } debug_log = "TCA_CEASEFIRE_DIAG FIRST_WAR_BEFORE_SAVE" }
+        if = { limit = { scope:actor = { is_at_war_with = scope:tca_frontier_ceasefire_test_second_recipient } } debug_log = "TCA_CEASEFIRE_DIAG SECOND_WAR_BEFORE_SAVE" }
+        title:h_china = { set_variable = { name = tca_frontier_ceasefire_checkpoint_phase value = 1 } }
+        trigger_event = { id = tca_frontier_ceasefire_test.4 days = 1 }
+    }
+}
+tca_frontier_ceasefire_test.4 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { title:h_china = { var:tca_frontier_ceasefire_checkpoint_phase = 3 } }
+        if = { limit = { scope:tca_frontier_ceasefire_test_saved_refusal = { var:tca_fw_state = 4 tca_fw_live_trigger = yes } scope:tca_frontier_ceasefire_test_saved_order = { var:tca_fw_state = 1 tca_fw_live_trigger = yes } } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_ceasefire 11" }
+        else = { add_character_flag = tca_test_tca_frontier_ceasefire_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_ceasefire 11" }
+
+            scope:tca_frontier_ceasefire_test_saved_refusal = { tca_fw_punish_effect = { LEVEL = 0 } }
+        if = { limit = { scope:tca_frontier_ceasefire_test_saved_order = { var:tca_fw_state = 1 } } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_ceasefire 12" }
+        else = { add_character_flag = tca_test_tca_frontier_ceasefire_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_ceasefire 12" }
+
+            scope:tca_frontier_ceasefire_test_saved_order = { tca_fw_stop_effect = { PAY = no } }
+        if = { limit = { scope:actor = { NOT = { is_at_war_with = scope:tca_frontier_ceasefire_test_second_recipient } is_at_war_with = scope:recipient } } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_ceasefire 13" }
+        else = { add_character_flag = tca_test_tca_frontier_ceasefire_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_ceasefire 13" }
+
+            scope:tca_frontier_border_war = { end_war = white_peace }
+            trigger_event = { id = tca_frontier_ceasefire_test.5 days = 2 }
+        }
+        else = { trigger_event = { id = tca_frontier_ceasefire_test.4 days = 1 } }
+    }
+}
+tca_frontier_ceasefire_test.5 = {
+    type = character_event hidden = yes
+    immediate = {
+        title:c_lingzhou = { save_scope_as = target }
+        save_scope_value_as = { name = tca_frontier_raid value = yes }
+        tca_frontier_border_war_start_effect = yes
+        scope:tca_frontier_border_war ?= { var:tca_fw_record ?= { end_story = yes } }
+        trigger_event = { id = tca_frontier_ceasefire_test.6 days = 2 }
+    }
+}
+tca_frontier_ceasefire_test.6 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_fw_test_record_effect = yes
+        scope:tca_frontier_ceasefire_test_record = { tca_fw_order_effect = { ORDER = yes } tca_fw_request_compensation_effect = yes }
+        scope:tca_frontier_ceasefire_test_top = { set_variable = { name = tca_frontier_ceasefire_test_gold value = gold } set_variable = { name = tca_frontier_ceasefire_test_treasury value = treasury } if = { limit = { treasury > 0 } remove_treasury = treasury } else = { add_treasury = { value = treasury multiply = -1 } } }
+        scope:tca_frontier_ceasefire_test_record = { tca_fw_compensation_effect = { ACCEPT = yes } }
+        if = { limit = { scope:tca_frontier_ceasefire_test_record = { var:tca_fw_state = 2 } scope:actor = { is_at_war_with = scope:recipient } scope:tca_frontier_ceasefire_test_top = { treasury = 0 gold = var:tca_frontier_ceasefire_test_gold } } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_ceasefire 14" }
+        else = { add_character_flag = tca_test_tca_frontier_ceasefire_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_ceasefire 14" }
+
+        scope:tca_frontier_ceasefire_test_top = { add_treasury = 10000 }
+        scope:actor = { set_variable = { name = tca_frontier_ceasefire_test_short_term value = treasury } }
+        # 标量通过save_scope_value读取，不能把金币数值当实体scope跳转。
+        save_scope_value_as = { name = tca_frontier_ceasefire_test_compensation value = scope:tca_frontier_ceasefire_test_record.var:tca_fw_compensation }
+        scope:tca_frontier_ceasefire_test_record = { tca_fw_compensation_effect = { ACCEPT = yes } }
+        scope:tca_frontier_ceasefire_test_record ?= { tca_fw_compensation_effect = { ACCEPT = yes } }
+        if = { limit = { scope:actor = { treasury = { value = var:tca_frontier_ceasefire_test_short_term add = scope:tca_frontier_ceasefire_test_compensation } NOT = { is_at_war_with = scope:recipient } } scope:tca_frontier_ceasefire_test_top = { treasury = { value = 10000 subtract = scope:tca_frontier_ceasefire_test_compensation } gold = var:tca_frontier_ceasefire_test_gold } } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_ceasefire 15" }
+        else = { add_character_flag = tca_test_tca_frontier_ceasefire_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_ceasefire 15" }
+
+        trigger_event = { id = tca_frontier_ceasefire_test.7 days = 2 }
+    }
+}
+tca_frontier_ceasefire_test.7 = {
+    type = character_event hidden = yes
+    immediate = {
+        title:c_lingzhou = { save_scope_as = target }
+        save_scope_value_as = { name = tca_frontier_raid value = yes }
+        save_scope_value_as = { name = tca_fw_imperial_order value = yes }
+        tca_frontier_border_war_start_effect = yes
+        save_scope_value_as = { name = tca_fw_imperial_order value = no }
+        # 中央授意须在投递前取消自主奏报；等待原始声明回调后仍不得再创建。
+        trigger_event = { id = tca_frontier_ceasefire_test.8 days = 3 }
+    }
+}
+tca_frontier_ceasefire_test.8 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { scope:tca_frontier_border_war = { var:tca_frontier_imperial_order ?= yes NOT = { has_variable = tca_fw_record } NOT = { var:tca_fw_reported ?= yes } } scope:actor = { is_at_war_with = scope:recipient } } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_ceasefire 16" }
+        else = { add_character_flag = tca_test_tca_frontier_ceasefire_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_ceasefire 16" }
+
+        scope:tca_frontier_border_war = { remove_variable = tca_frontier_imperial_order }
+        # 无人在途时明确重置本组件的报告锁，观察一轮原始书信AI选择；不改框架计数。
+        scope:tca_frontier_border_war = { remove_variable = tca_fw_reported tca_fw_start_effect = yes }
+        trigger_event = { id = tca_frontier_ceasefire_test.9 days = 12 }
+    }
+}
+tca_frontier_ceasefire_test.9 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { scope:actor = { NOT = { has_variable_list = tca_fw_records } } } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_ceasefire 17" }
+        else = { add_character_flag = tca_test_tca_frontier_ceasefire_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_ceasefire 17" }
+
+        # 若原生AI自行停战或退职，则补一名仍在任的官员供独立罢免组件，不将其冒充原AI路径。
+        if = { limit = { scope:actor = { is_landed = no } }
+            scope:tca_frontier_ceasefire_test_top = { random_vassal_or_below = { limit = { tca_is_landed_celestial_governor_trigger = yes is_adult = yes any_held_title = { is_noble_family_title = yes } } save_scope_as = actor tca_test_protect_character_effect = yes } }
+        }
+        # 罢免组件只需要已发生的抗命记录；战争结束后仍可处理同一次事实，不强行新开战争。
+        scope:actor = { create_story = { type = tca_frontier_ceasefire save_scope_as = tca_frontier_ceasefire_test_record } }
+        scope:tca_frontier_ceasefire_test_record = {
+            set_variable = { name = tca_fw_state value = 4 }
+            set_variable = { name = tca_fw_officer value = scope:actor }
+            set_variable = { name = tca_fw_sovereign value = scope:tca_frontier_ceasefire_test_top }
+            set_variable = { name = tca_fw_country value = scope:tca_frontier_ceasefire_test_top.primary_title }
+        }
+        scope:actor = {
+            add_character_modifier = { modifier = tca_fw_test_income }
+            tca_fw_test_set_gold_effect = { VALUE = 1 }
+            change_merit_no_experience = { value = 10000 subtract = merit }
+            set_variable = { name = tca_frontier_ceasefire_test_level value = merit_level }
+            random_held_title = { limit = { is_noble_family_title = yes } save_scope_as = tca_frontier_ceasefire_test_family }
+        }
+        scope:tca_frontier_ceasefire_test_record = { tca_fw_punish_effect = { LEVEL = 3 } }
+        trigger_event = { id = tca_frontier_ceasefire_test.10 days = 2 }
+    }
+}
+tca_frontier_ceasefire_test.10 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { scope:actor = { is_landed = no gold >= 0 merit_level = var:tca_frontier_ceasefire_test_level NOT = { tca_retirement_excludes_appointment_trigger = yes } appointment_timeout_days < 36500 } scope:tca_frontier_ceasefire_test_family = { holder = scope:actor } } debug_log = "TCA_TEST CHECK_PASS tca_test_frontier_ceasefire 18" }
+        else = { add_character_flag = tca_test_tca_frontier_ceasefire_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_frontier_ceasefire 18" }
+
+        scope:tca_frontier_border_war ?= { end_war = white_peace }
+        if = { limit = { has_character_flag = tca_test_tca_frontier_ceasefire_test_case_failed }
+            debug_log = "TCA_TEST FAIL tca_test_frontier_ceasefire"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+        }
+        else = { debug_log = "TCA_TEST PASS tca_test_frontier_ceasefire" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        tca_test_lane_end_effect = { GROUP = tca_frontier_ceasefire_test }
+    }
+}

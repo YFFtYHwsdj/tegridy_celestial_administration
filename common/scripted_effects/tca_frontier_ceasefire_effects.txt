@@ -1,0 +1,166 @@
+﻿# 战争作用域；B成功开战与原始CB声明共用，仅天朝地方自主战争首次进入。
+# tca_fw_reported随战争保存，即使已宽宥／听任也不再报告；中央授意标记由未来P5在战争上提供。
+tca_fw_start_effect = {
+    # 同步声明回调不继承调用链值：从进攻者的短暂桥接标记冻结来源；异步回调读取战争标记。
+    if = { limit = { OR = { scope:tca_fw_imperial_order ?= yes primary_attacker = { has_character_flag = tca_fw_declaring_imperial_war } } }
+        set_variable = { name = tca_frontier_imperial_order value = yes }
+    }
+    if = { limit = { tca_fw_war_trigger = yes NOT = { var:tca_fw_reported ?= yes } }
+        tca_fw_create_record_effect = yes
+        scope:tca_fw_record ?= { var:tca_fw_sovereign = { trigger_event = { id = tca_frontier_ceasefire.1 } } }
+    }
+}
+
+# 战争作用域；调用方先做每战去重。输出scope:tca_fw_record，准备本身不发信。
+# state=0奏报、1诏书、2索偿、3拒偿后回应、4已抗命待问责、5已结算。
+tca_fw_create_record_effect = {
+    save_scope_as = tca_fw_war
+    primary_attacker = { save_scope_as = tca_fw_officer create_story = { type = tca_frontier_ceasefire save_scope_as = tca_fw_record } }
+    primary_defender = { save_scope_as = tca_fw_defender }
+    set_variable = { name = tca_fw_reported value = yes }
+    set_variable = { name = tca_fw_record value = scope:tca_fw_record }
+    scope:tca_fw_record ?= {
+        set_variable = { name = tca_fw_state value = 0 }
+        set_variable = { name = tca_fw_war value = scope:tca_fw_war }
+        set_variable = { name = tca_fw_officer value = scope:tca_fw_officer }
+        set_variable = { name = tca_fw_defender value = scope:tca_fw_defender }
+        set_variable = { name = tca_fw_sovereign value = scope:tca_fw_officer.top_liege }
+        set_variable = { name = tca_fw_country value = scope:tca_fw_officer.top_liege.primary_title }
+    }
+    scope:tca_fw_officer = { add_to_variable_list = { name = tca_fw_records target = scope:tca_fw_record } }
+}
+
+# 记录作用域；ORDER=yes发诏、no听任。听任不补中央授意标记，不承担费用。
+tca_fw_order_effect = {
+    save_scope_as = tca_fw_record
+    if = { limit = { var:tca_fw_state = 0 tca_fw_live_trigger = yes }
+        if = { limit = { always = $ORDER$ }
+            set_variable = { name = tca_fw_state value = 1 }
+            var:tca_fw_officer = { trigger_event = { id = tca_frontier_ceasefire.2 days = 1 } }
+        }
+        else = { set_variable = { name = tca_fw_state value = 5 } end_story = yes }
+    }
+}
+
+# 记录作用域；首次诏书才可索偿，沿用原版进攻封臣罢兵补偿，不自行估算军费。
+tca_fw_request_compensation_effect = {
+    save_scope_as = tca_fw_record
+    if = { limit = { var:tca_fw_state = 1 tca_fw_live_trigger = yes }
+        set_variable = { name = tca_fw_state value = 2 }
+        var:tca_fw_officer = { save_scope_value_as = { name = tca_fw_requested_gold value = stop_war_attacker_bribe_size } }
+        set_variable = { name = tca_fw_compensation value = scope:tca_fw_requested_gold }
+        var:tca_fw_sovereign = { trigger_event = { id = tca_frontier_ceasefire.3 days = 1 } }
+    }
+}
+tca_fw_compensation_effect = {
+    save_scope_as = tca_fw_record
+    if = { limit = { var:tca_fw_state = 2 tca_fw_live_trigger = yes }
+        if = { limit = { always = $ACCEPT$ tca_fw_can_compensate_trigger = yes }
+            tca_fw_stop_effect = { PAY = yes }
+        }
+        else_if = { limit = { always = $ACCEPT$ } }
+        else = {
+            set_variable = { name = tca_fw_state value = 3 }
+            var:tca_fw_officer = { trigger_event = { id = tca_frontier_ceasefire.4 days = 1 } }
+        }
+    }
+}
+
+# 记录作用域；PAY=yes仅由索偿同意进入。先锁状态，再付款与同场白和平；失效不扣款。
+tca_fw_stop_effect = {
+    save_scope_as = tca_fw_record
+    if = { limit = { tca_fw_live_trigger = yes OR = {
+        AND = { always = $PAY$ tca_fw_can_compensate_trigger = yes }
+        AND = { NOT = { always = $PAY$ } OR = { var:tca_fw_state = 1 var:tca_fw_state = 3 } }
+    } }
+        set_variable = { name = tca_fw_state value = 5 }
+        if = { limit = { always = $PAY$ }
+            var:tca_fw_sovereign = { remove_treasury = scope:tca_fw_record.var:tca_fw_compensation }
+            var:tca_fw_officer = { add_treasury = scope:tca_fw_record.var:tca_fw_compensation }
+        }
+        var:tca_fw_officer = { every_character_war = {
+            limit = { this = scope:tca_fw_record.var:tca_fw_war }
+            end_war = white_peace
+        } }
+        tca_fw_notice_effect = { RESULT = 0 }
+        end_story = yes
+    }
+}
+
+# 记录作用域；明确拒绝后立即问责，保留事实，不以战后胜负决定是否曾抗命。
+tca_fw_refuse_effect = {
+    save_scope_as = tca_fw_record
+    if = { limit = { tca_fw_live_trigger = yes OR = { var:tca_fw_state = 1 var:tca_fw_state = 3 } }
+        set_variable = { name = tca_fw_state value = 4 }
+    }
+}
+
+# 记录作用域；LEVEL=0宽宥、1申斥、2惩戒、3罢免，必须已发生抗命且只消费一次。
+# 先冻结月金币收入与现有正金币余额，再扣功绩／原生退职；罚金直接销毁，不转给最高领主或任何国库，也不从treasury或官署经费代付。
+tca_fw_punish_effect = {
+    save_scope_as = tca_fw_record
+    save_scope_value_as = { name = tca_fw_penalty_level value = $LEVEL$ }
+    if = { limit = { var:tca_fw_state = 4 tca_fw_parties_valid_trigger = yes
+        OR = { scope:tca_fw_penalty_level < 3 tca_fw_can_dismiss_trigger = yes }
+    }
+        set_variable = { name = tca_fw_state value = 5 }
+        save_scope_value_as = { name = tca_fw_fine_months value = 0 }
+        if = { limit = { scope:tca_fw_penalty_level = 2 } save_scope_value_as = { name = tca_fw_fine_months value = 3 } }
+        else_if = { limit = { scope:tca_fw_penalty_level = 3 } save_scope_value_as = { name = tca_fw_fine_months value = 6 } }
+        var:tca_fw_officer = {
+            save_scope_value_as = { name = tca_fw_actual_fine value = { value = tca_fw_personal_monthly_income_value multiply = scope:tca_fw_fine_months max = { value = gold min = 0 } min = 0 } }
+            if = { limit = { scope:tca_fw_penalty_level = 1 } change_merit = -100 }
+            else_if = { limit = { scope:tca_fw_penalty_level = 2 } change_merit = -300 }
+            else_if = { limit = { scope:tca_fw_penalty_level = 3 } change_merit = -600 }
+            if = { limit = { scope:tca_fw_actual_fine > 0 } remove_long_term_gold = scope:tca_fw_actual_fine }
+            if = { limit = { scope:tca_fw_penalty_level = 3 } force_step_down_landed_titles = yes }
+        }
+        tca_fw_notice_effect = { RESULT = 1 }
+        end_story = yes
+    }
+}
+
+# 记录作用域；结果信只携带已冻结的收发信人／结果数值，不在事件中重新处分或引用已销毁story。
+tca_fw_notice_effect = {
+    var:tca_fw_officer = { save_scope_as = tca_fw_notice_officer }
+    var:tca_fw_sovereign = { save_scope_as = tca_fw_notice_sovereign }
+    save_scope_value_as = { name = tca_fw_notice_result value = $RESULT$ }
+    save_scope_value_as = { name = tca_fw_notice_penalty value = 0 }
+    save_scope_value_as = { name = tca_fw_notice_fine value = 0 }
+    if = { limit = { scope:tca_fw_notice_result = 1 }
+        save_scope_value_as = { name = tca_fw_notice_penalty value = scope:tca_fw_penalty_level }
+        save_scope_value_as = { name = tca_fw_notice_fine value = scope:tca_fw_actual_fine }
+    }
+    if = { limit = { scope:tca_fw_notice_result = 0 }
+        scope:tca_fw_notice_officer = { save_scope_as = tca_fw_notice_sender }
+        scope:tca_fw_notice_sovereign = { trigger_event = { id = tca_frontier_ceasefire.6 } }
+    }
+    else = {
+        scope:tca_fw_notice_sovereign = { save_scope_as = tca_fw_notice_sender }
+        scope:tca_fw_notice_officer = { trigger_event = { id = tca_frontier_ceasefire.6 } }
+    }
+}
+
+# 记录作用域；旧阶段书信过期不得结束已进入下一阶段的交涉。
+# 选项执行时因钱款或资格变化未能消费，才重投同阶段书信，避免留下无入口的记录。
+tca_fw_repeat_letter_effect = {
+    save_scope_as = tca_fw_record
+    if = { limit = { var:tca_fw_state = $STATE$ }
+        if = { limit = { tca_fw_parties_valid_trigger = yes OR = { var:tca_fw_state = 4 tca_fw_live_trigger = yes } }
+            if = { limit = { OR = { var:tca_fw_state = 0 var:tca_fw_state = 2 var:tca_fw_state = 4 } }
+                var:tca_fw_sovereign = { trigger_event = { id = $EVENT$ days = 1 } }
+            }
+            else = { var:tca_fw_officer = { trigger_event = { id = $EVENT$ days = 1 } } }
+        }
+        else = { end_story = yes }
+    }
+}
+
+# 原生抗命书信选项在记录事实后同日投递问责，不等战后或下一日；组件调用可只维护事实。
+tca_fw_send_accountability_effect = {
+    save_scope_as = tca_fw_record
+    if = { limit = { var:tca_fw_state = 4 tca_fw_parties_valid_trigger = yes NOT = { has_variable = tca_fw_accountability_sent } }
+        set_variable = { name = tca_fw_accountability_sent value = yes }
+        var:tca_fw_sovereign = { trigger_event = { id = tca_frontier_ceasefire.5 } }
+    }
+}

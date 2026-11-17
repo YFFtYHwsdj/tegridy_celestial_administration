@@ -1,4 +1,5 @@
-﻿# 输入actor、recipient、target及tca_frontier_raid选项；最终重查，只有创建成功才收费。
+﻿# 输入actor、recipient、target及tca_frontier_raid选项；可选当链值tca_fw_imperial_order标记中央授意。
+# 最终重查，只有创建成功才收费；中央来源先冻结到本场战争，再执行自主奏报。
 # 输出scope:tca_frontier_border_war；无持久待宣战变量；成功开战后的C1/C2记录由CB声明回调建立，不创建追讨任务。
 tca_frontier_border_war_start_effect = {
     clear_saved_scope = tca_frontier_border_war
@@ -14,7 +15,13 @@ tca_frontier_border_war_start_effect = {
                 save_scope_value_as = { name = tca_fe_added_authorization value = yes }
             }
         }
+        # 原生start_war的同步声明回调不继承调用链值；仅在创建期间桥接来源，返回后归还。
+        save_scope_value_as = { name = tca_fw_added_source value = no }
         scope:actor = {
+            if = { limit = { scope:tca_fw_imperial_order ?= yes NOT = { has_character_flag = tca_fw_declaring_imperial_war } }
+                add_character_flag = tca_fw_declaring_imperial_war
+                save_scope_value_as = { name = tca_fw_added_source value = yes }
+            }
             if = { limit = { scope:target = { tier = tier_county } }
                 if = { limit = { scope:tca_frontier_raid = yes }
                     start_war = { cb = tca_frontier_county_raid_cb target = scope:recipient target_title = scope:target }
@@ -27,6 +34,7 @@ tca_frontier_border_war_start_effect = {
                 }
                 else = { start_war = { cb = tca_frontier_duchy_conquest_cb target = scope:recipient target_title = scope:target } }
             }
+            if = { limit = { scope:tca_fw_added_source = yes } remove_character_flag = tca_fw_declaring_imperial_war }
             every_character_war = {
                 limit = { primary_attacker = scope:actor primary_defender = scope:recipient
                     OR = { using_cb = tca_frontier_county_raid_cb using_cb = tca_frontier_duchy_raid_cb using_cb = tca_frontier_county_conquest_cb using_cb = tca_frontier_duchy_conquest_cb }
@@ -35,6 +43,11 @@ tca_frontier_border_war_start_effect = {
             }
             if = { limit = { exists = scope:tca_frontier_border_war }
                 add_prestige = { value = tca_frontier_border_war_cost_value multiply = -1 }
+                # 可选当链来源在首次奏报前冻结到本场战争；未来P5不得事后改人物单一来源指针。
+                scope:tca_frontier_border_war = {
+                    if = { limit = { scope:tca_fw_imperial_order ?= yes } set_variable = { name = tca_frontier_imperial_order value = yes } }
+                    tca_fw_start_effect = yes
+                }
             }
         }
         if = { limit = { scope:tca_fe_added_authorization = yes } scope:actor = { remove_character_flag = tca_frontier_scripted_war_authorized } }

@@ -1,0 +1,48 @@
+﻿# 战争作用域；只接天朝地方有地主官自主发动的四类有限战争，不改变其宣战资格。
+tca_fw_war_trigger = {
+    OR = {
+        using_cb = tca_frontier_county_raid_cb using_cb = tca_frontier_duchy_raid_cb
+        using_cb = tca_frontier_county_conquest_cb using_cb = tca_frontier_duchy_conquest_cb
+    }
+    NOT = { var:tca_frontier_imperial_order ?= yes }
+    primary_attacker = {
+        tca_is_landed_celestial_governor_trigger = yes
+        top_liege = { government_has_flag = government_is_celestial is_independent_ruler = yes }
+    }
+}
+
+# 交涉story作用域；不将旧诏令交给继承人或另一个国家，抗命后不要求战争仍存续。
+tca_fw_parties_valid_trigger = {
+    save_temporary_scope_as = tca_fw_checked
+    var:tca_fw_officer ?= { is_alive = yes government_has_flag = government_is_celestial }
+    var:tca_fw_sovereign ?= { is_alive = yes is_independent_ruler = yes government_has_flag = government_is_celestial }
+    var:tca_fw_country.holder ?= scope:tca_fw_checked.var:tca_fw_sovereign
+    var:tca_fw_officer = { top_liege = scope:tca_fw_checked.var:tca_fw_sovereign this != scope:tca_fw_checked.var:tca_fw_sovereign }
+}
+
+# 先从进攻者现存战争集合核对原对象，确认后才访问war内部，避免解引用过期war。
+tca_fw_live_trigger = {
+    tca_fw_parties_valid_trigger = yes
+    exists = var:tca_fw_war
+    var:tca_fw_officer = { any_character_war = {
+        this = scope:tca_fw_checked.var:tca_fw_war
+        primary_attacker = scope:tca_fw_checked.var:tca_fw_officer
+        primary_defender = scope:tca_fw_checked.var:tca_fw_defender
+        NOT = { var:tca_frontier_imperial_order ?= yes }
+    } }
+}
+tca_fw_can_compensate_trigger = {
+    tca_fw_live_trigger = yes
+    var:tca_fw_state = 2
+    var:tca_fw_sovereign = { has_treasury = yes treasury >= scope:tca_fw_checked.var:tca_fw_compensation }
+    var:tca_fw_officer = { has_treasury = yes }
+}
+# 原生退职在没有可无地继续的头衔时会退化为depose；这里只允许有家门保底且仍有实地者。
+tca_fw_can_dismiss_trigger = {
+    tca_fw_parties_valid_trigger = yes
+    var:tca_fw_state = 4
+    var:tca_fw_officer = {
+        is_landed = yes
+        any_held_title = { is_noble_family_title = yes }
+    }
+}

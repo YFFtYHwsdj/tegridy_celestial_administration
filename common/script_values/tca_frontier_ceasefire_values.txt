@@ -1,0 +1,22 @@
+﻿# 人物作用域；只读取个人月金币收入，不能以地方国库收入或俸禄预算权重替代。
+# 处罚前冻结；负月收入为零，三／六个月由调用方乘入，最后再按个人金币余额限额。
+tca_fw_personal_monthly_income_value = { value = monthly_character_income min = 0 }
+
+# 交涉story作用域；皇帝兼顾其他防守战、国库和性格，不例行叫停每场地方战争。
+tca_fw_order_weight_value = {
+    value = 30
+    if = { limit = { var:tca_fw_sovereign = { treasury < 0 } } add = 40 }
+    if = { limit = { var:tca_fw_sovereign = { any_character_war = { is_defender = prev } } } add = 40 }
+    if = { limit = { var:tca_fw_sovereign = { has_trait = content } } add = 25 }
+    if = { limit = { var:tca_fw_sovereign = { has_trait = ambitious } } subtract = 20 }
+    min = 5 max = 100
+}
+tca_fw_obey_weight_value = {
+    value = 50
+    add = { value = var:tca_fw_officer.ai_honor multiply = 0.25 }
+    if = { limit = { var:tca_fw_officer = { opinion = { target = scope:tca_fw_record.var:tca_fw_sovereign value >= 50 } } } add = 10 }
+    else_if = { limit = { var:tca_fw_officer = { opinion = { target = scope:tca_fw_record.var:tca_fw_sovereign value <= -50 } } } subtract = 10 }
+    if = { limit = { var:tca_fw_officer = { has_trait = stubborn } } subtract = 30 }
+    if = { limit = { var:tca_fw_officer = { has_trait = loyal } } add = 30 }
+    min = 5 max = 100
+}
