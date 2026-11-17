@@ -130,6 +130,14 @@
 
 上述三个对象均无可追加的专用成功回调，互动及scripted effect也不能像on_action一样跨文件追加执行块。因此仅覆盖这三个必要对象，原版全部可执行内容保留，加入准备／成功钩子；不覆盖整份原版文件，不借宗教等无关辅助效果承接。基线、理由和冲突范围登记于`tools/upstream_overrides.json`；修改同名对象的其他模组须合并。原版`on_release_from_prison`仍仅负责清理，不能提供交易原因。
 
+### 外交与停战催化入口
+
+原版`title_on_actions.txt`的`on_explicit_claim_gain`提供人物root、目标`title`及继承`transfer_type`；`army_on_actions.txt`的`on_raid_action_completion`提供`raider`、`barony`、`county`；`alliance_on_actions.txt`的`on_alliance_added`提供`first`／`second`且原生说明只调用一次。均以独立二级子回调跨文件追加，不覆盖父effect。分值与限次见[设计](design.md#宣称普通掠夺与停战)。
+
+停战使用单对象覆盖`zz_tca_frontier_declared_war_effects.txt`中的`on_declared_war`。原版`00_war_effects.txt`在这里检查进攻者的单向`has_truce`及`allowed_war_declaration_sans_truce_penalties`；通用`on_war_started`晚于脚本调用者清理临时豁免，定向原版CB探针已暴露直接在通用回调重查会误算豁免。没有专用可追加的撕约成功回调，故完整保留原对象，仅在原版撕约成立分支保存战争事实，再由现有北疆开战子回调按目标限域计分。覆盖登记、基线和与同名对象模组的兼容边界见`tools/upstream_overrides.json`；不覆盖整份原版文件，不接管原版处罚。
+
+和约的签订与协商解除由正式接受事务接入；关闭入口保持无催化，防止失独立、国家合并及去重被误判。宽限超时在关闭前显式标记`overdue_default`；军事责任路径显式保存`breach_war`，不凭当前欠款或遗留saved scope猜原因。成功制止先冻结国家及人物上下文，再进行实际白和平／移除参战者；战争和争端可能立即销毁，计分不能事后解引用它们。冷却与新增国家键由`tca_frontier_diplomacy_catalyst_effects.txt`维护。辅助退出的已解决争端行保存双国家键作为同战锁，父约解除不抹除；只保留去重，不转交旧责任，战争结束后回收。
+
 ### 当前催化判定入口
 
 - `tca_frontier_title_in_scope_trigger`在头衔作用域判断：先核验地图省份存在，排除无地官署和销毁中的动态县级头衔；伯爵领的`title_province`位于`tca_frontier_region`，或其`any_de_jure_county`中至少一个县位于该范围。`tca_frontier_war_in_scope_trigger`只检查战争`target_titles`列表，不因任一参战国有北疆土地就把其南方战争纳入。

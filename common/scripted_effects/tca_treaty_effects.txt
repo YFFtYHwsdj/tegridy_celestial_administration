@@ -67,7 +67,10 @@ tca_treaty_accept_effect = {
             }
         }
         scope:tca_treaty_record = {
-            if = { limit = { scope:tca_treaty_proposal.var:tca_treaty_mode = 1 } tca_treaty_close_effect = yes }
+            if = { limit = { scope:tca_treaty_proposal.var:tca_treaty_mode = 1 }
+                tca_frontier_emit_treaty_dissolved_effect = yes
+                tca_treaty_close_effect = yes
+            }
             else_if = { limit = { scope:tca_treaty_proposal.var:tca_treaty_mode = 2 }
                 set_variable = { name = tca_treaty_arrears value = 0 }
                 remove_variable = tca_treaty_grace
@@ -83,6 +86,9 @@ tca_treaty_accept_effect = {
                     else = { set_variable = { name = tca_treaty_payer value = scope:tca_treaty_proposal.var:tca_treaty_to_title } }
                 }
                 change_variable = { name = tca_treaty_version add = 1 }
+                if = { limit = { scope:tca_treaty_proposal = { NOT = { has_variable = tca_treaty_existing } } }
+                    tca_frontier_emit_treaty_signed_effect = yes
+                }
             }
         }
         tca_treaty_proposal_notice_effect = { RESULT = 1 }
@@ -109,11 +115,13 @@ tca_treaty_close_effect = {
     }
 }
 # 和约作用域，OFFENDER必须为当前履约君主；先锁再罚，保持同约一次。
-# 仅复用原版两项威望值，不引入原版特长豁免、合法性或其他外交处罚。
+# 原版威望处罚不变；北疆范围追加终止催化。overdue_default仅由宽限超时设置，breach_war仅由军事责任路径设置。
+# 两者均是本约销毁前的原因上下文，不能用当前欠款存在推断主动拒付等同无力欠付。
 tca_treaty_break_effect = {
     save_scope_as = tca_treaty_breaking
     if = { limit = { NOT = { has_variable = tca_treaty_closed } OR = { var:tca_treaty_a = $OFFENDER$ var:tca_treaty_b = $OFFENDER$ } }
         set_variable = { name = tca_treaty_closed value = yes }
+        tca_frontier_treaty_broken_effect = yes
         $OFFENDER$ = { add_prestige = break_truce_prestige_loss add_prestige_level = break_truce_prestige_level_loss save_scope_as = tca_treaty_sender }
         var:tca_treaty_a ?= { if = { limit = { is_alive = yes } trigger_event = { id = tca_treaty.4 } } }
         var:tca_treaty_b ?= { if = { limit = { is_alive = yes } trigger_event = { id = tca_treaty.4 } } }
@@ -152,6 +160,8 @@ tca_treaty_maintain_effect = {
             else_if = { limit = { var:tca_treaty_arrears > 0 }
                 # 超过宽限后不得抢在每日维护前补缴，日期同样由付款入口限制。
                 if = { limit = { tca_treaty_grace_elapsed_value >= 0 }
+                    # 只有宽限超时走欠付原因；明确拒付仍使用主动毁约。
+                    set_variable = { name = tca_treaty_overdue_default value = yes }
                     tca_treaty_break_effect = { OFFENDER = var:tca_treaty_debtor.holder }
                 }
                 else = { tca_treaty_pay_effect = yes }

@@ -34,6 +34,7 @@ tca_treaty_check_attacker_effect = {
                     }
                     scope:tca_treaty_check_officer = { has_character_flag = tca_fw_declaring_imperial_war }
                 } }
+                    set_variable = { name = tca_treaty_breach_war value = scope:tca_treaty_check_war }
                     tca_treaty_break_effect = { OFFENDER = scope:tca_treaty_check_sovereign }
                 }
                 else = { tca_treaty_create_dispute_effect = yes }
@@ -71,7 +72,12 @@ tca_treaty_dispute_fail_effect = {
     if = { limit = { var:tca_treaty_dispute_state < 2 tca_treaty_dispute_valid_trigger = yes }
         set_variable = { name = tca_treaty_dispute_state value = 2 }
         save_scope_as = tca_treaty_dispute
-        var:tca_treaty_parent = { tca_treaty_break_effect = { OFFENDER = scope:tca_treaty_dispute.var:tca_treaty_sovereign } }
+        var:tca_treaty_parent = {
+            if = { limit = { exists = scope:tca_treaty_dispute.var:tca_treaty_war }
+                set_variable = { name = tca_treaty_breach_war value = scope:tca_treaty_dispute.var:tca_treaty_war }
+            }
+            tca_treaty_break_effect = { OFFENDER = scope:tca_treaty_dispute.var:tca_treaty_sovereign }
+        }
     }
 }
 
@@ -81,8 +87,12 @@ tca_treaty_dispute_obey_effect = {
     if = { limit = { var:tca_treaty_dispute_state = 1 tca_treaty_dispute_live_trigger = yes }
         set_variable = { name = tca_treaty_dispute_state value = 2 }
         save_scope_as = tca_treaty_dispute
-        var:tca_treaty_officer = { every_character_war = {
+        save_scope_as = tca_frontier_restraint_row
+        var:tca_treaty_parent.var:tca_treaty_title_a = { save_scope_as = tca_frontier_restraint_a }
+        var:tca_treaty_parent.var:tca_treaty_title_b = { save_scope_as = tca_frontier_restraint_b }
+        var:tca_treaty_officer = { save_scope_as = tca_frontier_restraint_officer every_character_war = {
             limit = { this = scope:tca_treaty_dispute.var:tca_treaty_war }
+            save_scope_as = tca_frontier_restraint_war
             if = { limit = { primary_attacker = scope:tca_treaty_dispute.var:tca_treaty_officer }
                 end_war = white_peace
             }
@@ -95,7 +105,10 @@ tca_treaty_dispute_obey_effect = {
                 }
                 remove_participant = scope:tca_treaty_dispute.var:tca_treaty_officer
             }
-        } }
+        }
+            # 先离开可能已销毁的war作用域，再在仍存活的边臣作用域确认退出。
+            tca_frontier_confirm_restraint_effect = yes
+        }
     }
 }
 
@@ -131,7 +144,11 @@ tca_treaty_finish_disputes_effect = {
 # 争端story逐日维护；旧战争消失但没有结果回调时保守判失败，避免把胜利误当保约。
 # 正常白和平/无效由原生回调先处理。成功退出的resolved行只等待战争结束，保持去重。
 tca_treaty_dispute_maintain_effect = {
-    if = { limit = { NOT = { tca_treaty_dispute_valid_trigger = yes } } end_story = yes }
+    if = { limit = { has_variable = tca_frontier_restraint_counted }
+        # 已退出的辅助行保存同战争国家对锁；父约关闭不抹除，实际原战争消失后才回收。
+        if = { limit = { NOT = { exists = var:tca_treaty_war } } end_story = yes }
+    }
+    else_if = { limit = { NOT = { tca_treaty_dispute_valid_trigger = yes } } end_story = yes }
     else_if = { limit = { var:tca_treaty_dispute_state < 2 }
         if = { limit = { OR = { NOT = { has_variable = tca_treaty_dispute_time } NOT = { tca_treaty_dispute_live_trigger = yes } } }
             tca_treaty_dispute_fail_effect = yes
@@ -166,6 +183,11 @@ tca_treaty_check_rejoined_attacker_effect = {
         }
         save_scope_as = tca_treaty_dispute
         # 重返的是进攻方；旧指令已履行后又被推翻，不再次给予同一场战争的制止窗口。
-        var:tca_treaty_parent = { tca_treaty_break_effect = { OFFENDER = scope:tca_treaty_dispute.var:tca_treaty_sovereign } }
+        var:tca_treaty_parent = {
+            if = { limit = { exists = scope:tca_treaty_dispute.var:tca_treaty_war }
+                set_variable = { name = tca_treaty_breach_war value = scope:tca_treaty_dispute.var:tca_treaty_war }
+            }
+            tca_treaty_break_effect = { OFFENDER = scope:tca_treaty_dispute.var:tca_treaty_sovereign }
+        }
     } }
 }

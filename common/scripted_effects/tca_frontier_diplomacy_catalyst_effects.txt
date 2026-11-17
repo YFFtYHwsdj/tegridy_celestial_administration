@@ -1,0 +1,222 @@
+﻿# 独立君主人物作用域；输出scope:tca_frontier_country_key。普通换主头衔继续使用仍持有的原代表。
+# 代表指针写入当前主头衔，普通继位可从继承的主头衔承接；合并国家时优先主头衔已有代表。
+# 原代表已转出本国或销毁时才改用当前主头衔，不把外国旧国家的冷却套给接收者。
+tca_frontier_resolve_country_key_effect = {
+    save_scope_as = tca_frontier_key_ruler
+    clear_saved_scope = tca_frontier_country_key
+    if = { limit = { primary_title = {
+        exists = var:tca_frontier_country_key
+        var:tca_frontier_country_key.holder = scope:tca_frontier_key_ruler
+    } }
+        primary_title.var:tca_frontier_country_key = { save_scope_as = tca_frontier_country_key }
+    }
+    else = {
+        random_held_title = { limit = {
+            exists = var:tca_frontier_country_key
+            var:tca_frontier_country_key.holder = scope:tca_frontier_key_ruler
+        }
+            var:tca_frontier_country_key = { save_scope_as = tca_frontier_country_key }
+        }
+    }
+    if = { limit = { NOT = { exists = scope:tca_frontier_country_key } }
+        primary_title = { save_scope_as = tca_frontier_country_key }
+    }
+    primary_title = { set_variable = { name = tca_frontier_country_key value = scope:tca_frontier_country_key } }
+}
+
+# 北疆外交催化：只向整体局势投递，冷却随国家代表头衔而非人物或和约story保存。
+# 到期列表由原生自动清理；局势结束不重置这些限次，防止结束／重启重领外交分。
+# 任意作用域；A/B为国家代表头衔，KIND为私有列表后缀、YEARS为冷却、CATALYST为催化键。
+# 双向查重；只在存在缓和去向且双方仍是不同的北疆独立国家时消费冷却。
+# 临时saved scopes：country_key、pair_a/b等供本文件内部使用，调用方不得依赖；无公开输出。
+tca_frontier_pair_relaxation_effect = {
+    if = { limit = {
+        exists = situation:tca_northern_frontier
+        situation:tca_northern_frontier.situation_sub_region:tca_frontier_all = { NOT = { sub_region_current_phase = tca_frontier_amity } }
+        $A$ = { exists = holder holder = { is_alive = yes is_independent_ruler = yes tca_frontier_realm_has_land_trigger = yes } }
+        $B$ = { exists = holder holder = { is_alive = yes is_independent_ruler = yes tca_frontier_realm_has_land_trigger = yes } }
+        $A$.holder != $B$.holder
+    }
+        $A$.holder = { tca_frontier_resolve_country_key_effect = yes }
+        scope:tca_frontier_country_key = { save_scope_as = tca_frontier_pair_a }
+        $B$.holder = { tca_frontier_resolve_country_key_effect = yes }
+        scope:tca_frontier_country_key = { save_scope_as = tca_frontier_pair_b }
+        if = { limit = {
+            scope:tca_frontier_pair_a = { NOT = { is_target_in_variable_list = { name = tca_frontier_$KIND$_partners target = scope:tca_frontier_pair_b } } }
+            scope:tca_frontier_pair_b = { NOT = { is_target_in_variable_list = { name = tca_frontier_$KIND$_partners target = scope:tca_frontier_pair_a } } }
+        }
+            scope:tca_frontier_pair_a = { add_to_variable_list = { name = tca_frontier_$KIND$_partners target = scope:tca_frontier_pair_b years = $YEARS$ } }
+            tca_frontier_emit_catalyst_effect = { CATALYST = $CATALYST$ }
+        }
+    }
+}
+
+# 原生on_alliance_added上下文：first/second为实际同盟双方，不按婚姻或同盟原因数量计分。
+tca_frontier_alliance_added_effect = {
+    if = { limit = {
+        exists = situation:tca_northern_frontier
+        scope:first = { is_independent_ruler = yes tca_frontier_is_participant_trigger = yes is_allied_to = scope:second }
+        scope:second = { is_independent_ruler = yes tca_frontier_is_participant_trigger = yes }
+    }
+        tca_frontier_pair_relaxation_effect = { A = scope:first.primary_title B = scope:second.primary_title KIND = alliance YEARS = 10 CATALYST = tca_frontier_alliance_formed }
+    }
+}
+
+# 原生on_explicit_claim_gain：root为获得者，title为目标，transfer_type标明继承。
+# 采用可确证的“非继承取得显性宣称”口径，不推断购买／伪造／事件的主观意图。
+# 同国同目标十年一次；首笔计分起365日内至多五笔，后续增计不刷新窗口。
+tca_frontier_claim_gained_effect = {
+    if = { limit = {
+        exists = situation:tca_northern_frontier
+        situation:tca_northern_frontier.situation_sub_region:tca_frontier_all = { NOT = { sub_region_current_phase = tca_frontier_warfare } }
+        NOT = { scope:transfer_type = flag:inheritance }
+        tca_frontier_is_participant_trigger = yes
+        scope:title = { exists = holder tca_frontier_title_in_scope_trigger = yes holder.top_liege != root.top_liege }
+    }
+        top_liege = { tca_frontier_resolve_country_key_effect = yes }
+        scope:tca_frontier_country_key = {
+            if = { limit = {
+                NOT = { is_target_in_variable_list = { name = tca_frontier_claim_targets target = scope:title } }
+                OR = { NOT = { has_variable = tca_frontier_claim_count } var:tca_frontier_claim_count < 5 }
+            }
+                if = { limit = { NOT = { has_variable = tca_frontier_claim_count } }
+                    set_variable = { name = tca_frontier_claim_count value = 0 days = 365 }
+                }
+                change_variable = { name = tca_frontier_claim_count add = 1 }
+                add_to_variable_list = { name = tca_frontier_claim_targets target = scope:title years = 10 }
+                tca_frontier_emit_catalyst_effect = { CATALYST = tca_frontier_claim_gained }
+            }
+        }
+    }
+}
+
+# 原生on_raid_action_completion：raider为军队所有者、county为实际掠夺县，不从root军队读取人物身份。
+# 完成才计，按被掠夺县统一限一年一次；正规劫掠CB胜利不调用此入口。
+tca_frontier_raid_completed_effect = {
+    if = { limit = {
+        exists = situation:tca_northern_frontier
+        situation:tca_northern_frontier.situation_sub_region:tca_frontier_all = { NOT = { sub_region_current_phase = tca_frontier_warfare } }
+        scope:raider = { tca_frontier_is_participant_trigger = yes }
+        scope:county = {
+            tca_frontier_title_in_scope_trigger = yes exists = holder
+            holder.top_liege != scope:raider.top_liege
+            NOT = { has_variable = tca_frontier_raid_counted }
+        }
+    }
+        scope:county = { set_variable = { name = tca_frontier_raid_counted value = yes years = 1 } }
+        tca_frontier_emit_catalyst_effect = { CATALYST = tca_frontier_county_raided }
+    }
+}
+
+# 原版on_declared_war的撕约成立分支调用，war为原生CB的战争redirect。
+# 通用on_war_started在脚本调用返回后运行，临时豁免可能已移除，故不能在那里重新判断。
+tca_frontier_record_truce_breach_effect = {
+    if = { limit = { exists = situation:tca_northern_frontier }
+        war = { set_variable = { name = tca_frontier_broken_truce value = yes } }
+    }
+}
+
+# 原生宣战上下文；读取原版已确证的单向撕停战事实，不重新猜测已消失的临时豁免。
+# 同场战争的主战国家对，停战100与军事毁约150只取较高值；战争变量与原声明锁各司其职。
+tca_frontier_truce_broken_effect = {
+    if = { limit = {
+        situation:tca_northern_frontier.situation_sub_region:tca_frontier_all = { NOT = { sub_region_current_phase = tca_frontier_warfare } }
+        scope:war = {
+            has_variable = tca_frontier_broken_truce
+            NOT = { has_variable = tca_frontier_truce_counted }
+            NOT = { has_variable = tca_frontier_military_breach_counted }
+        }
+    }
+        scope:war = { set_variable = { name = tca_frontier_truce_counted value = yes } }
+        tca_frontier_emit_catalyst_effect = { CATALYST = tca_frontier_truce_broken }
+    }
+}
+
+# 和约story作用域；在关闭标记写入后、story销毁前调用。仅读取已确认的终止原因。
+# 自动清理不调用；欠付超宽限是75，主动毁约／拒付150。军事分支见下游。
+tca_frontier_treaty_broken_effect = {
+    if = { limit = {
+        exists = situation:tca_northern_frontier
+        situation:tca_northern_frontier.situation_sub_region:tca_frontier_all = { NOT = { sub_region_current_phase = tca_frontier_warfare } }
+        var:tca_treaty_a = { is_independent_ruler = yes tca_frontier_realm_has_land_trigger = yes }
+        var:tca_treaty_b = { is_independent_ruler = yes tca_frontier_realm_has_land_trigger = yes }
+        var:tca_treaty_a != var:tca_treaty_b
+    }
+        if = { limit = { has_variable = tca_treaty_overdue_default }
+            tca_frontier_emit_catalyst_effect = { CATALYST = tca_frontier_treaty_overdue }
+        }
+        else_if = { limit = { exists = var:tca_treaty_breach_war }
+            tca_frontier_treaty_military_breach_effect = yes
+        }
+        else = { tca_frontier_emit_catalyst_effect = { CATALYST = tca_frontier_treaty_broken } }
+    }
+}
+
+# 和约story作用域，breach_war由已确认的军事责任路径显式保存，不使用可能遗留的saved scope。
+# 只与原停战的主战国家对去重；第三国援军涉及另一份约仍是独立外交事实。
+# 停战先计100时仅补50；军事毁约先计150时标记战争，阻止随后停战重复计分。
+tca_frontier_treaty_military_breach_effect = {
+    save_scope_as = tca_frontier_broken_treaty
+    if = { limit = { var:tca_treaty_breach_war = {
+        OR = {
+            AND = { primary_attacker.top_liege = scope:tca_frontier_broken_treaty.var:tca_treaty_a primary_defender.top_liege = scope:tca_frontier_broken_treaty.var:tca_treaty_b }
+            AND = { primary_attacker.top_liege = scope:tca_frontier_broken_treaty.var:tca_treaty_b primary_defender.top_liege = scope:tca_frontier_broken_treaty.var:tca_treaty_a }
+        }
+        tca_frontier_war_in_scope_trigger = yes
+    } }
+        var:tca_treaty_breach_war = {
+            if = { limit = { NOT = { has_variable = tca_frontier_military_breach_counted } }
+                set_variable = { name = tca_frontier_military_breach_counted value = yes }
+                if = { limit = { has_variable = tca_frontier_truce_counted }
+                    tca_frontier_emit_catalyst_effect = { CATALYST = tca_frontier_treaty_breach_after_truce }
+                }
+                else = { tca_frontier_emit_catalyst_effect = { CATALYST = tca_frontier_treaty_broken } }
+            }
+        }
+    }
+    else = { tca_frontier_emit_catalyst_effect = { CATALYST = tca_frontier_treaty_broken } }
+}
+
+# 人物作用域；退出前冻结restraint_a/b两代表头衔，调用时原战争／争端可能已经销毁。
+# 真实敌对已结束且原和约仍有效才计；同对国家双向五年冷却防止反复开战／制止刷分。
+tca_frontier_confirm_restraint_effect = {
+    if = { limit = {
+        exists = situation:tca_northern_frontier
+        situation:tca_northern_frontier.situation_sub_region:tca_frontier_all = { NOT = { sub_region_current_phase = tca_frontier_amity } }
+        NOT = { tca_treaty_person_hostile_trigger = { TARGET = scope:tca_frontier_restraint_b.holder } }
+        NOT = { tca_treaty_person_hostile_trigger = { TARGET = scope:tca_frontier_restraint_a.holder } }
+        scope:tca_frontier_restraint_a.holder = {
+            any_in_list = { variable = tca_treaties tca_treaty_valid_trigger = yes
+                OR = {
+                    AND = { var:tca_treaty_title_a = scope:tca_frontier_restraint_a var:tca_treaty_title_b = scope:tca_frontier_restraint_b }
+                    AND = { var:tca_treaty_title_b = scope:tca_frontier_restraint_a var:tca_treaty_title_a = scope:tca_frontier_restraint_b }
+                }
+            }
+        }
+    }
+        scope:tca_frontier_restraint_a.holder = { tca_frontier_resolve_country_key_effect = yes }
+        scope:tca_frontier_country_key = { save_scope_as = tca_frontier_restraint_key_a }
+        scope:tca_frontier_restraint_b.holder = { tca_frontier_resolve_country_key_effect = yes }
+        scope:tca_frontier_country_key = { save_scope_as = tca_frontier_restraint_key_b }
+        if = { limit = {
+            trigger_if = { limit = { exists = scope:tca_frontier_restraint_war }
+                scope:tca_frontier_restraint_war = { NOT = { any_in_list = { variable = tca_treaty_disputes
+                    has_variable = tca_frontier_restraint_counted
+                    OR = {
+                        AND = { var:tca_frontier_restraint_a = scope:tca_frontier_restraint_key_a var:tca_frontier_restraint_b = scope:tca_frontier_restraint_key_b }
+                        AND = { var:tca_frontier_restraint_b = scope:tca_frontier_restraint_key_a var:tca_frontier_restraint_a = scope:tca_frontier_restraint_key_b }
+                    }
+                } } }
+            }
+        }
+            # 主攻白和平已销毁行，无需再锁；辅助退出的行保留双国家键直到原战争结束。
+            scope:tca_frontier_restraint_row ?= {
+                set_variable = { name = tca_frontier_restraint_counted value = yes }
+                set_variable = { name = tca_frontier_restraint_owner value = scope:tca_frontier_restraint_officer }
+                set_variable = { name = tca_frontier_restraint_a value = scope:tca_frontier_restraint_key_a }
+                set_variable = { name = tca_frontier_restraint_b value = scope:tca_frontier_restraint_key_b }
+            }
+            tca_frontier_pair_relaxation_effect = { A = scope:tca_frontier_restraint_a B = scope:tca_frontier_restraint_b KIND = restraint YEARS = 5 CATALYST = tca_frontier_treaty_restraint }
+        }
+    }
+}

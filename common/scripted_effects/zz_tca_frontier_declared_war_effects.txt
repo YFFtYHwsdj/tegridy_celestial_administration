@@ -1,0 +1,476 @@
+﻿# 唯一原版对象覆盖：保留on_declared_war完整事务，仅在其确认撕约分支追加事实快照。
+# 通用开战回调晚于调用者清理临时豁免，无法免覆盖恢复原始上下文；不覆盖原版整文件。
+on_declared_war = {
+	on_declared_war_play_music = yes
+
+	###############################
+	##### 原版效果
+	###############################
+
+	#行政体系内部宣战的原版好感后果。
+	if = {
+		limit = {
+			scope:attacker = {
+				OR = {
+					government_has_flag = government_is_feudal
+					government_has_flag = government_is_clan
+					government_has_flag = government_is_tribal
+				}
+				liege ?= {
+					government_has_mechanic = administrative
+				}
+			}
+			scope:defender = {
+				government_has_mechanic = administrative
+				liege ?= scope:attacker.liege
+			}
+		}
+		custom_description_no_bullet = {
+			text = on_declared_war_in_admin
+		}
+		scope:attacker.liege = {
+			add_opinion = {
+				target = scope:attacker
+				modifier = declared_war_in_admin
+			}
+		}
+	}
+
+	# 原版撕毁停战判断。
+	if = {
+		limit = {
+			scope:attacker = {
+				has_truce = scope:defender
+				NOT = { has_character_flag = allowed_war_declaration_sans_truce_penalties }
+			}
+		}
+        # 原版已确认停战存在且没有临时豁免；在调用者清理标记前保存事实。
+        tca_frontier_record_truce_breach_effect = yes
+		scope:attacker = {
+			custom_description_no_bullet = {
+				text = attack_breaking_truce_text
+			}
+			# 同信仰撕约触发原版和平教义的绝罚。
+			if = {
+				limit = {
+					rite = {
+						rite_has_parameter = tenet_peace_of_god_excommunication_truce
+					}
+					scope:defender = { faith = scope:attacker.faith }
+					NOT = { has_trait = excommunicated }
+					faith = {
+						OR = {
+							AND = {
+								exists = religious_head
+								has_doctrine = doctrine_spiritual_head
+							}
+							has_doctrine_parameter = has_clerical_regions
+							any_faith_ruler = {
+								highest_held_title_tier >= tier_duchy
+								government_has_flag = government_is_theocracy
+							}
+						}
+						faith_has_sacraments_central_trigger = yes
+						NOT = { religious_head ?= scope:attacker }
+					}
+				}
+				add_excommunication_actual_effect = yes
+			}
+			# 从原版购得停战列表移除本次目标。
+			if = {
+				limit = {
+					has_purchased_truce_with_char = { TARGET = scope:defender }
+				}
+				remove_list_variable = {
+					name = bought_truce_list
+					target = scope:defender
+				}
+			}
+
+			if = {
+				limit = {
+					NOT = { has_perk = flexible_truces_perk }
+				}
+				add_prestige = break_truce_prestige_loss
+				add_prestige_level = break_truce_prestige_level_loss
+			}
+
+			if = {
+				limit = {
+					government_has_flag = government_is_mandala
+					scope:defender = { var:recent_mandala_suzerain ?= scope:attacker }
+				}
+				add_legitimacy = {
+					value = medium_legitimacy_loss
+					multiply = primary_title.tier
+				}
+				add_piety_experience = massive_piety_loss
+				add_character_modifier = {
+					modifier = mandala_broke_truce_modifier
+					years = 5
+				}
+			}
+			else = {
+				add_legitimacy = {
+					value = medium_legitimacy_loss
+					multiply = primary_title.tier
+				}
+			}
+			add_character_modifier = {
+				modifier = broke_truce
+				years = 3
+			}
+
+			# 原版斗争催化。
+			if = {
+				limit = {
+					any_character_struggle = {
+						involvement = involved
+						activate_struggle_catalyst_secondary_character_involvement_involved_trigger = {
+							CATALYST = catalyst_broke_truce_against_important_character
+							CHAR = scope:defender
+						}
+					}
+				}
+				every_character_struggle = {
+					involvement = involved
+					limit = {
+						activate_struggle_catalyst_secondary_character_involvement_involved_trigger = {
+							CATALYST = catalyst_broke_truce_against_important_character
+							CHAR = scope:defender
+						}
+					}
+					activate_struggle_catalyst = {
+						catalyst = catalyst_broke_truce_against_important_character
+						character = scope:attacker
+					}
+				}
+			}
+		}
+	}
+	# 同信仰战争按原版和平教义扣虔诚。
+	if = {
+		limit = {
+			scope:defender = { faith = scope:attacker.faith }
+			scope:attacker.rite ?= {
+				rite_has_parameter = tenet_peace_of_god_same_faith_war_piety_penalty
+			}
+		}
+		scope:attacker = {
+			custom_description_no_bullet = {
+				text = attack_same_faith_peace_of_god_text
+			}
+			add_piety = medium_piety_loss
+		}
+	}
+	# 原版解除婚约。
+	if = {
+		limit = {
+			scope:attacker = {
+				is_allied_to = scope:defender
+				any_close_family_member = {
+					court_owner = scope:attacker
+					is_betrothed = yes
+					betrothed = {
+						court_owner = scope:defender
+						is_close_family_of = scope:defender
+					}
+				}
+			}
+		}
+		scope:attacker = {
+			custom_description_no_bullet = {
+				text = attack_breaking_betrothal_text
+			}
+			add_prestige = {
+				value = break_truce_prestige_loss
+				multiply = break_betrothal_prestige_cost
+			}
+			#检查是否承诺大婚。
+			if = {
+				limit = {
+					has_variable = promised_grand_wedding_marriage_countdown
+					any_close_family_member = {
+						court_owner = scope:attacker
+						is_betrothed = yes
+						has_been_promised_grand_wedding = yes
+						betrothed = {
+							court_owner = scope:defender
+							is_close_family_of = scope:defender
+							has_been_promised_grand_wedding = yes
+						}
+					}
+				}
+				random_close_family_member = {
+					limit = {
+						court_owner = scope:attacker
+						is_betrothed = yes
+						has_been_promised_grand_wedding = yes
+						betrothed = {
+							court_owner = scope:defender
+							is_close_family_of = scope:defender
+							has_been_promised_grand_wedding = yes
+						}
+					}
+					save_scope_as = victim
+				}
+				#满足原版条件时启动家族世仇。
+				if = {
+					limit = {
+						has_dlc_feature = friends_and_foes
+						exists = scope:attacker.house.house_head
+						exists = scope:defender.house.house_head
+						scope:attacker.house != scope:defender.house
+					}
+					house_feud_start_effect = {
+						#世仇发起家主。
+						ACTOR = scope:attacker.house.house_head
+						#目标家主。
+						TARGET = scope:defender.house.house_head
+						#世仇原因。
+						REASON = family_broke_gw_betrothal
+						#相关进攻方家族成员。
+						ATTACKER = scope:attacker
+						#相关受害方家族成员。
+						VICTIM = scope:victim
+					}
+				}
+				#随后清理婚礼承诺。
+				clean_grand_wedding_betrothal_variables = yes
+			}
+			every_close_family_member = {
+				limit = {
+					court_owner = scope:attacker
+					is_betrothed = yes
+					betrothed = {
+						court_owner = scope:defender
+						is_close_family_of = scope:defender
+					}
+				}
+				break_betrothal = betrothed
+			}
+		}
+	}
+	# 原版破坏同盟。
+	else_if = {
+		limit = {
+			scope:attacker = {
+				is_allied_to = scope:defender
+			}
+		}
+		scope:attacker = {
+			break_alliance_due_to_attack_effect = { TARGET = scope:defender }
+		}
+	}
+	# 原版破坏朝贡。
+	if = {
+		limit = {
+			OR = {
+				scope:attacker = { is_tributary_of = scope:defender	}
+				scope:defender = { is_tributary_of = scope:attacker	}
+			}
+		}
+		scope:attacker = {
+			break_tributary_contract_due_to_attack_effect = { DEFENDER = scope:defender }
+		}
+	}
+	# 原版进攻监护方。
+	if = {
+		limit = {
+			scope:attacker = {
+				any_home_court_hostage = { is_hostage_of = scope:defender }
+			}
+		}
+		scope:attacker = {
+			add_prestige = break_truce_prestige_loss
+			add_prestige_level = break_truce_prestige_level_loss
+			add_character_modifier = {
+				modifier = attacked_warden
+				years = 5
+			}
+			# 对方扣押的本方人质。
+			every_home_court_hostage = {
+				save_scope_as = hostage
+				every_close_family_member = {
+					limit = {
+						this != scope:attacker
+					}
+					custom = attacked_warden_tt
+					add_opinion = {
+						modifier = attacked_warden
+						target = scope:attacker
+					}
+				}
+				if = {
+					limit = { is_hostage_of = scope:defender }
+					custom_description_no_bullet = {
+						text = attack_breaking_truce_hostage
+						subject = scope:defender
+						object = scope:hostage
+					}
+				}
+			}
+		}
+	}
+	# 原版进攻人质原属宫廷。
+	if = {
+		limit = {
+			scope:attacker = {
+				any_warden_hostage = { is_hostage_from = scope:defender }
+			}
+		}
+		scope:attacker = {
+			# 本方扣押的对方人质。
+			every_warden_hostage = {
+				save_scope_as = hostage
+				if = {
+					limit = { is_hostage_from = scope:defender }
+					custom_description_no_bullet = {
+						text = attack_breaking_truce_hostage
+						subject = scope:attacker
+						object = scope:hostage
+					}
+				}
+			}
+			add_prestige = break_truce_prestige_loss
+			add_prestige_level = break_truce_prestige_level_loss
+			add_character_modifier = {
+				modifier = attacked_home_court
+				years = 5
+			}
+			# 对方扣押的本方人质。
+			every_home_court_hostage = {
+				save_scope_as = hostage
+				every_close_family_member = {
+					limit = {
+						this != scope:attacker
+					}
+					custom = attacked_warden_tt
+					add_opinion = {
+						modifier = attacked_home_court
+						target = scope:attacker
+					}
+				}
+				if = {
+					limit = { is_hostage_of = scope:defender }
+					custom_description_no_bullet = {
+						text = attack_breaking_truce_hostage
+						subject = scope:defender
+						object = scope:hostage
+					}
+				}
+			}
+		}
+	}
+
+	# 原版好感后果。
+	scope:defender = {
+		add_opinion = {
+			target = scope:attacker
+			modifier = declared_war
+		}
+	}
+	if = {
+		limit = {
+			NOT = {
+				scope:attacker = {
+					is_parent_of = scope:defender
+				}
+			}
+		}
+		if = {
+			limit = {
+				scope:defender = {
+					has_father = yes
+				}
+			}
+			scope:defender = {
+				father = {
+					add_opinion = {
+						target = scope:attacker
+						modifier = declared_war_on_son_daughter
+					}
+				}
+			}
+		}
+		if = {
+			limit = {
+				scope:defender = {
+					has_mother = yes
+				}
+			}
+			scope:defender = {
+				mother = {
+					add_opinion = {
+						target = scope:attacker
+						modifier = declared_war_on_son_daughter
+					}
+				}
+			}
+		}
+	}
+	if = {
+		limit = {
+			scope:attacker.culture != scope:defender.culture
+			scope:attacker = { is_landed = yes }
+			scope:defender = { is_landed = yes }
+		}
+		scope:defender.culture = {
+			change_cultural_acceptance = {
+				target = scope:attacker.culture
+				value = declare_war_culture_acceptance_impact
+				desc = cultural_acceptance_loss_declared_war
+			}
+		}
+	}
+	if = {
+		limit = {
+			scope:defender = {
+				this = top_liege
+				government_has_flag = government_is_celestial
+				highest_held_title_tier >= tier_empire
+			}
+			scope:attacker = {
+				government_has_flag = government_is_celestial
+			}
+		}
+		scope:defender = {
+			add_opinion = {
+				target = scope:attacker
+				modifier = impugned_my_sovereignty
+			}
+		}
+	}
+
+	scope:attacker = {
+		if = {
+			limit = {
+				any_vassal = {
+					vassal_stance = parochial
+				}
+				eighty_percent_of_current_military_strength <= scope:defender.current_military_strength
+			}
+			custom_tooltip = parochial_vassal_disapproves_war
+			hidden_effect = {
+				every_vassal = {
+					vassal_stance = parochial
+					add_opinion = {
+						target = scope:attacker
+						modifier = parochial_disapproves_strong_war_enemy_opinion
+					}
+				}
+			}
+		}
+	}
+
+	# 氏族战争影响原版团结度。
+	add_clan_unity_interaction_effect = {
+		CHARACTER = scope:attacker
+		TARGET = scope:defender
+		VALUE = massive_unity_loss
+		DESC = clan_unity_declared_war.desc
+		REVERSE_NON_HOUSE_TARGET = no
+	}
+
+	intrigue_duel_on_attack_effect = yes
+}

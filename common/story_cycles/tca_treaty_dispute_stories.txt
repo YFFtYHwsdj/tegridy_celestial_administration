@@ -1,6 +1,28 @@
 ﻿# 一份和约/一场战争/一名主动参战者一行；已服从行保留至战争结束防止同战重复追责。
 tca_treaty_dispute = {
-    on_owner_death = { end_story = yes }
+    on_owner_death = {
+        # 普通争端不继承责任；成功制止后的纯去重行可托管给仍活着的参战者，直至同一战争结束。
+        if = { limit = { has_variable = tca_frontier_restraint_counted exists = var:tca_treaty_war }
+            save_scope_as = tca_frontier_restraint_transferring
+            clear_saved_scope = tca_frontier_restraint_new_owner
+            var:tca_treaty_war = { random_war_attacker = {
+                limit = { is_alive = yes this != scope:tca_frontier_restraint_transferring.var:tca_frontier_restraint_owner }
+                save_scope_as = tca_frontier_restraint_new_owner
+            } }
+            if = { limit = { NOT = { exists = scope:tca_frontier_restraint_new_owner } }
+                var:tca_treaty_war = { random_war_defender = {
+                    limit = { is_alive = yes this != scope:tca_frontier_restraint_transferring.var:tca_frontier_restraint_owner }
+                    save_scope_as = tca_frontier_restraint_new_owner
+                } }
+            }
+            if = { limit = { exists = scope:tca_frontier_restraint_new_owner }
+                make_story_owner = scope:tca_frontier_restraint_new_owner
+                set_variable = { name = tca_frontier_restraint_owner value = scope:tca_frontier_restraint_new_owner }
+            }
+            else = { end_story = yes }
+        }
+        else = { end_story = yes }
+    }
     on_end = {
         save_scope_as = tca_treaty_ending_dispute
         var:tca_treaty_war_leader ?= { every_character_war = {
