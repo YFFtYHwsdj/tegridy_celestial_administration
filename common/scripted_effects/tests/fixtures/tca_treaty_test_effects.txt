@@ -1,0 +1,55 @@
+﻿# 和约独立WORLD夹具。root为报告者；只借法国的文化／信仰／政体作为建角基础。
+# 新建双方、儿子及孙子并移交三个县；整个世界用后丢弃，不恢复历史领土。
+# 输出actor、recipient、tca_treaty_test_heir、tca_treaty_test_grandson；不直接创建正式和约记录。
+tca_treaty_test_prepare_effect = {
+    title:k_france.holder = { save_scope_as = tca_treaty_test_base }
+    create_character = { age = 60 gender = male dynasty = scope:tca_treaty_test_base.dynasty culture = scope:tca_treaty_test_base.culture faith = scope:tca_treaty_test_base.faith random_traits = no location = scope:tca_treaty_test_base.capital_province save_scope_as = actor }
+    create_character = { age = 40 gender = male father = scope:actor dynasty = scope:tca_treaty_test_base.dynasty culture = scope:tca_treaty_test_base.culture faith = scope:tca_treaty_test_base.faith random_traits = no location = scope:tca_treaty_test_base.capital_province save_scope_as = tca_treaty_test_heir }
+    create_character = { age = 20 gender = male father = scope:tca_treaty_test_heir dynasty = scope:tca_treaty_test_base.dynasty culture = scope:tca_treaty_test_base.culture faith = scope:tca_treaty_test_base.faith random_traits = no location = scope:tca_treaty_test_base.capital_province save_scope_as = tca_treaty_test_grandson }
+    create_character = { age = 40 gender = male dynasty = scope:tca_treaty_test_base.dynasty culture = scope:tca_treaty_test_base.culture faith = scope:tca_treaty_test_base.faith random_traits = no location = scope:tca_treaty_test_base.capital_province save_scope_as = recipient }
+    create_title_and_vassal_change = { type = granted save_scope_as = tca_treaty_test_grant }
+    title:c_rouen = { change_title_holder = { holder = scope:actor change = scope:tca_treaty_test_grant government_base = scope:tca_treaty_test_base take_baronies = yes } }
+    title:c_evreux = { change_title_holder = { holder = scope:recipient change = scope:tca_treaty_test_grant government_base = scope:tca_treaty_test_base take_baronies = yes } }
+    resolve_title_and_vassal_change = scope:tca_treaty_test_grant
+    scope:actor = { tca_treaty_test_independent_effect = yes add_realm_law_skip_effects = single_heir_succession_law set_designated_heir = scope:tca_treaty_test_heir }
+    scope:recipient = { tca_treaty_test_independent_effect = yes }
+    scope:tca_treaty_test_heir = { tca_test_protect_character_effect = yes }
+    scope:tca_treaty_test_grandson = { tca_test_protect_character_effect = yes }
+}
+# 人物作用域，授地后强制原生封建独立，保护自然死亡；故本夹具不得在正常存档使用。
+tca_treaty_test_independent_effect = {
+    change_government = feudal_government
+    tca_test_protect_character_effect = yes
+    create_title_and_vassal_change = { type = independency save_scope_as = tca_treaty_test_independence }
+    becomes_independent = { change = scope:tca_treaty_test_independence }
+    resolve_title_and_vassal_change = scope:tca_treaty_test_independence
+}
+# root为报告者，输入固定双方actor／recipient；AMOUNT、DIRECTION、MODE按正式提案接口传入。
+# 输出scope:tca_treaty_proposal；调用者决定接受／拒绝，夹具不伪造同意。
+tca_treaty_test_propose_effect = {
+    save_scope_value_as = { name = tca_treaty_amount value = $AMOUNT$ }
+    save_scope_value_as = { name = tca_treaty_direction value = $DIRECTION$ }
+    save_scope_value_as = { name = tca_treaty_mode value = $MODE$ }
+    scope:actor = { tca_treaty_send_proposal_effect = yes }
+}
+# 人物作用域，设置金币差额，仅调用正数收支效果，不让测试夹具本身制造透支。
+tca_treaty_test_gold_effect = {
+    if = { limit = { gold > $VALUE$ } remove_long_term_gold = { value = gold subtract = $VALUE$ } }
+    else_if = { limit = { gold < $VALUE$ } add_gold = { value = $VALUE$ subtract = gold } }
+}
+
+# 人物作用域，设置国库差额；只供独立账户边界检查使用，不触碰测试报告者国库。
+tca_treaty_test_treasury_effect = {
+    if = { limit = { treasury > $VALUE$ } remove_treasury = { value = treasury subtract = $VALUE$ } }
+    else_if = { limit = { treasury < $VALUE$ } add_treasury = { value = $VALUE$ subtract = treasury } }
+}
+
+# 报告者作用域；跨原生战争回调以人物私有变量恢复用例上下文，不依赖native on_action继承事件saved scopes。
+# 原始回调另提供scope:tca_treaty_test_war；无写生产人物索引／生产争端的副作用。
+tca_treaty_test_restore_context_effect = {
+    var:tca_treaty_test_actor = { save_scope_as = actor }
+    var:tca_treaty_test_recipient = { save_scope_as = recipient }
+    var:tca_treaty_test_officer = { save_scope_as = tca_treaty_test_heir }
+    var:tca_treaty_test_foreign = { save_scope_as = tca_treaty_test_grandson }
+    var:tca_treaty_test_record ?= { save_scope_as = tca_treaty_test_record }
+}

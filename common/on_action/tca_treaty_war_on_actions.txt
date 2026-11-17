@@ -1,0 +1,33 @@
+﻿# 原生所有CB战争回调的二级追加；不覆盖原版effect。
+on_war_started = { on_actions = { tca_treaty_war_started } }
+on_join_war_as_secondary = { on_actions = { tca_treaty_war_joined } }
+on_war_won_attacker = { on_actions = { tca_treaty_war_victory } }
+on_war_won_defender = { on_actions = { tca_treaty_war_victory } }
+on_war_white_peace = { on_actions = { tca_treaty_war_peace } }
+on_war_invalidated = { on_actions = { tca_treaty_war_peace } }
+tca_treaty_war_started = {
+    effect = {
+        scope:war = { save_scope_as = tca_treaty_check_war }
+        scope:attacker = { tca_treaty_check_attacker_effect = yes }
+        # 显式从业务完成处派发；不能改成同级on_actions，后者与effect并发而无先后保证。
+        scope:attacker = { trigger_event = { on_action = tca_treaty_native_started_processed } }
+    }
+}
+tca_treaty_war_joined = {
+    # 防守援军合法履约不追溯制造进攻方的旧罪；只有本次主动加入进攻方时检查全部防守者。
+    trigger = { scope:war = { is_attacker = root } }
+    effect = {
+        scope:war = { save_scope_as = tca_treaty_check_war }
+        tca_treaty_check_rejoined_attacker_effect = yes
+        tca_treaty_check_attacker_effect = yes
+        # root保持本次主动加入者；回调只在本次主动加入进攻方的正式事务完成后通知扩展。
+        trigger_event = { on_action = tca_treaty_native_joined_processed }
+    }
+}
+tca_treaty_war_victory = { effect = { scope:war = { tca_treaty_finish_disputes_effect = { FAILED = yes } } } }
+tca_treaty_war_peace = { effect = { scope:war = { tca_treaty_finish_disputes_effect = { FAILED = no } } } }
+
+# 显式业务后扩展通知。root为本次进攻人物，scope:war为原战争；直接毁约时parent可能已销毁。
+# 消费者只可读取正式结果，不得将本接点当成宣战或参战的替代入口。
+tca_treaty_native_started_processed = { }
+tca_treaty_native_joined_processed = { }

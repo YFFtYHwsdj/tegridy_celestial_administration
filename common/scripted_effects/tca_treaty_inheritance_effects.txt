@@ -1,0 +1,100 @@
+﻿# 即将死亡的人物作用域；逐约、逐代表头衔保存全部潜在继承人的既有同级/更高地位。
+# 不能只读primary_heir或继承后的等级，否则正常继位与国家合并无法区别。
+tca_treaty_before_death_effect = {
+    save_scope_as = tca_treaty_dying
+    every_in_list = { variable = tca_treaties
+        save_scope_as = tca_treaty_record
+        set_variable = { name = tca_treaty_inheritance_wait value = yes days = 1 }
+        if = { limit = { var:tca_treaty_a = scope:tca_treaty_dying }
+            set_variable = { name = tca_treaty_inherit_a value = yes }
+            clear_variable_list = tca_treaty_absorbers_a
+            var:tca_treaty_title_a = { every_title_heir = {
+                limit = { is_landed = yes primary_title.tier >= scope:tca_treaty_record.var:tca_treaty_title_a.tier }
+                save_scope_as = tca_treaty_absorber
+                scope:tca_treaty_record = { add_to_variable_list = { name = tca_treaty_absorbers_a target = scope:tca_treaty_absorber } }
+            } }
+        }
+        if = { limit = { var:tca_treaty_b = scope:tca_treaty_dying }
+            set_variable = { name = tca_treaty_inherit_b value = yes }
+            clear_variable_list = tca_treaty_absorbers_b
+            var:tca_treaty_title_b = { every_title_heir = {
+                limit = { is_landed = yes primary_title.tier >= scope:tca_treaty_record.var:tca_treaty_title_b.tier }
+                save_scope_as = tca_treaty_absorber
+                scope:tca_treaty_record = { add_to_variable_list = { name = tca_treaty_absorbers_b target = scope:tca_treaty_absorber } }
+            } }
+        }
+    }
+}
+# 和约作用域；仅死亡前标记允许换持有人；活人被夺位不把旧约自动交给篡位者。
+# 接续不改payer/debtor代表头衔、结算日期、欠款或版本。
+tca_treaty_reconcile_effect = {
+    if = { limit = { has_variable = tca_treaty_inherit_a }
+        if = { limit = {
+            var:tca_treaty_title_a.holder ?= { is_alive = yes is_independent_ruler = yes }
+            NOT = { any_in_list = { variable = tca_treaty_absorbers_a this = scope:tca_treaty_record.var:tca_treaty_title_a.holder } }
+        }
+            set_variable = { name = tca_treaty_a value = var:tca_treaty_title_a.holder }
+            var:tca_treaty_a = { add_to_variable_list = { name = tca_treaties target = scope:tca_treaty_record } }
+            remove_variable = tca_treaty_inherit_a
+            clear_variable_list = tca_treaty_absorbers_a
+        }
+        else = { set_variable = { name = tca_treaty_invalid value = yes } }
+    }
+    if = { limit = { NOT = { has_variable = tca_treaty_invalid } has_variable = tca_treaty_inherit_b }
+        if = { limit = {
+            var:tca_treaty_title_b.holder ?= { is_alive = yes is_independent_ruler = yes }
+            NOT = { any_in_list = { variable = tca_treaty_absorbers_b this = scope:tca_treaty_record.var:tca_treaty_title_b.holder } }
+        }
+            set_variable = { name = tca_treaty_b value = var:tca_treaty_title_b.holder }
+            var:tca_treaty_b = { add_to_variable_list = { name = tca_treaties target = scope:tca_treaty_record } }
+            remove_variable = tca_treaty_inherit_b
+            clear_variable_list = tca_treaty_absorbers_b
+        }
+        else = { set_variable = { name = tca_treaty_invalid value = yes } }
+    }
+    if = { limit = { NOT = { has_variable = tca_treaty_invalid } } tca_treaty_deduplicate_effect = yes }
+}
+# 和约争端作用域；抗命事实转入既有天朝内部问责，不重写原战争的fw指针或报告锁。
+# 只适用于天朝地方有地主官；其他政体不套用天朝功绩与卸任处罚。
+tca_treaty_dispute_accountability_effect = {
+    if = { limit = {
+        var:tca_treaty_officer ?= { tca_is_landed_celestial_governor_trigger = yes }
+        var:tca_treaty_sovereign ?= { government_has_flag = government_is_celestial is_independent_ruler = yes }
+    }
+        save_scope_as = tca_treaty_accountable
+        var:tca_treaty_officer = { create_story = { type = tca_frontier_ceasefire save_scope_as = tca_fw_record } }
+        scope:tca_fw_record = {
+            set_variable = { name = tca_fw_officer value = scope:tca_treaty_accountable.var:tca_treaty_officer }
+            set_variable = { name = tca_fw_sovereign value = scope:tca_treaty_accountable.var:tca_treaty_sovereign }
+            set_variable = { name = tca_fw_country value = scope:tca_treaty_accountable.var:tca_treaty_country }
+            set_variable = { name = tca_fw_state value = 4 }
+            var:tca_fw_officer = { add_to_variable_list = { name = tca_fw_records target = scope:tca_fw_record } }
+            tca_fw_send_accountability_effect = yes
+        }
+    }
+}
+
+# 和约作用域；较低国家的君主继承较高国家时，继承的新约与本人旧约可能指向同一国家。
+# 同一双方只保留代表头衔较高的一份；不合并两笔岁币，旧低级国家约无责失效。
+tca_treaty_deduplicate_effect = {
+    save_scope_as = tca_treaty_dedup
+    var:tca_treaty_a = { every_in_list = { variable = tca_treaties
+        limit = { this != scope:tca_treaty_dedup
+            OR = {
+                AND = { var:tca_treaty_a = scope:tca_treaty_dedup.var:tca_treaty_a var:tca_treaty_b = scope:tca_treaty_dedup.var:tca_treaty_b }
+                AND = { var:tca_treaty_b = scope:tca_treaty_dedup.var:tca_treaty_a var:tca_treaty_a = scope:tca_treaty_dedup.var:tca_treaty_b }
+            }
+        }
+        if = { limit = { exists = scope:tca_treaty_dedup }
+            save_scope_as = tca_treaty_duplicate
+            if = { limit = { var:tca_treaty_a = scope:tca_treaty_dedup.var:tca_treaty_a }
+                var:tca_treaty_title_a = { save_scope_as = tca_treaty_duplicate_title }
+            }
+            else = { var:tca_treaty_title_b = { save_scope_as = tca_treaty_duplicate_title } }
+            if = { limit = { scope:tca_treaty_duplicate_title.tier > scope:tca_treaty_dedup.var:tca_treaty_title_a.tier }
+                scope:tca_treaty_dedup = { set_variable = { name = tca_treaty_invalid value = yes } }
+            }
+            else = { tca_treaty_close_effect = yes }
+        }
+    } }
+}

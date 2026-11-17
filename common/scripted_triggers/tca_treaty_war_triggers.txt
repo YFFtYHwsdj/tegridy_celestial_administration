@@ -1,0 +1,52 @@
+﻿# 和约争端story作用域；旧君主死亡、改隶、和约消失均不得将旧责任交给后来者。
+# 临时scope:tca_treaty_dispute_checked仅供本组trigger内部引用。
+tca_treaty_dispute_valid_trigger = {
+    save_temporary_scope_as = tca_treaty_dispute_checked
+    exists = var:tca_treaty_parent
+    var:tca_treaty_opponent ?= { is_alive = yes is_independent_ruler = yes }
+    var:tca_treaty_sovereign ?= { is_alive = yes is_independent_ruler = yes }
+    var:tca_treaty_officer ?= { is_alive = yes top_liege = scope:tca_treaty_dispute_checked.var:tca_treaty_sovereign }
+    var:tca_treaty_country.holder ?= scope:tca_treaty_dispute_checked.var:tca_treaty_sovereign
+    var:tca_treaty_parent = {
+        OR = {
+            AND = { var:tca_treaty_a = scope:tca_treaty_dispute_checked.var:tca_treaty_sovereign var:tca_treaty_b = scope:tca_treaty_dispute_checked.var:tca_treaty_opponent }
+            AND = { var:tca_treaty_b = scope:tca_treaty_dispute_checked.var:tca_treaty_sovereign var:tca_treaty_a = scope:tca_treaty_dispute_checked.var:tca_treaty_opponent }
+        }
+    }
+}
+
+# 只从人物现存战争集合找回原war，避免先解引用失效战争；目标国可位于任一防守援军。
+tca_treaty_dispute_live_trigger = {
+    tca_treaty_dispute_valid_trigger = yes
+    has_variable = tca_treaty_dispute_time
+    exists = var:tca_treaty_war
+    var:tca_treaty_officer = { any_character_war = {
+        this = scope:tca_treaty_dispute_checked.var:tca_treaty_war
+        is_attacker = scope:tca_treaty_dispute_checked.var:tca_treaty_officer
+        any_war_defender = { top_liege = scope:tca_treaty_dispute_checked.var:tca_treaty_opponent }
+    } }
+}
+
+# 战争作用域；供既有边战罢兵入口排除和约已经接管的战争，不依赖回调执行先后。
+tca_treaty_war_requires_enforcement_trigger = {
+    save_temporary_scope_as = tca_treaty_enforcement_war
+    OR = {
+        var:tca_treaty_enforced ?= yes
+        primary_attacker.top_liege = {
+            save_temporary_scope_as = tca_treaty_enforcement_sovereign
+            any_in_list = { variable = tca_treaties
+                save_temporary_scope_as = tca_treaty_enforcement_parent
+                OR = {
+                    AND = {
+                        var:tca_treaty_a = scope:tca_treaty_enforcement_sovereign
+                        scope:tca_treaty_enforcement_war = { any_war_defender = { top_liege = scope:tca_treaty_enforcement_parent.var:tca_treaty_b } }
+                    }
+                    AND = {
+                        var:tca_treaty_b = scope:tca_treaty_enforcement_sovereign
+                        scope:tca_treaty_enforcement_war = { any_war_defender = { top_liege = scope:tca_treaty_enforcement_parent.var:tca_treaty_a } }
+                    }
+                }
+            }
+        }
+    }
+}

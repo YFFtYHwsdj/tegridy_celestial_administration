@@ -1,0 +1,55 @@
+﻿# 和约窗口只保存人物私有草稿，不修改正式条款或结算日期。
+# 人物作用域，输入scope:recipient；可选scope:tca_treaty_record供外交条目查看。
+tca_treaty_gui_open_effect = {
+    tca_treaty_gui_clear_effect = yes
+    set_variable = { name = tca_treaty_gui_open value = yes }
+    set_variable = { name = tca_treaty_gui_target value = scope:recipient }
+    set_variable = { name = tca_treaty_gui_amount value = 0 }
+    set_variable = { name = tca_treaty_gui_direction value = 0 }
+    set_variable = { name = tca_treaty_gui_mode value = 0 }
+    if = { limit = { exists = scope:tca_treaty_record }
+        set_variable = { name = tca_treaty_gui_existing value = scope:tca_treaty_record }
+    }
+    else = {
+        every_in_list = { variable = tca_treaties
+            limit = { OR = { var:tca_treaty_a = scope:recipient var:tca_treaty_b = scope:recipient } }
+            save_scope_as = tca_treaty_record
+        }
+        if = { limit = { exists = scope:tca_treaty_record }
+            set_variable = { name = tca_treaty_gui_existing value = scope:tca_treaty_record }
+        }
+    }
+    if = { limit = { has_variable = tca_treaty_gui_existing }
+        set_variable = { name = tca_treaty_gui_amount value = var:tca_treaty_gui_existing.var:tca_treaty_amount }
+        if = { limit = { var:tca_treaty_gui_existing = { has_variable = tca_treaty_payer } }
+            if = { limit = { var:tca_treaty_gui_existing.var:tca_treaty_payer.holder = root }
+                set_variable = { name = tca_treaty_gui_direction value = 1 }
+            }
+            else = { set_variable = { name = tca_treaty_gui_direction value = 2 } }
+        }
+    }
+}
+# 人物作用域；仅清理窗口状态，不销毁提案或和约。
+tca_treaty_gui_clear_effect = {
+    remove_variable = tca_treaty_gui_open
+    remove_variable = tca_treaty_gui_target
+    remove_variable = tca_treaty_gui_amount
+    remove_variable = tca_treaty_gui_direction
+    remove_variable = tca_treaty_gui_mode
+    remove_variable = tca_treaty_gui_existing
+    remove_variable = tca_treaty_gui_refuse_confirm
+    remove_variable = tca_treaty_gui_break_confirm
+}
+# 人物作用域；GUI先验权限，核心再次核对资格及记录版本。
+tca_treaty_gui_send_effect = {
+    save_scope_as = actor
+    var:tca_treaty_gui_target = { save_scope_as = recipient }
+    save_scope_value_as = { name = tca_treaty_amount value = var:tca_treaty_gui_amount }
+    save_scope_value_as = { name = tca_treaty_direction value = var:tca_treaty_gui_direction }
+    save_scope_value_as = { name = tca_treaty_mode value = var:tca_treaty_gui_mode }
+    if = { limit = { has_variable = tca_treaty_gui_existing }
+        var:tca_treaty_gui_existing = { save_scope_as = tca_treaty_existing }
+    }
+    tca_treaty_send_proposal_effect = yes
+    tca_treaty_gui_clear_effect = yes
+}

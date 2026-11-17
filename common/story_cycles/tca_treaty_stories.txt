@@ -1,0 +1,27 @@
+﻿# 和约由一方君主托管，死亡时暂托另一方，日维护用代表头衔及死亡前快照续接。
+# 若双方同时死亡则优先托新持有人；旧索引在死者变量销毁后不得再写。
+tca_treaty = {
+    on_owner_death = {
+        save_scope_as = tca_treaty_dying_owner
+        if = { limit = { var:tca_treaty_a ?= { is_alive = yes this != scope:tca_treaty_dying_owner.var:tca_treaty_owner } } make_story_owner = var:tca_treaty_a set_variable = { name = tca_treaty_owner value = var:tca_treaty_a } }
+        else_if = { limit = { var:tca_treaty_b ?= { is_alive = yes this != scope:tca_treaty_dying_owner.var:tca_treaty_owner } } make_story_owner = var:tca_treaty_b set_variable = { name = tca_treaty_owner value = var:tca_treaty_b } }
+        else_if = { limit = { var:tca_treaty_title_a.holder ?= { is_alive = yes this != scope:tca_treaty_dying_owner.var:tca_treaty_owner } } make_story_owner = var:tca_treaty_title_a.holder set_variable = { name = tca_treaty_owner value = var:tca_treaty_title_a.holder } }
+        else = { end_story = yes }
+    }
+    on_end = {
+        save_scope_as = tca_treaty_ending
+        var:tca_treaty_a ?= { if = { limit = { is_alive = yes } remove_list_variable = { name = tca_treaties target = scope:tca_treaty_ending } } }
+        var:tca_treaty_b ?= { if = { limit = { is_alive = yes } remove_list_variable = { name = tca_treaties target = scope:tca_treaty_ending } } }
+    }
+    effect_group = { days = 1 triggered_effect = { trigger = { always = yes } effect = { tca_treaty_maintain_effect = yes } } }
+}
+# 提案不跨死亡移交；30天未接受则过期，不改变旧约。
+tca_treaty_proposal = {
+    on_owner_death = { end_story = yes }
+    on_end = {
+        save_scope_as = tca_treaty_ending_proposal
+        var:tca_treaty_from ?= { if = { limit = { is_alive = yes } remove_list_variable = { name = tca_treaty_proposals target = scope:tca_treaty_ending_proposal } } }
+        var:tca_treaty_to ?= { if = { limit = { is_alive = yes } remove_list_variable = { name = tca_treaty_proposals target = scope:tca_treaty_ending_proposal } } }
+    }
+    effect_group = { days = 1 triggered_effect = { trigger = { NOT = { tca_treaty_proposal_valid_trigger = yes } } effect = { end_story = yes } } }
+}

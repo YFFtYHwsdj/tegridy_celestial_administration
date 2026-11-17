@@ -1,0 +1,365 @@
+﻿# 独立可丢弃和约世界。真实发送、接受和拒绝；年度到期及宽限截止为受控组件检查。
+# 继承由原生death触发，次日自然维护续接，不直接调用死亡快照或伪造继承变量。
+namespace = tca_treaty_test
+
+tca_treaty_test.1 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_treaty_test.1 tca_test_treaty_core"
+        remove_character_flag = tca_test_tca_treaty_test_case_failed
+        tca_treaty_test_prepare_effect = yes
+        trigger_event = { id = tca_treaty_test.2 days = 2 }
+    }
+}
+tca_treaty_test.2 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { scope:actor = { is_independent_ruler = yes player_heir = scope:tca_treaty_test_heir } scope:recipient = { is_independent_ruler = yes } }
+            tca_treaty_test_propose_effect = { AMOUNT = 100 DIRECTION = 1 MODE = 0 }
+            scope:tca_treaty_proposal = { save_scope_as = tca_treaty_test_first tca_treaty_reject_effect = yes }
+            if = { limit = { NOT = { exists = scope:tca_treaty_test_first } scope:actor = { NOT = { any_in_list = { variable = tca_treaties always = yes } } } } debug_log = "TCA_TEST CHECK_PASS tca_test_treaty_core 1" }
+            else = { add_character_flag = tca_test_tca_treaty_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_treaty_core 1" }
+            tca_treaty_test_propose_effect = { AMOUNT = 100 DIRECTION = 1 MODE = 0 }
+            scope:tca_treaty_proposal = { tca_treaty_accept_effect = yes }
+            scope:tca_treaty_record = { save_scope_as = tca_treaty_test_record }
+            save_scope_value_as = { name = tca_treaty_test_expected_due value = { value = current_date add = 365 } }
+            if = { limit = {
+                scope:tca_treaty_test_record = { var:tca_treaty_amount = 100 var:tca_treaty_payer = title:c_rouen var:tca_treaty_arrears = 0 var:tca_treaty_due = scope:tca_treaty_test_expected_due }
+                scope:actor = { any_in_list = { variable = tca_treaties count = 1 this = scope:tca_treaty_test_record } }
+                scope:recipient = { any_in_list = { variable = tca_treaties count = 1 this = scope:tca_treaty_test_record } }
+                NOT = { exists = scope:tca_treaty_proposal }
+            } debug_log = "TCA_TEST CHECK_PASS tca_test_treaty_core 2" }
+            else = { add_character_flag = tca_test_tca_treaty_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_treaty_core 2" }
+            scope:tca_treaty_test_record = { set_variable = { name = tca_treaty_test_due value = var:tca_treaty_due } }
+            if = { limit = { scope:actor = { is_independent_ruler = yes is_tributary = no NOT = { is_allied_to = scope:recipient } } scope:recipient = { is_independent_ruler = yes is_tributary = no NOT = { is_allied_to = scope:actor } } } debug_log = "TCA_TEST CHECK_PASS tca_test_treaty_core 3" }
+            else = { add_character_flag = tca_test_tca_treaty_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_treaty_core 3" }
+            # 谈判中的旧约继续有效；拒绝不修改年额、日期、欠款。
+            tca_treaty_test_propose_effect = { AMOUNT = 250 DIRECTION = 2 MODE = 0 }
+            scope:tca_treaty_proposal = { save_scope_as = tca_treaty_test_pending }
+            if = { limit = { scope:tca_treaty_test_record = { var:tca_treaty_amount = 100 var:tca_treaty_due = var:tca_treaty_test_due } } debug_log = "TCA_TEST CHECK_PASS tca_test_treaty_core 4" }
+            else = { add_character_flag = tca_test_tca_treaty_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_treaty_core 4" }
+            tca_treaty_test_propose_effect = { AMOUNT = 500 DIRECTION = 1 MODE = 0 }
+            if = { limit = { scope:actor = { any_in_list = { variable = tca_treaty_proposals count = 1 always = yes } } scope:recipient = { any_in_list = { variable = tca_treaty_proposals count = 1 always = yes } } } debug_log = "TCA_TEST CHECK_PASS tca_test_treaty_core 5" }
+            else = { add_character_flag = tca_test_tca_treaty_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_treaty_core 5" }
+            scope:tca_treaty_test_pending ?= { tca_treaty_reject_effect = yes }
+            # 时间戳边界组件：过期后接受必须失败，旧约继续存在。
+            tca_treaty_test_propose_effect = { AMOUNT = 250 DIRECTION = 2 MODE = 0 }
+            scope:tca_treaty_proposal = { set_variable = { name = tca_treaty_created value = { value = current_date subtract = 31 } } tca_treaty_accept_effect = yes }
+            if = { limit = { scope:tca_treaty_test_record = { var:tca_treaty_amount = 100 var:tca_treaty_due = var:tca_treaty_test_due } } debug_log = "TCA_TEST CHECK_PASS tca_test_treaty_core 6" }
+            else = { add_character_flag = tca_test_tca_treaty_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_treaty_core 6" }
+            scope:tca_treaty_proposal ?= { tca_treaty_reject_effect = yes }
+            tca_treaty_test_propose_effect = { AMOUNT = 250 DIRECTION = 1 MODE = 0 }
+            scope:tca_treaty_proposal = { save_scope_as = tca_treaty_test_consumed tca_treaty_accept_effect = yes }
+            scope:tca_treaty_test_consumed ?= { tca_treaty_accept_effect = yes }
+            if = { limit = { scope:tca_treaty_test_record = { var:tca_treaty_amount = 250 var:tca_treaty_due = var:tca_treaty_test_due } scope:actor = { any_in_list = { variable = tca_treaties count = 1 always = yes } } } debug_log = "TCA_TEST CHECK_PASS tca_test_treaty_core 7" }
+            else = { add_character_flag = tca_test_tca_treaty_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_treaty_core 7" }
+            trigger_event = { id = tca_treaty_test.3 days = 1 }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_treaty_core" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_lane_end_effect = { GROUP = tca_treaty_test } }
+    }
+}
+# 到期由组件推进到今日，不把此段算作自然年度支付证据。
+tca_treaty_test.3 = {
+    type = character_event hidden = yes
+    immediate = {
+        scope:actor = { tca_treaty_test_gold_effect = { VALUE = 100 } }
+        scope:recipient = { tca_treaty_test_gold_effect = { VALUE = 0 } }
+        scope:tca_treaty_test_record = { set_variable = { name = tca_treaty_due value = current_date } tca_treaty_maintain_effect = yes }
+        save_scope_value_as = { name = tca_treaty_test_expected_grace value = { value = current_date add = 90 } }
+        if = { limit = { scope:actor = { gold = 100 } scope:recipient = { gold = 0 } scope:tca_treaty_test_record = { var:tca_treaty_arrears = 250 var:tca_treaty_grace = scope:tca_treaty_test_expected_grace } } debug_log = "TCA_TEST CHECK_PASS tca_test_treaty_core 8" }
+        else = { add_character_flag = tca_test_tca_treaty_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_treaty_core 8" }
+        scope:tca_treaty_test_record = { set_variable = { name = tca_treaty_test_due value = var:tca_treaty_due } set_variable = { name = tca_treaty_test_grace value = var:tca_treaty_grace } }
+        # 修改未来年额不能暗中免掉已欠250，也不能重置既有宽限或结算日。
+        tca_treaty_test_propose_effect = { AMOUNT = 100 DIRECTION = 2 MODE = 0 }
+        scope:tca_treaty_proposal = { tca_treaty_accept_effect = yes }
+        if = { limit = { scope:tca_treaty_test_record = { var:tca_treaty_amount = 100 var:tca_treaty_arrears = 250 var:tca_treaty_grace = var:tca_treaty_test_grace var:tca_treaty_due = var:tca_treaty_test_due } } debug_log = "TCA_TEST CHECK_PASS tca_test_treaty_core 9" }
+        else = { add_character_flag = tca_test_tca_treaty_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_treaty_core 9" }
+        tca_treaty_test_propose_effect = { AMOUNT = 100 DIRECTION = 2 MODE = 2 }
+        scope:tca_treaty_proposal = { tca_treaty_reject_effect = yes }
+        if = { limit = { scope:tca_treaty_test_record = { var:tca_treaty_arrears = 250 } } debug_log = "TCA_TEST CHECK_PASS tca_test_treaty_core 10" }
+        else = { add_character_flag = tca_test_tca_treaty_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_treaty_core 10" }
+        # 欠债仍由原付款国支付，不能因未来方向改变把旧债转嫁给另一国。
+        scope:actor = { tca_treaty_test_gold_effect = { VALUE = 1000 } }
+        scope:tca_treaty_test_record = { tca_treaty_pay_effect = yes }
+        if = { limit = { scope:actor = { gold = 750 } scope:recipient = { gold = 250 } scope:tca_treaty_test_record = { var:tca_treaty_arrears = 0 var:tca_treaty_due = var:tca_treaty_test_due } } debug_log = "TCA_TEST CHECK_PASS tca_test_treaty_core 11" }
+        else = { add_character_flag = tca_test_tca_treaty_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_treaty_core 11" }
+        scope:recipient = { tca_treaty_test_gold_effect = { VALUE = 0 } }
+        scope:tca_treaty_test_record = { set_variable = { name = tca_treaty_due value = current_date } tca_treaty_maintain_effect = yes set_variable = { name = tca_treaty_test_due value = var:tca_treaty_due } }
+        tca_treaty_test_propose_effect = { AMOUNT = 100 DIRECTION = 2 MODE = 2 }
+        scope:tca_treaty_proposal = { tca_treaty_accept_effect = yes }
+        # 免债后的旧欠付信即使再选择拒付，也不得解约或再次处罚。
+        scope:recipient = { set_variable = { name = tca_treaty_test_notice_prestige value = prestige } set_variable = { name = tca_treaty_test_notice_level value = prestige_level } }
+        scope:tca_treaty_test_record = { tca_treaty_refuse_payment_effect = { OFFENDER = scope:recipient } }
+        if = { limit = { scope:tca_treaty_test_record = { var:tca_treaty_arrears = 0 var:tca_treaty_due = var:tca_treaty_test_due } scope:actor = { gold = 750 } scope:recipient = { gold = 0 prestige = var:tca_treaty_test_notice_prestige prestige_level = var:tca_treaty_test_notice_level } } debug_log = "TCA_TEST CHECK_PASS tca_test_treaty_core 12" }
+        else = { add_character_flag = tca_test_tca_treaty_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_treaty_core 12" }
+        # 真实普通继承：父亲死前儿子没有同级头衔；维护须保留旧约、年额与日期。
+        # 先让前面组件交易的过期书信自然落空；下一日再准备重载专用冻结债务。
+        trigger_event = { id = tca_treaty_test.35 days = 1 }
+    }
+}
+# 已到期／补缴已在同步组件中验证；此处只准备不发送书信的持久化状态，避免随机AI拒付污染继承探针。
+tca_treaty_test.35 = {
+    type = character_event hidden = yes
+    immediate = {
+        scope:tca_treaty_test_record = {
+            set_variable = { name = tca_treaty_arrears value = 100 }
+            set_variable = { name = tca_treaty_debtor value = title:c_evreux }
+            set_variable = { name = tca_treaty_creditor value = title:c_rouen }
+            set_variable = { name = tca_treaty_grace value = { value = current_date add = 90 } }
+            set_variable = { name = tca_treaty_test_grace value = var:tca_treaty_grace }
+        }
+        scope:actor = { death = { death_reason = death_natural_causes } }
+        # 死亡快照、冻结欠款与待维护继承跨原生保存重载；此阶段仅由专用GUI推进。
+        title:h_china = { set_variable = { name = tca_treaty_checkpoint_phase value = 1 } }
+        trigger_event = { id = tca_treaty_test.4 days = 1 }
+    }
+}
+tca_treaty_test.4 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { title:h_china = { var:tca_treaty_checkpoint_phase = 3 } }
+        if = { limit = { title:c_rouen.holder = scope:tca_treaty_test_heir scope:tca_treaty_test_record = { var:tca_treaty_a = scope:tca_treaty_test_heir var:tca_treaty_due = var:tca_treaty_test_due var:tca_treaty_arrears = 100 var:tca_treaty_grace = var:tca_treaty_test_grace var:tca_treaty_debtor = title:c_evreux } scope:tca_treaty_test_heir = { any_in_list = { variable = tca_treaties count = 1 this = scope:tca_treaty_test_record } } } debug_log = "TCA_TEST CHECK_PASS tca_test_treaty_core 13" }
+        else = { add_character_flag = tca_test_tca_treaty_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_treaty_core 13" }
+        # 第二次真实继承：孙子在继承前已经独立持有同级县，属于国家合并。
+        create_title_and_vassal_change = { type = granted save_scope_as = tca_treaty_test_grant }
+        title:c_chartres = { change_title_holder = { holder = scope:tca_treaty_test_grandson change = scope:tca_treaty_test_grant government_base = scope:tca_treaty_test_base take_baronies = yes } }
+        resolve_title_and_vassal_change = scope:tca_treaty_test_grant
+        scope:tca_treaty_test_grandson = { tca_treaty_test_independent_effect = yes set_variable = { name = tca_treaty_test_prestige value = prestige } set_variable = { name = tca_treaty_test_level value = prestige_level } }
+        scope:tca_treaty_test_heir = { add_realm_law_skip_effects = single_heir_succession_law set_designated_heir = scope:tca_treaty_test_grandson death = { death_reason = death_natural_causes } }
+        trigger_event = { id = tca_treaty_test.5 days = 2 }
+        }
+        else = { trigger_event = { id = tca_treaty_test.4 days = 1 } }
+    }
+}
+tca_treaty_test.5 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { title:c_rouen.holder = scope:tca_treaty_test_grandson NOT = { exists = scope:tca_treaty_test_record } scope:tca_treaty_test_grandson = { prestige_level >= var:tca_treaty_test_level NOT = { any_in_list = { variable = tca_treaties always = yes } } } } debug_log = "TCA_TEST CHECK_PASS tca_test_treaty_core 14" }
+        else = { add_character_flag = tca_test_tca_treaty_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_treaty_core 14" }
+        scope:tca_treaty_test_grandson = { save_scope_as = actor }
+        tca_treaty_test_propose_effect = { AMOUNT = 100 DIRECTION = 1 MODE = 0 }
+        scope:tca_treaty_proposal = { tca_treaty_accept_effect = yes }
+        scope:tca_treaty_record = { save_scope_as = tca_treaty_test_record }
+        scope:actor = { tca_treaty_test_gold_effect = { VALUE = 0 } add_prestige = 10000 add_prestige_level = 3 set_variable = { name = tca_treaty_test_prestige value = prestige } set_variable = { name = tca_treaty_test_level value = prestige_level } }
+        scope:tca_treaty_test_record = { set_variable = { name = tca_treaty_due value = current_date } tca_treaty_maintain_effect = yes set_variable = { name = tca_treaty_grace value = { value = current_date subtract = 1 } } tca_treaty_maintain_effect = yes }
+        if = { limit = { NOT = { exists = scope:tca_treaty_test_record } scope:actor = { gold = 0 prestige = { value = var:tca_treaty_test_prestige subtract = 250 } prestige_level = { value = var:tca_treaty_test_level subtract = 1 } } } debug_log = "TCA_TEST CHECK_PASS tca_test_treaty_core 15" }
+        else = { add_character_flag = tca_test_tca_treaty_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_treaty_core 15" }
+        scope:tca_treaty_test_record ?= { tca_treaty_break_effect = { OFFENDER = scope:actor } }
+        if = { limit = { scope:actor = { prestige = { value = var:tca_treaty_test_prestige subtract = 250 } prestige_level = { value = var:tca_treaty_test_level subtract = 1 } is_independent_ruler = yes is_tributary = no } scope:recipient = { is_independent_ruler = yes is_tributary = no } } debug_log = "TCA_TEST CHECK_PASS tca_test_treaty_core 16" }
+        else = { add_character_flag = tca_test_tca_treaty_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_treaty_core 16" }
+        # 政体账户边界：原版celestial声明treasury=yes；金币富余不得代替不足国库。
+        scope:recipient = { change_government = celestial_government tca_treaty_test_gold_effect = { VALUE = 1000 } tca_treaty_test_treasury_effect = { VALUE = 100 } }
+        scope:actor = { tca_treaty_test_gold_effect = { VALUE = 0 } }
+        tca_treaty_test_propose_effect = { AMOUNT = 250 DIRECTION = 2 MODE = 0 }
+        scope:tca_treaty_proposal = { tca_treaty_accept_effect = yes }
+        scope:tca_treaty_record = { save_scope_as = tca_treaty_test_record set_variable = { name = tca_treaty_due value = current_date } tca_treaty_maintain_effect = yes }
+        if = { limit = { scope:recipient = { has_treasury = yes treasury = 100 gold = 1000 } scope:actor = { has_treasury = no gold = 0 } scope:tca_treaty_test_record = { var:tca_treaty_arrears = 250 } } debug_log = "TCA_TEST CHECK_PASS tca_test_treaty_core 17" }
+        else = { add_character_flag = tca_test_tca_treaty_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_treaty_core 17" }
+        scope:recipient = { tca_treaty_test_treasury_effect = { VALUE = 500 } }
+        scope:tca_treaty_test_record = { tca_treaty_pay_effect = yes }
+        if = { limit = { scope:recipient = { treasury = 250 gold = 1000 } scope:actor = { gold = 250 } scope:tca_treaty_test_record = { var:tca_treaty_arrears = 0 } } debug_log = "TCA_TEST CHECK_PASS tca_test_treaty_core 18" }
+        else = { add_character_flag = tca_test_tca_treaty_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_treaty_core 18" }
+        scope:tca_treaty_test_record ?= { tca_treaty_close_effect = yes }
+        scope:actor = { tca_test_restore_character_effect = yes }
+        scope:recipient = { tca_test_restore_character_effect = yes }
+        trigger_event = { id = tca_treaty_test.6 days = 1 }
+    }
+}
+
+# 新建第二组国家核对较低国家的君主继承较高国家后的重约去重；不复用前一组已改政体的君主。
+tca_treaty_test.6 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_treaty_test_prepare_effect = yes
+        create_title_and_vassal_change = { type = granted save_scope_as = tca_treaty_test_grant }
+        title:d_normandy = { change_title_holder = { holder = scope:actor change = scope:tca_treaty_test_grant government_base = scope:tca_treaty_test_base } }
+        title:c_chartres = { change_title_holder = { holder = scope:tca_treaty_test_heir change = scope:tca_treaty_test_grant government_base = scope:tca_treaty_test_base take_baronies = yes } }
+        resolve_title_and_vassal_change = scope:tca_treaty_test_grant
+        scope:tca_treaty_test_heir = { tca_treaty_test_independent_effect = yes }
+        trigger_event = { id = tca_treaty_test.7 days = 2 }
+    }
+}
+tca_treaty_test.7 = {
+    type = character_event hidden = yes
+    immediate = {
+        scope:actor = { save_scope_as = tca_treaty_test_duke }
+        tca_treaty_test_propose_effect = { AMOUNT = 100 DIRECTION = 1 MODE = 0 }
+        scope:tca_treaty_proposal = { tca_treaty_accept_effect = yes }
+        scope:tca_treaty_record = { save_scope_as = tca_treaty_test_high_record set_variable = { name = tca_treaty_test_due value = var:tca_treaty_due } }
+        # 儿子继承前已有独立伯国及对同一第三国的250岁币旧约，公爵国的100岁币约应优先。
+        scope:tca_treaty_test_heir = { save_scope_as = actor add_prestige = 10000 add_prestige_level = 3 set_variable = { name = tca_treaty_test_prestige value = prestige } set_variable = { name = tca_treaty_test_level value = prestige_level } }
+        tca_treaty_test_propose_effect = { AMOUNT = 250 DIRECTION = 1 MODE = 0 }
+        scope:tca_treaty_proposal = { tca_treaty_accept_effect = yes }
+        scope:tca_treaty_record = { save_scope_as = tca_treaty_test_low_record }
+        scope:tca_treaty_test_duke = { death = { death_reason = death_natural_causes } }
+        trigger_event = { id = tca_treaty_test.8 days = 2 }
+    }
+}
+tca_treaty_test.8 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = {
+            title:d_normandy.holder = scope:tca_treaty_test_heir
+            NOT = { exists = scope:tca_treaty_test_low_record }
+            scope:tca_treaty_test_high_record = { var:tca_treaty_a = scope:tca_treaty_test_heir var:tca_treaty_title_a = title:d_normandy var:tca_treaty_amount = 100 var:tca_treaty_due = var:tca_treaty_test_due }
+            scope:tca_treaty_test_heir = { prestige >= var:tca_treaty_test_prestige prestige_level >= var:tca_treaty_test_level any_in_list = { variable = tca_treaties count = 1 always = yes } any_in_list = { variable = tca_treaties this = scope:tca_treaty_test_high_record } }
+            scope:recipient = { any_in_list = { variable = tca_treaties count = 1 always = yes } any_in_list = { variable = tca_treaties this = scope:tca_treaty_test_high_record } }
+        } debug_log = "TCA_TEST CHECK_PASS tca_test_treaty_core 19" }
+        else = { add_character_flag = tca_test_tca_treaty_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_treaty_core 19" }
+        # 同日强制两份曾存在的约到期；低约已销毁，只有高约100生效，不得重复收取350。
+        scope:tca_treaty_test_heir = { tca_treaty_test_gold_effect = { VALUE = 1000 } }
+        scope:recipient = { tca_treaty_test_gold_effect = { VALUE = 0 } }
+        scope:tca_treaty_test_low_record ?= { set_variable = { name = tca_treaty_due value = current_date } tca_treaty_maintain_effect = yes }
+        scope:tca_treaty_test_high_record = { set_variable = { name = tca_treaty_due value = current_date } tca_treaty_maintain_effect = yes }
+        if = { limit = { scope:tca_treaty_test_heir = { gold = 900 } scope:recipient = { gold = 100 } scope:tca_treaty_test_high_record = { var:tca_treaty_arrears = 0 var:tca_treaty_amount = 100 } } debug_log = "TCA_TEST CHECK_PASS tca_test_treaty_core 20" }
+        else = { add_character_flag = tca_test_tca_treaty_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_treaty_core 20" }
+        scope:tca_treaty_test_high_record ?= { tca_treaty_close_effect = yes }
+        scope:tca_treaty_test_low_record ?= { tca_treaty_close_effect = yes }
+        scope:tca_treaty_test_heir = { tca_test_restore_character_effect = yes }
+        scope:tca_treaty_test_grandson = { tca_test_restore_character_effect = yes }
+        scope:recipient = { tca_test_restore_character_effect = yes }
+        if = { limit = { has_character_flag = tca_test_tca_treaty_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_treaty_core" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+        else = { debug_log = "TCA_TEST PASS tca_test_treaty_core" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+        tca_test_lane_end_effect = { GROUP = tca_treaty_test }
+    }
+}
+
+# 原生战争回调独立世界：两个原版CB、地方主攻、援军退出及君主主动毁约。
+# 不直接调用战争扫描worker；制止选择调用正式事务，原生宣战与add_attacker负责产生争端。
+tca_treaty_test.30 = {
+    type = character_event hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_treaty_test.30 tca_test_treaty_war"
+        remove_character_flag = tca_test_tca_treaty_test_case_failed
+        tca_treaty_test_prepare_effect = yes
+        create_title_and_vassal_change = { type = granted save_scope_as = tca_treaty_test_grant }
+        title:d_normandy = { change_title_holder = { holder = scope:actor change = scope:tca_treaty_test_grant government_base = scope:tca_treaty_test_base } }
+        title:c_chartres = { change_title_holder = { holder = scope:tca_treaty_test_heir change = scope:tca_treaty_test_grant government_base = scope:tca_treaty_test_base take_baronies = yes } }
+        title:c_dorset = { change_title_holder = { holder = scope:tca_treaty_test_grandson change = scope:tca_treaty_test_grant government_base = scope:tca_treaty_test_base take_baronies = yes } }
+        resolve_title_and_vassal_change = scope:tca_treaty_test_grant
+        scope:tca_treaty_test_grandson = { tca_treaty_test_independent_effect = yes }
+        scope:tca_treaty_test_heir = { change_government = feudal_government create_title_and_vassal_change = { type = swear_fealty save_scope_as = tca_treaty_test_fealty } change_liege = { liege = scope:actor change = scope:tca_treaty_test_fealty } resolve_title_and_vassal_change = scope:tca_treaty_test_fealty }
+        trigger_event = { id = tca_treaty_test.31 days = 2 }
+    }
+}
+# 每次宣战／加入后都由正式业务完成通知续接，不在start_war返回时抢读尚未运行的native回调。
+tca_treaty_test.31 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { scope:actor = { is_independent_ruler = yes } scope:recipient = { is_independent_ruler = yes } scope:tca_treaty_test_heir = { top_liege = scope:actor is_landed = yes } scope:tca_treaty_test_grandson = { is_independent_ruler = yes } }
+            set_variable = { name = tca_treaty_test_actor value = scope:actor }
+            set_variable = { name = tca_treaty_test_recipient value = scope:recipient }
+            set_variable = { name = tca_treaty_test_officer value = scope:tca_treaty_test_heir }
+            set_variable = { name = tca_treaty_test_foreign value = scope:tca_treaty_test_grandson }
+            scope:actor = { set_variable = { name = tca_treaty_test_reporter value = root } }
+            scope:tca_treaty_test_heir = { set_variable = { name = tca_treaty_test_reporter value = root } }
+            scope:tca_treaty_test_grandson = { set_variable = { name = tca_treaty_test_reporter value = root } }
+            tca_treaty_test_propose_effect = { AMOUNT = 0 DIRECTION = 0 MODE = 0 }
+            scope:tca_treaty_proposal = { tca_treaty_accept_effect = yes }
+        scope:tca_treaty_record = { save_scope_as = tca_treaty_test_record }
+        set_variable = { name = tca_treaty_test_record value = scope:tca_treaty_test_record }
+            set_variable = { name = tca_treaty_test_stage value = 1 }
+            scope:tca_treaty_test_heir = { start_war = { cb = county_conquest_cb target = scope:recipient target_title = title:c_evreux } }
+        }
+        else = { debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_treaty_war" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } } tca_test_lane_end_effect = { GROUP = tca_treaty_test } }
+    }
+}
+tca_treaty_test.32 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { exists = scope:tca_treaty_test_record scope:tca_treaty_test_heir = { NOT = { is_at_war_with = scope:recipient } } } debug_log = "TCA_TEST CHECK_PASS tca_test_treaty_war 2" }
+        else = { add_character_flag = tca_test_tca_treaty_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_treaty_war 2" }
+        set_variable = { name = tca_treaty_test_stage value = 2 }
+        scope:tca_treaty_test_grandson = { start_war = { cb = individual_county_de_jure_cb target = scope:recipient target_title = title:c_evreux } }
+    }
+}
+tca_treaty_test.33 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { exists = scope:tca_treaty_test_record scope:tca_treaty_test_war ?= { primary_attacker = scope:tca_treaty_test_grandson NOT = { is_attacker = scope:tca_treaty_test_heir } } scope:tca_treaty_test_grandson = { is_at_war_with = scope:recipient } } debug_log = "TCA_TEST CHECK_PASS tca_test_treaty_war 4" }
+        else = { add_character_flag = tca_test_tca_treaty_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_treaty_war 4" }
+        scope:tca_treaty_test_war ?= { add_defender = scope:tca_treaty_test_heir }
+        if = { limit = { exists = scope:tca_treaty_test_record scope:tca_treaty_test_war ?= { is_defender = scope:tca_treaty_test_heir } } debug_log = "TCA_TEST CHECK_PASS tca_test_treaty_war 5" }
+        else = { add_character_flag = tca_test_tca_treaty_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_treaty_war 5" }
+        scope:tca_treaty_test_war ?= { remove_participant = scope:tca_treaty_test_heir }
+        trigger_event = { id = tca_treaty_test.34 days = 2 }
+    }
+}
+tca_treaty_test.34 = {
+    type = character_event hidden = yes
+    immediate = {
+        set_variable = { name = tca_treaty_test_stage value = 4 }
+        scope:tca_treaty_test_war ?= { add_attacker = scope:tca_treaty_test_heir }
+    }
+}
+tca_treaty_test.36 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { NOT = { exists = scope:tca_treaty_test_record } scope:tca_treaty_test_war ?= { is_attacker = scope:tca_treaty_test_heir } } debug_log = "TCA_TEST CHECK_PASS tca_test_treaty_war 6" }
+        else = { add_character_flag = tca_test_tca_treaty_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_treaty_war 6" }
+        scope:tca_treaty_test_war ?= { end_war = white_peace }
+        trigger_event = { id = tca_treaty_test.37 days = 2 }
+    }
+}
+tca_treaty_test.37 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_treaty_test_propose_effect = { AMOUNT = 0 DIRECTION = 0 MODE = 0 }
+        scope:tca_treaty_proposal = { tca_treaty_accept_effect = yes }
+        scope:tca_treaty_record = { save_scope_as = tca_treaty_test_record }
+        set_variable = { name = tca_treaty_test_record value = scope:tca_treaty_test_record }
+        set_variable = { name = tca_treaty_test_stage value = 5 }
+        scope:actor = { add_prestige = 10000 add_prestige_level = 3 set_variable = { name = tca_treaty_test_prestige value = prestige } set_variable = { name = tca_treaty_test_level value = prestige_level } start_war = { cb = county_conquest_cb target = scope:recipient target_title = title:c_evreux } }
+    }
+}
+# 正式宣战业务已结束；先消费私有阶段，再读取争端或加入援军，防止重复通知重复派发。
+tca_treaty_test.39 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { var:tca_treaty_test_stage = 1 }
+            set_variable = { name = tca_treaty_test_stage value = 0 }
+            scope:tca_treaty_test_war = { every_in_list = { variable = tca_treaty_disputes limit = { var:tca_treaty_parent = scope:tca_treaty_test_record var:tca_treaty_officer = scope:tca_treaty_test_heir } save_scope_as = tca_treaty_test_dispute } }
+            if = { limit = { exists = scope:tca_treaty_test_dispute exists = scope:tca_treaty_test_record } debug_log = "TCA_TEST CHECK_PASS tca_test_treaty_war 1" }
+                else = { add_character_flag = tca_test_tca_treaty_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_treaty_war 1" }
+            scope:tca_treaty_test_dispute ?= { tca_treaty_dispute_order_effect = { ORDER = yes } tca_treaty_dispute_obey_effect = yes }
+            trigger_event = { id = tca_treaty_test.32 days = 2 }
+        }
+        else_if = { limit = { var:tca_treaty_test_stage = 2 }
+            set_variable = { name = tca_treaty_test_stage value = 3 }
+            # 原主攻国中央授意不代表后来参战的第三国边臣也奉命；仍须先给其朝廷制止机会。
+            scope:tca_treaty_test_war = {
+                set_variable = { name = tca_frontier_imperial_order value = yes }
+                add_attacker = scope:tca_treaty_test_heir
+            }
+        }
+        else_if = { limit = { var:tca_treaty_test_stage = 5 }
+            set_variable = { name = tca_treaty_test_stage value = 0 }
+            if = { limit = { NOT = { exists = scope:tca_treaty_test_record } scope:actor = { is_at_war_with = scope:recipient prestige = { value = var:tca_treaty_test_prestige subtract = 250 } prestige_level = { value = var:tca_treaty_test_level subtract = 1 } } } debug_log = "TCA_TEST CHECK_PASS tca_test_treaty_war 7" }
+            else = { add_character_flag = tca_test_tca_treaty_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_treaty_war 7" }
+            scope:actor = { remove_variable = tca_treaty_test_reporter }
+            scope:tca_treaty_test_heir = { remove_variable = tca_treaty_test_reporter }
+            scope:tca_treaty_test_grandson = { remove_variable = tca_treaty_test_reporter }
+            if = { limit = { has_character_flag = tca_test_tca_treaty_test_case_failed } debug_log = "TCA_TEST FAIL tca_test_treaty_war" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } } }
+            else = { debug_log = "TCA_TEST PASS tca_test_treaty_war" if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } } }
+            tca_test_lane_end_effect = { GROUP = tca_treaty_test }
+        }
+    }
+}
+# 正式进攻方加入业务已结束；先核对新争端再制止，重返进攻方则仅等原生敌对缓存稳定。
+tca_treaty_test.40 = {
+    type = character_event hidden = yes
+    immediate = {
+        if = { limit = { var:tca_treaty_test_stage = 3 }
+            set_variable = { name = tca_treaty_test_stage value = 0 }
+            scope:tca_treaty_test_war = { every_in_list = { variable = tca_treaty_disputes limit = { var:tca_treaty_parent = scope:tca_treaty_test_record var:tca_treaty_officer = scope:tca_treaty_test_heir } save_scope_as = tca_treaty_test_dispute } }
+            if = { limit = { scope:tca_treaty_test_war ?= { is_attacker = scope:tca_treaty_test_heir any_in_list = { variable = tca_treaty_disputes count = 1 var:tca_treaty_officer = scope:tca_treaty_test_heir } } } debug_log = "TCA_TEST CHECK_PASS tca_test_treaty_war 3" }
+            else = { add_character_flag = tca_test_tca_treaty_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_treaty_war 3" }
+            scope:tca_treaty_test_dispute ?= { tca_treaty_dispute_order_effect = { ORDER = yes } tca_treaty_dispute_obey_effect = yes }
+            trigger_event = { id = tca_treaty_test.33 days = 2 }
+        }
+        else_if = { limit = { var:tca_treaty_test_stage = 4 }
+            set_variable = { name = tca_treaty_test_stage value = 0 }
+            trigger_event = { id = tca_treaty_test.36 days = 2 }
+        }
+    }
+}

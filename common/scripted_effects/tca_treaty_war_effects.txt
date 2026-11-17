@@ -1,0 +1,171 @@
+﻿# 人物作用域；输入scope:tca_treaty_check_war。按本次主动进攻者最高领主的每份和约检查。
+# 原始宣战与主动加入进攻方才调用；防守国后来合法增援不倒罚既有进攻者。
+tca_treaty_check_attacker_effect = {
+    save_scope_as = tca_treaty_check_officer
+    top_liege = {
+        save_scope_as = tca_treaty_check_sovereign
+        every_in_list = { variable = tca_treaties
+            save_scope_as = tca_treaty_check_parent
+            if = { limit = { var:tca_treaty_a = scope:tca_treaty_check_sovereign }
+                var:tca_treaty_b = { save_scope_as = tca_treaty_check_opponent }
+                var:tca_treaty_title_a = { save_scope_as = tca_treaty_check_country }
+            }
+            else = {
+                var:tca_treaty_a = { save_scope_as = tca_treaty_check_opponent }
+                var:tca_treaty_title_b = { save_scope_as = tca_treaty_check_country }
+            }
+            if = { limit = {
+                scope:tca_treaty_check_war = {
+                    any_war_defender = { top_liege = scope:tca_treaty_check_opponent }
+                    NOT = { any_in_list = { variable = tca_treaty_disputes
+                        var:tca_treaty_parent = scope:tca_treaty_check_parent
+                        var:tca_treaty_officer = scope:tca_treaty_check_officer
+                    } }
+                }
+            }
+                scope:tca_treaty_check_war = { set_variable = { name = tca_treaty_enforced value = yes } }
+                # 中央授意与君主亲自进攻同责；同步宣战回调从边臣短暂flag取证，异步回调读取war标记。
+                if = { limit = { OR = {
+                    scope:tca_treaty_check_officer = scope:tca_treaty_check_sovereign
+                    # 战争上的授意只归于原主攻者，不替后来加入的第三国边臣推定其朝廷授意。
+                    scope:tca_treaty_check_war = {
+                        primary_attacker = scope:tca_treaty_check_officer
+                        var:tca_frontier_imperial_order ?= yes
+                    }
+                    scope:tca_treaty_check_officer = { has_character_flag = tca_fw_declaring_imperial_war }
+                } }
+                    tca_treaty_break_effect = { OFFENDER = scope:tca_treaty_check_sovereign }
+                }
+                else = { tca_treaty_create_dispute_effect = yes }
+            }
+        }
+    }
+}
+
+# 和约作用域；调用方提供check_* scopes。每约/战争/主动参战者独立记录；不限制政府或CB。
+# state=0待朝廷决定、1待边臣答复、2已经处理（留在战争索引中防止重复登记）。
+tca_treaty_create_dispute_effect = {
+    scope:tca_treaty_check_officer = { create_story = { type = tca_treaty_dispute save_scope_as = tca_treaty_dispute } }
+    scope:tca_treaty_dispute = {
+        set_variable = { name = tca_treaty_parent value = scope:tca_treaty_check_parent }
+        set_variable = { name = tca_treaty_officer value = scope:tca_treaty_check_officer }
+        set_variable = { name = tca_treaty_sovereign value = scope:tca_treaty_check_sovereign }
+        # 责任跟随本约代表头衔，不以君主当前主头衔替代，切换主头衔不能清掉正在处理的争端。
+        set_variable = { name = tca_treaty_country value = scope:tca_treaty_check_country }
+        set_variable = { name = tca_treaty_opponent value = scope:tca_treaty_check_opponent }
+        set_variable = { name = tca_treaty_war value = scope:tca_treaty_check_war }
+        set_variable = { name = tca_treaty_war_leader value = scope:tca_treaty_check_war.primary_attacker }
+        set_variable = { name = tca_treaty_dispute_state value = 0 }
+        # 制止期限集中在此；覆盖朝廷回复及边臣执行两阶段，不因回信重新计时。
+        set_variable = { name = tca_treaty_dispute_time value = yes days = 30 }
+    }
+    scope:tca_treaty_check_war = { add_to_variable_list = { name = tca_treaty_disputes target = scope:tca_treaty_dispute } }
+    # 原生战争事务结束后再投递首封信，避免AI在宣战回调内部答信并重入end_war。
+    # 传信时间计入已经开始的30日总期限，不另行重置。
+    scope:tca_treaty_check_sovereign = { trigger_event = { id = tca_treaty_war.1 days = 1 } }
+}
+
+# 争端作用域；朝廷明确听任、抗命、超时或未制止即以胜负结束都立即毁约。
+# 先锁争端状态，再调用核心的一次性处罚；后续问责不能恢复和约。
+tca_treaty_dispute_fail_effect = {
+    if = { limit = { var:tca_treaty_dispute_state < 2 tca_treaty_dispute_valid_trigger = yes }
+        set_variable = { name = tca_treaty_dispute_state value = 2 }
+        save_scope_as = tca_treaty_dispute
+        var:tca_treaty_parent = { tca_treaty_break_effect = { OFFENDER = scope:tca_treaty_dispute.var:tca_treaty_sovereign } }
+    }
+}
+
+# 争端作用域；要求仍处原战争，先锁状态以避免白和平回调将成功制止判成失败。
+# 主攻者白和平；援军仅移除本人，绝不结束第三国战争。
+tca_treaty_dispute_obey_effect = {
+    if = { limit = { var:tca_treaty_dispute_state = 1 tca_treaty_dispute_live_trigger = yes }
+        set_variable = { name = tca_treaty_dispute_state value = 2 }
+        save_scope_as = tca_treaty_dispute
+        var:tca_treaty_officer = { every_character_war = {
+            limit = { this = scope:tca_treaty_dispute.var:tca_treaty_war }
+            if = { limit = { primary_attacker = scope:tca_treaty_dispute.var:tca_treaty_officer }
+                end_war = white_peace
+            }
+            else = {
+                # 一次退出同时消除本人对本战所有缔约国的主动敌对；先锁其他约的行，免其次日误罚。
+                every_in_list = { variable = tca_treaty_disputes
+                    limit = { var:tca_treaty_officer = scope:tca_treaty_dispute.var:tca_treaty_officer }
+                    set_variable = { name = tca_treaty_dispute_state value = 2 }
+                    set_variable = { name = tca_treaty_dispute_withdrawn value = yes }
+                }
+                remove_participant = scope:tca_treaty_dispute.var:tca_treaty_officer
+            }
+        } }
+    }
+}
+
+# 争端作用域；ORDER=yes制止，no听任。各阶段只消费一次；旧信不能覆盖新状态。
+tca_treaty_dispute_order_effect = {
+    if = { limit = { var:tca_treaty_dispute_state = 0 tca_treaty_dispute_live_trigger = yes }
+        if = { limit = { always = $ORDER$ }
+            set_variable = { name = tca_treaty_dispute_state value = 1 }
+            save_scope_as = tca_treaty_dispute
+            var:tca_treaty_officer = { trigger_event = { id = tca_treaty_war.2 days = 1 } }
+        }
+        else = { tca_treaty_dispute_fail_effect = yes }
+    }
+}
+
+# 战争作用域；FAILED=yes为任一方胜利，no为白和平/无效。和平回调不再要求战争仍可枚举。
+# 每个战争单独处理；其他战争仍由各自争端负责，不在此替其销案。
+tca_treaty_finish_disputes_effect = {
+    every_in_list = { variable = tca_treaty_disputes
+        if = { limit = { var:tca_treaty_dispute_state < 2 tca_treaty_dispute_valid_trigger = yes }
+            if = { limit = { always = $FAILED$ }
+                tca_treaty_dispute_fail_effect = yes
+            }
+            else = {
+                set_variable = { name = tca_treaty_dispute_state value = 2 }
+            }
+        }
+        end_story = yes
+    }
+    clear_variable_list = tca_treaty_disputes
+}
+
+# 争端story逐日维护；旧战争消失但没有结果回调时保守判失败，避免把胜利误当保约。
+# 正常白和平/无效由原生回调先处理。成功退出的resolved行只等待战争结束，保持去重。
+tca_treaty_dispute_maintain_effect = {
+    if = { limit = { NOT = { tca_treaty_dispute_valid_trigger = yes } } end_story = yes }
+    else_if = { limit = { var:tca_treaty_dispute_state < 2 }
+        if = { limit = { OR = { NOT = { has_variable = tca_treaty_dispute_time } NOT = { tca_treaty_dispute_live_trigger = yes } } }
+            tca_treaty_dispute_fail_effect = yes
+            end_story = yes
+        }
+    }
+    else_if = { limit = { var:tca_treaty_war_leader = { NOT = { any_character_war = { this = scope:tca_treaty_dispute_checked.var:tca_treaty_war } } } } end_story = yes }
+}
+
+# 争端作用域；只有明确抗命才接内部问责，听任及超时不虚构边臣已经抗命。
+# 主模块桥接effect复用既有处罚；毁约后的处分不再访问已销毁和约。
+tca_treaty_dispute_refuse_effect = {
+    if = { limit = { var:tca_treaty_dispute_state = 1 tca_treaty_dispute_live_trigger = yes }
+        save_scope_as = tca_treaty_dispute
+        tca_treaty_dispute_fail_effect = yes
+        tca_treaty_dispute_accountability_effect = yes
+    }
+}
+
+# 人物作用域；仅由原生on_join_war_as_secondary进攻方回调调用，输入check_war。
+# resolved行正常保留作去重；已经遵命退出却再次主动加入同战，视再次抗命立即毁约。
+# 此入口不能放入日常维护或普通check扫描，否则会把仍在处理的回调重复当成重新参战。
+tca_treaty_check_rejoined_attacker_effect = {
+    save_scope_as = tca_treaty_rejoiner
+    scope:tca_treaty_check_war = { every_in_list = { variable = tca_treaty_disputes
+        limit = {
+            var:tca_treaty_officer = scope:tca_treaty_rejoiner
+            var:tca_treaty_dispute_state = 2
+            var:tca_treaty_dispute_withdrawn ?= yes
+            tca_treaty_dispute_valid_trigger = yes
+            scope:tca_treaty_check_war = { any_war_defender = { top_liege = scope:tca_treaty_dispute_checked.var:tca_treaty_opponent } }
+        }
+        save_scope_as = tca_treaty_dispute
+        # 重返的是进攻方；旧指令已履行后又被推翻，不再次给予同一场战争的制止窗口。
+        var:tca_treaty_parent = { tca_treaty_break_effect = { OFFENDER = scope:tca_treaty_dispute.var:tca_treaty_sovereign } }
+    } }
+}

@@ -1,0 +1,74 @@
+﻿# 人物入口；只允许平等独立国家。现有敌对战争期间不能新签；旧约仍可协商修改或和平解除。
+tca_treaty_negotiate_trigger = {
+    $ACTOR$ = { save_temporary_scope_as = tca_treaty_negotiate_a }
+    $TARGET$ = { save_temporary_scope_as = tca_treaty_negotiate_b }
+    scope:tca_treaty_negotiate_a = {
+        is_alive = yes is_landed = yes is_independent_ruler = yes
+        this != scope:tca_treaty_negotiate_b
+        OR = {
+            # 已有和约可继续协商或和平解除；不能借此重置旧争端或欠款。
+            any_in_list = { variable = tca_treaties
+                tca_treaty_valid_trigger = yes
+                OR = { var:tca_treaty_a = scope:tca_treaty_negotiate_b var:tca_treaty_b = scope:tca_treaty_negotiate_b }
+            }
+            AND = {
+                NOT = { is_at_war_with = scope:tca_treaty_negotiate_b }
+                NOT = { tca_treaty_person_hostile_trigger = { TARGET = scope:tca_treaty_negotiate_b } }
+                NOT = { any_vassal_or_below = { tca_treaty_person_hostile_trigger = { TARGET = scope:tca_treaty_negotiate_b } } }
+            }
+        }
+    }
+    scope:tca_treaty_negotiate_b = { is_alive = yes is_landed = yes is_independent_ruler = yes }
+}
+
+# story作用域；只验证当前记录，不在trigger中修改或承接继承。
+tca_treaty_valid_trigger = {
+    save_temporary_scope_as = tca_treaty_checked
+    NOT = { has_variable = tca_treaty_closed }
+    NOT = { has_variable = tca_treaty_invalid }
+    var:tca_treaty_a ?= { is_alive = yes is_landed = yes is_independent_ruler = yes }
+    var:tca_treaty_b ?= { is_alive = yes is_landed = yes is_independent_ruler = yes this != scope:tca_treaty_checked.var:tca_treaty_a }
+    var:tca_treaty_title_a.holder ?= scope:tca_treaty_checked.var:tca_treaty_a
+    var:tca_treaty_title_b.holder ?= scope:tca_treaty_checked.var:tca_treaty_b
+}
+# 提案作用域；版本及代表头衔锁定，避免旧提案覆盖另一份刚修改的条款。
+tca_treaty_proposal_valid_trigger = {
+    save_temporary_scope_as = tca_treaty_proposal_checked
+    NOT = { has_variable = tca_treaty_consumed }
+    tca_treaty_negotiate_trigger = { ACTOR = var:tca_treaty_from TARGET = var:tca_treaty_to }
+    var:tca_treaty_from_title.holder ?= scope:tca_treaty_proposal_checked.var:tca_treaty_from
+    var:tca_treaty_to_title.holder ?= scope:tca_treaty_proposal_checked.var:tca_treaty_to
+    tca_treaty_proposal_age_value < 30
+    trigger_if = {
+        limit = { has_variable = tca_treaty_existing }
+        var:tca_treaty_existing ?= { tca_treaty_valid_trigger = yes var:tca_treaty_version = scope:tca_treaty_proposal_checked.var:tca_treaty_version }
+    }
+    trigger_else = {
+        var:tca_treaty_mode = 0
+        var:tca_treaty_from = { NOT = { any_in_list = { variable = tca_treaties OR = { var:tca_treaty_a = scope:tca_treaty_proposal_checked.var:tca_treaty_to var:tca_treaty_b = scope:tca_treaty_proposal_checked.var:tca_treaty_to } } } }
+    }
+}
+# 欠款双方按冻结的代表头衔取当前付款人；有国库者不得借个人金币绕过不足。
+tca_treaty_can_pay_trigger = {
+    tca_treaty_valid_trigger = yes
+    var:tca_treaty_arrears > 0
+    tca_treaty_grace_elapsed_value < 0
+    var:tca_treaty_debtor.holder ?= {
+        OR = {
+            AND = { has_treasury = yes treasury >= scope:tca_treaty_checked.var:tca_treaty_arrears }
+            AND = { has_treasury = no gold >= scope:tca_treaty_checked.var:tca_treaty_arrears }
+        }
+    }
+    exists = var:tca_treaty_creditor.holder
+}
+
+# 人物作用域；检查该人物已参战的另一侧是否含目标国家任一人物，不用君主本人参战替代国家敌对。
+tca_treaty_person_hostile_trigger = {
+    save_temporary_scope_as = tca_treaty_hostile_person
+    any_character_war = {
+        OR = {
+            AND = { is_attacker = scope:tca_treaty_hostile_person any_war_defender = { top_liege = $TARGET$ } }
+            AND = { is_defender = scope:tca_treaty_hostile_person any_war_attacker = { top_liege = $TARGET$ } }
+        }
+    }
+}

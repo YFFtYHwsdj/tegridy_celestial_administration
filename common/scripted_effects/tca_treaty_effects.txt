@@ -1,0 +1,183 @@
+﻿# root为提议发起者；输入actor/recipient、amount/direction/mode，可选existing；输出proposal。
+# 同一双方至多一份在途提案，拒绝或超期不修改旧约。调用方不得用该入口直接签约。
+tca_treaty_send_proposal_effect = {
+    clear_saved_scope = tca_treaty_proposal
+    if = { limit = { tca_treaty_negotiate_trigger = { ACTOR = scope:actor TARGET = scope:recipient } }
+        # 总是重新从双方索引解析，不信任GUI跨日携带的旧对象。
+        clear_saved_scope = tca_treaty_existing
+        scope:actor = { every_in_list = { variable = tca_treaties
+            limit = { OR = { var:tca_treaty_a = scope:recipient var:tca_treaty_b = scope:recipient } }
+            save_scope_as = tca_treaty_existing
+        } }
+        if = { limit = {
+            OR = { scope:tca_treaty_mode = 0 AND = { exists = scope:tca_treaty_existing scope:tca_treaty_mode >= 1 scope:tca_treaty_mode <= 2 } }
+            OR = { scope:tca_treaty_amount = 0 scope:tca_treaty_amount = 100 scope:tca_treaty_amount = 250 scope:tca_treaty_amount = 500 scope:tca_treaty_amount = 1000 scope:tca_treaty_amount = 2000 scope:tca_treaty_amount = 5000 }
+            OR = { AND = { scope:tca_treaty_amount = 0 scope:tca_treaty_direction = 0 } AND = { scope:tca_treaty_amount > 0 scope:tca_treaty_direction >= 1 scope:tca_treaty_direction <= 2 } }
+            scope:actor = { NOT = { any_in_list = { variable = tca_treaty_proposals OR = { var:tca_treaty_from = scope:recipient var:tca_treaty_to = scope:recipient } } } }
+        }
+            scope:actor = { create_story = { type = tca_treaty_proposal save_scope_as = tca_treaty_proposal } }
+            scope:tca_treaty_proposal = {
+                set_variable = { name = tca_treaty_from value = scope:actor }
+                set_variable = { name = tca_treaty_to value = scope:recipient }
+                set_variable = { name = tca_treaty_from_title value = scope:actor.primary_title }
+                set_variable = { name = tca_treaty_to_title value = scope:recipient.primary_title }
+                set_variable = { name = tca_treaty_amount value = scope:tca_treaty_amount }
+                set_variable = { name = tca_treaty_direction value = scope:tca_treaty_direction }
+                set_variable = { name = tca_treaty_mode value = scope:tca_treaty_mode }
+                set_variable = { name = tca_treaty_created value = current_date }
+                if = { limit = { exists = scope:tca_treaty_existing }
+                    set_variable = { name = tca_treaty_existing value = scope:tca_treaty_existing }
+                    set_variable = { name = tca_treaty_version value = scope:tca_treaty_existing.var:tca_treaty_version }
+                    if = { limit = { scope:tca_treaty_existing.var:tca_treaty_a = scope:actor }
+                        set_variable = { name = tca_treaty_from_title value = scope:tca_treaty_existing.var:tca_treaty_title_a }
+                        set_variable = { name = tca_treaty_to_title value = scope:tca_treaty_existing.var:tca_treaty_title_b }
+                    }
+                    else = {
+                        set_variable = { name = tca_treaty_from_title value = scope:tca_treaty_existing.var:tca_treaty_title_b }
+                        set_variable = { name = tca_treaty_to_title value = scope:tca_treaty_existing.var:tca_treaty_title_a }
+                    }
+                }
+            }
+            scope:actor = { add_to_variable_list = { name = tca_treaty_proposals target = scope:tca_treaty_proposal } }
+            scope:recipient = { add_to_variable_list = { name = tca_treaty_proposals target = scope:tca_treaty_proposal } trigger_event = { id = tca_treaty.1 days = 1 } }
+        }
+    }
+}
+# 提案作用域；只将已同意条款提交一次。修改不改变原结算日、既有欠款或宽限。
+tca_treaty_accept_effect = {
+    save_scope_as = tca_treaty_proposal
+    if = { limit = { tca_treaty_proposal_valid_trigger = yes }
+        set_variable = { name = tca_treaty_consumed value = yes }
+        if = { limit = { has_variable = tca_treaty_existing }
+            var:tca_treaty_existing = { save_scope_as = tca_treaty_record }
+        }
+        else = {
+            var:tca_treaty_from = { create_story = { type = tca_treaty save_scope_as = tca_treaty_record } }
+            scope:tca_treaty_record = {
+                set_variable = { name = tca_treaty_a value = scope:tca_treaty_proposal.var:tca_treaty_from }
+                set_variable = { name = tca_treaty_b value = scope:tca_treaty_proposal.var:tca_treaty_to }
+                set_variable = { name = tca_treaty_title_a value = scope:tca_treaty_proposal.var:tca_treaty_from_title }
+                set_variable = { name = tca_treaty_title_b value = scope:tca_treaty_proposal.var:tca_treaty_to_title }
+                set_variable = { name = tca_treaty_due value = { value = current_date add = 365 } }
+                set_variable = { name = tca_treaty_arrears value = 0 }
+                set_variable = { name = tca_treaty_version value = 0 }
+                set_variable = { name = tca_treaty_owner value = scope:tca_treaty_proposal.var:tca_treaty_from }
+                var:tca_treaty_a = { add_to_variable_list = { name = tca_treaties target = scope:tca_treaty_record } }
+                var:tca_treaty_b = { add_to_variable_list = { name = tca_treaties target = scope:tca_treaty_record } }
+            }
+        }
+        scope:tca_treaty_record = {
+            if = { limit = { scope:tca_treaty_proposal.var:tca_treaty_mode = 1 } tca_treaty_close_effect = yes }
+            else_if = { limit = { scope:tca_treaty_proposal.var:tca_treaty_mode = 2 }
+                set_variable = { name = tca_treaty_arrears value = 0 }
+                remove_variable = tca_treaty_grace
+                remove_variable = tca_treaty_debtor
+                remove_variable = tca_treaty_creditor
+                change_variable = { name = tca_treaty_version add = 1 }
+            }
+            else = {
+                set_variable = { name = tca_treaty_amount value = scope:tca_treaty_proposal.var:tca_treaty_amount }
+                remove_variable = tca_treaty_payer
+                if = { limit = { var:tca_treaty_amount > 0 }
+                    if = { limit = { scope:tca_treaty_proposal.var:tca_treaty_direction = 1 } set_variable = { name = tca_treaty_payer value = scope:tca_treaty_proposal.var:tca_treaty_from_title } }
+                    else = { set_variable = { name = tca_treaty_payer value = scope:tca_treaty_proposal.var:tca_treaty_to_title } }
+                }
+                change_variable = { name = tca_treaty_version add = 1 }
+            }
+        }
+        tca_treaty_proposal_notice_effect = { RESULT = 1 }
+        end_story = yes
+    }
+    else = { end_story = yes }
+}
+# 提案作用域；拒绝只结束本提案，不取消旧约。
+tca_treaty_reject_effect = {
+    tca_treaty_proposal_notice_effect = { RESULT = 0 }
+    end_story = yes
+}
+# 提案作用域；结果只携带冻结的收发者，不引用结束的story。
+tca_treaty_proposal_notice_effect = {
+    var:tca_treaty_to = { save_scope_as = tca_treaty_sender }
+    save_scope_value_as = { name = tca_treaty_result value = $RESULT$ }
+    var:tca_treaty_from ?= { if = { limit = { is_alive = yes } trigger_event = { id = tca_treaty.2 } } }
+}
+# 和约作用域；统一解除入口。on_end删除人物索引，欠款不会独立留存。
+tca_treaty_close_effect = {
+    if = { limit = { NOT = { has_variable = tca_treaty_closed } }
+        set_variable = { name = tca_treaty_closed value = yes }
+        end_story = yes
+    }
+}
+# 和约作用域，OFFENDER必须为当前履约君主；先锁再罚，保持同约一次。
+# 仅复用原版两项威望值，不引入原版特长豁免、合法性或其他外交处罚。
+tca_treaty_break_effect = {
+    save_scope_as = tca_treaty_breaking
+    if = { limit = { NOT = { has_variable = tca_treaty_closed } OR = { var:tca_treaty_a = $OFFENDER$ var:tca_treaty_b = $OFFENDER$ } }
+        set_variable = { name = tca_treaty_closed value = yes }
+        $OFFENDER$ = { add_prestige = break_truce_prestige_loss add_prestige_level = break_truce_prestige_level_loss save_scope_as = tca_treaty_sender }
+        var:tca_treaty_a ?= { if = { limit = { is_alive = yes } trigger_event = { id = tca_treaty.4 } } }
+        var:tca_treaty_b ?= { if = { limit = { is_alive = yes } trigger_event = { id = tca_treaty.4 } } }
+        end_story = yes
+    }
+}
+# 和约作用域；只支付冻结的已到期欠款，不预付未来年额。先清债防重复，再分别扣收。
+tca_treaty_pay_effect = {
+    save_scope_as = tca_treaty_paying
+    if = { limit = { tca_treaty_can_pay_trigger = yes }
+        save_scope_value_as = { name = tca_treaty_payment value = var:tca_treaty_arrears }
+        var:tca_treaty_debtor.holder = { save_scope_as = tca_treaty_debtor }
+        var:tca_treaty_creditor.holder = { save_scope_as = tca_treaty_creditor }
+        set_variable = { name = tca_treaty_arrears value = 0 }
+        remove_variable = tca_treaty_grace
+        remove_variable = tca_treaty_debtor
+        remove_variable = tca_treaty_creditor
+        scope:tca_treaty_debtor = {
+            if = { limit = { has_treasury = yes } remove_treasury = scope:tca_treaty_payment }
+            else = { remove_long_term_gold = scope:tca_treaty_payment }
+        }
+        scope:tca_treaty_creditor = {
+            if = { limit = { has_treasury = yes } add_treasury = scope:tca_treaty_payment }
+            else = { add_gold = scope:tca_treaty_payment }
+        }
+    }
+}
+# 和约作用域；每日维护先续接国家，再查欠款，最后形成新年度义务。
+# 结算日只前进固定365天；改约、补缴、继位都不重置；欠款年额与付款国独立冻结。
+tca_treaty_maintain_effect = {
+    save_scope_as = tca_treaty_record
+    if = { limit = { NOT = { has_variable = tca_treaty_inheritance_wait } }
+        tca_treaty_reconcile_effect = yes
+        if = { limit = { exists = scope:tca_treaty_record }
+            if = { limit = { NOT = { tca_treaty_valid_trigger = yes } } tca_treaty_close_effect = yes }
+            else_if = { limit = { var:tca_treaty_arrears > 0 }
+                # 超过宽限后不得抢在每日维护前补缴，日期同样由付款入口限制。
+                if = { limit = { tca_treaty_grace_elapsed_value >= 0 }
+                    tca_treaty_break_effect = { OFFENDER = var:tca_treaty_debtor.holder }
+                }
+                else = { tca_treaty_pay_effect = yes }
+            }
+            else_if = { limit = { tca_treaty_due_elapsed_value >= 0 }
+                change_variable = { name = tca_treaty_due add = 365 }
+                if = { limit = { var:tca_treaty_amount > 0 }
+                    set_variable = { name = tca_treaty_arrears value = var:tca_treaty_amount }
+                    set_variable = { name = tca_treaty_grace value = { value = current_date add = 90 } }
+                    set_variable = { name = tca_treaty_debtor value = var:tca_treaty_payer }
+                    if = { limit = { var:tca_treaty_payer = var:tca_treaty_title_a } set_variable = { name = tca_treaty_creditor value = var:tca_treaty_title_b } }
+                    else = { set_variable = { name = tca_treaty_creditor value = var:tca_treaty_title_a } }
+                    tca_treaty_pay_effect = yes
+                    if = { limit = { var:tca_treaty_arrears > 0 }
+                        var:tca_treaty_creditor.holder = { save_scope_as = tca_treaty_sender }
+                        var:tca_treaty_debtor.holder = { trigger_event = { id = tca_treaty.3 } }
+                    }
+                }
+            }
+        }
+    }
+}
+
+# 和约作用域；旧欠付信的拒付也须复核，免债/已付款后不能凭旧信制造毁约。
+tca_treaty_refuse_payment_effect = {
+    if = { limit = { tca_treaty_valid_trigger = yes var:tca_treaty_arrears > 0 var:tca_treaty_debtor.holder = $OFFENDER$ }
+        tca_treaty_break_effect = { OFFENDER = $OFFENDER$ }
+    }
+}

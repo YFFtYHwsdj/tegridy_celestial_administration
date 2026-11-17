@@ -1,0 +1,362 @@
+﻿# 本地玩家必须等于root；外交查看只写查看者的草稿，编辑还须为缔约君主。
+tca_treaty_gui_close = {
+    scope = character
+    saved_scopes = { tca_treaty_local_player }
+    is_valid = { this = scope:tca_treaty_local_player  }
+    effect = { if = { limit = { this = scope:tca_treaty_local_player  } tca_treaty_gui_clear_effect = yes } }
+}
+# 外交条目只传双方人物；从所看人物的正式索引重新查找，不依赖GUI提取story对象。
+tca_treaty_gui_open_record = {
+    scope = character
+    saved_scopes = { tca_treaty_local_player tca_treaty_row_a tca_treaty_row_b tca_treaty_viewed }
+    is_valid = {
+        this = scope:tca_treaty_local_player
+        exists = scope:tca_treaty_row_a
+        exists = scope:tca_treaty_row_b
+        exists = scope:tca_treaty_viewed
+        scope:tca_treaty_viewed = {
+            any_in_list = { variable = tca_treaties
+                var:tca_treaty_a = scope:tca_treaty_row_a
+                var:tca_treaty_b = scope:tca_treaty_row_b
+            }
+        }
+    }
+    effect = {
+        if = { limit = {
+            this = scope:tca_treaty_local_player
+            exists = scope:tca_treaty_row_a
+            exists = scope:tca_treaty_row_b
+            exists = scope:tca_treaty_viewed
+        }
+            scope:tca_treaty_viewed = {
+                every_in_list = { variable = tca_treaties
+                    limit = {
+                        var:tca_treaty_a = scope:tca_treaty_row_a
+                        var:tca_treaty_b = scope:tca_treaty_row_b
+                    }
+                    save_scope_as = tca_treaty_record
+                }
+            }
+            if = { limit = { exists = scope:tca_treaty_record }
+                scope:tca_treaty_record = {
+                    # 本国君主优先以其缔约身份选择对方；第三国查看者沿人物页方向查看。
+                    if = { limit = { var:tca_treaty_a = root } var:tca_treaty_b = { save_scope_as = recipient } }
+                    else_if = { limit = { var:tca_treaty_b = root } var:tca_treaty_a = { save_scope_as = recipient } }
+                    else_if = { limit = { var:tca_treaty_a = scope:tca_treaty_viewed } var:tca_treaty_b = { save_scope_as = recipient } }
+                    else = { var:tca_treaty_a = { save_scope_as = recipient } }
+                }
+                tca_treaty_gui_open_effect = yes
+            }
+        }
+    }
+}
+# 行内人物方向只决定显示，不承担写权限。
+tca_treaty_gui_row_a = {
+    scope = character
+    saved_scopes = { tca_treaty_row_a }
+    is_shown = { this = scope:tca_treaty_row_a }
+}
+tca_treaty_gui_edit = {
+    scope = character
+    saved_scopes = { tca_treaty_local_player }
+    is_valid = { this = scope:tca_treaty_local_player has_variable = tca_treaty_gui_target
+        tca_treaty_negotiate_trigger = { ACTOR = root TARGET = var:tca_treaty_gui_target }
+        trigger_if = { limit = { has_variable = tca_treaty_gui_existing }
+            var:tca_treaty_gui_existing = { OR = { var:tca_treaty_a = root var:tca_treaty_b = root } }
+        } }
+}
+tca_treaty_gui_amount_0 = {
+    scope = character
+    saved_scopes = { tca_treaty_local_player }
+    is_valid = { this = scope:tca_treaty_local_player has_variable = tca_treaty_gui_target
+        tca_treaty_negotiate_trigger = { ACTOR = root TARGET = var:tca_treaty_gui_target }
+        trigger_if = { limit = { has_variable = tca_treaty_gui_existing }
+            var:tca_treaty_gui_existing = { OR = { var:tca_treaty_a = root var:tca_treaty_b = root } }
+        } }
+    effect = { if = { limit = { this = scope:tca_treaty_local_player has_variable = tca_treaty_gui_target
+        tca_treaty_negotiate_trigger = { ACTOR = root TARGET = var:tca_treaty_gui_target }
+        trigger_if = { limit = { has_variable = tca_treaty_gui_existing }
+            var:tca_treaty_gui_existing = { OR = { var:tca_treaty_a = root var:tca_treaty_b = root } }
+        } } set_variable = { name = tca_treaty_gui_amount value = 0 } set_variable = { name = tca_treaty_gui_direction value = 0 } } }
+}
+tca_treaty_gui_amount_100 = {
+    scope = character
+    saved_scopes = { tca_treaty_local_player }
+    is_valid = { this = scope:tca_treaty_local_player has_variable = tca_treaty_gui_target
+        tca_treaty_negotiate_trigger = { ACTOR = root TARGET = var:tca_treaty_gui_target }
+        trigger_if = { limit = { has_variable = tca_treaty_gui_existing }
+            var:tca_treaty_gui_existing = { OR = { var:tca_treaty_a = root var:tca_treaty_b = root } }
+        } }
+    effect = { if = { limit = { this = scope:tca_treaty_local_player has_variable = tca_treaty_gui_target
+        tca_treaty_negotiate_trigger = { ACTOR = root TARGET = var:tca_treaty_gui_target }
+        trigger_if = { limit = { has_variable = tca_treaty_gui_existing }
+            var:tca_treaty_gui_existing = { OR = { var:tca_treaty_a = root var:tca_treaty_b = root } }
+        } } set_variable = { name = tca_treaty_gui_amount value = 100 } if = { limit = { var:tca_treaty_gui_direction = 0 } set_variable = { name = tca_treaty_gui_direction value = 1 } } } }
+}
+tca_treaty_gui_amount_250 = {
+    scope = character
+    saved_scopes = { tca_treaty_local_player }
+    is_valid = { this = scope:tca_treaty_local_player has_variable = tca_treaty_gui_target
+        tca_treaty_negotiate_trigger = { ACTOR = root TARGET = var:tca_treaty_gui_target }
+        trigger_if = { limit = { has_variable = tca_treaty_gui_existing }
+            var:tca_treaty_gui_existing = { OR = { var:tca_treaty_a = root var:tca_treaty_b = root } }
+        } }
+    effect = { if = { limit = { this = scope:tca_treaty_local_player has_variable = tca_treaty_gui_target
+        tca_treaty_negotiate_trigger = { ACTOR = root TARGET = var:tca_treaty_gui_target }
+        trigger_if = { limit = { has_variable = tca_treaty_gui_existing }
+            var:tca_treaty_gui_existing = { OR = { var:tca_treaty_a = root var:tca_treaty_b = root } }
+        } } set_variable = { name = tca_treaty_gui_amount value = 250 } if = { limit = { var:tca_treaty_gui_direction = 0 } set_variable = { name = tca_treaty_gui_direction value = 1 } } } }
+}
+tca_treaty_gui_amount_500 = {
+    scope = character
+    saved_scopes = { tca_treaty_local_player }
+    is_valid = { this = scope:tca_treaty_local_player has_variable = tca_treaty_gui_target
+        tca_treaty_negotiate_trigger = { ACTOR = root TARGET = var:tca_treaty_gui_target }
+        trigger_if = { limit = { has_variable = tca_treaty_gui_existing }
+            var:tca_treaty_gui_existing = { OR = { var:tca_treaty_a = root var:tca_treaty_b = root } }
+        } }
+    effect = { if = { limit = { this = scope:tca_treaty_local_player has_variable = tca_treaty_gui_target
+        tca_treaty_negotiate_trigger = { ACTOR = root TARGET = var:tca_treaty_gui_target }
+        trigger_if = { limit = { has_variable = tca_treaty_gui_existing }
+            var:tca_treaty_gui_existing = { OR = { var:tca_treaty_a = root var:tca_treaty_b = root } }
+        } } set_variable = { name = tca_treaty_gui_amount value = 500 } if = { limit = { var:tca_treaty_gui_direction = 0 } set_variable = { name = tca_treaty_gui_direction value = 1 } } } }
+}
+tca_treaty_gui_amount_1000 = {
+    scope = character
+    saved_scopes = { tca_treaty_local_player }
+    is_valid = { this = scope:tca_treaty_local_player has_variable = tca_treaty_gui_target
+        tca_treaty_negotiate_trigger = { ACTOR = root TARGET = var:tca_treaty_gui_target }
+        trigger_if = { limit = { has_variable = tca_treaty_gui_existing }
+            var:tca_treaty_gui_existing = { OR = { var:tca_treaty_a = root var:tca_treaty_b = root } }
+        } }
+    effect = { if = { limit = { this = scope:tca_treaty_local_player has_variable = tca_treaty_gui_target
+        tca_treaty_negotiate_trigger = { ACTOR = root TARGET = var:tca_treaty_gui_target }
+        trigger_if = { limit = { has_variable = tca_treaty_gui_existing }
+            var:tca_treaty_gui_existing = { OR = { var:tca_treaty_a = root var:tca_treaty_b = root } }
+        } } set_variable = { name = tca_treaty_gui_amount value = 1000 } if = { limit = { var:tca_treaty_gui_direction = 0 } set_variable = { name = tca_treaty_gui_direction value = 1 } } } }
+}
+tca_treaty_gui_amount_2000 = {
+    scope = character
+    saved_scopes = { tca_treaty_local_player }
+    is_valid = { this = scope:tca_treaty_local_player has_variable = tca_treaty_gui_target
+        tca_treaty_negotiate_trigger = { ACTOR = root TARGET = var:tca_treaty_gui_target }
+        trigger_if = { limit = { has_variable = tca_treaty_gui_existing }
+            var:tca_treaty_gui_existing = { OR = { var:tca_treaty_a = root var:tca_treaty_b = root } }
+        } }
+    effect = { if = { limit = { this = scope:tca_treaty_local_player has_variable = tca_treaty_gui_target
+        tca_treaty_negotiate_trigger = { ACTOR = root TARGET = var:tca_treaty_gui_target }
+        trigger_if = { limit = { has_variable = tca_treaty_gui_existing }
+            var:tca_treaty_gui_existing = { OR = { var:tca_treaty_a = root var:tca_treaty_b = root } }
+        } } set_variable = { name = tca_treaty_gui_amount value = 2000 } if = { limit = { var:tca_treaty_gui_direction = 0 } set_variable = { name = tca_treaty_gui_direction value = 1 } } } }
+}
+tca_treaty_gui_amount_5000 = {
+    scope = character
+    saved_scopes = { tca_treaty_local_player }
+    is_valid = { this = scope:tca_treaty_local_player has_variable = tca_treaty_gui_target
+        tca_treaty_negotiate_trigger = { ACTOR = root TARGET = var:tca_treaty_gui_target }
+        trigger_if = { limit = { has_variable = tca_treaty_gui_existing }
+            var:tca_treaty_gui_existing = { OR = { var:tca_treaty_a = root var:tca_treaty_b = root } }
+        } }
+    effect = { if = { limit = { this = scope:tca_treaty_local_player has_variable = tca_treaty_gui_target
+        tca_treaty_negotiate_trigger = { ACTOR = root TARGET = var:tca_treaty_gui_target }
+        trigger_if = { limit = { has_variable = tca_treaty_gui_existing }
+            var:tca_treaty_gui_existing = { OR = { var:tca_treaty_a = root var:tca_treaty_b = root } }
+        } } set_variable = { name = tca_treaty_gui_amount value = 5000 } if = { limit = { var:tca_treaty_gui_direction = 0 } set_variable = { name = tca_treaty_gui_direction value = 1 } } } }
+}
+tca_treaty_gui_direction_0 = {
+    scope = character
+    saved_scopes = { tca_treaty_local_player }
+    is_valid = { this = scope:tca_treaty_local_player has_variable = tca_treaty_gui_target
+        tca_treaty_negotiate_trigger = { ACTOR = root TARGET = var:tca_treaty_gui_target }
+        trigger_if = { limit = { has_variable = tca_treaty_gui_existing }
+            var:tca_treaty_gui_existing = { OR = { var:tca_treaty_a = root var:tca_treaty_b = root } }
+        } }
+    effect = { if = { limit = { this = scope:tca_treaty_local_player has_variable = tca_treaty_gui_target
+        tca_treaty_negotiate_trigger = { ACTOR = root TARGET = var:tca_treaty_gui_target }
+        trigger_if = { limit = { has_variable = tca_treaty_gui_existing }
+            var:tca_treaty_gui_existing = { OR = { var:tca_treaty_a = root var:tca_treaty_b = root } }
+        } } set_variable = { name = tca_treaty_gui_direction value = 0 } set_variable = { name = tca_treaty_gui_amount value = 0 } } }
+}
+tca_treaty_gui_direction_1 = {
+    scope = character
+    saved_scopes = { tca_treaty_local_player }
+    is_valid = { this = scope:tca_treaty_local_player has_variable = tca_treaty_gui_target
+        tca_treaty_negotiate_trigger = { ACTOR = root TARGET = var:tca_treaty_gui_target }
+        trigger_if = { limit = { has_variable = tca_treaty_gui_existing }
+            var:tca_treaty_gui_existing = { OR = { var:tca_treaty_a = root var:tca_treaty_b = root } }
+        } }
+    effect = { if = { limit = { this = scope:tca_treaty_local_player has_variable = tca_treaty_gui_target
+        tca_treaty_negotiate_trigger = { ACTOR = root TARGET = var:tca_treaty_gui_target }
+        trigger_if = { limit = { has_variable = tca_treaty_gui_existing }
+            var:tca_treaty_gui_existing = { OR = { var:tca_treaty_a = root var:tca_treaty_b = root } }
+        } } set_variable = { name = tca_treaty_gui_direction value = 1 } } }
+}
+tca_treaty_gui_direction_2 = {
+    scope = character
+    saved_scopes = { tca_treaty_local_player }
+    is_valid = { this = scope:tca_treaty_local_player has_variable = tca_treaty_gui_target
+        tca_treaty_negotiate_trigger = { ACTOR = root TARGET = var:tca_treaty_gui_target }
+        trigger_if = { limit = { has_variable = tca_treaty_gui_existing }
+            var:tca_treaty_gui_existing = { OR = { var:tca_treaty_a = root var:tca_treaty_b = root } }
+        } }
+    effect = { if = { limit = { this = scope:tca_treaty_local_player has_variable = tca_treaty_gui_target
+        tca_treaty_negotiate_trigger = { ACTOR = root TARGET = var:tca_treaty_gui_target }
+        trigger_if = { limit = { has_variable = tca_treaty_gui_existing }
+            var:tca_treaty_gui_existing = { OR = { var:tca_treaty_a = root var:tca_treaty_b = root } }
+        } } set_variable = { name = tca_treaty_gui_direction value = 2 } } }
+}
+tca_treaty_gui_mode_0 = {
+    scope = character
+    saved_scopes = { tca_treaty_local_player }
+    is_valid = { this = scope:tca_treaty_local_player has_variable = tca_treaty_gui_target
+        tca_treaty_negotiate_trigger = { ACTOR = root TARGET = var:tca_treaty_gui_target }
+        trigger_if = { limit = { has_variable = tca_treaty_gui_existing }
+            var:tca_treaty_gui_existing = { OR = { var:tca_treaty_a = root var:tca_treaty_b = root } }
+        } }
+    effect = { if = { limit = { this = scope:tca_treaty_local_player has_variable = tca_treaty_gui_target
+        tca_treaty_negotiate_trigger = { ACTOR = root TARGET = var:tca_treaty_gui_target }
+        trigger_if = { limit = { has_variable = tca_treaty_gui_existing }
+            var:tca_treaty_gui_existing = { OR = { var:tca_treaty_a = root var:tca_treaty_b = root } }
+        } } set_variable = { name = tca_treaty_gui_mode value = 0 } } }
+}
+tca_treaty_gui_mode_1 = {
+    scope = character
+    saved_scopes = { tca_treaty_local_player }
+    is_valid = { this = scope:tca_treaty_local_player has_variable = tca_treaty_gui_target
+        tca_treaty_negotiate_trigger = { ACTOR = root TARGET = var:tca_treaty_gui_target }
+        trigger_if = { limit = { has_variable = tca_treaty_gui_existing }
+            var:tca_treaty_gui_existing = { OR = { var:tca_treaty_a = root var:tca_treaty_b = root } }
+        } has_variable = tca_treaty_gui_existing }
+    effect = { if = { limit = { this = scope:tca_treaty_local_player has_variable = tca_treaty_gui_target
+        tca_treaty_negotiate_trigger = { ACTOR = root TARGET = var:tca_treaty_gui_target }
+        trigger_if = { limit = { has_variable = tca_treaty_gui_existing }
+            var:tca_treaty_gui_existing = { OR = { var:tca_treaty_a = root var:tca_treaty_b = root } }
+        } has_variable = tca_treaty_gui_existing } set_variable = { name = tca_treaty_gui_mode value = 1 } } }
+}
+tca_treaty_gui_mode_2 = {
+    scope = character
+    saved_scopes = { tca_treaty_local_player }
+    is_valid = { this = scope:tca_treaty_local_player has_variable = tca_treaty_gui_target
+        tca_treaty_negotiate_trigger = { ACTOR = root TARGET = var:tca_treaty_gui_target }
+        trigger_if = { limit = { has_variable = tca_treaty_gui_existing }
+            var:tca_treaty_gui_existing = { OR = { var:tca_treaty_a = root var:tca_treaty_b = root } }
+        } has_variable = tca_treaty_gui_existing }
+    effect = { if = { limit = { this = scope:tca_treaty_local_player has_variable = tca_treaty_gui_target
+        tca_treaty_negotiate_trigger = { ACTOR = root TARGET = var:tca_treaty_gui_target }
+        trigger_if = { limit = { has_variable = tca_treaty_gui_existing }
+            var:tca_treaty_gui_existing = { OR = { var:tca_treaty_a = root var:tca_treaty_b = root } }
+        } has_variable = tca_treaty_gui_existing } set_variable = { name = tca_treaty_gui_mode value = 2 } } }
+}
+tca_treaty_gui_send = {
+    scope = character
+    saved_scopes = { tca_treaty_local_player }
+    is_valid = { this = scope:tca_treaty_local_player has_variable = tca_treaty_gui_target
+        OR = {
+            var:tca_treaty_gui_mode > 0
+            AND = { var:tca_treaty_gui_amount = 0 var:tca_treaty_gui_direction = 0 }
+            AND = { var:tca_treaty_gui_amount > 0 OR = { var:tca_treaty_gui_direction = 1 var:tca_treaty_gui_direction = 2 } }
+        }
+
+        tca_treaty_negotiate_trigger = { ACTOR = root TARGET = var:tca_treaty_gui_target }
+        trigger_if = { limit = { has_variable = tca_treaty_gui_existing }
+            var:tca_treaty_gui_existing = { OR = { var:tca_treaty_a = root var:tca_treaty_b = root } }
+        } }
+    effect = { if = { limit = { this = scope:tca_treaty_local_player has_variable = tca_treaty_gui_target
+        OR = {
+            var:tca_treaty_gui_mode > 0
+            AND = { var:tca_treaty_gui_amount = 0 var:tca_treaty_gui_direction = 0 }
+            AND = { var:tca_treaty_gui_amount > 0 OR = { var:tca_treaty_gui_direction = 1 var:tca_treaty_gui_direction = 2 } }
+        }
+
+        tca_treaty_negotiate_trigger = { ACTOR = root TARGET = var:tca_treaty_gui_target }
+        trigger_if = { limit = { has_variable = tca_treaty_gui_existing }
+            var:tca_treaty_gui_existing = { OR = { var:tca_treaty_a = root var:tca_treaty_b = root } }
+        } } tca_treaty_gui_send_effect = yes } }
+}
+tca_treaty_gui_break_arm = {
+    scope = character
+    saved_scopes = { tca_treaty_local_player }
+    is_valid = { this = scope:tca_treaty_local_player has_variable = tca_treaty_gui_target
+        tca_treaty_negotiate_trigger = { ACTOR = root TARGET = var:tca_treaty_gui_target }
+        trigger_if = { limit = { has_variable = tca_treaty_gui_existing }
+            var:tca_treaty_gui_existing = { OR = { var:tca_treaty_a = root var:tca_treaty_b = root } }
+        } has_variable = tca_treaty_gui_existing }
+    effect = { if = { limit = { this = scope:tca_treaty_local_player has_variable = tca_treaty_gui_target
+        tca_treaty_negotiate_trigger = { ACTOR = root TARGET = var:tca_treaty_gui_target }
+        trigger_if = { limit = { has_variable = tca_treaty_gui_existing }
+            var:tca_treaty_gui_existing = { OR = { var:tca_treaty_a = root var:tca_treaty_b = root } }
+        } has_variable = tca_treaty_gui_existing } set_variable = { name = tca_treaty_gui_break_confirm value = yes } } }
+}
+tca_treaty_gui_break = {
+    scope = character
+    saved_scopes = { tca_treaty_local_player }
+    is_valid = { this = scope:tca_treaty_local_player has_variable = tca_treaty_gui_target
+        tca_treaty_negotiate_trigger = { ACTOR = root TARGET = var:tca_treaty_gui_target }
+        trigger_if = { limit = { has_variable = tca_treaty_gui_existing }
+            var:tca_treaty_gui_existing = { OR = { var:tca_treaty_a = root var:tca_treaty_b = root } }
+        } has_variable = tca_treaty_gui_existing has_variable = tca_treaty_gui_break_confirm }
+    effect = { if = { limit = { this = scope:tca_treaty_local_player has_variable = tca_treaty_gui_target
+        tca_treaty_negotiate_trigger = { ACTOR = root TARGET = var:tca_treaty_gui_target }
+        trigger_if = { limit = { has_variable = tca_treaty_gui_existing }
+            var:tca_treaty_gui_existing = { OR = { var:tca_treaty_a = root var:tca_treaty_b = root } }
+        } has_variable = tca_treaty_gui_existing has_variable = tca_treaty_gui_break_confirm } save_scope_as = actor var:tca_treaty_gui_existing = { tca_treaty_break_effect = { OFFENDER = scope:actor } } tca_treaty_gui_clear_effect = yes } }
+}
+# 欠款操作以欠款归属头衔的现君主授权，不依赖当前主头衔，也不受谈判入口限制。
+tca_treaty_gui_debt_visible = {
+    scope = character
+    saved_scopes = { tca_treaty_local_player }
+    is_shown = { this = scope:tca_treaty_local_player
+        has_variable = tca_treaty_gui_existing
+        var:tca_treaty_gui_existing = {
+            var:tca_treaty_arrears > 0
+            var:tca_treaty_debtor.holder = root
+        } }
+}
+tca_treaty_gui_pay = {
+    scope = character
+    saved_scopes = { tca_treaty_local_player }
+    is_valid = { this = scope:tca_treaty_local_player
+        has_variable = tca_treaty_gui_existing
+        var:tca_treaty_gui_existing = {
+            var:tca_treaty_arrears > 0
+            var:tca_treaty_debtor.holder = root
+        } var:tca_treaty_gui_existing = { tca_treaty_can_pay_trigger = yes } }
+    effect = { if = { limit = { this = scope:tca_treaty_local_player
+        has_variable = tca_treaty_gui_existing
+        var:tca_treaty_gui_existing = {
+            var:tca_treaty_arrears > 0
+            var:tca_treaty_debtor.holder = root
+        } var:tca_treaty_gui_existing = { tca_treaty_can_pay_trigger = yes } } var:tca_treaty_gui_existing = { tca_treaty_pay_effect = yes } } }
+}
+tca_treaty_gui_refuse_arm = {
+    scope = character
+    saved_scopes = { tca_treaty_local_player }
+    is_valid = { this = scope:tca_treaty_local_player
+        has_variable = tca_treaty_gui_existing
+        var:tca_treaty_gui_existing = {
+            var:tca_treaty_arrears > 0
+            var:tca_treaty_debtor.holder = root
+        }  }
+    effect = { if = { limit = { this = scope:tca_treaty_local_player
+        has_variable = tca_treaty_gui_existing
+        var:tca_treaty_gui_existing = {
+            var:tca_treaty_arrears > 0
+            var:tca_treaty_debtor.holder = root
+        }  } set_variable = { name = tca_treaty_gui_refuse_confirm value = yes } } }
+}
+tca_treaty_gui_refuse = {
+    scope = character
+    saved_scopes = { tca_treaty_local_player }
+    is_valid = { this = scope:tca_treaty_local_player
+        has_variable = tca_treaty_gui_existing
+        var:tca_treaty_gui_existing = {
+            var:tca_treaty_arrears > 0
+            var:tca_treaty_debtor.holder = root
+        } has_variable = tca_treaty_gui_refuse_confirm }
+    effect = { if = { limit = { this = scope:tca_treaty_local_player
+        has_variable = tca_treaty_gui_existing
+        var:tca_treaty_gui_existing = {
+            var:tca_treaty_arrears > 0
+            var:tca_treaty_debtor.holder = root
+        } has_variable = tca_treaty_gui_refuse_confirm } save_scope_as = actor var:tca_treaty_gui_existing = { tca_treaty_break_effect = { OFFENDER = scope:actor } } tca_treaty_gui_clear_effect = yes } }
+}

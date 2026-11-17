@@ -1,0 +1,42 @@
+﻿# 对外提议、答复、欠付与解约全部书信；结果信不再读取已回收提案。
+namespace = tca_treaty
+tca_treaty.1 = {
+    type = letter_event
+    sender = scope:tca_treaty_proposal.var:tca_treaty_from
+    opening = tca_treaty.opening
+    desc = { first_valid = {
+        triggered_desc = { trigger = { scope:tca_treaty_proposal.var:tca_treaty_mode = 1 } desc = tca_treaty.1.cancel }
+        triggered_desc = { trigger = { scope:tca_treaty_proposal.var:tca_treaty_mode = 2 } desc = tca_treaty.1.waive }
+        triggered_desc = { trigger = { scope:tca_treaty_proposal.var:tca_treaty_amount = 0 } desc = tca_treaty.1.free }
+        triggered_desc = { trigger = { scope:tca_treaty_proposal.var:tca_treaty_direction = 1 } desc = tca_treaty.1.offer }
+        desc = tca_treaty.1.ask
+    } }
+    trigger = { scope:tca_treaty_proposal ?= { tca_treaty_proposal_valid_trigger = yes var:tca_treaty_to = root } }
+    on_trigger_fail = { scope:tca_treaty_proposal ?= { end_story = yes } }
+    option = {
+        name = tca_treaty.1.accept
+        hidden_effect = { scope:tca_treaty_proposal = { tca_treaty_accept_effect = yes } }
+        ai_chance = { base = 50 modifier = { add = scope:tca_treaty_proposal.tca_treaty_acceptance_value } }
+    }
+    option = {
+        name = tca_treaty.1.reject
+        hidden_effect = { scope:tca_treaty_proposal = { tca_treaty_reject_effect = yes } }
+        ai_chance = { base = 50 }
+    }
+}
+tca_treaty.2 = {
+    type = letter_event sender = scope:tca_treaty_sender opening = tca_treaty.opening
+    desc = { first_valid = { triggered_desc = { trigger = { scope:tca_treaty_result = 1 } desc = tca_treaty.2.yes } desc = tca_treaty.2.no } }
+    option = { name = tca_treaty.ack }
+}
+tca_treaty.3 = {
+    type = letter_event sender = scope:tca_treaty_sender opening = tca_treaty.opening desc = tca_treaty.3.desc
+    trigger = { scope:tca_treaty_record ?= { tca_treaty_valid_trigger = yes var:tca_treaty_arrears > 0 var:tca_treaty_debtor.holder = root } }
+    option = { name = tca_treaty.3.pay trigger = { scope:tca_treaty_record = { tca_treaty_can_pay_trigger = yes } } hidden_effect = { scope:tca_treaty_record = { tca_treaty_pay_effect = yes } } ai_chance = { base = 100 } }
+    option = { name = tca_treaty.3.grace ai_chance = { base = 50 } }
+    option = { name = tca_treaty.3.refuse custom_tooltip = tca_treaty.3.break_tt hidden_effect = { scope:tca_treaty_record = { tca_treaty_refuse_payment_effect = { OFFENDER = root } } } ai_chance = { base = 0 } }
+}
+tca_treaty.4 = {
+    type = letter_event sender = scope:tca_treaty_sender opening = tca_treaty.opening desc = tca_treaty.4.desc
+    option = { name = tca_treaty.ack }
+}
