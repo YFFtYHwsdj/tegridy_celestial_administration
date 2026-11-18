@@ -1,0 +1,33 @@
+﻿# 原生内阁三种离任回调均传scope:councillor；合并追加独立子回调。
+on_leave_council = { on_actions = { tca_official_family_council_departure } }
+on_fired_from_council = { on_actions = { tca_official_family_council_departure } }
+on_councillor_left = { on_actions = { tca_official_family_council_departure } }
+
+tca_official_family_council_departure = {
+    effect = { scope:councillor ?= { tca_official_family_schedule_return_check_effect = yes } }
+}
+
+# 人物作用域；清理防重标记后按真实新职位复验，跨署转任不返回旧领主或最高领主。
+tca_official_family_return_check = {
+    effect = {
+        remove_character_flag = tca_official_family_return_check_pending
+        tca_official_family_return_if_unassigned_effect = yes
+    }
+}
+
+# 原版宫廷职位只有逐职位的离任效果。季度补查覆盖未接离任回调的职位及旧存档，
+# 每个独立天朝只由最高领主扫描一次，只处理需要归顶的天朝无地家门。
+quarterly_playable_pulse = { on_actions = { tca_official_family_quarterly_return_check } }
+
+tca_official_family_quarterly_return_check = {
+    trigger = {
+        is_independent_ruler = yes
+        government_has_flag = government_is_celestial
+    }
+    effect = {
+        every_vassal_or_below = {
+            limit = { tca_official_family_needs_return_trigger = yes }
+            tca_official_family_return_if_unassigned_effect = yes
+        }
+    }
+}

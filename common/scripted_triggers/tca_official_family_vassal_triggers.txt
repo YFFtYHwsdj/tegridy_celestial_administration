@@ -1,8 +1,31 @@
-﻿# 家门人物作用域，无参数或副作用；仅放行天朝实际地方主官或中央大臣下的天朝无地家门。
-# 原版1.21归顶分支调用；普通世族与其它政体仍沿用原版，不按is_landed漏掉已登记无地地方官署。
-tca_official_family_keeps_liege_trigger = {
+﻿# 家门人物作用域，无参数及副作用；只认天朝无地家门，按其主头衔判断。
+tca_official_landless_family_trigger = {
     government_has_flag = government_is_celestial
     primary_title ?= { is_noble_family_title = yes }
     is_landed = no
-    liege ?= { OR = { tca_is_celestial_governor_trigger = yes tgp_is_any_minister = yes } }
+}
+
+# 家门人物作用域；只认可当前直属主官的实职，跨署遗留的旧职位不能保留隶属。
+tca_official_family_keeps_liege_trigger = {
+    tca_official_landless_family_trigger = yes
+    liege ?= {
+        OR = {
+            tca_is_celestial_governor_trigger = yes
+            tgp_is_any_minister = yes
+        }
+    }
+    OR = {
+        var:tca_court_family_transfer_target ?= liege
+        is_councillor_of = liege
+        any_court_position_employer = { this = prev.liege }
+    }
+}
+
+# 家门人物作用域；仅检查仍有在世最高领主、尚未直属且没有留属依据的人物。
+tca_official_family_needs_return_trigger = {
+    is_alive = yes
+    tca_official_landless_family_trigger = yes
+    liege != top_liege
+    top_liege ?= { is_alive = yes }
+    tca_official_family_keeps_liege_trigger = no
 }

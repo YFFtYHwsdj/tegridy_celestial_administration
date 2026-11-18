@@ -101,6 +101,7 @@ tca_court_on_received_effect = {
 tca_court_on_departure_effect = {
     scope:employee = {
         if = { limit = { is_alive = yes }
+            tca_official_family_schedule_return_check_effect = yes
             remove_character_flag = tca_military_appointment_cooldown
             remove_variable = tca_court_organizing_office
             # 原生on_end通常会清理；离任也幂等移除，防止跨署时把旧费用误认作已含在新署支出中。
@@ -247,10 +248,11 @@ tca_royal_architect_on_departure_effect = {
         tca_court_on_departure_effect = yes
         scope:employee = { remove_character_flag = tca_royal_architect_commission }
     }
+    else = { scope:employee = { tca_official_family_schedule_return_check_effect = yes } }
 }
 
 # 雇主作用域；必需target_liege与tca_chosen_officer。只接收已经选中且复验过的候选。
-# AI即时任命与玩家接受邀请共用本事务；失败时恢复来源关系，正常离任不改变领属。
+# AI即时任命与玩家接受邀请共用本事务；失败时恢复来源关系，离任回调次日读取最终隶属及在职状态。
 tca_court_appoint_selected_effect = {
     clear_saved_scope = tca_court_previous_liege
     scope:tca_chosen_officer = {
@@ -287,10 +289,13 @@ tca_court_appoint_selected_effect = {
         scope:tca_court_previous_liege ?= {
             if = { limit = { is_alive = yes }
                 scope:tca_chosen_officer = { tca_court_move_to_office_effect = { OWNER = scope:tca_court_previous_liege } }
-                tca_court_visit_lifecycle_positions_effect = { RESTORE = 1 }
-                tca_court_restore_unlinked_council_effect = yes
+                if = { limit = { scope:tca_chosen_officer = { tca_court_member_of_office_trigger = { OWNER = scope:tca_court_previous_liege } } }
+                    tca_court_visit_lifecycle_positions_effect = { RESTORE = 1 }
+                    tca_court_restore_unlinked_council_effect = yes
+                }
             }
         }
+        scope:tca_chosen_officer = { tca_official_family_schedule_return_check_effect = yes }
         debug_log = "TCA_COURT appointment failed; original court restored where valid"
     }
     scope:tca_chosen_officer = { remove_character_flag = tca_military_appointment_allowed remove_character_flag = tca_court_unlinked_council_transfer remove_variable = tca_court_old_position remove_variable = tca_court_old_council }
