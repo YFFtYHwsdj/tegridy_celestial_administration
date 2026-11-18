@@ -88,7 +88,22 @@ revoke_title_interaction = {
 		# 同时确认拥有合法撤销权。
 		scope:puppet_or_actor = {
 			trigger_if = {
-				limit = { government_has_flag = government_is_tribal }
+				limit = {  scope:recipient = {
+						highest_held_title_tier = tier_barony # 男爵头衔允许直接剥夺。
+					}
+				}
+				always = yes
+			}
+			trigger_else_if = {
+				limit = { realm_law_use_church_authority = yes }
+				custom_description = {
+					text = "has_law_allowing_title_revocation_church"
+					has_realm_law_flag = title_revocation_allowed
+				}
+			}
+			trigger_else = {
+				trigger_if = {
+					limit = { government_has_flag = government_is_tribal }
 				custom_description = {
 					text = "has_law_allowing_title_revocation_tribal"
 					has_realm_law_flag = title_revocation_allowed
@@ -105,9 +120,9 @@ revoke_title_interaction = {
 				limit = { government_has_mechanic = administrative }
 			}
 			trigger_else_if = {
-				limit = { realm_law_use_church_authority = yes }
+				limit = {  government_has_flag  =  government_is_republic  }
 				custom_description = {
-					text = "has_law_allowing_title_revocation_church"
+					text =  "has_law_allowing_title_revocation_republic"
 					has_realm_law_flag = title_revocation_allowed
 				}
 			}
@@ -115,7 +130,7 @@ revoke_title_interaction = {
 				custom_description = {
 					text = "has_law_allowing_title_revocation_crown"
 					has_realm_law_flag = title_revocation_allowed
-				}
+				 } }
 			}
 		}
 		trigger_if = {
@@ -167,7 +182,7 @@ revoke_title_interaction = {
 			text = protected_from_revocation.tt
 			NOT = { scope:recipient = { has_character_flag = titles_protected } }
 		}
-	
+
 		trigger_if = { limit = { scope:is_puppet_action ?= yes } scope:puppet_or_actor = { influence >= tca_tongpan_influence_surcharge_value } }
 	}
 
@@ -203,7 +218,7 @@ revoke_title_interaction = {
 				has_revoke_title_reason = scope:recipient
 			}
 			scope:recipient = {
-			 	any_held_title = {
+                any_held_title = {
 					scope:puppet_or_actor = {
 						has_claim_on = prev
 					}
@@ -242,7 +257,10 @@ revoke_title_interaction = {
 				is_nomad_title = yes
 				is_head_of_faith = yes
 				has_clerical_region = yes
-			}
+			 AND = {
+					holder = { government_has_flag = government_is_republic }
+					gdp_is_republic_title_trigger = yes
+				} }
 			custom_description = {
 				text = "character_interactions_not_clerical_elector_title"
 				pam_title_is_clerical_elector_trigger = no
@@ -412,9 +430,9 @@ revoke_title_interaction = {
 					}
 				}
 				multiply = {
-	  				value = 0.5
-	  				desc = vassal_in_disaster_situation
-	  			}
+                    value = 0.5
+                    desc = vassal_in_disaster_situation
+                }
 			}
 			if = {
 				limit = {
@@ -426,7 +444,7 @@ revoke_title_interaction = {
 				limit = { scope:is_puppet_action ?= yes }
 				multiply = 0
 			}
-		
+
 			add = scope:puppet_or_actor.tca_tongpan_influence_surcharge_value
 			if = { limit = { scope:is_puppet_action ?= yes } multiply = 0 }
 		}
@@ -629,10 +647,15 @@ revoke_title_interaction = {
 			}
 		}
 		else = {
-			war_for_revoke_effect = {
+			 if = {
+				limit = {
+					scope:puppet_or_actor = {
+						NOT = { has_realm_law_flag = republic_vassal_refusal_allowed }
+					}
+				} war_for_revoke_effect = {
 				LIEGE = scope:puppet_or_actor
 				REBEL = scope:recipient
-			}
+			 } }
 			scope:recipient = {
 				add_opinion = {
 					target = scope:puppet_or_actor
@@ -934,7 +957,7 @@ revoke_title_interaction = {
 		}
 		modifier = { #相对军事实力。
 			desc = offer_vassalization_interaction_aibehavior_power_tt
-	  	  	add = {
+            add = {
 				value = 1
 				subtract = {
 					value = scope:recipient.current_military_strength
@@ -942,7 +965,7 @@ revoke_title_interaction = {
 				}
 				multiply = 50
 				max = 20
-	  		}
+            }
 		}
 		modifier = { # 律法主义传统。
 			desc = tradition_legalistic_name
@@ -973,7 +996,14 @@ revoke_title_interaction = {
 			}
 			desc = VASSALS_REFUSAL_indomitable_azatani
 		}
-	}
+	 modifier = {
+			add = -50
+			OR = {
+				gg_first_and_second_are_opposite_sides_trigger = { FIRST = scope:actor SECOND = scope:recipient }
+				scope:recipient = { is_gg_undecided_trigger = yes }
+			}
+			desc = RECIPIENT_IS_NOT_YOUR_GG
+		} }
 
 	# AI 行为。
 	ai_targets = {
@@ -981,10 +1011,7 @@ revoke_title_interaction = {
 	}
 	ai_frequency = 0 # 此项由引擎处理，见 AI defines 的 REVOKE_TITLE_TICK；是否发送撤销请求的逻辑仍写在下方脚本中。
 
-	ai_potential = {
-		has_realm_law_flag = title_revocation_allowed
-		primary_title.tier >= tier_county
-	}
+
 
 	ai_will_do = {
 		base = -1000
@@ -1083,7 +1110,11 @@ revoke_title_interaction = {
 		# 始终撤销偏好首都及首都公国。
 		modifier = {
 			years_from_game_start >= 3
+			 exists = scope:puppet_or_actor.primary_title.title_capital_county
 			OR = {
+				scope:landed_title = scope:puppet_or_actor.primary_title.title_capital_county
+				scope:landed_title = scope:puppet_or_actor.primary_title.title_capital_county.de_jure_liege
+			} OR = {
 				scope:puppet_or_actor = {
 					is_at_war = no
 					OR = {
@@ -1106,11 +1137,7 @@ revoke_title_interaction = {
 					primary_title = title:e_hre
 				}
 			}
-			exists = scope:puppet_or_actor.primary_title.title_capital_county
-			OR = {
-				scope:landed_title = scope:puppet_or_actor.primary_title.title_capital_county
-				scope:landed_title = scope:puppet_or_actor.primary_title.title_capital_county.de_jure_liege
-			}
+
 			NAND = { # 不要以暴政撤销玩家头衔，须保留小领主玩家的发展空间。
 				scope:landed_title.holder = {
 					is_ai = no
@@ -1124,7 +1151,9 @@ revoke_title_interaction = {
 		# 低于直辖上限时，有时会不顾暴政撤销首都公国内的县。
 		modifier = {
 			years_from_game_start >= 3
-			OR = {
+			 scope:landed_title.tier = tier_county # 仅处理伯爵领。
+			exists = scope:puppet_or_actor.primary_title.title_capital_county
+			scope:landed_title.de_jure_liege = scope:puppet_or_actor.primary_title.title_capital_county.de_jure_liege OR = {
 				scope:puppet_or_actor = {
 					is_at_war = no
 					OR = {
@@ -1163,14 +1192,14 @@ revoke_title_interaction = {
 					}
 				}
 			}
-			exists = scope:puppet_or_actor.primary_title.title_capital_county
+
 			OR = {
 				scope:puppet_or_actor.primary_title.title_capital_county.holder = scope:puppet_or_actor # 已拥有自己的 de_jure 首都。
 				NOT = {
 					scope:puppet_or_actor.primary_title.title_capital_county.holder.top_liege = scope:puppet_or_actor.top_liege # 或 de_jure 首都不在自己的政权内。
 				}
 			}
-			scope:landed_title.tier = tier_county # 仅限县。
+			   # 仅限县。
 			OR = { # AI 几乎会立即送出无法合法持有的领地，因此仅限其能持有当地地产的县。
 				scope:landed_title.title_province = { has_holding_type = castle_holding } # 所有角色都能持有城堡。
 				AND = {
@@ -1209,7 +1238,7 @@ revoke_title_interaction = {
 				}
 			}
 
-			scope:landed_title.de_jure_liege = scope:puppet_or_actor.primary_title.title_capital_county.de_jure_liege # 与首都位于同一公国。
+			   # 与首都位于同一公国。
 
 			scope:recipient = { # 不针对玩家。
 				is_ai = yes
@@ -1304,13 +1333,13 @@ revoke_title_interaction = {
 		}
 		# 可免暴政时，撤销异信仰封臣的头衔。
 		modifier = {
-			scope:puppet_or_actor = {
+			 scope:puppet_or_actor.faith != scope:recipient.faith
+			scope:recipient.primary_title.tier > tier_barony scope:puppet_or_actor = {
 				NOT = {
 					title_revocation_is_tyrannical_trigger = { VASSAL = scope:recipient }
 				}
 			}
-			scope:puppet_or_actor.faith != scope:recipient.faith
-			scope:recipient.primary_title.tier > tier_barony
+
 			OR = {
 				scope:puppet_or_actor.faith.religion != scope:recipient.faith.religion
 				scope:puppet_or_actor.ai_zeal >= low_negative_ai_value
@@ -1324,9 +1353,9 @@ revoke_title_interaction = {
 				}
 				NOT = {
 					any_vassal = {
-						faith != scope:puppet_or_actor.faith
+						 is_imprisoned_by = scope:puppet_or_actor faith != scope:puppet_or_actor.faith
 						primary_title.tier > tier_barony
-						is_imprisoned_by = scope:puppet_or_actor
+
 						time_in_prison = { years < 1 }
 					}
 				}
@@ -1336,12 +1365,9 @@ revoke_title_interaction = {
 		# 可免暴政时，撤销厌恶角色的头衔。
 		modifier = {
 			scope:puppet_or_actor = {
-				NOT = {
+				 has_relation_rival = scope:recipient NOT = {
 					title_revocation_is_tyrannical_trigger = { VASSAL = scope:recipient }
-				}
-				OR = {
-					has_relation_rival = scope:recipient
-					has_relation_nemesis = scope:recipient
+
 				}
 			}
 			add = 100
@@ -1355,9 +1381,8 @@ revoke_title_interaction = {
 			scope:puppet_or_actor = {
 				OR = {
 					has_relation_friend = scope:recipient
-					has_relation_best_friend = scope:recipient
-					has_relation_lover = scope:recipient
-					has_relation_soulmate = scope:recipient
+
+					has_relation_lover    = scope:recipient
 					is_parent_of = scope:recipient
 					is_grandparent_of = scope:recipient
 					is_great_grandparent_of = scope:recipient
@@ -1434,12 +1459,13 @@ revoke_title_interaction = {
 			scope:puppet_or_actor = {
 				government_has_flag = government_is_clan
 				exists = house
-				ai_wants_high_unity = yes
+
 			}
 			scope:recipient = {
 				government_has_flag = government_is_clan
 				house ?= scope:puppet_or_actor.house
-			}
+			 }
+			scope:puppet_or_actor = { ai_wants_high_unity = yes }
 			add = -1000
 		}		# 行政政体：除非确有必要，否则不撤销同家族成员头衔。
 		modifier = {
@@ -1494,7 +1520,20 @@ revoke_title_interaction = {
 					highest_held_title_tier = tier_barony
 				}
 			}
-		}
+		 }
+
+		# 追求高家族团结的AI避免剥夺同族头衔。
+		modifier = {
+			scope:puppet_or_actor = {
+				government_has_flag = government_uses_house_unity
+				exists = house
+			}
+			scope:recipient = {
+				government_has_flag = government_uses_house_unity
+				house ?= scope:puppet_or_actor.house
+			}
+			scope:puppet_or_actor = { ai_wants_high_unity = yes }
+			add = -1000 }
 
 		# 若拒绝会使半个政权反叛，则不撤销；囚犯、男爵和合法撤销除外，因为不会引发内战。
 		modifier = {
@@ -1578,6 +1617,11 @@ revoke_title_interaction = {
 			}
 			factor = 0
 		}
+	 modifier = {
+			scope:actor = {
+				gg_hre_causes_additional_tyranny_trigger = { TARGET = scope:recipient }
+} factor = 0
+		}
 	}
 }
 
@@ -1660,6 +1704,15 @@ retract_vassal_interaction = {
 			}
 			trigger_else_if = {
 				limit = {
+					government_has_flag = government_is_republic
+				}
+				custom_description = {
+					text = "has_law_allowing_vassal_retraction_republic"
+					has_realm_law_flag = vassal_retraction_allowed
+				}
+			}
+			trigger_else_if = {
+				limit = {
 					realm_law_use_church_authority = yes
 				}
 				custom_description = {
@@ -1681,7 +1734,7 @@ retract_vassal_interaction = {
 			text = cannot_take_overt_hostile_actions_against_diarch.tt
 			NOT = { scope:recipient ?= scope:puppet_or_actor.diarch }
 		}
-	
+
 		trigger_if = { limit = { scope:is_puppet_action ?= yes } scope:puppet_or_actor = { influence >= tca_tongpan_influence_surcharge_value } }
 	}
 
@@ -1708,7 +1761,7 @@ retract_vassal_interaction = {
 				multiply = 0
 			}
 		}
-	
+
 		influence = { value = 0
 			add = scope:puppet_or_actor.tca_tongpan_influence_surcharge_value
 			if = { limit = { scope:is_puppet_action ?= yes } multiply = 0 }
@@ -1750,10 +1803,17 @@ retract_vassal_interaction = {
 
 	on_decline = {
 		scope:puppet_or_actor = { vassal_revocation_tyranny_effect = yes }
-		war_for_retraction_effect = {
-			LIEGE = scope:puppet_or_actor
-			REBEL = scope:recipient
-			SUBVASSAL = scope:secondary_recipient
+		if = {
+			limit = {
+				scope:puppet_or_actor = {
+					NOT = { has_realm_law_flag = republic_vassal_refusal_allowed }
+				}
+			}
+			war_for_retraction_effect = {
+				LIEGE = scope:puppet_or_actor
+				REBEL = scope:recipient
+				SUBVASSAL = scope:secondary_recipient
+			}
 		}
 		scope:recipient = {
 			add_opinion = {
@@ -2063,6 +2123,15 @@ retract_vassal_interaction = {
 			}
 			desc = VASSALS_REFUSAL_indomitable_azatani
 		}
+		# 教皇派与皇帝派局势修正。
+		modifier = {
+			add = -50
+			OR = {
+				gg_first_and_second_are_opposite_sides_trigger = { FIRST = scope:actor SECOND = scope:recipient }
+				scope:recipient = { is_gg_undecided_trigger = yes }
+			}
+			desc = RECIPIENT_IS_NOT_YOUR_GG
+		}
 	}
 
 	#使用牵制。
@@ -2315,9 +2384,7 @@ retract_vassal_interaction = {
 			scope:puppet_or_actor = {
 				OR = {
 					has_relation_friend = scope:recipient
-					has_relation_best_friend = scope:recipient
 					has_relation_lover = scope:recipient
-					has_relation_soulmate = scope:recipient
 					is_heir_of = scope:recipient
 				}
 			}
@@ -2377,6 +2444,13 @@ retract_vassal_interaction = {
 					highest_held_title_tier = tier_barony
 				}
 			}
+		}
+
+		modifier = {
+			scope:actor = {
+				gg_hre_causes_additional_tyranny_trigger = { TARGET = scope:recipient }
+			}
+			factor = 0
 		}
 	}
 }
@@ -2550,7 +2624,13 @@ imprison_interaction = {
 						is_close_or_extended_family_of = scope:puppet_or_actor.top_liege
 					}
 				}
-			}
+			 }
+			trigger_if = {
+				limit = {
+					government_has_flag = government_is_republic
+					scope:recipient = { government_has_flag = government_is_republic }
+				}
+				has_imprisonment_reason = scope:recipient }
 		}
 		imprison_neutral_is_valid_showing_failures_only_triggers_trigger = yes
 		trigger_if = {
@@ -2591,7 +2671,7 @@ imprison_interaction = {
 				}
 			}
 		}
-	
+
 		trigger_if = { limit = { scope:is_puppet_action ?= yes } scope:puppet_or_actor = { influence >= tca_tongpan_influence_surcharge_value } }
 	}
 
@@ -2692,7 +2772,7 @@ imprison_interaction = {
 				multiply = 0
 			}
 		}
-	
+
 		influence = { value = 0
 			add = scope:puppet_or_actor.tca_tongpan_influence_surcharge_value
 			if = { limit = { scope:is_puppet_action ?= yes } multiply = 0 }
@@ -2791,7 +2871,22 @@ imprison_interaction = {
 					}
 				}
 			}
-		}
+		 if = {
+				limit = {
+					scope:recipient = {
+						NOR = {
+							is_guelph_leader_trigger = yes
+							is_ghibelline_leader_trigger = yes
+						}
+					}
+				}
+				gg_triggered_catalyst_effect = {
+					ACTOR = scope:actor
+					RECIPIENT = scope:recipient
+					CATALYST = catalyst_attempt_imprison_opposite_party
+				}
+			}
+			gg_involvement_catalyst_effect = yes }
 		if = {
 			limit = { scope:hook = yes }
 			scope:puppet_or_actor = { use_hook = scope:recipient }
@@ -2851,7 +2946,7 @@ imprison_interaction = {
 				NOT = { scope:puppet_or_actor = { has_imprisonment_reason = scope:recipient } }
 				scope:recipient = { is_landed_or_landless_administrative_or_theocratic = yes }
 			}
-			add_clan_unity_interaction_effect = {
+			 add_house_unity_interaction_effect  = {
 				CHARACTER = scope:puppet_or_actor
 				TARGET = scope:recipient
 				VALUE = major_unity_loss
@@ -2864,7 +2959,7 @@ imprison_interaction = {
 				NOT = { scope:puppet_or_actor = { has_imprisonment_reason = scope:recipient } }
 				scope:recipient = { is_landed_or_landless_administrative_or_theocratic = no }
 			}
-			add_clan_unity_interaction_effect = {
+			 add_house_unity_interaction_effect  = {
 				CHARACTER = scope:puppet_or_actor
 				TARGET = scope:recipient
 				VALUE = medium_unity_loss
@@ -2873,7 +2968,7 @@ imprison_interaction = {
 			}
 		}
 		else = { # 有正当理由时仅损失少量团结度：无论是否犯罪，对方仍是家人。
-			add_clan_unity_interaction_effect = {
+			 add_house_unity_interaction_effect  = {
 				CHARACTER = scope:puppet_or_actor
 				TARGET = scope:recipient
 				VALUE = minor_unity_loss
@@ -3192,7 +3287,12 @@ imprison_interaction = {
 					}
 					remove_character_flag = flag_hostile_actions_disabled_delay
 				}
-			}
+			 gg_triggered_catalyst_effect = {
+					ACTOR = scope:actor
+					RECIPIENT = scope:recipient
+					CATALYST = catalyst_attempt_imprison_opposite_party
+				}
+				gg_involvement_catalyst_effect = yes }
 
 			# 氏族政体下，此互动影响团结度。
 			if = { # 无拘捕理由且目标有地时，团结度损失较大。
@@ -3202,7 +3302,7 @@ imprison_interaction = {
 					}
 					scope:recipient = { is_landed_or_landless_administrative_or_theocratic  = yes }
 				}
-				add_clan_unity_interaction_effect = {
+				 add_house_unity_interaction_effect  = {
 					CHARACTER = scope:puppet_or_actor
 					TARGET = scope:recipient
 					VALUE = major_unity_loss
@@ -3217,7 +3317,7 @@ imprison_interaction = {
 					}
 					scope:recipient = { is_landed_or_landless_administrative_or_theocratic  = no }
 				}
-				add_clan_unity_interaction_effect = {
+				 add_house_unity_interaction_effect  = {
 					CHARACTER = scope:puppet_or_actor
 					TARGET = scope:recipient
 					VALUE = medium_unity_loss
@@ -3226,7 +3326,7 @@ imprison_interaction = {
 				}
 			}
 			else = { # 有正当理由时仅损失少量团结度：无论是否犯罪，对方仍是家人。
-				add_clan_unity_interaction_effect = {
+				 add_house_unity_interaction_effect  = {
 					CHARACTER = scope:puppet_or_actor
 					TARGET = scope:recipient
 					VALUE = miniscule_unity_loss
@@ -3383,7 +3483,7 @@ imprison_interaction = {
 			add = 50
 			scope:puppet_or_actor = {
 				has_perk = prison_feudal_complex_perk
-			}
+			 NOT = { government_has_flag = government_is_merchant } }
 			desc = AI_PRISON_FEUDAL_COMPLEX_PERK
 		}
 		modifier = { #我是国王！
@@ -3632,7 +3732,14 @@ imprison_interaction = {
 			scope:recipient = { has_character_modifier = ach_intent_imprisonment_modifier }
 			desc = ach_host_intent_imprison_reason
 		}
-	}
+	 modifier = {
+			add = -50
+			OR = {
+				gg_first_and_second_are_opposite_sides_trigger = { FIRST = scope:actor SECOND = scope:recipient }
+				scope:recipient = { is_gg_undecided_trigger = yes }
+			}
+			desc = RECIPIENT_IS_NOT_YOUR_GG
+		} }
 
 	# AI 行为。
 	ai_targets = {
@@ -3651,7 +3758,15 @@ imprison_interaction = {
 		kingdom = 10
 		empire = 10
 		hegemony = 10
-	}
+	 }
+	ai_frequency_by_tier_government_override = {
+		government = merchant_government
+		barony = 0
+		county = 108
+		duchy = 0
+		kingdom = 0
+		empire = 0
+		hegemony = 0 }
 
 	ai_will_do = {
 		base = -100
@@ -3711,8 +3826,9 @@ imprison_interaction = {
 						intrigue > scope:recipient.intrigue
 						intrigue >= 12
 					}
-					has_perk = prison_feudal_complex_perk
-					scope:recipient = {
+					 AND = { has_perk = prison_feudal_complex_perk
+					 NOT = { government_has_flag = government_is_merchant }
+			} scope:recipient = {
 						has_dread_level_towards = {
 							target = scope:puppet_or_actor
 							level >= 1
@@ -3765,9 +3881,8 @@ imprison_interaction = {
 				OR = {
 					has_secret_relation_lover = scope:recipient
 					has_relation_lover = scope:recipient
-					has_relation_soulmate = scope:recipient
-					has_relation_friend = scope:recipient
-					has_relation_best_friend = scope:recipient
+
+					has_relation_friend    = scope:recipient
 					opinion = {
 						target = scope:recipient
 						value > very_high_positive_opinion
@@ -3780,9 +3895,8 @@ imprison_interaction = {
 		modifier = { # 不拘捕自己的子女，除非对方是仇敌或死敌。
 			scope:recipient = {
 				is_child_of = scope:puppet_or_actor
-				NOR = {
-					has_relation_rival = scope:puppet_or_actor
-					has_relation_nemesis = scope:puppet_or_actor
+				 NOT  = {
+					has_relation_rival    = scope:puppet_or_actor
 				}
 			}
 			add = -1000
@@ -3792,8 +3906,7 @@ imprison_interaction = {
 			scope:recipient = {
 				is_spouse_of = scope:puppet_or_actor
 				NOR = {
-					has_relation_rival = scope:puppet_or_actor
-					has_relation_nemesis = scope:puppet_or_actor
+					has_relation_rival    = scope:puppet_or_actor
 					exposed_cheating_on_spouse_trigger = { SPOUSE = scope:puppet_or_actor }
 				}
 			}
@@ -3811,8 +3924,7 @@ imprison_interaction = {
 						scope:puppet_or_actor = { has_revoke_title_reason = scope:recipient }
 					}
 					is_a_faction_member = yes
-					has_relation_rival = scope:puppet_or_actor
-					has_relation_nemesis = scope:puppet_or_actor
+					has_relation_rival    = scope:puppet_or_actor
 					exposed_cheating_on_spouse_trigger = { SPOUSE = scope:puppet_or_actor }
 					scope:puppet_or_actor = { # 对密谋同谋不作区别，一律倾向于拘捕。
 						any_targeting_scheme = {
@@ -4041,7 +4153,9 @@ imprison_interaction = {
 		}
 
 		# 天朝扩展：整体上更谨慎对待家族集团。
-		house_bloc_tyranny_war_modifiers = yes
+		 evaluate_action_decreasing_house_unity = {
+			VALUE = 100
+		} house_bloc_tyranny_war_modifiers = yes
 
 		modifier = { # 避免在大型活动期间引发暴政战争。
 			factor = 0
@@ -4066,8 +4180,11 @@ imprison_interaction = {
 			scope:recipient = { government_has_flag = government_is_landless_adventurer }
 		}
 
-		evaluate_action_decreasing_house_unity = {
-			VALUE = 100
+		 modifier  = {
+			 scope:actor  =  {
+				gg_hre_causes_additional_tyranny_trigger = { TARGET = scope:recipient }
+			}
+			factor = 0
 		}
 	}
 }
@@ -4160,7 +4277,7 @@ execute_prisoner_interaction = {
 				ai_vengefulness >= medium_positive_ai_value
 				OR = {
 					has_relation_rival = scope:recipient # 处决仇敌。
-					has_relation_nemesis = scope:recipient # 处决仇敌。
+					   # 处决仇敌。
 					scope:recipient = {
 						is_spouse_of = scope:puppet_or_actor
 						exposed_cheating_on_spouse_trigger = { SPOUSE = scope:puppet_or_actor }
@@ -4183,7 +4300,7 @@ execute_prisoner_interaction = {
 				ai_vengefulness >= very_high_positive_ai_value
 				OR = {
 					has_relation_rival = scope:recipient # 处决仇敌。
-					has_relation_nemesis = scope:recipient # 处决仇敌。
+					   # 处决仇敌。
 					scope:recipient = {
 						is_spouse_of = scope:puppet_or_actor
 						exposed_cheating_on_spouse_trigger = { SPOUSE = scope:puppet_or_actor }
@@ -4194,12 +4311,18 @@ execute_prisoner_interaction = {
 		#scope:target 曾引发政权内乱。
 		character_hates_scope_due_to_strife_modifier = { TARGET = scope:recipient }
 		modifier = {
-			factor = 0
+			 add = 40
+			gg_target_house_head_is_opposite_side_trigger = {
+				ACTOR = scope:puppet_or_actor
+				TARGET = scope:recipient
+			}
+			desc = HOUSE_HEAD_IS_OPPOSING_GG
+		}
+		modifier = { factor = 0
 			scope:puppet_or_actor = {
 				NOR = { # 除非有某种理由，否则不处决。
 					has_execute_reason = scope:recipient
-					has_relation_rival = scope:recipient # 处决仇敌。
-					has_relation_nemesis = scope:recipient # 处决仇敌。
+					has_relation_rival    = scope:recipient # 处决仇敌。
 					scope:recipient = {
 						is_spouse_of = scope:puppet_or_actor
 						exposed_cheating_on_spouse_trigger = { SPOUSE = scope:puppet_or_actor }
@@ -4423,7 +4546,14 @@ execute_prisoner_interaction = {
 	}
 
 	is_valid_showing_failures_only = {
-		scope:recipient = { NOT = { has_strong_hook = scope:puppet_or_actor } }
+		 scope:puppet_or_actor = {
+			trigger_if = {
+				limit = {
+					gdp_is_assembly_head_trigger = yes
+				}
+				gdp_republic_execution_allowed_trigger = { TARGET = scope:recipient }
+			}
+		} scope:recipient = { NOT = { has_strong_hook = scope:puppet_or_actor } }
 		scope:recipient = {
 			custom_description = {
 				text = "currently_being_tortured"
@@ -4463,7 +4593,7 @@ execute_prisoner_interaction = {
 	cost = {
 		# 通常免费，但某些分权类型要求支付费用。
 		prestige = liege_diarchy_surcharge_interaction_execute_prisoner_interaction_value
-	
+
 		influence = { value = 0
 			add = scope:puppet_or_actor.tca_tongpan_influence_surcharge_value
 		}
@@ -4565,7 +4695,12 @@ execute_prisoner_interaction = {
 					value = yes
 				}
 			}
-		}
+		 gg_triggered_catalyst_effect = {
+				ACTOR = scope:actor
+				RECIPIENT = scope:recipient
+				CATALYST = catalyst_execute_opposite_party
+			}
+			gg_involvement_catalyst_would_invalidate_situation_tooltip_effect = yes }
 		# 接下来处理其余效果。
 		if = {
 			limit = { scope:recipient = { is_imprisoned_by = scope:puppet_or_actor } }
@@ -4929,7 +5064,9 @@ execute_prisoner_interaction = {
 				}
 			}
 
-			if = {
+			 scope:puppet_or_actor = {
+				gdp_consume_execution_approval_effect = { TARGET = scope:recipient }
+			} if = {
 				limit = { always = scope:execution_devour }
 				scope:puppet_or_actor = {
 					custom_tooltip = devour_as_execution_tooltip
@@ -4953,7 +5090,18 @@ execute_prisoner_interaction = {
 				}
 				scope:puppet_or_actor = {
 					add_piety = miniscule_piety_value
+				 }
+			}
+
+			# 共和国处决提供威望与宗族威望。
+			if = {
+				limit = {
+					scope:puppet_or_actor = {
+						house ?= { has_house_aspiration_parameter = ambition_execute_and_banish_provide_bonuses }
+					}
 				}
+				scope:puppet_or_actor = {
+					gdp_ambition_execute_and_banish_bonus_effect = yes }
 			}
 
 			scope:puppet_or_actor = {
@@ -4967,7 +5115,7 @@ execute_prisoner_interaction = {
 				}
 			}
 		}
-	
+
         tca_test_record_tongpan_execution_effect = yes
 	}
 

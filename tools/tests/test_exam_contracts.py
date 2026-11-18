@@ -38,15 +38,15 @@ class ExamContractTests(unittest.TestCase):
                 if key == 'activity_local_examination':
                     region_call = 'tca_exam_local_guest_region_trigger = yes'
                     self.assertEqual(patched.count(region_call), 1)
-                    patched = patched.replace(region_call, 'default_location.county.empire = { OR = { this = scope:host.capital_county.empire any_title_to_title_neighboring_kingdom = { this = scope:host.capital_county.kingdom } } }')
+                    patched = patched.replace(region_call, 'exists = scope:host.capital_county default_location.county.empire = { OR = { this = scope:host.capital_county.empire any_title_to_title_neighboring_kingdom = { this = scope:host.capital_county.kingdom } } }')
                     # 同地规则本身保持原版，只为死亡/缺地点提供安全拒绝；原生用例验证正反分支。
                     location_call = 'tca_exam_entourage_same_location_trigger = { OWNER = scope:owner }'
                     self.assertEqual(patched.count(location_call), 1)
                     patched = patched.replace(location_call, 'location = scope:owner.location')
-                    # on_end七处与已报错阶段三处均为正向查询；归一化后仍逐token精确比原版。
+                    # 新版统一结算后，所有人物正向子集查询均保护活动关联；归一化后逐token比较。
                     membership = re.compile(r'tca_exam_member_in_activity_subset_trigger = \{ NAME = (\w+) \}')
                     names = membership.findall(patched)
-                    self.assertCountEqual(names, ['guests', 'guests', 'entrants', 'entrants', 'scoreboard', 'failees', 'failees', 'imperial_examiners', 'entrants', 'failees'])
+                    self.assertCountEqual(names, ['guests', 'guests', 'entrants', 'entrants', 'entrants', 'entrants', 'entrants', 'scoreboard', 'failees', 'imperial_examiners', 'entrants', 'failees', 'failees', 'imperial_examiners', 'guests', 'entrants'])
                     patched = membership.sub(r'is_in_guest_subset = { name = \1 }', patched)
                     patched = patched.replace('tca_exam_activity_gather_guests_effect = yes', 'imperial_examination_gather_guests_effect = yes')
                     patched = patched.replace('tca_exam_activity_scoreboard_setup_effect = yes', 'metropolitan_examination_scoreboard_setup_effect = yes')

@@ -86,7 +86,6 @@ execute_prisoner_interaction = {
 				ai_vengefulness >= medium_positive_ai_value
 				OR = {
 					has_relation_rival = scope:recipient # Execute rivals
-					has_relation_nemesis = scope:recipient # Execute rivals
 					scope:recipient = {
 						is_spouse_of = scope:puppet_or_actor
 						exposed_cheating_on_spouse_trigger = { SPOUSE = scope:puppet_or_actor }
@@ -109,7 +108,6 @@ execute_prisoner_interaction = {
 				ai_vengefulness >= very_high_positive_ai_value
 				OR = {
 					has_relation_rival = scope:recipient # Execute rivals
-					has_relation_nemesis = scope:recipient # Execute rivals
 					scope:recipient = {
 						is_spouse_of = scope:puppet_or_actor
 						exposed_cheating_on_spouse_trigger = { SPOUSE = scope:puppet_or_actor }
@@ -120,12 +118,19 @@ execute_prisoner_interaction = {
 		#Scope:target has caused internal strife in the realm
 		character_hates_scope_due_to_strife_modifier = { TARGET = scope:recipient }
 		modifier = {
+			add = 40
+			gg_target_house_head_is_opposite_side_trigger = {
+				ACTOR = scope:puppet_or_actor
+				TARGET = scope:recipient
+			}
+			desc = HOUSE_HEAD_IS_OPPOSING_GG
+		}
+		modifier = {
 			factor = 0
 			scope:puppet_or_actor = {
 				NOR = { # Do not execute unless you have some sort of reason to do it
 					has_execute_reason = scope:recipient
 					has_relation_rival = scope:recipient # Execute rivals
-					has_relation_nemesis = scope:recipient # Execute rivals
 					scope:recipient = {
 						is_spouse_of = scope:puppet_or_actor
 						exposed_cheating_on_spouse_trigger = { SPOUSE = scope:puppet_or_actor }
@@ -349,6 +354,14 @@ execute_prisoner_interaction = {
 	}
 
 	is_valid_showing_failures_only = {
+		scope:puppet_or_actor = {
+			trigger_if = {
+				limit = {
+					gdp_is_assembly_head_trigger = yes
+				}
+				gdp_republic_execution_allowed_trigger = { TARGET = scope:recipient }
+			}
+		}
 		scope:recipient = { NOT = { has_strong_hook = scope:puppet_or_actor } }
 		scope:recipient = {
 			custom_description = {
@@ -487,6 +500,13 @@ execute_prisoner_interaction = {
 					value = yes
 				}
 			}
+			#Guelphs & Ghibellines
+			gg_triggered_catalyst_effect = {
+				ACTOR = scope:actor
+				RECIPIENT = scope:recipient
+				CATALYST = catalyst_execute_opposite_party
+			}
+			gg_involvement_catalyst_would_invalidate_situation_tooltip_effect = yes
 		}
 		# Now, the rest of it.
 		if = {
@@ -850,6 +870,9 @@ execute_prisoner_interaction = {
 					EXECUTIONER = scope:puppet_or_actor
 				}
 			}
+			scope:puppet_or_actor = {
+				gdp_consume_execution_approval_effect = { TARGET = scope:recipient }
+			}
 
 			if = {
 				limit = { always = scope:execution_devour }
@@ -875,6 +898,18 @@ execute_prisoner_interaction = {
 				}
 				scope:puppet_or_actor = {
 					add_piety = miniscule_piety_value
+				}
+			}
+
+			# GDP - Republic: Executions grants prestige and renown
+			if = {
+				limit = {
+					scope:puppet_or_actor = {
+						house ?= { has_house_aspiration_parameter = ambition_execute_and_banish_provide_bonuses }
+					}
+				}
+				scope:puppet_or_actor = {
+					gdp_ambition_execute_and_banish_bonus_effect = yes
 				}
 			}
 

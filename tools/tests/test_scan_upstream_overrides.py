@@ -10,6 +10,29 @@ from scan_upstream_overrides import main, scan
 
 
 class CoverageScanTests(unittest.TestCase):
+    def test_registered_whole_file_classifies_its_native_objects(self):
+        path = "common/on_action/native.txt"
+        self.write(self.game / path, "on_change = { effect = {} }\non_other = {}")
+        self.write(self.mod / path, "on_change = { effect = { always = yes } }\non_other = {}")
+        self.registry["file_overrides"] = [{"key": "tca_native", "vanilla": path,
+            "mod": path, "baseline": "tools/baselines/native.txt"}]
+        self.save_registry()
+        code, output, error = self.run_cli("--json")
+        self.assertEqual(code, 1, error)  # 同路径提示仍要求人工审阅，登记不隐去该提示。
+        report = json.loads(output)
+        self.assertEqual(report["counts"]["unregistered"], 0)
+        self.assertEqual(report["counts"]["registered_file_override"], 2)
+
+    def test_parse_error_reports_incomplete_scan_and_other_collisions(self):
+        self.write(self.game / "events/broken.txt", "broken.1 = {")
+        self.write(self.game / "common/script_values/native.txt", "shared = 1")
+        self.write(self.mod / "common/script_values/mod.txt", "shared = 2")
+        code, output, error = self.run_cli("--json")
+        self.assertEqual(code, 2, error)
+        report = json.loads(output)
+        self.assertEqual(report["counts"]["unregistered"], 1)
+        self.assertIn("unclosed", report["scan_errors"][0])
+
     def setUp(self):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)

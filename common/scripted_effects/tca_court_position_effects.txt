@@ -169,6 +169,20 @@ tca_court_dispatch_position_effect = {
         tca_court_fill_position_effect = { POSITION = $POSITION$ BASE = $BASE$ BIAS = $BIAS$ ADMISSION = $ADMISSION$ SKILL = $SKILL$ OFFICE = $OFFICE$ KEEP_CURRENT = $KEEP_CURRENT$ }
     }
 }
+# 调用者已冻结官署与候选清单；消费完整最高空缺队列，不新增候选或重新扫描空缺。
+# 共用tca_court_vacant_offices及tca_court_candidates；保存scope:target_liege及scope:tca_chosen_officer，沿用scope:tca_court_dispatch_importance与scope:tca_court_dispatched数值。
+# 即使某个高位空缺无合格者也消费该条；清单最终清理由调用者负责。
+tca_court_dispatch_pool_effect = {
+    while = { limit = { list_size:tca_court_vacant_offices > 0 list_size:tca_court_candidates > 0 }
+                ordered_in_list = { list = tca_court_vacant_offices order_by = tca_court_next_vacancy_value max = 1 check_range_bounds = no
+                    save_scope_as = target_liege
+                    save_scope_value_as = { name = tca_court_dispatch_importance value = tca_court_next_vacancy_value }
+                    clear_saved_scope = tca_court_dispatched
+                    tca_court_visit_positions_effect = { VISITOR = tca_court_dispatch_position_effect }
+                    if = { limit = { tca_court_next_vacancy_value = 0 } remove_from_list = tca_court_vacant_offices }
+                }
+            }
+}
 # 独立天朝最高领主作用域；只有此入口建立全朝清单，原季度与开局入口委派到这里。
 tca_court_quarterly_fill_effect = {
     if = { limit = { NOT = { has_character_flag = tca_court_batch_active } }
@@ -191,15 +205,7 @@ tca_court_quarterly_fill_effect = {
                 every_courtier = { tca_court_collect_officer_effect = yes }
             }
             # 每轮最多移除一个冻结职位，空缺数量有限；任何失败也消费该条，不产生重入循环。
-            while = { limit = { list_size:tca_court_vacant_offices > 0 list_size:tca_court_candidates > 0 }
-                ordered_in_list = { list = tca_court_vacant_offices order_by = tca_court_next_vacancy_value max = 1 check_range_bounds = no
-                    save_scope_as = target_liege
-                    save_scope_value_as = { name = tca_court_dispatch_importance value = tca_court_next_vacancy_value }
-                    clear_saved_scope = tca_court_dispatched
-                    tca_court_visit_positions_effect = { VISITOR = tca_court_dispatch_position_effect }
-                    if = { limit = { tca_court_next_vacancy_value = 0 } remove_from_list = tca_court_vacant_offices }
-                }
-            }
+            tca_court_dispatch_pool_effect = yes
         }
         # 无候选时也清除全部尚未消费的冻结变量，不让下季读取旧权重。
         tca_court_visit_positions_effect = { VISITOR = tca_court_clear_snapshot_effect }
@@ -260,7 +266,10 @@ tca_court_appoint_selected_effect = {
         add_character_flag = tca_military_appointment_allowed
     }
     scope:tca_chosen_officer = { tca_court_move_to_office_effect = { OWNER = scope:target_liege } }
-    appoint_court_position = { recipient = scope:tca_chosen_officer court_position = $POSITION$ }
+    # 迁隶回调可能改变实际归属；进入目标官署后才调用原生命令，否则由下方统一回滚。
+    if = { limit = { scope:tca_chosen_officer = { tca_court_member_of_office_trigger = { OWNER = scope:target_liege } } }
+        appoint_court_position = { recipient = scope:tca_chosen_officer court_position = $POSITION$ }
+    }
     if = { limit = { scope:tca_chosen_officer = { has_court_position = $POSITION$ tca_court_member_of_office_trigger = { OWNER = scope:target_liege } } }
         if = { limit = { is_ai = no }
             send_interface_message = { type = msg_court_position_gained title = tca_court_appointment_title desc = tca_court_appointment_desc left_icon = scope:tca_chosen_officer }

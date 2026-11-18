@@ -558,7 +558,7 @@ window = {
 					using = Animation_Character_Window_Refresh
 
 					portrait_head_small = {
-						name = "religious_superior_portrait" #tutorial uses this
+						name = "religious_superior_portrait" # 供教程定位。
 						blockoverride "portrait_transformation"
 						{
 							portrait_scale = { -1 1 }
@@ -624,7 +624,7 @@ window = {
 					using = Animation_Character_Window_Refresh
 
 					portrait_head_small = {
-						name = "liege_portrait" #tutorial uses this
+						name = "liege_portrait" # 供教程定位。
 						blockoverride "portrait_transformation"
 						{
 							portrait_scale = { -1 1 }
@@ -759,7 +759,7 @@ window = {
 
 						text_label_center = {
 							visible = "[Not( Character.IsHostage )]"
-							text = "[suzerain|E]"
+							text =  "SUZERAIN_OR_PATRON"
 							margin_left = 28
 
 							# 朝贡图标
@@ -1314,7 +1314,7 @@ window = {
 						}
 
 						vbox = {
-							visible = "[Or( Character.GetGovernment.HasMechanic( 'administrative' ), And( And( Not( Character.HasLandedTitles ), Not( Character.HasLiege ) ), GetPlayer.GetGovernment.HasMechanic( 'administrative' ) ) )]"
+							visible =  "[And( Not( Character.IsTheocraticLessee ), Or( Character.GetGovernment.HasMechanic( 'administrative' ), And( And( Not( Character.HasLandedTitles ), Not( Character.HasLiege ) ), GetPlayer.GetGovernment.HasMechanic( 'administrative' ) ) ) )]"
 							margin_right = 3
 							spacing = -3
 
@@ -1675,10 +1675,10 @@ window = {
 						}
 
 						vbox = {
-							datacontext = "[CharacterWindow.GetCharacter]"
+							 hbox = { datacontext = "[CharacterWindow.GetCharacter]"
 							visible = "[And( Not( Character.GetPrimaryTitle.HasFaction ), And( Character.HasLandedTitles, Character.IsAlive ) )]"
 							tooltip = "[Character.GetDomainLimitTooltip]"
-							spacing = -2
+							 margin = { 4 4 } spacing =  4
 
 							background = {
 								visible = "[GreaterThan_int32( Character.GetDomainSize, Character.GetDomainLimit )]"
@@ -1699,7 +1699,13 @@ window = {
 							}
 						}
 
-						flowcontainer = {
+						 hbox_trade_posts = {
+								visible = "[And(Character.CanOwnTradePosts(), Character.GetGovernment.HasGovernmentFlag( 'government_has_trade_posts' ) )]"
+								margin = { 4 4 }
+								spacing = 4
+								using = Animation_Character_Window_Refresh
+							}
+						} flowcontainer = {
 							margin = { 3 2 }
 							ignoreinvisible = yes
 
@@ -1709,11 +1715,15 @@ window = {
 
 							flowcontainer = {
 								visible = "[Character.IsTheocraticLessee]"
-								tooltip = "CV_THEOCRACY_LESSEE_TOOLTIP"
+
 								spacing = -2
 								direction = horizontal
 
-								background = {
+								 tooltipwidget = {
+									widget_value_breakdown_tooltip = {
+										datacontext = "[Character.GetTheocraticLesseeBreakdown]"
+									}
+								} background = {
 									using = Background_Area_Dark
 									margin_right = 10
 								}
@@ -1760,7 +1770,7 @@ window = {
 							layoutpolicy_horizontal = expanding
 							margin_right = 10
 
-							using = Animation_Character_Window_Refresh
+							 spacing = 8 using = Animation_Character_Window_Refresh
 
 							vbox = {
 								visible = "[Not(Character.HasLandedTitles)]"
@@ -1778,9 +1788,20 @@ window = {
 
 								text_single = {
 									name = "government_type"
-									layoutpolicy_horizontal = expanding
+									 visible = "[Not( Character.IsTrader )]" layoutpolicy_horizontal = expanding
 									text = "[Character.GetLocationDesc]"
-									default_format = "#low"
+									 default_format = "#low"
+									format_override = { high medium }
+									format_override = { V medium }
+									align = nobaseline
+									autoresize = no
+								}
+
+								text_single = {
+									name = "trader_location"
+									visible = "[Character.IsTrader]"
+									layoutpolicy_horizontal = expanding
+									text = "[Character.Custom('GetTraderLocationDesc')]" default_format = "#low"
 									format_override = { high medium }
 									format_override = { V medium }
 									align = nobaseline
@@ -1895,7 +1916,7 @@ window = {
 									text = "[Character.GetTreasury|0]"
 									align = nobaseline
 									default_format = "#high"
-									using = Font_Size_Medium
+
 								}
 
 								text_single = {
@@ -1910,9 +1931,65 @@ window = {
 								}
 							}
 
-							spacer = {
-								visible = "[And( Character.HasTreasury, GreaterThan_int32( GetDataModelSize(CharacterWindow.GetDiplomacyItems), '(int32)0' ) )]"
-								size = { 10 0 }
+							 hbox = {
+								ignoreinvisible = yes
+
+								datacontext = "[Character.GetActiveLawInGroupWithFlag('company_size')]"
+								visible = "[Or( Character.GetActiveLawInGroupWithFlag('company_size').IsValid, GreaterThan_int32( Character.GetCurrentProfitRouteCount, '(int32)0' ) )]"
+
+								background = {
+									margin = { 6 0 }
+									using = Background_Area_Titles
+								}
+
+								# 商团规模。
+								hbox = {
+									visible = "[Character.GetActiveLawInGroupWithFlag('company_size').IsValid]"
+									margin = { 4 4 }
+									spacing = 4
+
+									using = Animation_Character_Window_Refresh
+
+									tooltipwidget = {
+										general_law_tooltip = {}
+									}
+									using = tooltip_ne
+
+									widget_company_size = {
+										name = "company_size_icon"
+
+										blockoverride "company_size_tooltip" {}
+									}
+								}
+
+								# 最高贸易专长类别。
+								widget_trade_good_category_tiny = {
+									datacontext = "[Character.GetHighestTradeGoodCategory]"
+									visible = "[TradeGoodCategory.IsValid]"
+
+									blockoverride "title_text" {
+										margin = { 0 5 }
+										text = TRADE_GOOD_CATEGORY_HIGHEST_LEVEL
+										default_format = "#T"
+									}
+
+									blockoverride "expertise_desc" {
+										cooltip_paragraph = {
+											text = "TRADE_GOOD_CATEGORY_HIGHEST_LEVEL_DESC"
+											default_format = "#weak"
+										}
+									}
+
+								}
+
+								# 营利商路。
+								hbox_profit_routes = {
+									using = Animation_Character_Window_Refresh
+									using = tooltip_ne
+								}
+							} spacer = {
+								visible =  "[GreaterThan_int32( GetDataModelSize(CharacterWindow.GetDiplomacyItems), '(int32)0' )]"
+								size = {  2  0 }
 							}
 						}
 
@@ -2000,7 +2077,7 @@ window = {
 			datacontext = "[CharacterWindow.GetCharacter]"
 			visible = "[And(CharacterWindow.AreNoneExpanded, Not( GreaterThan_CFixedPoint( GetPlayer.MakeScope.Var('hide_ui_character_sheet_bottom').GetValue, '(CFixedPoint)0' ) ))]"
 			layoutpolicy_horizontal = expanding
-			using = Animation_ShowHide_Quick
+			using =  Animation_Tab_Switch
 
 			button_tab = {
 				name = "family_button"
@@ -3613,7 +3690,7 @@ window = {
 											spacing = 10
 
 											text_single = {
-												visible = "[NotEqualTo_int32(Character.GetPrimaryTitle.GetTierFrame, '(int32)2')]" #nonbaron
+												visible =  "[And(NotEqualTo_int32(Character.GetPrimaryTitle.GetTierFrame, '(int32)2'), Character.IsLandedRuler)]"  # 排除男爵。
 												layoutpolicy_horizontal = expanding
 
 												text = "REALM_WINDOW_SIZE"
@@ -3724,7 +3801,7 @@ window = {
 										spacing = 10
 
 										text_single = {
-											visible = "[NotEqualTo_int32(Character.GetPrimaryTitle.GetTierFrame, '(int32)2')]" #nonbaron
+											visible = "[NotEqualTo_int32(Character.GetPrimaryTitle.GetTierFrame, '(int32)2')]" # 排除男爵。
 											layoutpolicy_horizontal = expanding
 
 											text = "REALM_WINDOW_SIZE"
@@ -3841,8 +3918,9 @@ window = {
 						datamodel_wrap = 6
 
 						item = {
-							icon_trait = {
-								blockoverride "icon_size"
+							 widget = {
+								size = { 90 105 } icon_trait = {
+								 parentanchor = top|hcenter blockoverride "icon_size"
 								{
 									size = { 70 70 }
 								}
@@ -3850,13 +3928,13 @@ window = {
 								text_multi = {
 									parentanchor = bottom|hcenter
 									widgetanchor = top|hcenter
-									position = { 0 -5 }
+									position = { 0  -3  }
 									autoresize = yes
 									max_width = 80
 									text = "[Trait.GetNameNoTooltip(Character.Self)]"
 									default_format = "#high"
 									align = hcenter
-								}
+								 } }
 							}
 						}
 					}
@@ -3874,8 +3952,9 @@ window = {
 						datamodel_wrap = 6
 
 						item = {
-							icon_trait = {
-								blockoverride "icon_size"
+							 widget = {
+								size = { 90 105 } icon_trait = {
+								 parentanchor = top|hcenter blockoverride "icon_size"
 								{
 									size = { 70 70 }
 								}
@@ -3883,12 +3962,13 @@ window = {
 								text_multi = {
 									parentanchor = bottom|hcenter
 									widgetanchor = top|hcenter
-									position = { 0 -5 }
-									size = { 80 40 }
+									position = { 0  -3  }
+									 autoresize  =  yes
+										max_width =  80
 									text = "[Trait.GetNameNoTooltip(Character.Self)]"
 									default_format = "#high"
 									align = top|hcenter
-								}
+								 } }
 							}
 						}
 					}
@@ -4079,11 +4159,11 @@ window = {
 											button = {
 												parentanchor = top|hcenter
 												alwaystransparent = "[DiplomacyItem.IsConfederation]"
-												position = { 0 -30 }
-												size = { 50 50 }
+												position = { 0  -34  }
+												size = {  44 24  }
 												texture = "gfx/interface/icons/diplomatic_icons.dds"
 												frame = "[DiplomacyItem.GetDiplomacyFrame]"
-												framesize = { 120 120 }
+												framesize = { 120  60  }
 												scale = 1.3
 
 												tooltip_visible = no
@@ -4110,7 +4190,10 @@ window = {
 														using = Background_Area_ExtraDark
 														margin = { 3 1 }
 													}
-												}
+												 }
+
+												blockoverride "hat" {
+													visible = no }
 											}
 
 											coa_confederation_medium = {
@@ -4216,8 +4299,8 @@ window = {
 							hbox = {
 								layoutpolicy_horizontal = expanding
 
-								hbox = {
-									margin_right = 10
+								 vbox  = {
+									 layoutpolicy_vertical = expanding margin_right = 10
 									margin_top = 8
 									margin_left = -4
 
@@ -4225,9 +4308,18 @@ window = {
 										size = { 32 32 }
 										texture = "[ModifierItem.GetIcon]"
 									}
-								}
+								 expand = { }
 
-								text_single = {
+								 }
+
+								vbox = {
+									layoutpolicy_horizontal = expanding
+									layoutpolicy_vertical = expanding
+									max_width = 500
+
+									hbox = {
+										layoutpolicy_horizontal = expanding
+										min_height = 40 text_single = {
 									layoutpolicy_horizontal = expanding
 									text = "[ModifierItem.GetStaticModifier.GetName]"
 								}
@@ -4258,26 +4350,16 @@ window = {
 									alwaystransparent = no
 								}
 
-								vbox = {
-									datamodel = "[TimedModifierPreviewList.GetItems]"
-									layoutpolicy_horizontal = expanding
-									max_width = 500
 
-									item = {
-										vbox = {
-											layoutpolicy_horizontal = expanding
 
 											text_single = {
 												layoutpolicy_horizontal = expanding
-												text = "[TimedModifierPreviewItem.GetTitle]"
-											}
+												text =  "MODIFIER_STACKS"
+											default_format = "#underline"
+											using = tooltip_se
 
-											text_single = {
-												layoutpolicy_horizontal = expanding
-												text = "[TimedModifierPreviewItem.GetExpirationDate]"
-											}
-
-											expand = {}
+											tooltipwidget  = {
+												 modifier_stacks_tooltip  = {
 										}
 									}
 								}
@@ -4321,7 +4403,11 @@ window = {
 									layoutpolicy_horizontal = growing
 									max_width = 500
 									text = "[TimedModifierScaledSingleItem.GetExpirationDate]"
-								}
+								 }
+							}
+						}
+
+						expand = { }
 							}
 
 							spacer = {
@@ -4515,7 +4601,7 @@ window = {
 			vbox_filter_group = {
 				layoutpolicy_horizontal = expanding
 				datacontext = "[CharacterSelectionList.GetCategory('age_filter_category')]"
-				
+
 				blockoverride "filters" {
 					filter_item = {
 						layoutpolicy_horizontal = expanding
@@ -4527,7 +4613,7 @@ window = {
 			vbox_filter_group = {
 				layoutpolicy_horizontal = expanding
 				datacontext = "[CharacterSelectionList.GetCategory('personal_filter_category')]"
-				
+
 				blockoverride "filters" {
 					filter_item = {
 						layoutpolicy_horizontal = expanding
@@ -4563,7 +4649,7 @@ window = {
 			vbox_filter_group = {
 				layoutpolicy_horizontal = expanding
 				datacontext = "[CharacterSelectionList.GetCategory('politics_filter_category')]"
-				
+
 				blockoverride "filters" {
 					filter_item = {
 						layoutpolicy_horizontal = expanding
@@ -4652,6 +4738,142 @@ types CharacterWindow
 
 		expand = {}
 	}
+
+	type  hbox_trade_posts = hbox {
+		visible = "[And(Character.CanOwnTradePosts(), Character.GetGovernment.HasGovernmentFlag( 'government_has_trade_posts' ) )]"
+		margin = { 32 4 }
+		spacing = 4
+
+		icon = {
+			name = "trade_post_icon"
+			size = { 30 30 }
+			texture = "gfx/interface/icons/trade/icon_trade_post.dds"
+		}
+
+		text_single = {
+			max_width = 128
+			text = "CHARACTER_VIEW_TRADE_POSTS"
+			default_format = "#V"
+			align = nobaseline
+		}
+
+		tooltipwidget = {
+			container = {
+				using = GeneralTooltipSetup
+				alwaystransparent = no
+
+				object_tooltip_pop_out = {
+					blockoverride "title_text" {
+						default_format = "#T"
+						text = "CHARACTER_VIEW_TRADE_POSTS_TT"
+					}
+
+					blockoverride "concept_link" {}
+
+					blockoverride "main_description" {
+						cooltip_paragraph = {
+							visible = "[GreaterThan_int32( Character.GetNumTradePosts, Character.GetMaxTradePosts )]"
+							text = "CHARACTER_VIEW_TRADE_POST_OVER_LIMIT_HEADER"
+						}
+						cooltip_paragraph = {
+							margin_left = 12
+							visible = "[GreaterThan_int32( Character.GetNumTradePosts, Character.GetMaxTradePosts )]"
+							text = "[GetModifier( 'above_trade_post_limit_modifier' ).GetDescWithEffects]"
+						}
+						spacer = {
+							size = { 0 10 }
+							visible = "[GreaterThan_int32( Character.GetNumTradePosts, Character.GetMaxTradePosts )]"
+						}
+
+						vbox = {
+							layoutpolicy_horizontal = expanding
+							datamodel = "[Character.GetTradePosts]"
+
+							item = {
+								text_single = {
+									layoutpolicy_horizontal = expanding
+									datacontext = "[District.GetHolding]"
+									datacontext = "[Holding.GetProvince.GetTitle.GetTradeMarket]"
+									text = "CHARACTER_VIEW_TRADE_POST_DISTRICT"
+									expand = {}
+								}
+							}
+						}
+
+						spacer = {
+							size = { 0 10 }
+						}
+
+						cooltip_paragraph = {
+							default_format = "#bold"
+							text = "CHARACTER_VIEW_TRADE_POST_LIMIT"
+						}
+
+						cooltip_paragraph = {
+							text = "[Character.GetTradePostLimitBreakdown]"
+						}
+					}
+				}
+			}
+		}
+	}
+
+
+	# 营利商路。
+	type hbox_profit_routes = hbox {
+		# 共和国布局空间不足时不显示。
+		visible = "[And( Character.IsMerchant, GreaterThan_int32( Character.GetCurrentProfitRouteCount, '(int32)0' ) )]"
+		margin = { 4 4 }
+		spacing = 4
+
+		tooltipwidget = {
+			container = {
+				using = GeneralTooltipSetup
+				alwaystransparent = no
+
+				object_tooltip_pop_out = {
+					blockoverride "title_text" {
+						default_format = "#T"
+						text = "CHARACTER_VIEW_PROFIT_ROUTES_TT"
+					}
+
+					blockoverride "concept_link" {}
+
+					blockoverride "main_description" {
+						vbox = {
+							layoutpolicy_horizontal = expanding
+							datamodel = "[Character.GetTradeRoutes]"
+
+							item = {
+								text_single = {
+									visible = "[TradeRoute.IsProfitRoute]"
+									layoutpolicy_horizontal = expanding
+									text = "CHARACTER_VIEW_PROFIT_ROUTE_NAME"
+									align = nobaseline
+									expand = {}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+
+		icon = {
+			name = "profit_route_icon"
+			size = { 30 30 }
+			texture = "gfx/interface/icons/trade/icon_trade_route.dds"
+		}
+
+		text_single = {
+			name = "profit_route_count"
+			max_width = 50
+			text = "CHARACTER_VIEW_PROFIT_ROUTES"
+			align = nobaseline
+			default_format = "#high"
+		}
+	}
+
 
 	type icon_row_header_background = icon
 	{
@@ -4873,25 +5095,14 @@ types CharacterWindow
 					}
 
 					item = {
-						coa_title_tiny_crown = {
+						 coa_title_tiny_crown_with_status_icons  = {
 							datacontext = "[TitleItem.GetTitle]"
 							parentanchor = left|vcenter
-							using = tooltip_ne
-
-							icon_title_has_laws_status = {}
-
-							icon = {
-								name = "is_nomad"
-								visible = "[TitleItem.GetTitle.IsNomad]"
-								parentanchor = bottom|right
-								size = { 25 25 }
-								position = { 5 0 }
-								texture = "gfx/interface/icons/title_status/icon_title_nomad.dds"
-							}
+							 blockoverride "extra_icons"  {
 
 							icon = {
 								name = "is_leased_out"
-								visible = "[TitleItem.GetTitle.IsLeasedOut]"
+								visible =  "[Title.IsLeasedOut]"
 								parentanchor = bottom|right
 								size = { 20 20 }
 								position = { 4 1 }
@@ -4902,7 +5113,7 @@ types CharacterWindow
 									color = { 0 0 0 1 }
 									glow_radius = 1
 									using = Glow_Standard
-								}
+								 } }
 							}
 						}
 					}
@@ -5103,12 +5314,12 @@ types CharacterWindow
 							visible = "[And(Not(DiplomacyItem.IsStruggle), Not(And(DiplomacyItem.IsConfederation, DiplomacyItem.GetConfederation.GetType.IsHouseBasedConfederation)))]"
 							parentanchor = top|hcenter
 							alwaystransparent = yes
-							position = { 0 -28 }
-							size = { 54 54 }
+							position = { 0  -22  }
+							size = {  44 22  }
 							texture = "gfx/interface/icons/diplomatic_icons.dds"
 							# 为 diplomatic_icons.dds 新增图标时，需要引擎通过下方函数建立 DiplomacyItem 与图标的映射
 							frame = "[DiplomacyItem.GetDiplomacyFrame]"
-							framesize = { 120 120 }
+							framesize = { 120  60  }
 
 							tooltip_visible = no
 						}
@@ -5141,13 +5352,19 @@ types CharacterWindow
 								onclick = "[DiplomacyItem.OnClick]"
 								button_ignore = none
 							}
-						}
+						 blockoverride "hat" {
+								visible = no
+							}
+
+							blockoverride "crown" {
+								visible = no
+							} }
 
 						coa_confederation_small = {
 							visible = "[And(Not(Confederation.GetType.IsHouseBasedConfederation), DiplomacyItem.IsConfederation)]"
 							parentanchor = hcenter
 
-							tooltip = "[DiplomacyItem.GetTooltip]"
+							 position = { 0 -6 } tooltip = "[DiplomacyItem.GetTooltip]"
 							using = tooltip_es
 
 							blockoverride "coa_button"

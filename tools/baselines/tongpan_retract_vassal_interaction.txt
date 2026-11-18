@@ -77,6 +77,15 @@ retract_vassal_interaction = {
 			}
 			trigger_else_if = {
 				limit = {
+					government_has_flag = government_is_republic
+				}
+				custom_description = {
+					text = "has_law_allowing_vassal_retraction_republic"
+					has_realm_law_flag = vassal_retraction_allowed
+				}
+			}
+			trigger_else_if = {
+				limit = {
 					realm_law_use_church_authority = yes
 				}
 				custom_description = {
@@ -158,10 +167,17 @@ retract_vassal_interaction = {
 
 	on_decline = {
 		scope:puppet_or_actor = { vassal_revocation_tyranny_effect = yes }
-		war_for_retraction_effect = {
-			LIEGE = scope:puppet_or_actor
-			REBEL = scope:recipient
-			SUBVASSAL = scope:secondary_recipient
+		if = {
+			limit = {
+				scope:puppet_or_actor = {
+					NOT = { has_realm_law_flag = republic_vassal_refusal_allowed }
+				}
+			}
+			war_for_retraction_effect = {
+				LIEGE = scope:puppet_or_actor
+				REBEL = scope:recipient
+				SUBVASSAL = scope:secondary_recipient
+			}
 		}
 		scope:recipient = {
 			add_opinion = {
@@ -471,6 +487,15 @@ retract_vassal_interaction = {
 			}
 			desc = VASSALS_REFUSAL_indomitable_azatani
 		}
+		#GG modifier
+		modifier = {
+			add = -50
+			OR = {
+				gg_first_and_second_are_opposite_sides_trigger = { FIRST = scope:actor SECOND = scope:recipient }
+				scope:recipient = { is_gg_undecided_trigger = yes }
+			}
+			desc = RECIPIENT_IS_NOT_YOUR_GG
+		}
 	}
 
 	#Use hook
@@ -723,9 +748,7 @@ retract_vassal_interaction = {
 			scope:puppet_or_actor = {
 				OR = {
 					has_relation_friend = scope:recipient
-					has_relation_best_friend = scope:recipient
 					has_relation_lover = scope:recipient
-					has_relation_soulmate = scope:recipient
 					is_heir_of = scope:recipient
 				}
 			}
@@ -785,6 +808,13 @@ retract_vassal_interaction = {
 					highest_held_title_tier = tier_barony
 				}
 			}
+		}
+
+		modifier = {
+			scope:actor = {
+				gg_hre_causes_additional_tyranny_trigger = { TARGET = scope:recipient }
+			}
+			factor = 0
 		}
 	}
 }

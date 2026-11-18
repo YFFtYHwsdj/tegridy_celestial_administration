@@ -2,8 +2,13 @@
 # 普通人物保留原版事件、资格、费用和AI逻辑；本覆盖不授予退休身份或额外恩荫。
 renounce_noble_family_title_decision = {
 	picture = {
+		trigger = { tgp_retires_to_eastern_estate_trigger = yes }
 		reference = "gfx/interface/illustrations/event_scenes/tgp_asia_estate.dds"
 	}
+	picture = {
+		reference = "gfx/interface/illustrations/event_scenes/ep3_medi_estate.dds"
+	}
+
 	sort_order = 85
 
 	desc = {
@@ -36,6 +41,7 @@ renounce_noble_family_title_decision = {
 		any_held_title = { is_noble_family_title = yes }
 		# 普通佛教家主仍沿用原版出家入口；奉祠／致仕传家不授devoted，故可使用本决议。
 		OR = { tca_retirement_is_exited_trigger = yes NOT = { religion = religion:buddhism_religion } }
+		NOT = { government_has_flag = government_is_republic }
 		NOT = { top_liege = root } # 原版不作为独立君主的通用退位决议
 		is_house_head = yes
 		is_playable_character = yes
@@ -58,15 +64,22 @@ renounce_noble_family_title_decision = {
 				current_heir ?= { is_available_ai_adult = yes }
 			}
 		}
+		trigger_if = {
+			limit = {
+				OR = {
+					government_has_flag = government_is_republic
+					government_has_flag = government_is_administrative
+				}
+			}
+			is_landed = no
+		}
 	}
 
 	is_valid_showing_failures_only = {
 		is_available_adult = yes
 		is_at_war_with_liege = no
 		trigger_if = {
-			limit = {
-				has_realm_law_flag = celestial_retirement_law
-			}
+			limit = { has_realm_law_flag = celestial_retirement_law }
 			tgp_is_above_retirement_age_trigger = { REALM_OWNER = root }
 		}
 	}
@@ -87,7 +100,11 @@ renounce_noble_family_title_decision = {
 				}
 			}
 			show_as_tooltip = {
+				if = {
+				limit = { tgp_retires_to_eastern_estate_trigger = yes }
 				add_character_modifier = { modifier = ep3_renounced_estate }
+			}
+			else = { add_character_modifier = { modifier = tgp_western_renounced_estate } }
 				custom_tooltip = renounce_noble_family_title_decision_tt
 				if = {
 					limit = { exists = scope:new_player }

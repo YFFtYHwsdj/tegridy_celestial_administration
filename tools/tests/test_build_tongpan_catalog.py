@@ -29,6 +29,13 @@ class TongpanCatalogTests(unittest.TestCase):
             effect = (mod / 'common/scripted_effects/tca_tongpan_catalog_effects.txt').read_text(encoding='utf-8-sig')
             self.assertIn('value = title:c_tca_tongpan_a', effect)
             self.assertEqual(effect.count('name = tca_tongpan_reserve'), 2)
+            # 已初始化库存的旧档仍须刷新新版固定映射，且不得重新初始化库存。
+            self.assertRegex(effect, r'has_global_variable = tca_tongpan_static_catalog_v2[^\n]*\n'
+                                    r'[^\n]*tca_tongpan_static_office[^\n]*\n'
+                                    r'[^\n]*set_global_variable = \{ name = tca_tongpan_static_catalog_v2[^\n]*\n'
+                                    r'    \}\n(?:    #[^\n]*\n)?    if = \{\n'
+                                    r'[^\n]*has_global_variable = tca_tongpan_catalog_v1[^\n]*\n'
+                                    r'[^\n]*tca_tongpan_reserve')
             flavor = (mod / 'common/flavorization/tca_tongpan_holder_flavorization.txt').read_text(encoding='utf-8-sig')
             self.assertEqual(flavor.count('c_tca_tongpan_a'), 2)
             self.assertEqual(flavor.count('c_tca_tongpan_reserve_002'), 2)

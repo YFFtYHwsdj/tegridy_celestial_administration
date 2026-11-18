@@ -8,6 +8,8 @@ from check_upstream_overrides import tokens
 ROOT = Path(__file__).resolve().parents[1]
 # 此头衔 ID 与 Workshop 的 gte_contest.1013.bold.failure 在 Jomini 本地化中发生哈希冲突。
 TITLE_NAME_KEYS = {'c_tca_tongpan_yingzhou_2': 'tca_tongpan_name_yingzhou_2'}
+# 原版县清单变化时递增固定映射版本，旧档在下次维护补齐目录。
+STATIC_CATALOG_VERSION = 2
 DEFAULT_GAME = Path.home() / 'Library/Application Support/Steam/steamapps/common/Crusader Kings III/game'
 
 
@@ -39,9 +41,10 @@ def write_assets(game_dir, mod_dir, reserve_count):
         raise ValueError('no vanilla counties found')
     counties = sorted(counties)
     titles = ['# 从原版 landed_titles 生成固定通判官职及预留池；不逐条手改。\n# 维护入口：python3 tools/build_tongpan_catalog.py --game-dir <CK3 game目录>；默认预留128个，详见 docs/tongpan/implementation.md。']
-    effects = ['# 从原版县目录生成固定绑定与预留库存；任命逻辑在 tca_tongpan_effects.txt。\n# 维护入口：python3 tools/build_tongpan_catalog.py --game-dir <CK3 game目录>；不逐条手改。',
+    static_catalog_flag = f'tca_tongpan_static_catalog_v{STATIC_CATALOG_VERSION}'
+    effects = ['# 从原版县目录生成固定映射与预留库存；任命逻辑在 tca_tongpan_effects.txt。\n# 维护入口：python3 tools/build_tongpan_catalog.py --game-dir <CK3 game目录>；不逐条手改。',
                'tca_initialize_tongpan_catalog_effect = {',
-               '    if = {', '        limit = { NOT = { has_global_variable = tca_tongpan_catalog_v1 } }']
+               '    if = {', f'        limit = {{ NOT = {{ has_global_variable = {static_catalog_flag} }} }}']
     loc = {'english': ['l_english:'], 'simp_chinese': ['l_simp_chinese:']}
     for county in counties:
         office = 'c_tca_tongpan_' + county[2:]
@@ -50,6 +53,9 @@ def write_assets(game_dir, mod_dir, reserve_count):
         name_key = TITLE_NAME_KEYS.get(office, office)
         loc['english'].append(f' {name_key}: "[GetTitleByKey(\'{county}\').GetNameNoTierNoTooltip] Tongpan Office"')
         loc['simp_chinese'].append(f' {name_key}: "[GetTitleByKey(\'{county}\').GetNameNoTierNoTooltip]通判司"')
+    effects += [f'        set_global_variable = {{ name = {static_catalog_flag} value = yes }}', '    }',
+                '    # 沿用旧档的预留池初始化标记，只刷新固定映射。',
+                '    if = {', '        limit = { NOT = { has_global_variable = tca_tongpan_catalog_v1 } }']
     for number in range(1, reserve_count + 1):
         office = f'c_tca_tongpan_reserve_{number:03}'
         titles.append(f'{office} = {{ capital = c_bianzhou color = {{ 110 125 145 }} landless = yes allow_domicile = no no_automatic_claims = yes definite_form = yes can_be_named_after_dynasty = no destroy_on_succession = no delete_on_destroy = no }}')

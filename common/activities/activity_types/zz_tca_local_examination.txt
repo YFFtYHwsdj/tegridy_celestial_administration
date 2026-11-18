@@ -1,5 +1,6 @@
-﻿# 原版乡试活动覆盖；只在到场自动设置应试意图时加入任职门槛。
-# 原版邀请、考官、协助、陪同及全部活动生命周期保持原样；必要性和基线见覆盖登记。
+﻿# 1.21乡试活动覆盖：保留原版主持者统一结算、榜单和奖励；人物子集查询复用活动关联保护。
+# 到场自动应试仍走正式任职门槛；地域、随行地点及召集入口复用独立安全接口。
+# on_end按每位到场人物执行；共享结算与清理仅由host执行，个人奖励仍逐人处理。
 activity_local_examination = {
 
 	notify_player_can_join_activity = yes
@@ -326,9 +327,9 @@ activity_local_examination = {
 		}
 	}
 
+	###################
 
-
-
+	###################
 
 	is_single_location = yes
 
@@ -531,7 +532,7 @@ activity_local_examination = {
 					has_character_flag = exam_taker
 					OR = {
 						has_variable = been_caught_cheating_longterm
-						is_in_guest_subset = { name = failees }
+						tca_exam_member_in_activity_subset_trigger = { NAME = failees }
 					}
 				}
 				desc = imperial_examination_conclusion.entrant_failee
@@ -539,16 +540,16 @@ activity_local_examination = {
 			triggered_desc = {
 				trigger = {
 					has_character_flag = exam_taker
-					is_in_guest_subset = { name = entrants }
+					tca_exam_member_in_activity_subset_trigger = { NAME = entrants }
 				}
 				desc = local_examination_conclusion.entrant_passed
 			}
 		}
 	}
 
+	###################
 
-
-
+	###################
 
 	options = {
 
@@ -703,9 +704,9 @@ activity_local_examination = {
 						}
 					}
 			        add = {
-						value = ai_rationality
-						multiply = 0.25
-						desc = "ai_rationality"
+                        value = ai_rationality
+                        multiply = 0.25
+                        desc = "ai_rationality"
 			        }
 				}
 			}
@@ -764,9 +765,9 @@ activity_local_examination = {
 				ai_will_do = {
 					value = 150
 			        add = {
-						value = ai_sociability
-						multiply = 0.25
-						desc = "ai_sociability"
+                        value = ai_sociability
+                        multiply = 0.25
+                        desc = "ai_sociability"
 			        }
 					if = {
 						limit = { has_trait = compassionate }
@@ -801,9 +802,9 @@ activity_local_examination = {
 				ai_will_do = {
 					value = 100
 			        add = {
-						value = ai_sociability
-						multiply = 0.25
-						desc = "ai_sociability"
+                        value = ai_sociability
+                        multiply = 0.25
+                        desc = "ai_sociability"
 			        }
 					if = {
 						limit = { has_trait = lazy }
@@ -899,19 +900,19 @@ activity_local_examination = {
 				ai_will_do = {
 					value = 100
 			        add = {
-						value = ai_honor
-						multiply = 0.25
-						desc = "ai_honor"
+                        value = ai_honor
+                        multiply = 0.25
+                        desc = "ai_honor"
 			        }
 			        add = {
-						value = ai_compassion
-						multiply = 0.25
-						desc = "ai_compassion"
+                        value = ai_compassion
+                        multiply = 0.25
+                        desc = "ai_compassion"
 			        }
 			        add = {
-						value = ai_rationality
-						multiply = 0.25
-						desc = "ai_rationality"
+                        value = ai_rationality
+                        multiply = 0.25
+                        desc = "ai_rationality"
 			        }
 					if = {
 						limit = { has_trait = compassionate }
@@ -1021,9 +1022,9 @@ activity_local_examination = {
 		}
 	}
 
+	###################
 
-
-
+	###################
 
 	phases = {
 
@@ -1090,7 +1091,7 @@ activity_local_examination = {
 					every_attending_character = {
 						limit = {
 							is_ai = no
-							is_in_guest_subset = { name = entrants }
+							tca_exam_member_in_activity_subset_trigger = { NAME = entrants }
 							NOT = { has_activity_intent = local_exam_taker_intent }
 						}
 						save_temporary_scope_as = temp_character
@@ -1151,128 +1152,117 @@ activity_local_examination = {
 			}
 
 			on_end = {
-                # 仅保护七处正向子集查询；已脱离活动者返回no，其它结算及奖励调用原样保留。
 
-                if = {
-                    limit = { this = scope:host }
-                    imperial_examination_determine_exam_outcome_effect = yes
-                }
-                if = {
-					limit = {
-						tca_exam_member_in_activity_subset_trigger = { NAME = entrants }
-					}
-
-                    imperial_examination_prune_failees_effect = yes
-
-                    if = {
-                        limit = { tca_exam_member_in_activity_subset_trigger = { NAME = scoreboard } }
-                        save_temporary_scope_as = temp_character
-                        scope:activity = {
-                            remove_from_guest_subset = {
-                                name = scoreboard
-                                target = scope:temp_character
-                            }
-                        }
-                    }
-                }
-
-                scope:activity = {
-					set_variable = {
-						name = first_place_entrant_score
-						value = 0
-					}
-
-					ordered_guest_subset = {
-						name = entrants
-						order_by = imperial_examination_score_value
-						max = 3
-					    check_range_bounds = no
-					    if = {
-					        limit = { exists = scope:top_entrant_2 }
-					        save_scope_as = top_entrant_3
-					    }
-					    else_if = {
-					        limit = { exists = scope:top_entrant_1 }
-					        save_scope_as = top_entrant_2
-					    }
-					    else = { save_scope_as = top_entrant_1 }
-					}
+				if = {
+					limit = { this = scope:host }
+					imperial_examination_determine_exam_outcome_effect = yes
 					scope:activity = {
-						if = {
-							limit = { exists = scope:top_entrant_1 }
-							set_variable = {
-								name = first_place_entrant
-								value = scope:top_entrant_1
+						every_attending_character = {
+							limit = {
+
+								involved_activity ?= scope:activity
+								tca_exam_member_in_activity_subset_trigger = { NAME = entrants }
 							}
 
-							change_variable = {
-								name = first_place_entrant_score
-								add = scope:top_entrant_1.var:imperial_examination_score
-							}
+							imperial_examination_prune_failees_effect = yes
+
 							if = {
-								limit = { exists = var:first_place_entrant_score }
-
+								limit = { tca_exam_member_in_activity_subset_trigger = { NAME = scoreboard } }
+								save_temporary_scope_as = temp_character
+								scope:activity = {
+									remove_from_guest_subset = {
+										name = scoreboard
+										target = scope:temp_character
+									}
+								}
 							}
 						}
-						if = {
-							limit = { exists = scope:top_entrant_2 }
-							set_variable = {
-								name = second_place_entrant
-								value = scope:top_entrant_2
-							}
+
+						set_variable = {
+							name = first_place_entrant_score
+							value = 0
 						}
-						if = {
-							limit = { exists = scope:top_entrant_3 }
-							set_variable = {
-								name = third_place_entrant
-								value = scope:top_entrant_3
-							}
-						}
-					}
 
-					if = {
-						limit = { has_perfect_score_trigger = { SCORE_VAR = first_place_entrant_score } }
-						set_variable = has_perfect_score
-					}
-					if = {
-						limit = { has_good_score_trigger = { SCORE_VAR = first_place_entrant_score } }
-						set_variable = has_great_score
-					}
-					if = {
-						limit = { has_decent_score_trigger = { SCORE_VAR = first_place_entrant_score } }
-						set_variable = has_decent_score
-					}
-					if = {
-						limit = { has_questionable_score_trigger = { SCORE_VAR = first_place_entrant_score } }
-						set_variable = has_questionable_score
-					}
-
-					set_variable = {
-						name = num_final_failees
-						value = 0
-					}
-					every_attending_character = {
-						limit = {
-
-							involved_activity ?= scope:activity
-							tca_exam_member_in_activity_subset_trigger = { NAME = failees }
+						ordered_guest_subset = {
+							name = entrants
+							order_by = imperial_examination_score_value
+							max = 3
+						    check_range_bounds = no
+						    if = {
+						        limit = { exists = scope:top_entrant_2 }
+						        save_scope_as = top_entrant_3
+						    }
+						    else_if = {
+						        limit = { exists = scope:top_entrant_1 }
+						        save_scope_as = top_entrant_2
+						    }
+						    else = { save_scope_as = top_entrant_1 }
 						}
 						scope:activity = {
-							change_variable = {
-								name = num_final_failees
-								add = 1
+							if = {
+								limit = { exists = scope:top_entrant_1 }
+								set_variable = {
+									name = first_place_entrant
+									value = scope:top_entrant_1
+								}
+
+								change_variable = {
+									name = first_place_entrant_score
+									add = scope:top_entrant_1.var:imperial_examination_score
+								}
+								if = {
+									limit = { exists = var:first_place_entrant_score }
+
+								}
+							}
+							if = {
+								limit = { exists = scope:top_entrant_2 }
+								set_variable = {
+									name = second_place_entrant
+									value = scope:top_entrant_2
+								}
+							}
+							if = {
+								limit = { exists = scope:top_entrant_3 }
+								set_variable = {
+									name = third_place_entrant
+									value = scope:top_entrant_3
+								}
 							}
 						}
-					}
-				}
-				if = {
-					limit = {
-						tca_exam_member_in_activity_subset_trigger = { NAME = failees }
-					}
-					scope:activity = {
-						change_variable = {
+
+						if = {
+							limit = { has_perfect_score_trigger = { SCORE_VAR = first_place_entrant_score } }
+							set_variable = has_perfect_score
+						}
+						if = {
+							limit = { has_good_score_trigger = { SCORE_VAR = first_place_entrant_score } }
+							set_variable = has_great_score
+						}
+						if = {
+							limit = { has_decent_score_trigger = { SCORE_VAR = first_place_entrant_score } }
+							set_variable = has_decent_score
+						}
+						if = {
+							limit = { has_questionable_score_trigger = { SCORE_VAR = first_place_entrant_score } }
+							set_variable = has_questionable_score
+						}
+
+						set_variable = {
 							name = num_final_failees
-							add = 1
+							value = 0
+						}
+						every_attending_character = {
+							limit = {
+								involved_activity ?= scope:activity
+								tca_exam_member_in_activity_subset_trigger = { NAME = failees }
+							}
+							scope:activity = {
+								change_variable = {
+									name = num_final_failees
+									add = 1
+								}
+							}
 						}
 					}
 				}
@@ -1331,38 +1321,26 @@ activity_local_examination = {
 						}
 					}
 				}
-				scope:activity = {
+				if = {
+					limit = { this = scope:host }
 
-	                imperial_examination_clean_up_phase_variables_effect = yes
+					imperial_examination_clean_up_phase_variables_effect = yes
 				}
 
 				if = {
 					limit = { has_activity_intent = local_exam_support_entrants_intent }
 					scope:activity = {
-						if = {
+						every_attending_character = {
 							limit = {
-								any_attending_character = {
-									has_activity_intent = local_exam_taker_intent
-									OR = {
-										is_close_or_extended_family_of = root
-										has_relation_disciple = root
-										this = root.primary_spouse
-									}
-									court_owner = root
+								has_activity_intent = local_exam_taker_intent
+								OR = {
+									is_close_or_extended_family_of = root
+									has_relation_disciple = root
+									this = root.primary_spouse
 								}
+								court_owner = root
 							}
-							every_attending_character = {
-								limit = {
-									has_activity_intent = local_exam_taker_intent
-									OR = {
-										is_close_or_extended_family_of = root
-										has_relation_disciple = root
-										this = root.primary_spouse
-									}
-									court_owner = root
-								}
-								add_to_list = parent_relevant_entrants
-							}
+							add_to_list = parent_relevant_entrants
 						}
 					}
 					add_character_flag = {
@@ -1386,9 +1364,9 @@ activity_local_examination = {
 		}
 	}
 
+	###################
 
-
-
+	###################
 
 	open_invite = yes
 
@@ -1480,6 +1458,7 @@ activity_local_examination = {
 		trigger_if = {
 			limit = {
 				is_pool_character = no
+				NOT = { government_has_flag = government_is_merchant }
 			}
 			top_liege = scope:host.top_liege
 		}
@@ -1528,8 +1507,6 @@ activity_local_examination = {
 			}
 		}
 
-
-		# 主持人死亡或首府失效时拒绝邀请，正常地域规则由共用接口原样保留。
 		tca_exam_local_guest_region_trigger = yes
 	}
 
@@ -1626,11 +1603,11 @@ activity_local_examination = {
 		max = 15
 		ai_max = 7
 		invite_rule_order = 1
-	}
+    }
 
+	###################
 
-
-
+	###################
 
 	pulse_actions = {
 		entries = {
@@ -1671,7 +1648,11 @@ activity_local_examination = {
 		every_player = {
 			limit = {
 				is_landed = no
-				NOT = { has_variable = recently_invited_to_exam }
+				NOR = {
+					has_variable = recently_invited_to_exam
+					government_has_flag = government_is_merchant
+					government_has_flag = government_is_republic
+				}
 				should_notify_can_join_activity = scope:activity.activity_type
 				has_none_of_variables = {
 					name = passed_provincial_exam
@@ -1704,7 +1685,6 @@ activity_local_examination = {
 		imperial_examination_gather_stray_entrants_effect = yes
 		if = {
 			limit = {
-				# 在任官员仍可到场，但不得自动切换为考生。
 				tca_exam_can_take_exam_trigger = yes
 				is_ai = no
 				has_none_of_variables = {
@@ -1739,22 +1719,25 @@ activity_local_examination = {
 	}
 
 	on_complete = {
-		scope:activity = {
-			every_attending_character = {
-				if = {
-					limit = {
-						appointment_timeout_days > 0
-						appointment_timeout_days < 365
+		if = {
+			limit = { this = scope:host }
+			scope:activity = {
+				every_attending_character = {
+					if = {
+						limit = {
+							appointment_timeout_days > 0
+							appointment_timeout_days < 365
+						}
+						clear_appointment_timeout = yes
 					}
-					clear_appointment_timeout = yes
 				}
 			}
 		}
 	}
 
+	###################
 
-
-
+	###################
 
 	header_background = "gfx/interface/illustrations/activity_header_backgrounds/activity_local_examination.dds"
 
@@ -1789,9 +1772,7 @@ activity_local_examination = {
 					}
 				}
 			}
-			scripted_animation = {
-				animation = jockey_walk
-			}
+			scripted_animation = horse_camel_activity_travel_animation
 		}
 		player_guest_traveling = {
 			camera = camera_activity_horse
@@ -1813,9 +1794,7 @@ activity_local_examination = {
 					}
 				}
 			}
-			scripted_animation = {
-				animation = jockey_walk
-			}
+			scripted_animation = horse_camel_activity_travel_animation
 		}
 		player_entrant = {
 			camera = camera_event_left
@@ -1826,7 +1805,7 @@ activity_local_examination = {
 						limit = {
 							this != scope:activity.activity_host
 							location = scope:activity.activity_location
-							is_in_guest_subset = { name = entrants }
+							tca_exam_member_in_activity_subset_trigger = { NAME = entrants }
 						}
 						add_to_list = characters
 					}
@@ -1867,7 +1846,7 @@ activity_local_examination = {
 					}
 					every_attending_character = {
 						limit = {
-							is_in_guest_subset = { name = entrants }
+							tca_exam_member_in_activity_subset_trigger = { NAME = entrants }
 						}
 						add_to_list = characters
 					}
@@ -1896,7 +1875,7 @@ activity_local_examination = {
 					}
 					every_attending_character = {
 						limit = {
-							is_in_guest_subset = { name = guests }
+							tca_exam_member_in_activity_subset_trigger = { NAME = guests }
 						}
 						add_to_list = characters
 					}
@@ -1918,7 +1897,7 @@ activity_local_examination = {
 					}
 					every_attending_character = {
 						limit = {
-							is_in_guest_subset = { name = imperial_examiners }
+							tca_exam_member_in_activity_subset_trigger = { NAME = imperial_examiners }
 						}
 						add_to_list = characters
 					}

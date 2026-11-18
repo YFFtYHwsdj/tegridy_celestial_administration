@@ -33,12 +33,6 @@ tca_court_session.1 = {
                             assign_councillor_type = { type = councillor_chancellor target = scope:tca_mcp_backup fire_on_actions = yes }
                         }
                         tca_test_military_council_appoint_effect = yes
-                        # 自备公国只提高本署官署等级，保留原有县级监押；不借第二块真实领地。
-                        create_dynamic_title = { tier = duchy name = tca_test_arrest_office_name }
-                        scope:new_title = { save_scope_as = tca_court_session_duchy set_capital_county = scope:tca_mcp_county set_landless_title = no }
-                        create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_court_session_grant }
-                        scope:tca_court_session_duchy = { change_title_holder = { holder = scope:tca_mcp_governor change = scope:tca_court_session_grant } }
-                        resolve_title_and_vassal_change = scope:tca_court_session_grant
                         title:h_china = {
                             set_variable = { name = tca_court_session_actor value = scope:tca_mcp_governor }
                             set_variable = { name = tca_court_session_phase value = 0 }
@@ -119,29 +113,21 @@ tca_court_session.1002 = {
                 debug_log = "TCA_TEST CHECK_PASS tca_test_court_player_session 4"
             }
             else = { add_character_flag = tca_test_tca_military_court_positions_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_court_player_session 4" }
+            # 完成县署旧职与任期断言后再升署，避免先把旧监押变成非法职位。
+            create_dynamic_title = { tier = duchy name = tca_test_arrest_office_name }
+            scope:new_title = { save_scope_as = tca_court_session_duchy set_capital_county = scope:tca_mcp_county set_landless_title = no }
+            create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_court_session_grant }
+            scope:tca_court_session_duchy = { change_title_holder = { holder = scope:tca_mcp_governor change = scope:tca_court_session_grant } }
+            resolve_title_and_vassal_change = scope:tca_court_session_grant
+            # 复用正式队列消费入口，不假定都监必然是最高空缺；仅使用本例候选与官署。
+            every_in_list = { list = tca_court_vacant_offices remove_from_list = tca_court_vacant_offices }
             scope:tca_mcp_governor = {
-                # 诊断只记录正式守门与冻结值，不改变候选、空缺或分发条件。
-                if = { limit = { tca_military_inspector_office_valid_trigger = yes } debug_log = "TCA_COURT_SESSION DIAG inspector office valid" }
-                else = { debug_log = "TCA_COURT_SESSION DIAG inspector office invalid" }
-                if = { limit = { tca_court_available_for_tca_military_inspector_court_position_trigger = yes } debug_log = "TCA_COURT_SESSION DIAG inspector council available" }
-                else = { debug_log = "TCA_COURT_SESSION DIAG inspector council blocked" }
                 tca_court_visit_positions_effect = { VISITOR = tca_court_snapshot_position_effect }
-                if = { limit = { has_variable = tca_court_vacant_tca_military_inspector_court_position }
-                    debug_log = "TCA_COURT_SESSION DIAG inspector frozen=[THIS.Char.MakeScope.Var('tca_court_vacant_tca_military_inspector_court_position').GetValue]"
-                }
-                else = { debug_log = "TCA_COURT_SESSION DIAG inspector not frozen" }
-                save_scope_value_as = { name = tca_court_dispatch_importance value = tca_court_next_vacancy_value }
-                clear_saved_scope = tca_court_dispatched
-                if = { limit = { exists = scope:tca_court_dispatched } debug_log = "TCA_COURT_SESSION DIAG dispatched marker survived clear" }
-                if = { limit = { var:tca_court_vacant_tca_military_inspector_court_position ?= scope:tca_court_dispatch_importance } debug_log = "TCA_COURT_SESSION DIAG inspector is highest frozen vacancy" }
-                debug_log_scopes = yes
-                tca_court_visit_positions_effect = { VISITOR = tca_court_dispatch_position_effect }
-                if = { limit = { exists = scope:tca_court_dispatched } debug_log = "TCA_COURT_SESSION DIAG dispatcher entered" }
-                else = { debug_log = "TCA_COURT_SESSION DIAG dispatcher not entered" }
-                if = { limit = { scope:tca_mcp_officer = { has_court_position = tca_military_inspector_court_position } } debug_log = "TCA_COURT_SESSION DIAG inspector held immediately" }
-                else = { debug_log = "TCA_COURT_SESSION DIAG inspector absent immediately" }
-                tca_court_visit_positions_effect = { VISITOR = tca_court_clear_snapshot_effect }
+                if = { limit = { tca_court_next_vacancy_value > 0 } add_to_list = tca_court_vacant_offices }
             }
+            tca_court_dispatch_pool_effect = yes
+            scope:tca_mcp_governor = { tca_court_visit_positions_effect = { VISITOR = tca_court_clear_snapshot_effect } }
+            every_in_list = { list = tca_court_vacant_offices remove_from_list = tca_court_vacant_offices }
             # 另等两日，持续资格与内阁联动必须真实保留，不能只看强制appoint瞬间。
             trigger_event = { id = tca_court_session.1003 days = 2 }
         }

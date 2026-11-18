@@ -162,18 +162,27 @@ def global_keys(path, relative_path):
         yield key
 
 
-def discover_collisions(game_dir, mod_dir):
-    """查找模组与已安装游戏脚本中的同名顶层定义。"""
+def discover_collisions(game_dir, mod_dir, errors=None):
+    """查找同名定义；提供errors时收集损坏文件，调用者必须报告扫描不完整。"""
+    def keys_in(path, relative):
+        try:
+            return list(global_keys(path, relative))
+        except (OSError, UnicodeError, ValueError) as error:
+            if errors is None:
+                raise
+            errors.append(str(error))
+            return []
+
     native_by_key = {}
     for path in script_files(game_dir):
         relative = path.relative_to(game_dir)
-        for key in global_keys(path, relative):
+        for key in keys_in(path, relative):
             native_by_key.setdefault((script_type(relative), key), []).append(relative.as_posix())
 
     collisions = set()
     for path in script_files(mod_dir):
         relative = path.relative_to(mod_dir)
-        for key in global_keys(path, relative):
+        for key in keys_in(path, relative):
             for native_path in native_by_key.get((script_type(relative), key), []):
                 collisions.add((key, relative.as_posix(), native_path))
     return collisions
@@ -186,7 +195,9 @@ def _entry_identity(entry):
 def entry_definitions(entry, path):
     # 多个 namespace 声明属于有效元数据，不是重复事件。
     ignored = ("namespace",) if Path(entry["vanilla"]).parts[:1] == ("events",) else ()
-    return read_definitions(path, ignored_keys=ignored)
+    # 原生 on_action 文件可多次声明追加回调；登记的逐对象基线仍独立比较。
+    additive = Path(entry["vanilla"]).parts[:2] == ("common", "on_action")
+    return read_definitions(path, allow_duplicates=additive, ignored_keys=ignored)
 
 
 def _compare_entry(entry, label, expected, source_path, definition_key):
@@ -303,12 +314,18 @@ def check(game_dir, mod_dir):
                 print(f"NEEDS REVIEW: {label} definition {entry['key']} is missing from {path}")
                 changed = 1
 
-    collisions = discover_collisions(game_dir, mod_dir)
-    unclassified = collisions - set(known)
+    scan_errors = []
+    collisions = discover_collisions(game_dir, mod_dir, errors=scan_errors)
+    # 整文件覆盖已逐字节核对完整原版基线；其中保留的原生对象不再重复登记。
+    file_pairs = {(entry["mod"], entry["vanilla"]) for entry in registry.get("file_overrides", [])}
+    unclassified = {item for item in collisions - set(known) if item[1:] not in file_pairs}
     if unclassified:
         changed = 1
         for key, mod_path, vanilla_path in sorted(unclassified):
             print(f"UNREGISTERED SAME-NAME DEFINITION: {key}: mod/{mod_path} <> game/{vanilla_path}")
+
+    if scan_errors:
+        raise ValueError("incomplete collision scan:\n" + "\n".join(scan_errors))
 
     if not changed:
         print(f"OK: {len(registry['overrides'])} vanilla overrides match reviewed baselines; "

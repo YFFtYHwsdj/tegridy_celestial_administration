@@ -1,18 +1,22 @@
-﻿# 新增覆盖的已审阅原版对象；不刷新既有基线。
+# 新增覆盖的已审阅原版对象；不刷新既有基线。
 give_new_noble_family_title_effect = {
 	if = {
 		limit = {
-			is_house_head = yes
 			government_allows = noble_families
 			trigger_if = {
-				limit = {
-					government_has_flag = government_has_county_tier_noble_families
-				}
-				highest_held_title_tier >= tier_county
+				limit = { government_has_mechanic = administrative } # excludes republic/soryo
+				is_house_head = yes
+				highest_held_title_tier >= min_appointment_tier
+				liege = { government_allows = noble_families }
 			}
-			trigger_else = { highest_held_title_tier >= tier_duchy }
-			liege = {
-				government_allows = noble_families
+			# Republic house members in the same republic as their house head must not found a cadet branch
+			trigger_if = {
+				limit = {
+					government_has_flag = government_is_republic
+					is_house_head = no
+					exists = house.house_head.highest_liege_matching_mechanic:republic
+				}
+				NOT = { highest_liege_matching_mechanic:republic = house.house_head.highest_liege_matching_mechanic:republic }
 			}
 			trigger_if = {
 				limit = { any_held_title = { is_noble_family_title = yes } }
