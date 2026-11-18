@@ -1,0 +1,92 @@
+﻿# 人物作用域；输出 scope:tca_province_contract_choice（数字档位，-1 为维持）。
+# MARGIN 为最低收益，资格和收益均先按原始分检查。
+tca_province_contract_choose_effect = {
+    save_scope_value_as = { name = tca_province_contract_choice value = -1 }
+    if = {
+        limit = {
+            tca_province_contract_prefecture_is_gain_trigger = { MARGIN = $MARGIN$ }
+            tca_province_contract_industrial_is_gain_trigger = { MARGIN = $MARGIN$ }
+        }
+        save_scope_value_as = { name = tca_province_contract_choice value = 2 }
+        random = {
+            chance = tca_province_contract_industrial_pick_chance
+            save_scope_value_as = { name = tca_province_contract_choice value = 1 }
+        }
+    }
+    else_if = {
+        limit = {
+            tca_province_contract_prefecture_is_gain_trigger = { MARGIN = $MARGIN$ }
+            OR = {
+                NOT = { tca_province_contract_standard_is_gain_trigger = { MARGIN = $MARGIN$ } }
+                tca_province_contract_prefecture_score > tca_province_contract_standard_score
+            }
+        }
+        save_scope_value_as = { name = tca_province_contract_choice value = 2 }
+    }
+    else_if = {
+        limit = {
+            tca_province_contract_industrial_is_gain_trigger = { MARGIN = $MARGIN$ }
+            OR = {
+                NOT = { tca_province_contract_standard_is_gain_trigger = { MARGIN = $MARGIN$ } }
+                tca_province_contract_industrial_score > tca_province_contract_standard_score
+            }
+        }
+        save_scope_value_as = { name = tca_province_contract_choice value = 1 }
+    }
+    else_if = {
+        limit = {
+            tca_province_contract_standard_is_gain_trigger = { MARGIN = $MARGIN$ }
+            OR = {
+                NOT = { tca_province_contract_prefecture_is_gain_trigger = { MARGIN = $MARGIN$ } }
+                tca_province_contract_standard_score > tca_province_contract_prefecture_score
+            }
+            OR = {
+                NOT = { tca_province_contract_industrial_is_gain_trigger = { MARGIN = $MARGIN$ } }
+                tca_province_contract_standard_score > tca_province_contract_industrial_score
+            }
+        }
+        save_scope_value_as = { name = tca_province_contract_choice value = 0 }
+    }
+}
+
+# 人物作用域；任命落定后复核府、监。只改档位，不设置协商冷却或发送通知。
+tca_province_contract_review_appointment_effect = {
+    if = {
+        limit = {
+            tca_uses_civil_province_contract_trigger = yes
+            OR = {
+                AND = {
+                    vassal_contract_has_flag = celestial_province_metropolitan
+                    tca_province_contract_can_be_prefecture_trigger = no
+                }
+                AND = {
+                    vassal_contract_has_flag = celestial_province_industrial
+                    tca_province_contract_can_be_industrial_trigger = no
+                }
+            }
+        }
+        vassal_contract_set_obligation_level = { type = celestial_provinces level = 0 }
+    }
+}
+
+# 人物作用域，应用已选档位。对传入的府、监重新核对资格，以防异步批复时首府已变。
+tca_province_contract_apply_choice_effect = {
+    if = {
+        limit = {
+            scope:tca_province_contract_choice = 2
+            tca_province_contract_can_be_prefecture_trigger = yes
+        }
+        vassal_contract_set_obligation_level = { type = celestial_provinces level = 2 }
+    }
+    else_if = {
+        limit = {
+            scope:tca_province_contract_choice = 1
+            tca_province_contract_can_be_industrial_trigger = yes
+        }
+        vassal_contract_set_obligation_level = { type = celestial_provinces level = 1 }
+    }
+    else_if = {
+        limit = { scope:tca_province_contract_choice = 0 }
+        vassal_contract_set_obligation_level = { type = celestial_provinces level = 0 }
+    }
+}

@@ -1,0 +1,124 @@
+﻿namespace = tca_province_contract_test
+
+# 临海为只读样本。用块式原生触发器交叉核对矿产读数，检测比较值语法失效。
+tca_province_contract_test.1 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_province_contract_test.1 tca_test_province_contract_scores"
+        remove_character_flag = tca_test_tca_province_contract_test_case_failed
+        if = {
+            limit = {
+                debug_only = yes
+                title:b_linhai.title_province ?= {
+                    province_size_level = 5
+                    has_building_or_higher = pb_market_03
+                    NOT = { has_building_or_higher = pb_market_04 }
+                    province_has_district = urban_housing_district
+                    production_of_trade_good_category_type = { target = trade_good_category:trade_category_minerals value > 0 }
+                }
+            }
+            if = {
+                limit = {
+                    title:b_linhai.title_province = {
+                        tca_province_contract_capital_prefecture_score > 5.27
+                        tca_province_contract_capital_prefecture_score < 5.30
+                    }
+                }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_province_contract_scores 1"
+            }
+            else = {
+                add_character_flag = tca_test_tca_province_contract_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_province_contract_scores 1"
+            }
+            if = {
+                limit = {
+                    title:b_linhai.title_province = {
+                        tca_province_contract_mineral_strength > 0
+                        tca_province_contract_mineral_strength < 1
+                        tca_province_contract_guild_strength = 0
+                    }
+                }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_province_contract_scores 2"
+            }
+            else = {
+                add_character_flag = tca_test_tca_province_contract_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_province_contract_scores 2"
+            }
+            if = {
+                limit = { has_character_flag = tca_test_tca_province_contract_test_case_failed }
+                debug_log = "TCA_TEST FAIL tca_test_province_contract_scores"
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+            }
+            else = {
+                debug_log = "TCA_TEST PASS tca_test_province_contract_scores"
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } }
+            }
+        }
+        else = {
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_province_contract_scores"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+        }
+        remove_character_flag = tca_test_tca_province_contract_test_case_failed
+    }
+}
+
+# 只借用临海当天的契约，结束时精确复原。确认普通选档及合格者复核不回州。
+tca_province_contract_test.2 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_province_contract_test.2 tca_test_province_contract_transition"
+        remove_character_flag = tca_test_tca_province_contract_test_case_failed
+        if = {
+            limit = {
+                debug_only = yes
+                title:c_taizhou.holder ?= {
+                    tca_uses_civil_province_contract_trigger = yes
+                    capital_province ?= title:b_linhai.title_province
+                    vassal_contract_obligation_level:celestial_provinces = 0
+                }
+            }
+            title:c_taizhou.holder = { tca_province_contract_choose_effect = { MARGIN = 3 } }
+            if = {
+                limit = { scope:tca_province_contract_choice = 2 }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_province_contract_transition 1"
+            }
+            else = {
+                add_character_flag = tca_test_tca_province_contract_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_province_contract_transition 1"
+            }
+            title:c_taizhou.holder = {
+                tca_province_contract_apply_choice_effect = yes
+                tca_province_contract_review_appointment_effect = yes
+            }
+            if = {
+                limit = {
+                    title:c_taizhou.holder = { vassal_contract_has_flag = celestial_province_metropolitan }
+                }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_province_contract_transition 2"
+            }
+            else = {
+                add_character_flag = tca_test_tca_province_contract_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_province_contract_transition 2"
+            }
+            title:c_taizhou.holder = {
+                vassal_contract_set_obligation_level = { type = celestial_provinces level = 0 }
+            }
+            if = {
+                limit = { has_character_flag = tca_test_tca_province_contract_test_case_failed }
+                debug_log = "TCA_TEST FAIL tca_test_province_contract_transition"
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+            }
+            else = {
+                debug_log = "TCA_TEST PASS tca_test_province_contract_transition"
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } }
+            }
+        }
+        else = {
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_province_contract_transition"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+        }
+        remove_character_flag = tca_test_tca_province_contract_test_case_failed
+    }
+}

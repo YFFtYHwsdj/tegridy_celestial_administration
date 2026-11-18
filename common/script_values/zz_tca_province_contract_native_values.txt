@@ -1,0 +1,351 @@
+﻿movement_demands_acceptance_value = {
+	value = -10
+	# Opinion
+	add = {
+		value = "scope:petition_recipient.opinion(scope:petitioner)"
+		multiply = 0.5
+	}
+	# petitioner's movement is in power
+	if = {
+		add = 10
+		limit = {
+			situation:dynastic_cycle = {
+				any_participant_group = {
+					participant_group_has_character = scope:petitioner
+					trigger_if = {
+						limit = {
+							participant_group_type = expansion_movement
+						}
+						is_movement_in_power = { MOVEMENT = expansion_movement }
+					}
+					trigger_else_if = {
+						limit = {
+							participant_group_type = advancement_movement
+						}
+						is_movement_in_power = { MOVEMENT = advancement_movement }
+					}
+					trigger_else_if = {
+						limit = {
+							participant_group_type = pro_hegemon_movement
+						}
+						is_movement_in_power = { MOVEMENT = pro_hegemon_movement }
+					}
+					trigger_else_if = {
+						limit = {
+							participant_group_type = conservative_movement
+						}
+						is_movement_in_power = { MOVEMENT = conservative_movement }
+					}
+					trigger_else = {
+						always = no
+					}
+				}
+			}
+		}
+		desc = POWERFUL_MOVEMENT
+	}
+	# petition_recipient is my elder
+	if = {
+		limit = {
+			scope:petitioner = {
+				has_relation_disciple = scope:petition_recipient
+			}
+		}
+		desc = is_actors_elder
+		add = 20
+	}
+	# petitioner's merit level
+	add = {
+		value = 10
+		multiply = scope:petitioner.merit_level
+		desc = actors_merit_level_desc
+	}
+
+	# house power difference
+	if = { # If you are from a powerful family
+		limit = {
+			scope:petitioner.house ?= {
+				is_powerful_family = yes
+			}
+		}
+		add = 15
+		desc = your_house_is_powerful_reason
+	}
+	if = { # If you are from a dominant family
+		limit = {
+			scope:petitioner.house ?= {
+				is_dominant_family = yes
+			}
+		}
+		add = 25
+		desc = your_house_is_dominant_reason
+	}
+	if = { # Difference in influence level
+		limit = {
+			scope:petitioner.influence_level != scope:petition_recipient.influence_level
+		}
+		add = {
+			add = {
+				add = 5
+				multiply = scope:petitioner.influence_level
+			}
+			subtract = {
+				add = 5
+				multiply = scope:petition_recipient.influence_level
+			}
+		}
+		desc = difference_in_influence_level_reason
+	}
+	if = {
+		limit = {
+			scope:petitioner = {
+				is_powerful_vassal = yes
+			}
+		}
+		add = 5
+		desc = AI_POWERFUL_VASSAL
+	}
+	#petition types
+	if = {
+		limit = {
+			OR = {
+				scope:change_celestial_bureaucracy ?= yes
+				scope:petitioner.var:movement_petition ?= flag:change_bureaucracy_laws
+			}
+		}
+		add = 50
+	}
+	if = {
+		limit = {
+			OR = {
+				scope:change_celestial_army_liege_law ?= yes
+				scope:petitioner.var:movement_petition ?= flag:change_army_laws
+			}
+		}
+		add = -20
+	}
+	if = {
+		limit = {
+			OR = {
+				scope:change_province_type ?= yes
+				scope:petitioner.var:movement_petition ?= flag:change_province_military
+			}
+			scope:hegemon = {
+				any_vassal = {
+					count < celestial_province_military_max_value
+					vassal_contract_has_flag = celestial_province_military
+				}
+			}
+		}
+		add = 20
+	}
+	if = {
+		limit = {
+			OR = {
+				scope:change_province_type ?= yes
+				scope:petitioner.var:movement_petition ?= flag:change_province_military
+			}
+			scope:hegemon = {
+				any_vassal = {
+					count >= celestial_province_military_max_value
+					vassal_contract_has_flag = celestial_province_military
+				}
+			}
+		}
+		add = -20
+	}
+	if = {
+		limit = {
+			OR = {
+				scope:change_province_type ?= yes
+				scope:petitioner.var:movement_petition ?= flag:change_province_protectorate
+			}
+			scope:hegemon = {
+				any_vassal = {
+					count < celestial_province_protectorate_max_value
+					vassal_contract_has_flag = celestial_province_protectorate
+				}
+			}
+		}
+		add = 20
+	}
+	if = {
+		limit = {
+			OR = {
+				scope:change_province_type ?= yes
+				scope:petitioner.var:movement_petition ?= flag:change_province_protectorate
+			}
+			scope:hegemon = {
+				any_vassal = {
+					count >= celestial_province_protectorate_max_value
+					vassal_contract_has_flag = celestial_province_protectorate
+				}
+			}
+		}
+		add = -20
+	}
+	if = {
+		limit = {
+			OR = {
+				scope:hold_examinations ?= yes
+				scope:petitioner.var:movement_petition ?= flag:hold_examinations
+			}
+			scope:hegemon.hegemon_favored_stability_phase_value >= 0
+		}
+		add = 50
+	}
+	if = {
+		limit = {
+			OR = {
+				scope:hold_examinations ?= yes
+				scope:petitioner.var:movement_petition ?= flag:hold_examinations
+			}
+			scope:hegemon.hegemon_favored_stability_phase_value < 0
+		}
+		add = -25
+	}
+	if = {
+		limit = {
+			OR = {
+				scope:increase_budget ?= yes
+				scope:petitioner.var:budget_change ?= flag:decrease_military
+			}
+			scope:hegemon = {
+				NOR = {
+					has_realm_law_flag = military_budget_law_minor_negative_impact
+					has_realm_law_flag = military_budget_law_major_negative_impact
+				}
+			}
+		}
+		add = 25
+	}
+	if = {
+		limit = {
+			OR = {
+				scope:increase_budget ?= yes
+				scope:petitioner.var:budget_change ?= flag:decrease_salary
+			}
+			scope:hegemon = {
+				NOR = {
+					has_realm_law_flag = military_budget_law_minor_negative_impact
+					has_realm_law_flag = military_budget_law_major_negative_impact
+				}
+			}
+		}
+		add = 25
+	}
+	if = {
+		limit = {
+			OR = {
+				scope:increase_budget ?= yes
+				scope:petitioner.var:budget_change ?= flag:decrease_ministry
+			}
+			scope:hegemon = {
+				NOR = {
+					has_realm_law_flag = ministry_budget_law_minor_negative_impact
+					has_realm_law_flag = ministry_budget_law_major_negative_impact
+				}
+			}
+		}
+		add = 25
+	}
+	if = {
+		limit = {
+			OR = {
+				scope:petitioner.var:movement_petition ?= flag:increase_budget_salary
+				scope:petitioner.var:movement_petition ?= flag:increase_budget_ministry
+				scope:petitioner.var:movement_petition ?= flag:increase_budget_military
+			}
+			scope:hegemon.treasury_years_since_budget_enact_date < 3
+		}
+		add = -25
+	}
+	#petition counter offer
+	if = {
+		limit = {
+			scope:petitioner.var:movement_petition_persuasion ?= flag:give_influence
+		}
+		add = 50
+	}
+	if = {
+		limit = {
+			scope:petitioner.var:movement_petition_persuasion ?= flag:give_maa
+			scope:hegemon.hegemon_favored_stability_phase_value >= 0
+		}
+		add = -25
+	}
+	if = {
+		limit = {
+			scope:petitioner.var:movement_petition_persuasion ?= flag:give_maa
+			scope:hegemon.hegemon_favored_stability_phase_value < 0
+		}
+		add = 50
+	}
+	if = {
+		limit = {
+			scope:petitioner = {
+				var:movement_petition_persuasion ?= flag:use_hook
+				has_strong_usable_hook = scope:petition_recipient
+			}
+		}
+		add = 50
+	}
+	if = {
+		limit = {
+			scope:petitioner = {
+				var:movement_petition_persuasion ?= flag:use_hook
+				has_usable_hook = scope:petition_recipient
+			}
+		}
+		add = 25
+	}
+	if = {
+		limit = {
+			scope:petitioner.var:movement_petition_persuasion ?= flag:give_hook
+		}
+		add = 25
+	}
+
+	if = {
+		limit = {
+			scope:petitioner.var:budget_change ?= flag:decrease_salary
+			scope:hegemon = {
+				# Never decrease FROM these levels to lower, because they cost major legitimacy
+				OR = {
+					has_realm_law_flag = salary_budget_law_minor_negative_impact
+					has_realm_law_flag = salary_budget_law_major_negative_impact
+				}
+			}
+		}
+		multiply = 0
+	}
+	if = {
+		limit = {
+			scope:petitioner.var:budget_change ?= flag:decrease_ministry
+			scope:hegemon = {
+				# Never decrease FROM these levels to lower, because they cost major legitimacy
+				OR = {
+					has_realm_law_flag = ministry_budget_law_minor_negative_impact
+					has_realm_law_flag = ministry_budget_law_major_negative_impact
+				}
+			}
+		}
+		multiply = 0
+	}
+	if = {
+		limit = {
+			scope:petitioner.var:budget_change ?= flag:decrease_military
+			scope:hegemon = {
+				# Never decrease FROM these levels to lower, because they cost major legitimacy
+				OR = {
+					has_realm_law_flag = military_budget_law_minor_negative_impact
+					has_realm_law_flag = military_budget_law_major_negative_impact
+				}
+			}
+		}
+		multiply = 0
+	}
+}
+
+# 仅供原版年度超额检查及提醒引用。比较人数最多等于封臣总数。
+celestial_province_metropolitan_max_value = { value = vassal_count add = 1 }

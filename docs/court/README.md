@@ -20,7 +20,7 @@
 - 男爵级知县。
 - 都护府、独立统治者、家族、专门无地官职不套用普通地方名称；提刑仍显示提点刑狱公事。
 
-分类直接使用 celestial_province_standard/metropolitan/industrial/military。原版简中 government_l_simp_chinese.yml:708 起已分别将它们称为州、府、监、军，并非本模组另造分类。
+分类直接使用 celestial_province_standard/metropolitan/industrial/military。原版简中 government_l_simp_chinese.yml:708 起已分别将它们称为州、府、监、军，并非本模组另造分类。州、府、监的治理方案见[地方行政契约](../province_contracts/README.md)。
 
 ## 外部名称管理
 

@@ -1,0 +1,74 @@
+﻿ai_only_liege_modify_vassal_contract_admin_province_interaction = {
+	category = interaction_category_vassal
+	send_name = "modify_vassal_contract_interaction_SEND"
+	desc = liege_modify_vassal_contract_interaction_desc
+
+	auto_accept = yes
+
+	is_available = {
+		# This also blocks non-admin govs with admin vassals from changing province obligations... but we're OK with that.
+		government_has_flag = government_uses_admin_province_obligations
+		is_ai = yes
+	}
+
+	is_shown = {
+		scope:actor = {
+			AND = {
+				government_has_flag = government_uses_admin_province_obligations
+				scope:recipient = { government_has_flag = government_uses_admin_province_obligations }
+			}
+		}
+		scope:recipient = {
+			this != scope:actor
+			liege ?= scope:actor
+			is_tributary = no
+			NOT = {
+				has_strong_hook = scope:actor
+			}
+			is_ruler = yes
+			government_has_flag = government_uses_admin_province_obligations
+			NOT = { has_variable = admin_contract_cooldown }
+
+			does_ai_liege_in_vassal_contract_desire_admin_province_obligation_change = yes
+		}
+		NOT = { scope:actor = { is_at_war_with = scope:recipient } }
+	}
+
+	on_accept = {
+		scope:actor = {
+			stress_and_fulfillment_impact = {
+				generous = minor_stress_impact_gain
+			}
+		}
+
+		scope:recipient = {
+			trigger_event = char_interaction.0253
+			set_variable = {
+				name = admin_contract_cooldown
+				value = yes
+				years = admin_contract_cooldown_value
+			}
+		}
+
+		# Additional Flavor Titles
+		scope:recipient = { additional_flavor_check_effect = yes }
+	}
+
+	ai_targets = {
+		ai_recipients = vassals
+		max = 10
+	}
+
+	ai_frequency_by_tier = {
+		barony = 0
+		county = 0
+		duchy = 12
+		kingdom = 6
+		empire = 6
+		hegemony = 3
+	}
+
+	ai_will_do = {
+		base = 100
+	}
+}

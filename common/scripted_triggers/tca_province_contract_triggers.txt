@@ -1,0 +1,141 @@
+﻿# 地产作用域；城镇评分和设府资格共用城市认定。
+tca_province_contract_is_urban_trigger = {
+    OR = {
+        has_holding_type = city_holding
+        province_has_district = urban_housing_district
+    }
+}
+
+# 人物作用域；府、监准入只看地方有地主官的当前首府。
+tca_province_contract_can_be_prefecture_trigger = {
+    tca_is_landed_celestial_governor_trigger = yes
+    capital_province ?= {
+        OR = {
+            tca_province_contract_is_urban_trigger = yes
+            province_has_district = market_district
+        }
+    }
+}
+
+tca_province_contract_can_be_industrial_trigger = {
+    tca_is_landed_celestial_governor_trigger = yes
+    capital_province ?= {
+        OR = {
+            # 采石、矿区、盐区以实际建成的生产主楼为准。
+            has_building_or_higher = stone_resource_building_1
+            has_building_or_higher = mine_tier_1
+            has_building_or_higher = salt_resource_building_1
+            has_building_with_flag = special_mine
+            has_building_with_flag = special_mine_salt
+            has_building_with_flag = special_mine_copper
+            has_building_with_flag = special_mine_silver
+            has_building_with_flag = special_mine_gold
+            has_building_with_flag = special_mine_iron
+            has_building_with_flag = special_mine_jade
+            # 只列生产建筑链首级；附属税署、行会行政及公益建筑不计。
+            has_building_or_higher = brewers_guild_1
+            has_building_or_higher = weavers_guild_1
+            has_building_or_higher = guild_carpenters_1
+            has_building_or_higher = guild_butchery_1
+            has_building_or_higher = guild_builders_1
+            has_building_or_higher = guild_tannery_1
+            has_building_or_higher = guild_parchment_workshop_1
+            has_building_or_higher = blacksmiths_guild_1
+            has_building_or_higher = bladesmiths_of_toledo_1
+            has_building_or_higher = guild_textiles_silk_1
+            has_building_or_higher = guild_glassmakers_1
+            has_building_or_higher = guild_goldsmiths_1
+            has_building_or_higher = luxury_carpet_workshop_1
+        }
+    }
+}
+
+# 人物作用域；军制省和都护等交还原版选档。
+tca_uses_civil_province_contract_trigger = {
+    tca_is_landed_celestial_governor_trigger = yes
+    OR = {
+        vassal_contract_has_flag = celestial_province_standard
+        vassal_contract_has_flag = celestial_province_industrial
+        vassal_contract_has_flag = celestial_province_metropolitan
+    }
+}
+
+# 人物作用域；MARGIN 为相对现行档位的最低改约收益。
+tca_province_contract_prefecture_is_gain_trigger = {
+    tca_province_contract_can_be_prefecture_trigger = yes
+    NOT = { vassal_contract_has_flag = celestial_province_metropolitan }
+    tca_province_contract_prefecture_gain >= $MARGIN$
+}
+
+tca_province_contract_industrial_is_gain_trigger = {
+    tca_province_contract_can_be_industrial_trigger = yes
+    NOT = { vassal_contract_has_flag = celestial_province_industrial }
+    tca_province_contract_industrial_gain >= $MARGIN$
+}
+
+tca_province_contract_standard_is_gain_trigger = {
+    NOT = { vassal_contract_has_flag = celestial_province_standard }
+    tca_province_contract_standard_gain >= $MARGIN$
+}
+
+tca_province_contract_has_gain_trigger = {
+    OR = {
+        tca_province_contract_prefecture_is_gain_trigger = { MARGIN = $MARGIN$ }
+        tca_province_contract_industrial_is_gain_trigger = { MARGIN = $MARGIN$ }
+        tca_province_contract_standard_is_gain_trigger = { MARGIN = $MARGIN$ }
+    }
+}
+
+# 人物作用域，当前仍可接收已送出的目标档位。
+tca_province_contract_can_apply_choice_trigger = {
+    tca_uses_civil_province_contract_trigger = yes
+    trigger_if = {
+        limit = { scope:tca_province_contract_choice = 2 }
+        tca_province_contract_can_be_prefecture_trigger = yes
+        NOT = { vassal_contract_has_flag = celestial_province_metropolitan }
+    }
+    trigger_else_if = {
+        limit = { scope:tca_province_contract_choice = 1 }
+        tca_province_contract_can_be_industrial_trigger = yes
+        NOT = { vassal_contract_has_flag = celestial_province_industrial }
+    }
+    trigger_else = {
+        scope:tca_province_contract_choice = 0
+        NOT = { vassal_contract_has_flag = celestial_province_standard }
+    }
+}
+
+# 人物作用域，派系候选人按请愿人的议题复用普通准入。
+tca_province_contract_petition_recipient_trigger = {
+    trigger_if = {
+        limit = { scope:petitioner.var:movement_petition ?= flag:change_province_metropolitan }
+        tca_province_contract_can_be_prefecture_trigger = yes
+        NOT = { vassal_contract_has_flag = celestial_province_metropolitan }
+    }
+    trigger_else_if = {
+        limit = { scope:petitioner.var:movement_petition ?= flag:change_province_industrial }
+        tca_province_contract_can_be_industrial_trigger = yes
+        NOT = { vassal_contract_has_flag = celestial_province_industrial }
+    }
+    trigger_else = { always = yes }
+}
+
+# 人物作用域，scope:recipient 为当前直属领主。沿用原生免影响力资格。
+tca_province_contract_can_use_diarch_right_trigger = {
+    is_diarch_of_target = scope:recipient
+    scope:recipient = { has_diarchy_active_parameter = diarch_gets_a_free_change_on_vassal_contract }
+    trigger_if = {
+        limit = { has_variable_list = diarch_contract_rights_used_list }
+        NOT = {
+            is_target_in_variable_list = { name = diarch_contract_rights_used_list target = scope:recipient }
+        }
+    }
+}
+
+tca_province_contract_can_request_free_trigger = {
+    OR = {
+        house ?= { is_dominant_family = yes }
+        tca_province_contract_can_use_diarch_right_trigger = yes
+        has_usable_hook = scope:recipient
+    }
+}

@@ -1,0 +1,165 @@
+﻿# 原生主官改约窗口依赖手动选择义务档位；为 AI 提供同审批、同成本的发送入口。
+# on_send 冻结选档和免付手段，获准时要求双方仍属同一直属关系且目标仍有效。
+tca_province_contract_request_interaction = {
+    category = interaction_category_vassal
+    icon = icon_contract_modification_single
+    send_name = admin_vassal_modify_vassal_contract_interaction_send
+    desc = tca_province_contract_request_interaction_desc
+    notification_text = tca_province_contract_request_interaction_desc
+
+    is_shown = {
+        scope:actor = {
+            is_ai = yes
+            tca_uses_civil_province_contract_trigger = yes
+            liege ?= scope:recipient
+            tgp_is_ceremonial_liege_trigger = no
+            is_tributary = no
+        }
+    }
+
+    can_send = {
+        scope:actor = {
+            NOT = { is_at_war_with = scope:recipient }
+            subject_contract_is_blocked_from_modification = no
+            NOT = { has_variable = admin_contract_cooldown }
+            NOT = { has_variable = admin_contract_request_cooldown }
+            NOT = { has_pending_interaction_of_type = tca_province_contract_request_interaction }
+            OR = {
+                tca_province_contract_can_request_free_trigger = yes
+                influence >= major_influence_value
+            }
+            tca_province_contract_has_gain_trigger = { MARGIN = tca_province_contract_request_margin }
+        }
+    }
+
+    auto_accept = { scope:actor = { tca_province_contract_can_request_free_trigger = yes } }
+
+    on_send = {
+        scope:actor = {
+            tca_province_contract_choose_effect = { MARGIN = tca_province_contract_request_margin }
+            set_variable = { name = tca_province_contract_requested_level value = scope:tca_province_contract_choice years = 1 }
+            set_variable = { name = tca_province_contract_request_payment value = flag:influence years = 1 }
+            if = {
+                limit = { house ?= { is_dominant_family = yes } }
+                set_variable = { name = tca_province_contract_request_payment value = flag:family years = 1 }
+            }
+            else_if = {
+                limit = { tca_province_contract_can_use_diarch_right_trigger = yes }
+                set_variable = { name = tca_province_contract_request_payment value = flag:diarch years = 1 }
+            }
+            else_if = {
+                limit = { has_usable_hook = scope:recipient }
+                set_variable = { name = tca_province_contract_request_payment value = flag:hook years = 1 }
+            }
+        }
+    }
+
+    on_accept = {
+        scope:actor = {
+            if = {
+                limit = {
+                    has_variable = tca_province_contract_requested_level
+                    has_variable = tca_province_contract_request_payment
+                    liege ?= scope:recipient
+                    subject_contract_is_blocked_from_modification = no
+                    NOT = { has_variable = admin_contract_cooldown }
+                    NOT = { is_at_war_with = scope:recipient }
+                    trigger_if = {
+                        limit = { var:tca_province_contract_request_payment = flag:influence }
+                        influence >= major_influence_value
+                    }
+                    trigger_else_if = {
+                        limit = { var:tca_province_contract_request_payment = flag:hook }
+                        has_usable_hook = scope:recipient
+                    }
+                    trigger_else_if = {
+                        limit = { var:tca_province_contract_request_payment = flag:diarch }
+                        tca_province_contract_can_use_diarch_right_trigger = yes
+                    }
+                    trigger_else = { house ?= { is_dominant_family = yes } }
+                }
+                save_scope_value_as = { name = tca_province_contract_choice value = var:tca_province_contract_requested_level }
+                if = {
+                    limit = { tca_province_contract_can_apply_choice_trigger = yes }
+                    send_interface_message = {
+                        type = msg_vassal_contract_change
+                        title = modify_vassal_contract_interaction_notification
+                        right_icon = scope:recipient
+                        if = {
+                            limit = { var:tca_province_contract_request_payment = flag:influence }
+                            change_influence = major_influence_loss
+                        }
+                        else_if = {
+                            limit = { var:tca_province_contract_request_payment = flag:hook }
+                            use_hook = scope:recipient
+                            add_achievement_flag_effect = { FLAG = achievement_fine_print_flag }
+                        }
+                        else_if = {
+                            limit = { var:tca_province_contract_request_payment = flag:diarch }
+                            # 原生结算负责记录分权者权利及对应的好感损失。
+                            save_scope_as = puppet_or_actor
+                            save_scope_value_as = { name = diarch value = yes }
+                            diarch_changed_own_contract_effect = yes
+                        }
+                        tca_province_contract_apply_choice_effect = yes
+                        set_variable = { name = admin_contract_cooldown value = yes years = admin_contract_cooldown_value }
+                    }
+                }
+            }
+            remove_variable = tca_province_contract_requested_level
+            remove_variable = tca_province_contract_request_payment
+        }
+    }
+
+    on_decline = {
+        scope:actor = {
+            remove_variable = tca_province_contract_requested_level
+            remove_variable = tca_province_contract_request_payment
+            set_variable = { name = admin_contract_request_cooldown value = yes years = admin_contract_cooldown_value }
+        }
+    }
+
+    ai_targets = {
+        ai_recipients = liege
+        max = 1
+    }
+    ai_frequency = 12
+    ai_will_do = { base = 100 }
+
+	ai_accept = {
+		base = -25
+
+		# 好感权重。
+		opinion_modifier = {
+			who = scope:recipient
+			opinion_target = scope:actor
+			multiplier = 1
+			desc = AI_OPINION_REASON
+		}
+
+		# 治理效率越高，请求越容易被接受。
+		modifier = {
+			add = scope:actor.governor_efficiency_presented
+			desc = AI_GOVERNOR_EFFICIENCY
+		}
+
+		# 强大家族成员的请求更容易被接受。
+		modifier = {
+			scope:actor = {
+				house ?= { is_powerful_family = yes }
+				NOT = { house ?= scope:recipient.house }
+			}
+			add = 50
+			desc = AI_POWERFUL_FAMILY
+		}
+
+		# 皇族成员的请求更容易被接受。
+		modifier = {
+			scope:actor = {
+				house ?= scope:recipient.house
+			}
+			add = 60
+			desc = AI_SAME_HOUSE
+		}
+	}
+}

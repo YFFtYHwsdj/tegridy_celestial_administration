@@ -1,0 +1,114 @@
+﻿# 人物作用域；三个分数仅由当前首府与州制基准决定。
+tca_province_contract_standard_score = 2
+
+tca_province_contract_prefecture_score = {
+    value = 0
+    capital_province ?= { add = tca_province_contract_capital_prefecture_score }
+}
+
+# 地产作用域；只计算这一块首府地产的城镇与市场建设。
+tca_province_contract_capital_prefecture_score = {
+    value = 0
+    if = {
+        limit = { tca_province_contract_is_urban_trigger = yes }
+        add = {
+            value = province_size_level
+            subtract = 1
+            min = 0
+            max = 7
+            multiply = 4
+            divide = 7
+        }
+    }
+    if = { limit = { has_building_or_higher = pb_market_04 } add = 4 }
+    else_if = { limit = { has_building_or_higher = pb_market_03 } add = 3 }
+    else_if = { limit = { has_building_or_higher = pb_market_02 } add = 2 }
+    else_if = { limit = { has_building_or_higher = pb_market_01 } add = 1 }
+    max = 6
+}
+
+# 地产作用域；按类别产量的不同尺度归一化。零产量时除数仍大于零。
+tca_province_contract_mineral_strength = {
+    value = "production_of_trade_good_category_type(trade_good_category:trade_category_minerals)"
+    divide = {
+        value = "production_of_trade_good_category_type(trade_good_category:trade_category_minerals)"
+        add = 42.5
+    }
+}
+
+tca_province_contract_guild_strength = {
+    value = "production_of_trade_good_category_type(trade_good_category:trade_category_guild_goods)"
+    divide = {
+        value = "production_of_trade_good_category_type(trade_good_category:trade_category_guild_goods)"
+        add = 35
+    }
+}
+
+tca_province_contract_industrial_score = {
+    value = 0
+    capital_province ?= {
+        add = {
+            value = tca_province_contract_mineral_strength
+            min = tca_province_contract_guild_strength
+        }
+    }
+    multiply = 6
+}
+
+# 人物作用域；收益为目标原始分减当前原始分。
+tca_province_contract_current_score = {
+    if = {
+        limit = { vassal_contract_has_flag = celestial_province_metropolitan }
+        value = tca_province_contract_prefecture_score
+    }
+    else_if = {
+        limit = { vassal_contract_has_flag = celestial_province_industrial }
+        value = tca_province_contract_industrial_score
+    }
+    else = { value = tca_province_contract_standard_score }
+}
+
+tca_province_contract_prefecture_gain = {
+    value = tca_province_contract_prefecture_score
+    subtract = tca_province_contract_current_score
+}
+
+tca_province_contract_industrial_gain = {
+    value = tca_province_contract_industrial_score
+    subtract = tca_province_contract_current_score
+}
+
+tca_province_contract_standard_gain = {
+    value = tca_province_contract_standard_score
+    subtract = tca_province_contract_current_score
+}
+
+# 两档均过门槛时，统一在选档处抽取一次。此概率等价于给监减府的
+# 分差加一个均匀分布的 ±0.5 扰动后与零比较。
+tca_province_contract_industrial_pick_chance = {
+    value = tca_province_contract_industrial_score
+    subtract = tca_province_contract_prefecture_score
+    add = 0.5
+    multiply = 100
+    min = 0
+    max = 100
+}
+
+# 人物作用域，保留派系原有位望排序作为其他议题的排序依据。
+tca_province_contract_petition_priority = {
+    if = {
+        limit = { scope:petitioner.var:movement_petition ?= flag:change_province_metropolitan }
+        value = tca_province_contract_prefecture_gain
+    }
+    else_if = {
+        limit = { scope:petitioner.var:movement_petition ?= flag:change_province_industrial }
+        value = tca_province_contract_industrial_gain
+    }
+    else = { value = var:movement_power_individual }
+}
+
+# 申请人作用域；免影响力时按领主主动改约门槛。
+tca_province_contract_request_margin = {
+    value = 3
+    if = { limit = { tca_province_contract_can_request_free_trigger = yes } value = 2 }
+}
