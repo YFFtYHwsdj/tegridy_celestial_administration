@@ -5,12 +5,21 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from check_upstream_overrides import body, check, main, definitions
+from check_upstream_overrides import body, check, main, definitions, entry_definitions
 
 NATIVE = "sample_override"
 
 
 class UpstreamCheckTests(unittest.TestCase):
+    def test_on_action_file_allows_repeated_additive_callbacks(self):
+        path = Path(tempfile.mktemp(suffix=".txt"))
+        self.addCleanup(lambda: path.unlink(missing_ok=True))
+        path.write_text("yearly = { on_actions = { first } }\nyearly = { on_actions = { second } }\nquarterly = {}", encoding="utf-8")
+        parsed = entry_definitions({"vanilla": "common/on_action/yearly.txt"}, path)
+        self.assertIn("quarterly", parsed)
+        with self.assertRaisesRegex(ValueError, "duplicate top-level"):
+            entry_definitions({"vanilla": "common/scripted_effects/yearly.txt"}, path)
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)

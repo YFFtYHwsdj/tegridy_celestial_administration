@@ -35,10 +35,28 @@ tca_retirement_native_transfer_test.20 = {
         tca_test_validate_environment_effect = yes
         if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
             if = { limit = { scope:tca_nn_family.current_heir = scope:tca_nn_heir scope:tca_nn_actor = { can_execute_decision = renounce_noble_family_title_decision } }
-                scope:tca_nn_actor = { execute_decision = renounce_noble_family_title_decision }
+                # 1.21原生隐退按行动前政体选择地产修正；仅鼓励出家的礼仪授予devoted。
+                save_scope_value_as = { name = tca_nn_expected_eastern value = no }
+                save_scope_value_as = { name = tca_nn_expected_devoted value = no }
+                scope:tca_nn_actor = {
+                    if = { limit = { tgp_retires_to_eastern_estate_trigger = yes } save_scope_value_as = { name = tca_nn_expected_eastern value = yes } }
+                    if = { limit = { OR = { has_trait = devoted rite = { rite_has_doctrine = doctrine_monasticism_encouraged } } } save_scope_value_as = { name = tca_nn_expected_devoted value = yes } }
+                    execute_decision = renounce_noble_family_title_decision
+                }
                 trigger_event = { id = tca_retirement_native_transfer_test.21 days = 5 }
             }
             else = {
+                # 区分继承缓存与决议资格，前置不足仍记未执行，不跳过真实决议。
+                scope:tca_nn_family.current_heir ?= { save_scope_as = tca_nn_actual_heir }
+                if = { limit = { NOT = { scope:tca_nn_family.current_heir = scope:tca_nn_heir } } debug_log = "TCA_NN HEIR_MISMATCH" }
+                scope:tca_nn_actor = {
+                    if = { limit = { NOT = { can_execute_decision = renounce_noble_family_title_decision } } debug_log = "TCA_NN DECISION_INVALID" }
+                    if = { limit = { is_landed = yes } debug_log = "TCA_NN ACTOR_LANDED" }
+                    if = { limit = { is_house_head = no } debug_log = "TCA_NN ACTOR_NOT_HOUSE_HEAD" }
+                    if = { limit = { is_available = no } debug_log = "TCA_NN ACTOR_UNAVAILABLE" }
+                }
+                scope:tca_nn_heir = { if = { limit = { is_available_ai_adult = no } debug_log = "TCA_NN HEIR_UNAVAILABLE" } }
+                debug_log_scopes = yes
                 debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_retirement_native_transfer_normal"
                 if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
                 scope:tca_nn_actor = { tca_test_cleanup_merit_probe_character_effect = yes }
@@ -56,7 +74,7 @@ tca_retirement_native_transfer_test.21 = {
             if = { limit = {
                 scope:tca_nn_family.holder = scope:tca_nn_heir
                 scope:tca_nn_heir = { house.house_head = this domicile = scope:tca_nn_estate NOT = { tca_retirement_is_exited_trigger = yes } }
-                scope:tca_nn_actor = { has_trait = devoted has_character_modifier = ep3_renounced_estate is_ruler = no NOT = { tca_retirement_is_exited_trigger = yes } }
+                scope:tca_nn_actor = { OR = { AND = { scope:tca_nn_expected_devoted = yes has_trait = devoted } AND = { scope:tca_nn_expected_devoted = no NOT = { has_trait = devoted } } } OR = { AND = { scope:tca_nn_expected_eastern = yes has_character_modifier = ep3_renounced_estate } AND = { scope:tca_nn_expected_eastern = no has_character_modifier = tgp_western_renounced_estate } } is_ruler = no NOT = { tca_retirement_is_exited_trigger = yes } }
             } debug_log = "TCA_TEST CHECK_PASS tca_test_retirement_native_transfer_normal 2" }
             else = { add_character_flag = tca_test_tca_retirement_native_transfer_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_retirement_native_transfer_normal 2" }
             scope:tca_nn_actor = { tca_test_cleanup_merit_probe_character_effect = yes }

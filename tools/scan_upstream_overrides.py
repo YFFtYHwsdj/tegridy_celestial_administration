@@ -24,9 +24,12 @@ def scan(game_dir, mod_dir):
                 raise ValueError(f"definition classified more than once: {identity}")
             classified[identity] = status
 
-    collisions = discover_collisions(game_dir, mod_dir)
+    errors = []
+    collisions = discover_collisions(game_dir, mod_dir, errors=errors)
+    file_pairs = {(entry["mod"], entry["vanilla"]) for entry in registry.get("file_overrides", [])}
     objects = [{"key": key, "mod": mod, "vanilla": vanilla,
-                "status": classified.get((key, mod, vanilla), "unregistered")}
+                "status": classified.get((key, mod, vanilla),
+                    "registered_file_override" if (mod, vanilla) in file_pairs else "unregistered")}
                for key, mod, vanilla in sorted(collisions)]
     stale = [{"key": key, "mod": mod, "vanilla": vanilla,
               "status": classified[(key, mod, vanilla)]}
@@ -35,17 +38,19 @@ def scan(game_dir, mod_dir):
                        for path in script_files(mod_dir)
                        if (game_dir / path.relative_to(mod_dir)).is_file()]
     counts = {status: sum(item["status"] == status for item in objects)
-              for status in ("registered_override", "registered_extension", "unregistered")}
+              for status in ("registered_override", "registered_extension", "registered_file_override", "unregistered")}
     counts["stale_registration"] = len(stale)
     counts["same_path_files"] = len(same_path_files)
     return {"scope": ["common/**/*.txt", "events/**/*.txt"], "counts": counts,
             "objects": objects, "stale_registrations": stale,
-            "same_path_files": same_path_files}
+            "same_path_files": same_path_files, "scan_errors": errors}
 
 
 def print_report(report):
     print("SCAN SCOPE: common/**/*.txt and events/**/*.txt; reviewed baselines are not checked.")
-    labels = {"registered_override": "REGISTERED OVERRIDE",
+    for error in report["scan_errors"]:
+        print(f"SCAN INCOMPLETE: {error}")
+    labels = {"registered_override": "REGISTERED OVERRIDE", "registered_file_override": "REGISTERED FILE OVERRIDE",
               "registered_extension": "REGISTERED EXTENSION", "unregistered": "UNREGISTERED"}
     for item in report["objects"]:
         print(f"{labels[item['status']]}: {item['key']}: "
@@ -80,6 +85,8 @@ def main(argv=None):
     else:
         print_report(report)
     counts = report["counts"]
+    if report["scan_errors"]:
+        return 2
     return int(bool(counts["unregistered"] or counts["stale_registration"] or counts["same_path_files"]))
 
 

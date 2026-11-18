@@ -3,4 +3,4 @@ name="国是：东京梦华"
 tags={
     "Gameplay"
 }
-supported_version="1.20.0.4"
+supported_version="1.21.*"

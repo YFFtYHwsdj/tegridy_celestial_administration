@@ -5,17 +5,17 @@
 ## 实现入口
 
 - `common/script_values/appointment/tca_tongpan_appointment_values.txt`：绑定州的任命重要度；`common/script_values/appointment/zz_tca_appointment_values.txt`在既有原版覆盖内按官署标记分流，保留提刑和其他头衔算法。中英文重要度分项由 `tca_tongpan_prominence_l_*` 提供。
-- `tools/build_tongpan_catalog.py`：3,442个固定官职、128个池官职、固定映射、限定官职的持有人称谓和双语名称；不含测试生成。
+- `tools/build_tongpan_catalog.py`：3,515个固定官职、128个池官职、固定映射、限定官职的持有人称谓和双语名称；不含测试生成。
 - `common/scripted_effects/tca_tongpan_effects.txt`：绑定、三级挂靠、本职原生评分补位、destroy与恢复、角色分权同步和皇帝级维护。
 - `common/scripted_triggers/tca_tongpan_triggers.txt`：实际政权与伯爵主头衔资格、专职校验、双向绑定与生效条件。
 - `common/laws/tca_tongpan_laws.txt`、`common/law_groups/tca_tongpan_law_groups.txt`：皇帝级开关、费用、冷却和开局默认。
 - `common/diarchies/`、`common/script_values/tca_tongpan_values.txt`：单使命、称职度、0/20/40/60/80档位和数值。
 - `common/on_action/tca_tongpan_on_actions.txt`、`events/tca_tongpan_events.txt`：原生回调追加维护，合并到次日；季度及年度补查。
-- `common/script_values/zz_tca_tongpan_native_values.txt`：原版治理效率与四项威望附费的包装；保留原生治理效率0.5—1.5总上限。
+- `common/script_values/zz_tca_tongpan_native_values.txt`：四项原版威望附费的包装；治理效率通过分权类型的领主修正接入1.21原生计算。
 - `common/character_interactions/zz_tca_tongpan_action_costs.txt`：原版四项互动追加影响力费用，代理操作沿用原版承担者路径；本模组两项司法拘捕入口也追加费用。
-- `common/on_action/diarchy_on_action.txt`：修正原版退出分权时直接读取已故旧分权者变量的问题。仅给共治头衔变量分支增加存活检查，其余四个回调原样保留；采用同名文件遮蔽，避免多个effect定义的加载错误。五个对象均登记并保留原版基线。
+- 共治回调以1.21完整原版为底，仅在退出分权的共治变量分支增加存活检查；本版全量仍复现原版对已故通判读取变量报错，因此保留这个必要保护。完整原版基线与同文件兼容边界见覆盖清单。
 
-新增同名原版对象及追加回调已登记 `tools/upstream_overrides.json`；原版主体保存在已审阅基线／原样helper中。影响力需要覆盖整个互动对象，兼容范围大于仅追加数值的威望适配。
+新增同名原版对象及追加回调已登记 `tools/upstream_overrides.json`；必要覆盖的原版主体保存在当前已审阅基线／原样helper中。影响力需要覆盖整个互动对象，兼容范围大于仅追加数值的威望适配。
 
 原版不允许给无持有者头衔查询任命分数；原版`celestial_appointment_succession_law`属于realm法，不能直接当作官署title法安装。因此首次／纠错时在同一次效果内先由挂靠上级暂持官职，安装通判官署头衔法并挂接正确法理公国，再按本职引擎分数抽选并立即授予专职人选。有效在任者不经过暂持步骤。此处的原生头衔回调可能被其他模组观察到，属于需要兼容验收的边界。
 
@@ -47,7 +47,9 @@
 
 双开局人物、家族和官职任期由 `tools/build_startup_officials.py` 维护；与官署目录生成器分工，详见[共用设计](../appointment/startup_officials_design.md)和[验证](../appointment/startup_officials_verification.md)。
 
-`tools/build_tongpan_catalog.py` 从安装游戏的 `game/` 目录生成固定官职、预留池、索引和双语名称。不要逐条修改生成文件；扩充池时同步审阅初始化迁移。历史人物快照位于 `common/scripted_effects/tca_historical_character_registry.txt`，用于首次／纠错补位排除，正常原版继任不因此排除合格历史人物。更新名单需重新审阅来源；当前没有重建该快照的工具。
+`tools/build_tongpan_catalog.py` 从安装游戏的 `game/` 目录生成固定官职、预留池、索引和双语名称。原版县清单变化时递增生成器的固定映射版本，已有游戏在下次官署维护时刷新映射，保留现有官署绑定和预留池。扩充池时同步审阅初始化迁移。历史人物快照位于 `common/scripted_effects/tca_historical_character_registry.txt`，用于首次／纠错补位排除，正常原版继任不因此排除合格历史人物。更新名单需重新审阅来源；当前没有重建该快照的工具。
+
+生命周期回归用例模拟预留池已初始化、1.21固定目录尚未刷新时的状态，检查正式初始化入口补齐新增县的固定映射。真实旧版游戏存档的跨版本加载仍待验收。
 
 ## 自动验证与尚未解决的问题
 
@@ -87,6 +89,10 @@ python3 tools/run_game_tests.py --case tca_tongpan_test.1 --seed 1538798675 --ti
 当前上述真实路径及画面仍待验收；实际错误、重复对象、残留状态或相关引擎错误都阻止对应项目通过。所测语言、缩放和角色视角应明确记录。
 
 GUI探针 `python3 tools/run_diarchy_ui_probe.py --timeout 180` 验证固定场景的真实窗口目标及正式表达式，完整边界见[测试运行](../testing/README.md)。它不证明不同玩家角色、实际鼠标、全部缩放与保存重载均已验收。
+
+1.21固定场景中，自身、领主、通判标签及返回检查均通过。通判窗口、HUD 按钮及其可见性条件沿用适配前的定义。在独立1066局通过按钮原有数据上下文执行其正式回调，首屏所有者为洪州知州，显示的分权者为本地玩家通判。此项验证原生窗口绑定，鼠标命中与画面仍须人工验收。
+
+原窗口探针通过 `OpenGameViewData` 打开后又在首屏断言前调用 `SetYourDiarchyTab`，该路径曾读到皇帝或通判本人。正式 HUD 回调的独立验证未复现此现象。结束分权互动自适配前即隐藏，因此探针在可用性检查处失败，后续两日的收益清理未执行。
 
 ## GUI维护约定
 

@@ -32,6 +32,16 @@ tca_tongpan_test.2001 = {
                 # 绝不通过调用维护满足此开局断言。
                 if = { limit = { var:tca_test_tongpan_startup_count > 0 var:tca_test_tongpan_startup_missing = 0 } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 29" }
                 else = { add_character_flag = tca_test_tca_tongpan_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 29" }
+                # 模拟旧档的目录状态。保留预留池与已有官署，只撤去新版县的目录项及版本标记。
+                title:c_acerenza = { remove_variable = tca_tongpan_static_office }
+                remove_global_variable = tca_tongpan_static_catalog_v2
+                tca_initialize_tongpan_catalog_effect = yes
+                if = { limit = {
+                    has_global_variable = tca_tongpan_catalog_v1
+                    has_global_variable = tca_tongpan_static_catalog_v2
+                    title:c_acerenza = { var:tca_tongpan_static_office ?= title:c_tca_tongpan_acerenza }
+                } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 66" }
+                else = { add_character_flag = tca_test_tca_tongpan_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 66" }
                 if = { limit = { has_realm_law = tca_tongpan_enabled_law } add_character_flag = tca_test_tp2_restore_law }
                 # 只读保留禁法前的真实官署持有人，区分后续维护是保留旧任还是重新授职。
                 clear_saved_scope = tca_test_tp2_before_disable_officer
@@ -47,7 +57,7 @@ tca_tongpan_test.2001 = {
                 tca_refresh_tongpan_realm_effect = yes
                 create_character = { age = 40 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite save_scope_as = tca_test_tp2_duke }
                 scope:tca_test_tp2_duke = { tca_test_tp2_register_owned_character_effect = yes }
-                create_character = { age = 35 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite diplomacy = 1 martial = 1 stewardship = 1 intrigue = 1 learning = 1 save_scope_as = tca_test_tp2_governor }
+                create_character = { age = 35 gender_female_chance = 0 random_traits = no dynasty = none employer = root culture = root.culture faith = root.faith rite = root.rite diplomacy = 12 martial = 12 stewardship = 12 intrigue = 12 learning = 12 save_scope_as = tca_test_tp2_governor }
                 scope:tca_test_tp2_governor = { tca_test_tp2_register_owned_character_effect = yes }
                 scope:tca_test_tp2_duke = {
                     create_dynasty = { spread_to_descendants = yes }
@@ -155,7 +165,7 @@ tca_tongpan_test.2001 = {
                 # 真实伯爵通判必须通过正式任命入口读取绑定州和最高领主首都，不能只让数值夹具通过。
                 save_scope_value_as = { name = tca_test_tp2_distance_squared value = "title:c_hongzhou.title_province.squared_distance(root.capital_province)" }
                 save_scope_value_as = { name = tca_test_tp2_distance_bonus value = { value = 500 subtract = { value = scope:tca_test_tp2_distance_squared multiply = 0.0001 } min = 0 } }
-                save_scope_value_as = { name = tca_test_tp2_prominence_expected value = { value = title:c_hongzhou.title_province.monthly_income multiply = 12 add = scope:tca_test_tp2_distance_bonus } }
+                save_scope_value_as = { name = tca_test_tp2_prominence_expected value = { value = title:c_hongzhou.title_province.total_monthly_tax_income multiply = 12 add = scope:tca_test_tp2_distance_bonus } }
                 if = { limit = { scope:tca_test_tp2_distance_squared > 0 scope:tca_test_tp2_distance_squared < 5000000 scope:tca_test_tp2_office = { tier = tier_county appointment_title_value = scope:tca_test_tp2_prominence_expected } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 59" }
                 else = { add_character_flag = tca_test_tca_tongpan_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 59" }
                 # 独立且确定性的称职度夹具；技能修改效果的
@@ -284,13 +294,29 @@ tca_tongpan_test.1001 = {
             scope:tca_test_tp2_officer = { set_relation_rival = scope:tca_test_tp2_duke }
             if = { limit = { scope:tca_test_tp2_officer = { liege = scope:tca_test_tp2_duke tca_tongpan_loyalty_value = scope:tca_test_tp2_loyalty_model } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 31" }
             else = { add_character_flag = tca_test_tca_tongpan_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 31" }
-            # 读取原生最终及显示数值，不仅检查本模组辅助值。
+            # 读取同一人物当前原生数值，再结束分权对照实际加成与清理，不复制原生公式。
             scope:tca_test_tp2_governor = {
-                save_scope_value_as = { name = tca_test_tp2_eff_base value = { value = tca_native_governor_efficiency_value multiply = 100 subtract = 100 } }
-                save_scope_value_as = { name = tca_test_tp2_eff_delta value = { value = governor_efficiency_presented subtract = scope:tca_test_tp2_eff_base } }
-                save_scope_value_as = { name = tca_test_tp2_eff_error value = { value = scope:tca_test_tp2_eff_delta subtract = { value = diarch.tca_tongpan_aptitude_value multiply = 0.5 } } }
+                save_scope_value_as = { name = tca_test_tp2_eff_with value = governor_efficiency }
+                save_scope_value_as = { name = tca_test_tp2_eff_bonus value = tca_tongpan_efficiency_value }
+                save_scope_value_as = { name = tca_test_tp2_eff_display_error value = { value = governor_efficiency multiply = 100 subtract = 100 subtract = governor_efficiency_presented } }
+                end_diarchy = yes
             }
-            if = { limit = { scope:tca_test_tp2_governor = { governor_efficiency > tca_native_governor_efficiency_value } scope:tca_test_tp2_eff_delta > 0 scope:tca_test_tp2_eff_error >= -0.02 scope:tca_test_tp2_eff_error <= 0.02 } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 32" }
+            debug_log = "TCA_TEST WAIT tca_test_tongpan_lifecycle 1 days"
+            trigger_event = { id = tca_tongpan_test.1101 days = 1 }
+        }
+    }
+}
+tca_tongpan_test.1101 = {
+    type = character_event hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { NOT = { has_character_flag = tca_test_suite_aborted } }
+            scope:tca_test_tp2_governor = {
+                save_scope_value_as = { name = tca_test_tp2_eff_base value = governor_efficiency }
+                save_scope_value_as = { name = tca_test_tp2_eff_expected value = { value = governor_efficiency add = scope:tca_test_tp2_eff_bonus min = 0.5 max = 1.5 } }
+                save_scope_value_as = { name = tca_test_tp2_eff_error value = { value = scope:tca_test_tp2_eff_with subtract = scope:tca_test_tp2_eff_expected } }
+            }
+            if = { limit = { scope:tca_test_tp2_eff_base > 0.5 scope:tca_test_tp2_eff_base < 1.5 scope:tca_test_tp2_eff_with > scope:tca_test_tp2_eff_base scope:tca_test_tp2_eff_error >= -0.0002 scope:tca_test_tp2_eff_error <= 0.0002 scope:tca_test_tp2_eff_display_error = 0 } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 32" }
             else = { add_character_flag = tca_test_tca_tongpan_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 32" debug_log_scopes = yes }
             add_realm_law_skip_effects = tca_tongpan_disabled_law
             tca_refresh_tongpan_realm_effect = yes
@@ -641,7 +667,7 @@ tca_tongpan_test.1005 = {
                 resolve_title_and_vassal_change = scope:tca_test_tp2_boundary_fealty
             }
             title:c_hongzhou = { tca_refresh_tongpan_county_effect = yes }
-            if = { limit = { scope:tca_test_tp2_high_governor = { tca_has_active_tongpan_trigger = yes tca_native_governor_efficiency_value = 1.5 tca_tongpan_efficiency_value = 0.5 governor_efficiency = 1.5 } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 55" }
+            if = { limit = { scope:tca_test_tp2_high_governor = { tca_has_active_tongpan_trigger = yes tca_tongpan_efficiency_value = 0.5 governor_efficiency = 1.5 } } debug_log = "TCA_TEST CHECK_PASS tca_test_tongpan_lifecycle 55" }
             else = { add_character_flag = tca_test_tca_tongpan_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_tongpan_lifecycle 55" debug_log_scopes = yes }
             create_title_and_vassal_change = { type = granted add_claim_on_loss = no save_scope_as = tca_test_tp2_boundary_change }
             title:c_hongzhou = { change_title_holder = { holder = scope:tca_test_tp2_governor change = scope:tca_test_tp2_boundary_change } }

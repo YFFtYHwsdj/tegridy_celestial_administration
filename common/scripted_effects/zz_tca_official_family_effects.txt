@@ -8,114 +8,115 @@ tca_native_create_noble_family_effect = {
 	save_scope_as = new_noble_family_holder
 	$GOVERNMENT_GIVER$ = { save_scope_as = government_giver }
 	if = {
-		limit = { scope:government_giver ?= { government_allows = noble_families } }
+		limit = { exists = scope:noble_family_suggested_liege }
+		scope:noble_family_suggested_liege = { save_scope_as = liege }
+	}
+	else_if = {
+		limit = { is_ruler = no }
 		if = {
 			limit = {
-				is_ruler = no
+				scope:government_giver = { is_ruler = yes }
 			}
-			if = {
-				limit = {
-					scope:government_giver = { is_ruler = yes }
-				}
-				scope:government_giver = {
-					if = {
-						limit = {
-							highest_held_title_tier <= tier_duchy
-						}
-						top_liege = {
-							save_scope_as = liege
-						}
-					}
-					else = {
-						save_scope_as = liege
-					}
-				}
-			}
-			else = {
-				liege_or_court_owner ?= {
-					save_scope_as = liege
-				}
-			}
-		}
-		hidden_effect = { # NF can only be held by house heads
-			if = { # Start by checking that we are not the house head already
-				limit = {
-					exists = house.house_head
-					NOT = { house.house_head = scope:new_noble_family_holder }
-				}
-				if = { # If not, let's see if it would be reasonable to become house head...
-					limit = {
-						house.house_head ?= {
-							is_ai = yes # Don't steal house head from a player
-							OR = {
-								# Within same realm but less important
-								AND = {
-									top_liege = scope:new_noble_family_holder.top_liege
-									OR = {
-										is_ruler = no
-										highest_held_title_tier < scope:new_noble_family_holder.highest_held_title_tier
-									}
-								}
-								# Wanderer
-								NOT = { exists = liege }
-							}
-						}
-					}
-					house = { set_house_head = scope:new_noble_family_holder }
-				}
-				else = { # ... Otherwise, we create a cadet branch
-					create_cadet_house_with_name_effect = yes
-				}
-			}
-		}
-		scope:new_noble_family_holder = {
-			if = {
-				limit = {
-					NOT = {
-						any_held_title = { is_noble_family_title = yes }
-					}
-				}
-				give_noble_family_title_effect = { GOVERNMENT_GIVER = scope:government_giver }
-			}
-			scope:new_title.holder ?= {
+			scope:government_giver = {
 				if = {
-					limit = {
-						is_landed = no
-						exists = scope:liege
-						scope:liege.highest_held_title_tier > highest_held_title_tier
-					}
-					create_title_and_vassal_change = {
-						type = swear_fealty
-						save_scope_as = change
-					}
-					change_liege = {
-						liege = scope:liege
-						change = scope:change
-					}
-					resolve_title_and_vassal_change = scope:change
+					limit = { highest_held_title_tier <= tier_duchy }
+					top_liege = { save_scope_as = liege }
 				}
-			}
-			custom_description = { text = create_noble_family_tt }
-
-			#Notifications
-			every_player = {
-				limit = {
-					top_liege = scope:new_noble_family_holder.top_liege
-					this != scope:new_noble_family_holder
-					# China has hundreds of Noble Families, it gets spammy
-					NOT = { government_allows = merit }
-				}
-				trigger_event = {
-					id = ep3_emperor_yearly.2410
-					days = 1
-				}
+				else = { save_scope_as = liege }
 			}
 		}
+		else = {
+			liege_or_court_owner ?= { save_scope_as = liege }
+		}
+	}
+	# Who a non-ruler becomes a vassal of when getting the title, rulers keep their current liege unless one was suggested
+	if = {
+		limit = { exists = scope:liege }
+		scope:liege = { save_scope_as = noble_family_liege }
 	}
 	else = {
-		debug_log = "try create NF title but goverment does not allow"
+		scope:government_giver = { save_scope_as = noble_family_liege }
 	}
-	debug_log_scopes = yes
+	hidden_effect = { # NF can only be held by house heads
+		if = { # Start by checking that we are not the house head already
+			limit = {
+				exists = house.house_head
+				NOT = { house.house_head = scope:new_noble_family_holder }
+			}
+			if = { # If not, let's see if it would be reasonable to become house head...
+				limit = {
+					house.house_head ?= {
+						is_ai = yes # Don't steal house head from a player
+						NOT = { any_held_title = { is_noble_family_title = yes } }
+						OR = {
+							# Within same realm but less important
+							AND = {
+								top_liege = scope:new_noble_family_holder.top_liege
+								OR = {
+									is_ruler = no
+									highest_held_title_tier < scope:new_noble_family_holder.highest_held_title_tier
+								}
+							}
+							# Wanderer
+							NOT = { exists = liege }
+						}
+					}
+				}
+				house = { set_house_head = scope:new_noble_family_holder }
+			}
+			else = { # ... Otherwise, we create a cadet branch
+				create_cadet_house_with_name_effect = yes
+			}
+		}
+	}
+	scope:new_noble_family_holder = {
+		if = {
+			limit = {
+				NOT = {
+					any_held_title = { is_noble_family_title = yes }
+				}
+			}
+			give_noble_family_title_effect = {
+				GOVERNMENT_GIVER = scope:government_giver
+				LIEGE = scope:noble_family_liege
+			}
+		}
+		scope:new_title.holder ?= {
+			save_scope_as = noble_family_head
+			if = {
+				limit = {
+					is_landed = no
+					exists = scope:liege
+					NOT = { liege = scope:liege }
+					scope:liege.highest_held_title_tier > highest_held_title_tier
+				}
+				create_title_and_vassal_change = {
+					type = swear_fealty
+					save_scope_as = change
+				}
+				change_liege = {
+					liege = scope:liege
+					change = scope:change
+				}
+				resolve_title_and_vassal_change = scope:change
+			}
+		}
+		custom_description = { text = create_noble_family_tt }
+
+		#Notifications
+		every_player = {
+			limit = {
+				top_liege = scope:new_noble_family_holder.top_liege
+				this != scope:new_noble_family_holder
+				# China has hundreds of Noble Families, it gets spammy
+				NOT = { government_allows = merit }
+			}
+			trigger_event = {
+				id = ep3_emperor_yearly.2410
+				days = 1
+			}
+		}
+	}
 }
 
 create_noble_family_effect = {
@@ -128,17 +129,21 @@ create_noble_family_effect = {
 tca_native_give_new_noble_family_title_effect = {
 	if = {
 		limit = {
-			is_house_head = yes
 			government_allows = noble_families
 			trigger_if = {
-				limit = {
-					government_has_flag = government_has_county_tier_noble_families
-				}
-				highest_held_title_tier >= tier_county
+				limit = { government_has_mechanic = administrative } # excludes republic/soryo
+				is_house_head = yes
+				highest_held_title_tier >= min_appointment_tier
+				liege = { government_allows = noble_families }
 			}
-			trigger_else = { highest_held_title_tier >= tier_duchy }
-			liege = {
-				government_allows = noble_families
+			# Republic house members in the same republic as their house head must not found a cadet branch
+			trigger_if = {
+				limit = {
+					government_has_flag = government_is_republic
+					is_house_head = no
+					exists = house.house_head.highest_liege_matching_mechanic:republic
+				}
+				NOT = { highest_liege_matching_mechanic:republic = house.house_head.highest_liege_matching_mechanic:republic }
 			}
 			trigger_if = {
 				limit = { any_held_title = { is_noble_family_title = yes } }

@@ -99,7 +99,7 @@ class RunEvidenceTests(unittest.TestCase):
         self.assertTrue(any('duplicate event' in issue.lower() for issue in issues))
 
     def test_registered_vanilla_named_shadow_error_is_owned(self):
-        error = "[14:51:42][E][jomini_onaction.cpp:161]: There is more than one 'effect' defined using most recent:file: common/on_action/diarchy_on_action.txt line: 3 (on_left_diarchy)"
+        error = "[14:51:42][E][jomini_onaction.cpp:161]: There is more than one 'effect' defined using most recent:file: common/on_action/title_on_actions.txt line: 3 (on_vassal_change)"
         issues, _ = inspect_run(self.run_log(), error, {'tca_test_example'})
         self.assertTrue(any('duplicate on_action effect' in issue for issue in issues))
 

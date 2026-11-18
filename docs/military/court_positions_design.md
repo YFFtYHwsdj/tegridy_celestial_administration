@@ -113,7 +113,7 @@
 
 战略附加值由 `tca_military_office_strategic_weight` 维护：军制省或都护府+15；与外国直接接壤+15；首府要塞每级0.5、最高15；辖区每县0.5、最高10；总军力每2000人1分、最高4；兵士规模每2.5级1分、最高11；宫廷位阶伯爵／公爵／王国／帝国／霸权为0／3／6／9／12。合计最高82，不跨越100分的职类间距。
 
-人物现职读取与季度排序采用[共用数值](../../common/script_values/tca_court_flow_values.txt)，军事战略权重仍维护于[军事数值](../../common/script_values/tca_military_court_position_values.txt)。收入与发展度的文官权重不直接用于军职。
+人物现职读取与季度排序采用[共用数值](../../common/script_values/tca_court_flow_values.txt)，军事战略权重仍维护于[军事数值](../../common/script_values/tca_military_court_position_values.txt)。收入与繁荣度的文官权重不直接用于军职。
 
 ## 七、季度批次与任免
 

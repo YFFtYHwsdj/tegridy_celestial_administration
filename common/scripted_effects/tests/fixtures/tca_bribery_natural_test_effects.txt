@@ -9,8 +9,8 @@ tca_test_bribery_natural_prepare_effect = {
     clear_variable_list = tca_bribery_natural_original_people
     clear_variable_list = tca_bribery_natural_baronies
     clear_variable_list = tca_bribery_natural_titles
-    # 空无地天朝的附庸会被原生维护归入首府所在天朝；自建演员直接留在真实中国，
-    # 不借县、不反复改领属。最高领主为真实报告者，仅用于只读排除观察。
+    # 空无地天朝的附庸会被原生维护归入首府所在天朝；付款者留在真实中国，临时借县维持有地身份。
+    # 观察期间不反复改领属。最高领主为真实报告者，仅用于只读排除观察。
     save_scope_as = tca_bribery_natural_emperor
     tca_test_bribery_natural_create_group_effect = { TARGET = tca_bribery_natural_thin TIER = 1 }
     tca_test_bribery_natural_create_group_effect = { TARGET = tca_bribery_natural_generous TIER = 2 }
@@ -60,8 +60,8 @@ tca_test_bribery_natural_create_group_effect = {
         add_character_flag = tca_merit_grant_suppress
         set_variable = { name = tca_merit_approved_level value = 9 }
         tca_merit_refresh_cap_effect = yes
-        # 正直但贪财的受贿者仍可能被关系／困境说动；其正式主动兴趣为零，
-        # 避免收款当日又自行行贿，干扰精确入账观察。薄礼对象以负债而非更改概率获得最低档。
+        # 正直但贪财的受贿者仍可能被关系或困境说动；主动兴趣为零，使本组三人只担当收款者。
+        # 薄礼对象以负债取得最低档，沿用正式概率。
         add_trait = greedy add_trait = just
         if = { limit = { var:tca_bribery_natural_tier = 1 } remove_short_term_gold = gold remove_short_term_gold = 1000 }
 
@@ -77,6 +77,7 @@ tca_test_bribery_natural_create_group_effect = {
             set_merit_level = 1 remove_short_term_gold = gold add_gold = 5000
             add_trait = ambitious add_trait = deceitful add_trait = arbitrary
             set_variable = { name = tca_bribery_natural_target value = scope:$TARGET$ }
+            set_variable = { name = tca_bribery_natural_reporter value = scope:tca_bribery_natural_reporter }
             create_title_and_vassal_change = { type = swear_fealty add_claim_on_loss = no save_scope_as = tca_bribery_natural_fealty }
             change_liege = { liege = scope:$TARGET$ change = scope:tca_bribery_natural_fealty }
             resolve_title_and_vassal_change = scope:tca_bribery_natural_fealty
@@ -200,13 +201,65 @@ tca_test_bribery_natural_return_counties_effect = {
     clear_variable_list = tca_bribery_natural_baronies
 }
 
-# 报告者作用域；每日观察已有自然成交，随后保存下一日比较基线，不发送任何互动。
-# 每位付款者观察三位私有目标；目标的汇总入账按当日新增的全部冷却关系计算，
-# 可同时成交多人；精确匹配最低档总价才接受报价证据。无关金币变动会留下失败而非放宽预期。
+# 正式发送上下文；只有独立测试的自建付款者与指定收款者采集最低档。
+# 将最低档保存在本次互动上下文，避免答复前收入、好感或其他成交改变预期。
+tca_test_bribery_natural_capture_offer_effect = {
+    if = { limit = {
+        scope:actor = { debug_only = yes has_variable = tca_bribery_natural_reporter }
+        scope:recipient = { has_variable = tca_bribery_natural_tier }
+    }
+        save_scope_value_as = { name = tca_bribery_natural_offer_tier value = tca_bribery_cheapest_tier_value }
+        save_scope_value_as = { name = tca_bribery_natural_offer_quote value = tca_bribery_ai_price_value }
+    }
+}
+
+# 正式回复上下文；报价复核后、原生支付前保存两方精确余额。
+tca_test_bribery_natural_capture_balances_effect = {
+    if = { limit = {
+        exists = scope:tca_bribery_natural_offer_tier
+        scope:actor = { has_variable = tca_bribery_natural_reporter }
+    }
+        save_scope_value_as = { name = tca_bribery_natural_actor_gold_before value = scope:actor.gold }
+        save_scope_value_as = { name = tca_bribery_natural_recipient_gold_before value = scope:recipient.gold }
+    }
+}
+
+# 正式回复上下文；同一事务内验证双边余额与发送时最低档，记录通过核验的收款人。
+tca_test_bribery_natural_check_settlement_effect = {
+    if = { limit = {
+        exists = scope:tca_bribery_natural_offer_tier
+        scope:actor = { has_variable = tca_bribery_natural_reporter }
+    }
+        scope:actor = {
+            if = { limit = {
+                scope:tca_bribery_natural_offer_tier > 0
+                tca_bribery_selected_tier_value = scope:tca_bribery_natural_offer_tier
+                scope:tca_bribery_quote = scope:tca_bribery_natural_offer_quote
+                gold = { value = scope:tca_bribery_natural_actor_gold_before subtract = scope:tca_bribery_quote }
+                scope:recipient = { gold = { value = scope:tca_bribery_natural_recipient_gold_before add = scope:tca_bribery_quote } }
+            }
+                add_to_variable_list = { name = tca_bribery_natural_verified_payees target = scope:recipient }
+                var:tca_bribery_natural_reporter = {
+                    if = { limit = { scope:tca_bribery_natural_offer_tier = 1 } change_variable = { name = tca_bribery_natural_seen_1 add = 1 } }
+                    else_if = { limit = { scope:tca_bribery_natural_offer_tier = 2 } change_variable = { name = tca_bribery_natural_seen_2 add = 1 } }
+                    else = { change_variable = { name = tca_bribery_natural_seen_3 add = 1 } }
+                }
+                debug_log = "TCA_BRIBERY_NATURAL settlement_verified actor=[THIS.Char.GetID]"
+            }
+            else = {
+                debug_log = "TCA_BRIBERY_NATURAL transaction_failed=settlement actor=[THIS.Char.GetID]"
+                debug_log_scopes = yes
+                var:tca_bribery_natural_reporter = {
+                    add_character_flag = tca_test_tca_bribery_natural_test_case_failed
+                    add_character_flag = tca_bribery_natural_transaction_failed
+                }
+            }
+        }
+    }
+}
+
+# 报告者作用域；每日验证正式成交留下的牵制和双向名单，以及最高领主和外朝排除。
 tca_test_bribery_natural_observe_effect = {
-    scope:tca_bribery_natural_thin = { set_variable = { name = tca_bribery_natural_expected_income value = 0 } }
-    scope:tca_bribery_natural_generous = { set_variable = { name = tca_bribery_natural_expected_income value = 0 } }
-    scope:tca_bribery_natural_lavish = { set_variable = { name = tca_bribery_natural_expected_income value = 0 } }
     every_in_list = {
         variable = tca_bribery_natural_observers
         save_scope_as = actor
@@ -220,60 +273,28 @@ tca_test_bribery_natural_observe_effect = {
             is_target_in_variable_list = { name = tca_bribery_recent_partners target = scope:tca_bribery_natural_foreign }
         } } root = { add_character_flag = tca_bribery_natural_exclusion_failed } }
     }
-    tca_test_bribery_natural_check_income_effect = { TARGET = tca_bribery_natural_thin }
-    tca_test_bribery_natural_check_income_effect = { TARGET = tca_bribery_natural_generous }
-    tca_test_bribery_natural_check_income_effect = { TARGET = tca_bribery_natural_lavish }
 }
 
-# 付款者作用域；TARGET为被观察对象，KEY隔离每一对人物的观测基线。
-# 原生AI可选择任意本朝对象，因此三位受贿者都观察，不能只追踪预先指定的直属目标。
+# 付款者作用域；TARGET为三位私有收款者之一，KEY隔离每对人物的一次性观察标记。
 tca_test_bribery_natural_observe_pair_effect = {
     scope:$TARGET$ = { save_scope_as = recipient }
-    if = {
-        limit = { NOT = { has_character_flag = tca_bribery_natural_observed_$KEY$ } is_target_in_variable_list = { name = tca_bribery_recent_partners target = scope:recipient } }
-        add_character_flag = tca_bribery_natural_observed_$KEY$
-        if = { limit = {
-            has_hook_of_type = { target = scope:recipient type = tca_bribery_hook }
-            scope:recipient = { is_target_in_variable_list = { name = tca_bribery_recent_partners target = scope:actor } }
-            has_variable = tca_bribery_natural_previous_quote_$KEY$
-            var:tca_bribery_natural_previous_tier_$KEY$ > 0
-        }
-            scope:recipient = { change_variable = { name = tca_bribery_natural_expected_income add = scope:actor.var:tca_bribery_natural_previous_quote_$KEY$ } }
-            if = { limit = { var:tca_bribery_natural_previous_tier_$KEY$ = 1 } root = { change_variable = { name = tca_bribery_natural_seen_1 add = 1 } } }
-            else_if = { limit = { var:tca_bribery_natural_previous_tier_$KEY$ = 2 } root = { change_variable = { name = tca_bribery_natural_seen_2 add = 1 } } }
-            else = { root = { change_variable = { name = tca_bribery_natural_seen_3 add = 1 } } }
-            set_variable = { name = tca_bribery_natural_diag_pair_tier value = var:tca_bribery_natural_previous_tier_$KEY$ }
-            set_variable = { name = tca_bribery_natural_diag_pair_quote value = var:tca_bribery_natural_previous_quote_$KEY$ }
-            debug_log = "TCA_BRIBERY_NATURAL observed actor=[THIS.Char.GetID] tier=[THIS.Char.MakeScope.Var('tca_bribery_natural_diag_pair_tier').GetValue] quote=[THIS.Char.MakeScope.Var('tca_bribery_natural_diag_pair_quote').GetValue]"
-            remove_variable = tca_bribery_natural_diag_pair_tier
-            remove_variable = tca_bribery_natural_diag_pair_quote
-        }
-        else = {
-            debug_log = "TCA_BRIBERY_NATURAL transaction_failed actor=[THIS.Char.GetID]"
-            if = { limit = { NOT = { has_hook_of_type = { target = scope:recipient type = tca_bribery_hook } } } debug_log = "TCA_BRIBERY_NATURAL transaction_failed=hook" }
-            if = { limit = { scope:recipient = { NOT = { is_target_in_variable_list = { name = tca_bribery_recent_partners target = scope:actor } } } } debug_log = "TCA_BRIBERY_NATURAL transaction_failed=reciprocal_list" }
-            if = { limit = { NOT = { has_variable = tca_bribery_natural_previous_quote_$KEY$ } } debug_log = "TCA_BRIBERY_NATURAL transaction_failed=quote_baseline" }
-            if = { limit = { NOT = { var:tca_bribery_natural_previous_tier_$KEY$ > 0 } } debug_log = "TCA_BRIBERY_NATURAL transaction_failed=tier_baseline" }
-            root = { add_character_flag = tca_test_tca_bribery_natural_test_case_failed add_character_flag = tca_bribery_natural_transaction_failed }
+    if = { limit = {
+        NOT = { has_character_flag = tca_bribery_natural_observed_$KEY$ }
+        OR = {
+            is_target_in_variable_list = { name = tca_bribery_recent_partners target = scope:recipient }
+            is_target_in_variable_list = { name = tca_bribery_natural_verified_payees target = scope:recipient }
         }
     }
-    # 只读计算下一日最低报价；不写saved send_option值，不将报价注入自然AI上下文。
-    set_variable = { name = tca_bribery_natural_previous_tier_$KEY$ value = tca_bribery_cheapest_tier_value }
-    set_variable = { name = tca_bribery_natural_previous_quote_$KEY$ value = scope:recipient.tca_bribery_base_price_value }
-    if = { limit = { var:tca_bribery_natural_previous_tier_$KEY$ = 2 } set_variable = { name = tca_bribery_natural_previous_quote_$KEY$ value = { value = var:tca_bribery_natural_previous_quote_$KEY$ multiply = 1.5 ceiling = yes } } }
-    else_if = { limit = { var:tca_bribery_natural_previous_tier_$KEY$ = 3 } set_variable = { name = tca_bribery_natural_previous_quote_$KEY$ value = { value = var:tca_bribery_natural_previous_quote_$KEY$ multiply = 2 ceiling = yes } } }
-}
-
-# 报告者作用域；首次仅设基线，实际发生自然成交的日期才核对精确总入账。
-tca_test_bribery_natural_check_income_effect = {
-    scope:$TARGET$ = {
-        if = { limit = { var:tca_bribery_natural_expected_income > 0 }
-            if = { limit = { NOT = { gold = { value = var:tca_bribery_natural_previous_gold add = var:tca_bribery_natural_expected_income } } }
-                debug_log = "TCA_BRIBERY_NATURAL income_mismatch recipient=[THIS.Char.GetID] expected=[THIS.Char.MakeScope.Var('tca_bribery_natural_expected_income').GetValue]"
-                root = { add_character_flag = tca_test_tca_bribery_natural_test_case_failed add_character_flag = tca_bribery_natural_transaction_failed }
-            }
+        add_character_flag = tca_bribery_natural_observed_$KEY$
+        if = { limit = { NOT = {
+            has_hook_of_type = { target = scope:recipient type = tca_bribery_hook }
+            is_target_in_variable_list = { name = tca_bribery_recent_partners target = scope:recipient }
+            scope:recipient = { is_target_in_variable_list = { name = tca_bribery_recent_partners target = scope:actor } }
+            is_target_in_variable_list = { name = tca_bribery_natural_verified_payees target = scope:recipient }
+        } }
+            debug_log = "TCA_BRIBERY_NATURAL transaction_failed=receipt_or_relationship actor=[THIS.Char.GetID]"
+            root = { add_character_flag = tca_test_tca_bribery_natural_test_case_failed add_character_flag = tca_bribery_natural_transaction_failed }
         }
-        set_variable = { name = tca_bribery_natural_previous_gold value = gold }
     }
 }
 
@@ -316,7 +337,12 @@ tca_test_bribery_natural_diagnose_effect = {
 tca_test_bribery_natural_cleanup_effect = {
     tca_test_bribery_natural_return_counties_effect = yes
     every_in_list = { variable = tca_bribery_natural_titles save_scope_as = tca_bribery_natural_destroy_title root = { destroy_title = scope:tca_bribery_natural_destroy_title } }
-    every_in_list = { variable = tca_bribery_natural_people tca_test_cleanup_merit_probe_character_effect = yes }
+    every_in_list = {
+        variable = tca_bribery_natural_people
+        remove_variable = tca_bribery_natural_reporter
+        clear_variable_list = tca_bribery_natural_verified_payees
+        tca_test_cleanup_merit_probe_character_effect = yes
+    }
     clear_variable_list = tca_bribery_natural_titles
     clear_variable_list = tca_bribery_natural_people
     clear_variable_list = tca_bribery_natural_observers

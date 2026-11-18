@@ -30,23 +30,25 @@ class JudicialLoadingTests(unittest.TestCase):
                 self.assertIn(key, entries)
                 self.assertNotRegex(entries[key], r'(?<![\w.])(?:actor|recipient)\.', key)
 
-    def test_native_naming_override_changes_only_title_capital_link(self):
-        native = (ROOT / 'tools/baselines/tgp_chinese_naming_tier_trigger.txt').read_text()
-        mod = definitions((ROOT / 'common/scripted_triggers/zz_tca_chinese_naming_triggers.txt').read_text(encoding='utf-8-sig'))
-        corrected = native.replace('scope:title ?= {\n\t\t\tcapital_county.title_province',
-                                   'scope:title ?= {\n\t\t\ttitle_capital_county.title_province')
-        self.assertNotEqual(corrected, native)
-        self.assertEqual(mod['tgp_chinese_naming_tier_trigger'],
-                         definitions(corrected)['tgp_chinese_naming_tier_trigger'])
+    def test_native_title_callback_only_exempts_local_celestial_families(self):
+        native = (ROOT / 'tools/baselines/tca_title_on_actions_121.txt').read_text(encoding='utf-8-sig')
+        actual = (ROOT / 'common/on_action/title_on_actions.txt').read_text(encoding='utf-8-sig')
+        guard = 'NOT = { tca_official_family_keeps_liege_trigger = yes }'
+        self.assertEqual(actual.count(guard), 1)
+        self.assertEqual(tokens(actual.replace(guard, '')), tokens(native))
 
-    def test_native_unique_naming_helper_changes_only_title_capital_link(self):
-        native = (ROOT / 'tools/baselines/tgp_has_unique_chinese_naming.txt').read_text()
-        mod = definitions((ROOT / 'common/scripted_triggers/zz_tca_chinese_naming_triggers.txt').read_text(encoding='utf-8-sig'))
-        corrected = native.replace('scope:title.capital_county.title_province',
-                                   'scope:title.title_capital_county.title_province')
-        self.assertNotEqual(corrected, native)
-        self.assertEqual(mod['tgp_has_unique_chinese_naming'],
-                         definitions(corrected)['tgp_has_unique_chinese_naming'])
+    def test_native_diarchy_callback_only_guards_dead_character_variables(self):
+        native = (ROOT / 'tools/baselines/tca_diarchy_on_actions_121.txt').read_text(encoding='utf-8-sig')
+        actual = (ROOT / 'common/on_action/diarchy_on_action.txt').read_text(encoding='utf-8-sig')
+        guard = 'limit = { is_alive = yes has_variable = use_co_ruler_title }'
+        self.assertEqual(actual.count(guard), 1)
+        self.assertEqual(tokens(actual.replace(guard, 'limit = { has_variable = use_co_ruler_title }')), tokens(native))
+
+    def test_court_aptitude_addition_stays_in_candidate_scope(self):
+        native = definitions((ROOT / 'tools/baselines/tca_general_aptitude_bonus.txt').read_text(encoding='utf-8-sig'))['general_aptitude_bonus']
+        actual = definitions((ROOT / 'common/script_values/zz_tca_court_aptitude_values.txt').read_text(encoding='utf-8-sig'))['general_aptitude_bonus']
+        addition = tokens('add = { value = tca_court_organize_bonus desc = tca_court_organize_office_bonus }')
+        self.assertEqual(actual, native[:-1] + addition + native[-1:])
 
     def test_native_event_cases_are_registered_in_dispatcher(self):
         from check_test_run import expected_cases
