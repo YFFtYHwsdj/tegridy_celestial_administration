@@ -1,0 +1,27 @@
+﻿# 地产升级栏复用同一组工程参数，报价按持有人的原生施工费用计算。
+macro = {
+    definition = "TcaTongpanConstructionScopes"
+    replace_with = "GuiScope.SetRoot(GetPlayer.MakeScope).AddScope('tca_tp_project_site', HoldingView.GetProvince.MakeScope).AddScope('tca_tp_project_upgrade', GUITrackItem.GetNextBuilding.MakeScope).AddScope('tca_tp_project_governor', HoldingView.GetHolder.MakeScope).AddScope('tca_tp_project_price', MakeScopeValue(tca_TongpanConstructionQuote.GetFixedPointValue)).End"
+}
+
+# 只判断是否占用主操作位。价格或余额变化不能切换入口。
+macro = {
+    definition = "tca_TongpanConstructionIsShown"
+    replace_with = "And4(GetPlayer.IsValid, Not(HoldingView.GetDistrict.IsOwnedByTitle), Not(Or(GUITrackItem.HasNextPrestigeCost, GUITrackItem.HasNextPietyCost)), GetScriptedGui('tca_tongpan_construction_gui').IsShown(TcaTongpanConstructionScopes))"
+}
+
+# 与主操作位共用显示分支。报价、金额显示及余额检查读取同一份原生报价。
+macro = {
+    definition = "tca_TongpanConstructionVisible"
+    replace_with = "And(Not(GUITrackItem.IsSponsorConstructionVisible), tca_TongpanConstructionIsShown)"
+}
+
+macro = {
+    definition = "tca_TongpanConstructionQuote"
+    replace_with = "GUITrackItem.GetNextGoldCost(HoldingView.GetHolder)"
+}
+
+macro = {
+    definition = "tca_TongpanConstructionTreasuryShortfall"
+    replace_with = "LessThan_CFixedPoint(HoldingView.GetHolder.GetTreasury, tca_TongpanConstructionQuote.GetFixedPointValue)"
+}

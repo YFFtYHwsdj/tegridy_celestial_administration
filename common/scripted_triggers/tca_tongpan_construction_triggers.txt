@@ -1,0 +1,65 @@
+﻿# 地块作用域。通判是无地地方主官，付款知州必须是绑定州的有地主官，
+# 并且直接持有目标地产。申请和执行用同一张工程单。
+tca_tongpan_construction_site_trigger = {
+    has_holding = yes
+    province_owner ?= scope:tca_tp_project_governor
+    county.holder ?= scope:tca_tp_project_governor
+    scope:tca_tp_project_governor ?= {
+        primary_title = scope:tca_tp_project_site.county
+        tca_is_landed_celestial_governor_trigger = yes
+        tca_has_active_tongpan_trigger = yes
+        diarch ?= scope:tca_tp_project_officer
+    }
+}
+
+# 建筑类型作用域。限普通建筑升一级，排除占用独立施工槽的贸易站及特殊区划。
+tca_tongpan_construction_upgrade_trigger = {
+    has_previous_building_level = yes
+    NOR = {
+        building_type_has_flag = castle
+        building_type_has_flag = city
+        building_type_has_flag = temple
+        building_type_has_flag = temple_citadel
+        building_type_has_flag = tribe
+        building_type_has_flag = nomadic_camp
+        building_type_has_flag = herder_camp
+        building_type_has_flag = holy_building
+        building_type_has_flag = duchy_building
+        building_type_has_flag = mandala_capital_building
+    }
+}
+
+# 任意作用域。GUI传入地点、建筑、按知州计算的报价、知州与通判。
+# 审批完成时重验条件；报价在申请时冻结，施工资格和余额依执行当下判断。
+tca_tongpan_construction_can_start_trigger = {
+    exists = scope:tca_tp_project_price
+    scope:tca_tp_project_price > 0
+    scope:tca_tp_project_upgrade ?= { tca_tongpan_construction_upgrade_trigger = yes }
+    scope:tca_tp_project_site ?= {
+        tca_tongpan_construction_site_trigger = yes
+        NOT = { has_variable = tca_tp_project_payer }
+        NOT = { has_variable = merchant_construction_sponsor }
+        can_start_building_construction_for_owner = scope:tca_tp_project_upgrade
+        custom_tooltip = {
+            text = tca_tongpan_construction_no_recent_work
+            county = { NOT = { has_variable = tca_tp_project_cooldown } }
+        }
+    }
+    custom_tooltip = {
+        text = tca_tongpan_construction_can_afford
+        scope:tca_tp_project_governor ?= { treasury >= scope:tca_tp_project_price }
+    }
+}
+
+# 知州作用域。共用权限入口供 GUI 和督建确认事件读取。
+tca_tongpan_construction_can_order_trigger = {
+    diarchy_swing >= 60
+}
+
+# 任意作用域；只消费仍在有效期内、由此事件送出的工程单。
+tca_tongpan_construction_pending_trigger = {
+    scope:tca_tp_project_site.county ?= {
+        has_variable = tca_tp_project_request
+        var:tca_tp_project_request = scope:tca_tp_project_request_date
+    }
+}

@@ -1,0 +1,45 @@
+﻿# 角色 root 是本地玩家通判。窗口传入地块、升级目标、地产持有人和以持有人计算的报价。
+tca_tongpan_construction_gui = {
+    scope = character
+    saved_scopes = { tca_tp_project_site tca_tp_project_upgrade tca_tp_project_governor tca_tp_project_price }
+
+    is_shown = {
+        tca_can_open_tongpan_diarchy_trigger = yes
+        scope:tca_tp_project_upgrade ?= { tca_tongpan_construction_upgrade_trigger = yes }
+        scope:tca_tp_project_site ?= {
+            province_owner ?= scope:tca_tp_project_governor
+            county.holder ?= scope:tca_tp_project_governor
+            county = root.primary_title.var:tca_tongpan_county
+        }
+    }
+
+    is_valid = {
+        save_temporary_scope_as = tca_tp_project_officer
+        tca_tongpan_construction_can_start_trigger = yes
+        custom_tooltip = {
+            text = tca_tongpan_construction_no_pending_request
+            scope:tca_tp_project_site.county = { NOT = { has_variable = tca_tp_project_request } }
+        }
+    }
+
+    effect = {
+        save_scope_as = tca_tp_project_officer
+        if = {
+            limit = {
+                tca_tongpan_construction_can_start_trigger = yes
+                scope:tca_tp_project_site.county = { NOT = { has_variable = tca_tp_project_request } }
+            }
+            scope:tca_tp_project_site.county = {
+                set_variable = { name = tca_tp_project_request value = current_date days = 30 }
+            }
+            save_scope_value_as = { name = tca_tp_project_request_date value = current_date }
+            if = {
+                limit = { scope:tca_tp_project_governor = { tca_tongpan_construction_can_order_trigger = yes } }
+                trigger_event = tca_tongpan_construction.2
+            }
+            else = {
+                scope:tca_tp_project_governor = { trigger_event = tca_tongpan_construction.1 }
+            }
+        }
+    }
+}

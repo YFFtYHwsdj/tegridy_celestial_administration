@@ -1,0 +1,86 @@
+﻿# 任意作用域；接收 tca_tongpan_construction_can_start_trigger 约定的五项工程参数。
+# 预先登记原付款人和通判，原版开工效果为领地产权人启动施工，且无原版退款金额。
+# 州库只在确认合法后扣一次；完工与取消由地块回调清理。
+tca_tongpan_construction_start_effect = {
+    if = {
+        limit = { tca_tongpan_construction_can_start_trigger = yes }
+        scope:tca_tp_project_site = {
+            set_variable = { name = tca_tp_project_payer value = scope:tca_tp_project_governor }
+            set_variable = { name = tca_tp_project_builder value = scope:tca_tp_project_officer }
+            set_variable = { name = tca_tp_project_funds value = scope:tca_tp_project_price }
+            scope:tca_tp_project_governor = { remove_treasury = scope:tca_tp_project_price }
+            county = { set_variable = { name = tca_tp_project_cooldown value = yes years = 1 } }
+            start_building_construction_for_holder = scope:tca_tp_project_upgrade
+        }
+        scope:tca_tp_project_officer = {
+            send_interface_toast = {
+                title = tca_tongpan_construction_started
+                left_icon = scope:tca_tp_project_governor
+                right_icon = scope:tca_tp_project_site.barony
+            }
+        }
+    }
+    else = {
+        scope:tca_tp_project_officer ?= {
+            send_interface_toast = { title = tca_tongpan_construction_unavailable }
+        }
+    }
+}
+
+# 地块作用域。常规建造和贸易站使用独立槽，另一槽先完工时保留本工程。
+# 回调由引擎派发，在常规施工槽清空后再读取记录。
+tca_tongpan_construction_finish_effect = {
+    if = {
+        limit = {
+            has_variable = tca_tp_project_payer
+            has_ongoing_holding_construction = no
+        }
+        if = {
+            limit = {
+                var:tca_tp_project_payer ?= {
+                    is_alive = yes
+                    tca_has_active_tongpan_trigger = yes
+                    diarch ?= root.var:tca_tp_project_builder
+                    primary_title = root.county
+                }
+                province_owner ?= var:tca_tp_project_payer
+            }
+            var:tca_tp_project_builder = {
+                send_interface_toast = {
+                    title = tca_tongpan_construction_finished
+                    right_icon = root.barony
+                    change_merit = tca_tongpan_construction_merit_value
+                }
+            }
+        }
+        tca_tongpan_construction_clear_effect = yes
+    }
+}
+
+# 地块作用域。退款回原付款人州库；付款人已故时归还原州继任知州的州库。
+tca_tongpan_construction_refund_effect = {
+    if = {
+        limit = {
+            has_variable = tca_tp_project_payer
+            has_ongoing_holding_construction = no
+        }
+        if = {
+            limit = {
+                var:tca_tp_project_payer ?= { is_alive = yes government_allows = treasury }
+            }
+            var:tca_tp_project_payer = { add_treasury = root.var:tca_tp_project_funds }
+        }
+        else_if = {
+            limit = { county.holder ?= { government_allows = treasury } }
+            county.holder = { add_treasury = root.var:tca_tp_project_funds }
+        }
+        tca_tongpan_construction_clear_effect = yes
+    }
+}
+
+# 地块作用域；每项工程完成或取消只消耗一次记录。
+tca_tongpan_construction_clear_effect = {
+    remove_variable = tca_tp_project_payer
+    remove_variable = tca_tp_project_builder
+    remove_variable = tca_tp_project_funds
+}
