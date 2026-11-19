@@ -1,0 +1,290 @@
+﻿# 原生同平章事死亡交接。独占中国议席、头衔及天平，使用独立夹具并在结束时归还原任。
+namespace = tca_central_opinion_test
+
+tca_central_opinion_test.1 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_central_opinion_test.1 tca_test_central_opinion_handoff"
+        if = {
+            limit = {
+                debug_only = yes
+                title:h_china.holder = root
+                has_diarchy_type = grand_secretariat
+                has_realm_law = grand_chancellor_law
+                diarch ?= { is_alive = yes has_title = title:e_minister_chancellor }
+                cp:councillor_chancellor ?= diarch
+            }
+            diarch = { save_scope_as = tca_co_test_original }
+            save_scope_value_as = { name = tca_co_test_borrowed value = 0 }
+            tca_test_create_merit_interface_character_effect = { CHARACTER = tca_co_test_outgoing GOVERNMENT = celestial_government }
+            scope:tca_co_test_outgoing = {
+                tca_test_add_native_merit_probe_exams_effect = yes
+                add_trait = education_diplomacy_1
+                change_merit = 24000
+                clear_appointment_timeout = yes
+            }
+            tca_test_create_merit_interface_character_effect = { CHARACTER = tca_co_test_a GOVERNMENT = celestial_government }
+            scope:tca_co_test_a = {
+                tca_test_add_native_merit_probe_exams_effect = yes
+                add_trait = education_diplomacy_1
+                change_merit = 24000
+                clear_appointment_timeout = yes
+            }
+            tca_test_create_merit_interface_character_effect = { CHARACTER = tca_co_test_b GOVERNMENT = celestial_government }
+            scope:tca_co_test_b = {
+                tca_test_add_native_merit_probe_exams_effect = yes
+                add_trait = education_diplomacy_1
+                change_merit = 24000
+                clear_appointment_timeout = yes
+            }
+            tca_test_create_merit_interface_character_effect = { CHARACTER = tca_co_test_reserve GOVERNMENT = celestial_government }
+            scope:tca_co_test_reserve = {
+                tca_test_add_native_merit_probe_exams_effect = yes
+                add_trait = education_diplomacy_1
+                change_merit = 24000
+            }
+            trigger_event = { id = tca_central_opinion_test.2 days = 2 }
+        }
+        else = {
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_central_opinion_handoff"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+            tca_test_lane_end_effect = { GROUP = tca_central_opinion_test }
+        }
+    }
+}
+
+# 任命自建首辅，正常形成议席、官署和政事堂关系，再刷新候选人名单。
+tca_central_opinion_test.2 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        if = {
+            limit = {
+                diarch ?= scope:tca_co_test_original
+                scope:tca_co_test_outgoing = { has_appointment_level_for_title = title:e_minister_chancellor }
+                scope:tca_co_test_a = { has_appointment_level_for_title = title:e_minister_chancellor merit_level = scope:tca_co_test_b.merit_level }
+                scope:tca_co_test_b = { has_appointment_level_for_title = title:e_minister_chancellor }
+            }
+            save_scope_value_as = { name = tca_co_test_borrowed value = 1 }
+            save_scope_value_as = { name = tca_co_test_borrowed_date value = current_date }
+            save_scope_value_as = { name = tca_co_test_original_swing value = diarchy_swing }
+            scope:tca_co_test_original = {
+                save_scope_value_as = { name = tca_co_test_original_timeout value = appointment_timeout_days }
+            }
+            assign_councillor_type = { type = councillor_chancellor target = scope:tca_co_test_outgoing fire_on_actions = yes remove_existing_councillor = yes }
+            set_diarchy_swing = 90
+            # 两名候选人获得相同的原生投资，排除其他候选人的基础分干扰。
+            title:e_minister_chancellor = {
+                change_appointment_investment = { target = scope:tca_co_test_a value = 2000 }
+                change_appointment_investment = { target = scope:tca_co_test_b value = 2000 }
+            }
+            scope:tca_co_test_outgoing = {
+                add_opinion = { target = scope:tca_co_test_a modifier = pleased_opinion opinion = { value = 0 subtract = "opinion(scope:tca_co_test_a)" } }
+                add_opinion = { target = scope:tca_co_test_b modifier = pleased_opinion opinion = { value = 0 subtract = "opinion(scope:tca_co_test_b)" } }
+                scriptedtests_recalculate_succession = yes
+            }
+            add_opinion = { target = scope:tca_co_test_a modifier = pleased_opinion opinion = { value = 0 subtract = "opinion(scope:tca_co_test_a)" } }
+            add_opinion = { target = scope:tca_co_test_b modifier = pleased_opinion opinion = { value = 0 subtract = "opinion(scope:tca_co_test_b)" } }
+            trigger_event = { id = tca_central_opinion_test.3 days = 1 }
+        }
+        else = {
+            tca_central_opinion_test_restore_effect = yes
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_central_opinion_handoff"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+            tca_test_lane_end_effect = { GROUP = tca_central_opinion_test }
+        }
+    }
+}
+
+tca_central_opinion_test.3 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        if = {
+            limit = {
+                diarch ?= scope:tca_co_test_outgoing
+                title:e_minister_chancellor.holder ?= scope:tca_co_test_outgoing
+                title:e_minister_chancellor.current_heir ?= {
+                    OR = { this = scope:tca_co_test_a this = scope:tca_co_test_b }
+                }
+            }
+            title:e_minister_chancellor.current_heir = { save_scope_as = tca_co_test_baseline }
+            if = { limit = { scope:tca_co_test_baseline = scope:tca_co_test_a } scope:tca_co_test_b = { save_scope_as = tca_co_test_favored } }
+            else = { scope:tca_co_test_a = { save_scope_as = tca_co_test_favored } }
+            set_diarchy_swing = 90
+            scope:tca_co_test_favored = {
+                save_scope_value_as = { name = tca_co_test_central_before value = "appointment_candidate_score(title:e_minister_chancellor)" }
+                save_scope_value_as = { name = tca_co_test_local_before value = "appointment_candidate_score(title:k_xichuan)" }
+            }
+            scope:tca_co_test_baseline = {
+                save_scope_value_as = { name = tca_co_test_baseline_before value = "appointment_candidate_score(title:e_minister_chancellor)" }
+            }
+            add_opinion = { target = scope:tca_co_test_favored modifier = grateful_opinion opinion = 250 }
+            add_opinion = { target = scope:tca_co_test_baseline modifier = grateful_opinion opinion = 250 }
+            scope:tca_co_test_outgoing = {
+                add_opinion = { target = scope:tca_co_test_favored modifier = grateful_opinion opinion = 250 }
+                add_opinion = { target = scope:tca_co_test_baseline modifier = grateful_opinion opinion = -250 }
+            }
+            scope:tca_co_test_favored = {
+                save_scope_value_as = { name = tca_co_test_favored_delta value = {
+                    value = "appointment_candidate_score(title:e_minister_chancellor)"
+                    subtract = scope:tca_co_test_central_before
+                } }
+            }
+            scope:tca_co_test_baseline = {
+                save_scope_value_as = { name = tca_co_test_baseline_delta value = {
+                    value = "appointment_candidate_score(title:e_minister_chancellor)"
+                    subtract = scope:tca_co_test_baseline_before
+                } }
+            }
+            if = {
+                limit = { scope:tca_co_test_favored_delta >= 49.9 scope:tca_co_test_favored_delta <= 50.1 scope:tca_co_test_baseline_delta >= -40.1 scope:tca_co_test_baseline_delta <= -39.9 }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_central_opinion_handoff 1"
+            }
+            else = {
+                add_character_flag = tca_test_tca_central_opinion_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_central_opinion_handoff 1"
+                debug_log_scopes = yes
+            }
+            if = { limit = { scope:tca_co_test_favored = { "appointment_candidate_score(title:k_xichuan)" = scope:tca_co_test_local_before } } debug_log = "TCA_TEST CHECK_PASS tca_test_central_opinion_handoff 2" }
+        else = { add_character_flag = tca_test_tca_central_opinion_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_central_opinion_handoff 2" }
+            set_diarchy_swing = 0
+            save_scope_value_as = { name = tca_co_test_factor_0 value = tca_central_opinion_chief_factor_value }
+            set_diarchy_swing = 20
+            save_scope_value_as = { name = tca_co_test_factor_20 value = tca_central_opinion_chief_factor_value }
+            set_diarchy_swing = 40
+            save_scope_value_as = { name = tca_co_test_factor_40 value = tca_central_opinion_chief_factor_value }
+            set_diarchy_swing = 60
+            save_scope_value_as = { name = tca_co_test_factor_60 value = tca_central_opinion_chief_factor_value }
+            set_diarchy_swing = 80
+            save_scope_value_as = { name = tca_co_test_factor_80 value = tca_central_opinion_chief_factor_value }
+            set_diarchy_swing = 90
+            save_scope_value_as = { name = tca_co_test_factor_90 value = tca_central_opinion_chief_factor_value }
+            if = {
+                limit = {
+                    scope:tca_co_test_factor_0 = 0.05
+                    scope:tca_co_test_factor_20 = 0.15
+                    scope:tca_co_test_factor_40 = 0.25
+                    scope:tca_co_test_factor_60 = 0.325
+                    scope:tca_co_test_factor_80 = 0.40
+                    scope:tca_co_test_factor_90 = 0.45
+                }
+                debug_log = "TCA_TEST CHECK_PASS tca_test_central_opinion_handoff 3"
+            }
+            else = {
+                add_character_flag = tca_test_tca_central_opinion_test_case_failed
+                debug_log = "TCA_TEST CHECK_FAIL tca_test_central_opinion_handoff 3"
+                debug_log_scopes = yes
+            }
+            scope:tca_co_test_outgoing = { scriptedtests_recalculate_succession = yes }
+            trigger_event = { id = tca_central_opinion_test.4 days = 1 }
+        }
+        else = {
+            tca_central_opinion_test_restore_effect = yes
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_central_opinion_handoff"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+            tca_test_lane_end_effect = { GROUP = tca_central_opinion_test }
+        }
+    }
+}
+
+tca_central_opinion_test.4 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        if = { limit = { diarch ?= scope:tca_co_test_outgoing title:e_minister_chancellor.current_heir ?= scope:tca_co_test_favored } debug_log = "TCA_TEST CHECK_PASS tca_test_central_opinion_handoff 4" }
+        else = { add_character_flag = tca_test_tca_central_opinion_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_central_opinion_handoff 4" }
+        save_scope_value_as = { name = tca_co_test_reserve_in_line value = 0 }
+        title:e_minister_chancellor = {
+            every_title_heir = {
+                limit = { this = scope:tca_co_test_reserve }
+                save_scope_value_as = { name = tca_co_test_reserve_in_line value = 1 }
+            }
+        }
+        scope:tca_co_test_outgoing = {
+            add_opinion = { target = scope:tca_co_test_reserve modifier = grateful_opinion opinion = 250 }
+        }
+        # 只触发死亡。最终得主由原版决定。
+        if = {
+            limit = { diarch ?= scope:tca_co_test_outgoing scope:tca_co_test_outgoing = { is_alive = yes } }
+            scope:tca_co_test_outgoing = { death = { death_reason = death_natural_causes } }
+        }
+        if = { limit = { scope:tca_co_test_outgoing = { is_alive = no } title:e_minister_chancellor.holder ?= scope:tca_co_test_favored } debug_log = "TCA_TEST CHECK_PASS tca_test_central_opinion_handoff 5" }
+        else = { add_character_flag = tca_test_tca_central_opinion_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_central_opinion_handoff 5" }
+        if = { limit = { title:e_minister_chancellor = { NOT = { has_variable = tca_central_opinion_predecessor } } } debug_log = "TCA_TEST CHECK_PASS tca_test_central_opinion_handoff 6" }
+        else = { add_character_flag = tca_test_tca_central_opinion_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_central_opinion_handoff 6" }
+        if = {
+            limit = {
+                scope:tca_co_test_reserve_in_line = 0
+                scope:tca_co_test_reserve = {
+                    var:tca_central_opinion_predecessor ?= scope:tca_co_test_outgoing
+                    var:tca_central_opinion_saved_score = 45
+                }
+            }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_central_opinion_handoff 7"
+        }
+        else = {
+            add_character_flag = tca_test_tca_central_opinion_test_case_failed
+            debug_log = "TCA_TEST CHECK_FAIL tca_test_central_opinion_handoff 7"
+            debug_log_scopes = yes
+        }
+
+        save_scope_value_as = { name = tca_co_test_new_chief_score_delta value = 0 }
+        if = {
+            limit = { diarch ?= scope:tca_co_test_favored }
+            set_diarchy_swing = 90
+            scope:tca_co_test_favored = {
+                add_opinion = { target = scope:tca_co_test_baseline modifier = pleased_opinion opinion = { value = 0 subtract = "opinion(scope:tca_co_test_baseline)" } }
+            }
+            scope:tca_co_test_baseline = { save_scope_value_as = { name = tca_co_test_new_score_before value = "appointment_candidate_score(title:e_minister_chancellor)" } }
+            scope:tca_co_test_favored = {
+                add_opinion = { target = scope:tca_co_test_baseline modifier = grateful_opinion opinion = 250 }
+            }
+            scope:tca_co_test_baseline = {
+                save_scope_value_as = { name = tca_co_test_new_chief_score_delta value = {
+                    value = "appointment_candidate_score(title:e_minister_chancellor)"
+                    subtract = scope:tca_co_test_new_score_before
+                } }
+            }
+        }
+        if = {
+            limit = {
+                scope:tca_co_test_baseline = { var:tca_central_opinion_predecessor ?= scope:tca_co_test_outgoing }
+                scope:tca_co_test_new_chief_score_delta >= 44.9
+                scope:tca_co_test_new_chief_score_delta <= 45.1
+            }
+            debug_log = "TCA_TEST CHECK_PASS tca_test_central_opinion_handoff 8"
+        }
+        else = {
+            add_character_flag = tca_test_tca_central_opinion_test_case_failed
+            debug_log = "TCA_TEST CHECK_FAIL tca_test_central_opinion_handoff 8"
+            debug_log_scopes = yes
+        }
+        trigger_event = { id = tca_central_opinion_test.5 days = 2 }
+    }
+}
+
+tca_central_opinion_test.5 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        tca_test_validate_environment_effect = yes
+        if = { limit = { diarch ?= scope:tca_co_test_favored cp:councillor_chancellor ?= scope:tca_co_test_favored } debug_log = "TCA_TEST CHECK_PASS tca_test_central_opinion_handoff 9" }
+        else = { add_character_flag = tca_test_tca_central_opinion_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_central_opinion_handoff 9" }
+        tca_central_opinion_test_restore_effect = yes
+        if = { limit = { diarch ?= scope:tca_co_test_original cp:councillor_chancellor ?= scope:tca_co_test_original title:e_minister_chancellor.holder ?= scope:tca_co_test_original diarchy_swing = scope:tca_co_test_original_swing } debug_log = "TCA_TEST CHECK_PASS tca_test_central_opinion_handoff 10" }
+        else = { add_character_flag = tca_test_tca_central_opinion_test_case_failed debug_log = "TCA_TEST CHECK_FAIL tca_test_central_opinion_handoff 10" }
+        if = {
+            limit = { has_character_flag = tca_test_tca_central_opinion_test_case_failed }
+            debug_log = "TCA_TEST FAIL tca_test_central_opinion_handoff"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+        }
+        else = {
+            debug_log = "TCA_TEST PASS tca_test_central_opinion_handoff"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } }
+        }
+        remove_character_flag = tca_test_tca_central_opinion_test_case_failed
+        tca_test_lane_end_effect = { GROUP = tca_central_opinion_test }
+    }
+}

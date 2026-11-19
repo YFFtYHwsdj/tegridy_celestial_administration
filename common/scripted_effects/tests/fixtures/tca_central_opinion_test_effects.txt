@@ -1,0 +1,47 @@
+﻿# 只清本用例自建人物与借用的中央议席。root 为皇帝；第一次进入时已保存原任、冷却和天平。
+tca_central_opinion_test_restore_effect = {
+    if = {
+        limit = { scope:tca_co_test_borrowed = 1 scope:tca_co_test_original ?= { is_alive = yes } }
+        if = {
+            limit = { NOT = { cp:councillor_chancellor ?= scope:tca_co_test_original } }
+            scope:tca_co_test_original = {
+                if = {
+                    limit = { NOT = { has_character_flag = tca_merit_interface_probe } }
+                    add_character_flag = tca_merit_interface_probe
+                    add_character_flag = tca_co_test_owns_interface_flag
+                }
+            }
+            assign_councillor_type = { type = councillor_chancellor target = scope:tca_co_test_original fire_on_actions = yes remove_existing_councillor = yes }
+            scope:tca_co_test_original = {
+                if = {
+                    limit = { has_character_flag = tca_co_test_owns_interface_flag }
+                    remove_character_flag = tca_merit_interface_probe
+                    remove_character_flag = tca_co_test_owns_interface_flag
+                }
+                save_scope_value_as = { name = tca_co_test_remaining_timeout value = {
+                    value = scope:tca_co_test_original_timeout
+                    subtract = { value = current_date subtract = scope:tca_co_test_borrowed_date }
+                } }
+                clear_appointment_timeout = yes
+                if = {
+                    limit = { scope:tca_co_test_remaining_timeout > 0 }
+                    set_variable = { name = tca_merit_central_remaining_timeout value = scope:tca_co_test_remaining_timeout }
+                    set_appointment_timeout = { days = tca_merit_central_remaining_timeout_days }
+                    remove_variable = tca_merit_central_remaining_timeout
+                }
+            }
+        }
+        set_diarchy_swing = scope:tca_co_test_original_swing
+    }
+    if = {
+        limit = { scope:tca_co_test_borrowed = 1 }
+        title:e_minister_chancellor = {
+            change_appointment_investment = { target = scope:tca_co_test_a value = -2000 }
+            change_appointment_investment = { target = scope:tca_co_test_b value = -2000 }
+        }
+    }
+    scope:tca_co_test_outgoing ?= { if = { limit = { is_alive = yes } tca_test_cleanup_merit_probe_character_effect = yes } }
+    scope:tca_co_test_a ?= { tca_test_cleanup_merit_probe_character_effect = yes }
+    scope:tca_co_test_b ?= { tca_test_cleanup_merit_probe_character_effect = yes }
+    scope:tca_co_test_reserve ?= { tca_test_cleanup_merit_probe_character_effect = yes }
+}

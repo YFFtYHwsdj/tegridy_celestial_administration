@@ -1,0 +1,65 @@
+﻿# 中央候选人好感。两方系数合计 0.50；数值以原版政事堂六个档位的起点分段。
+# 皇帝作用域；有效政事堂缺席时返回 0，皇帝独占好感权重。
+tca_central_opinion_chief_factor_value = {
+    value = 0
+    if = {
+        limit = {
+            has_diarchy_type = grand_secretariat
+            diarch ?= { is_alive = yes }
+        }
+        if = { limit = { diarchy_swing >= 90 } value = 0.45 }
+        else_if = { limit = { diarchy_swing >= 80 } value = 0.40 }
+        else_if = { limit = { diarchy_swing >= 60 } value = 0.325 }
+        else_if = { limit = { diarchy_swing >= 40 } value = 0.25 }
+        else_if = { limit = { diarchy_swing >= 20 } value = 0.15 }
+        else = { value = 0.05 }
+    }
+}
+
+# 候选人作用域（root）；scope:title 为正在评分的原生头衔。
+# 两项分别显示，死亡交易内沿用临终档位；原版在本项之后施加最终修正。
+tca_central_opinion_appointment_score_value = {
+    if = {
+        limit = {
+            scope:title ?= { tgp_is_minister_title = yes }
+            top_liege ?= { tgp_has_access_to_ministry_trigger = yes }
+            this != top_liege
+        }
+        if = {
+            limit = { scope:title.var:tca_central_opinion_sovereign ?= top_liege }
+            add = {
+                value = "top_liege.opinion(root)"
+                multiply = { value = 0.5 subtract = scope:title.var:tca_central_opinion_chief_factor }
+                desc = tca_central_opinion_emperor_score
+            }
+            # 相同皇帝和头衔的有效交接只能消费本届首辅保存的分数。
+            if = {
+                limit = {
+                    exists = var:tca_central_opinion_saved_score
+                    var:tca_central_opinion_predecessor ?= scope:title.var:tca_central_opinion_predecessor
+                }
+                add = { value = var:tca_central_opinion_saved_score desc = tca_central_opinion_chief_score }
+            }
+        }
+        else = {
+            add = {
+                value = "top_liege.opinion(root)"
+                multiply = { value = 0.5 subtract = top_liege.tca_central_opinion_chief_factor_value }
+                desc = tca_central_opinion_emperor_score
+            }
+            if = {
+                limit = {
+                    top_liege ?= {
+                        has_diarchy_type = grand_secretariat
+                        diarch ?= { is_alive = yes this != root }
+                    }
+                }
+                add = {
+                    value = "top_liege.diarch.opinion(root)"
+                    multiply = top_liege.tca_central_opinion_chief_factor_value
+                    desc = tca_central_opinion_chief_score
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,90 @@
+﻿# 首辅临终暂存；人物作用域为实际首辅，由 on_death 在引擎决定继任者前调用。
+# 从首辅法与实际持衔共同定位本次交接的中央头衔，不依赖人物的主头衔。
+tca_central_opinion_capture_effect = {
+    save_scope_as = tca_central_opinion_dying
+    top_liege = { save_scope_as = tca_central_opinion_ruler }
+    if = {
+        limit = {
+            has_title = title:e_minister_chancellor
+            scope:tca_central_opinion_ruler = { has_realm_law = grand_chancellor_law }
+        }
+        title:e_minister_chancellor = { tca_central_opinion_capture_title_effect = yes }
+    }
+    else_if = {
+        limit = {
+            has_title = title:e_minister_censor
+            scope:tca_central_opinion_ruler = { has_realm_law = grand_censor_law }
+        }
+        title:e_minister_censor = { tca_central_opinion_capture_title_effect = yes }
+    }
+    else_if = {
+        limit = {
+            has_title = title:e_minister_grand_marshal
+            scope:tca_central_opinion_ruler = { has_realm_law = grand_marshal_law }
+        }
+        title:e_minister_grand_marshal = { tca_central_opinion_capture_title_effect = yes }
+    }
+}
+
+# 目标头衔作用域；消费 dying、ruler，输出 dying 本职的候选暂存。
+# 原生顺位可截短。除现有名单外补采达到门槛的在世封臣及皇帝廷内家门主，
+# 大元帅另含同一朝廷的近亲。采集不改变资格或排位，最终选人由原版完成。
+tca_central_opinion_capture_title_effect = {
+    save_scope_as = tca_central_opinion_office
+    save_scope_value_as = { name = tca_central_opinion_factor value = scope:tca_central_opinion_ruler.tca_central_opinion_chief_factor_value }
+    every_title_heir = { tca_central_opinion_capture_candidate_effect = yes }
+    scope:tca_central_opinion_ruler = {
+        every_vassal_or_below = {
+            limit = {
+                is_adult = yes
+                has_appointment_level_for_title = scope:tca_central_opinion_office
+            }
+            tca_central_opinion_capture_candidate_effect = yes
+        }
+        every_courtier = {
+            limit = {
+                is_adult = yes
+                is_house_head = yes
+                any_held_title = { is_noble_family_title = yes }
+                has_appointment_level_for_title = scope:tca_central_opinion_office
+            }
+            tca_central_opinion_capture_candidate_effect = yes
+        }
+    }
+    if = {
+        limit = { this = title:e_minister_grand_marshal }
+        scope:tca_central_opinion_dying = {
+            every_close_family_member = {
+                limit = { top_liege ?= scope:tca_central_opinion_ruler }
+                tca_central_opinion_capture_candidate_effect = yes
+            }
+        }
+    }
+
+    # 存好所有候选人再发布事务。成功授职立即关闭，悬空事务和候选人临时值一天后失效。
+    set_variable = { name = tca_central_opinion_predecessor value = scope:tca_central_opinion_dying days = 1 }
+    set_variable = { name = tca_central_opinion_chief_factor value = scope:tca_central_opinion_factor days = 1 }
+    set_variable = { name = tca_central_opinion_sovereign value = scope:tca_central_opinion_ruler days = 1 }
+}
+
+# 候选人作用域；消费 dying、ruler、factor。逐人保存折算分及所属前任，重复成员只读取一次好感。
+tca_central_opinion_capture_candidate_effect = {
+    if = {
+        limit = {
+            is_alive = yes
+            this != scope:tca_central_opinion_dying
+            this != scope:tca_central_opinion_ruler
+            NOT = { var:tca_central_opinion_predecessor ?= scope:tca_central_opinion_dying }
+        }
+        save_temporary_scope_as = tca_central_opinion_candidate
+        set_variable = {
+            name = tca_central_opinion_saved_score
+            value = {
+                value = "scope:tca_central_opinion_dying.opinion(scope:tca_central_opinion_candidate)"
+                multiply = scope:tca_central_opinion_factor
+            }
+            days = 1
+        }
+        set_variable = { name = tca_central_opinion_predecessor value = scope:tca_central_opinion_dying days = 1 }
+    }
+}

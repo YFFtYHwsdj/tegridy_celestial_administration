@@ -1,0 +1,28 @@
+﻿# 仅追加子回调。临终保存沿原生死亡继任评分消费，头衔交手后立即停止使用快照。
+on_death = { on_actions = { tca_central_opinion_on_death } }
+on_title_gain = { on_actions = { tca_central_opinion_on_title_gain } }
+
+# root 是临终首辅。每次死亡先用实际政事堂关系筛选，仅匹配者才遍历候选人。
+tca_central_opinion_on_death = {
+    trigger = {
+        is_alive = yes
+        top_liege ?= {
+            has_diarchy_type = grand_secretariat
+            diarch ?= prev
+            tgp_has_access_to_ministry_trigger = yes
+        }
+    }
+    effect = { tca_central_opinion_capture_effect = yes }
+}
+
+# root 是新的持有者；头衔换手后关闭事务。候选人临时值随一天时限自动过期。
+tca_central_opinion_on_title_gain = {
+    trigger = { scope:title ?= { has_variable = tca_central_opinion_sovereign } }
+    effect = {
+        scope:title = {
+            remove_variable = tca_central_opinion_sovereign
+            remove_variable = tca_central_opinion_predecessor
+            remove_variable = tca_central_opinion_chief_factor
+        }
+    }
+}
