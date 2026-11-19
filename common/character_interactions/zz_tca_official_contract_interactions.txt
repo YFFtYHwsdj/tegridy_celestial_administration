@@ -8,7 +8,19 @@ admin_liege_modify_vassal_contract_interaction = {
 	icon = icon_contract_modification_single
 
 	send_name = admin_liege_modify_vassal_contract_interaction
-	desc = admin_liege_modify_vassal_contract_interaction_desc
+	desc = {
+		desc = admin_liege_modify_vassal_contract_interaction_desc
+		triggered_desc = {
+			trigger = {
+				scope:recipient = {
+					tca_road_contract_managed_trigger = yes
+					vassal_contract_has_flag = celestial_military_appointment
+					primary_title ?= { any_owned_title_maa_regiment = { count >= 1 } }
+				}
+			}
+			desc = tca_road_contract_disband_warning
+		}
+	}
 
 	force_notification = yes
 	notification_text = MODIFY_VASSAL_CONTRACT_NOTIFICATION_TO_VASSAL
@@ -201,9 +213,15 @@ admin_liege_modify_vassal_contract_interaction = {
 					save_scope_as = obligation
 
 					scope:recipient = {
-						vassal_contract_set_obligation_level = {
-							type = scope:obligation.vassal_contract_type
-							level = scope:obligation
+						if = {
+							limit = { scope:obligation.vassal_contract_type = vassal_contract:celestial_provinces }
+							tca_road_contract_apply_effect = { LEVEL = scope:obligation }
+						}
+						else = {
+							vassal_contract_set_obligation_level = {
+								type = scope:obligation.vassal_contract_type
+								level = scope:obligation
+							}
 						}
 
                         # 两侧改约共用保存入口；按实际变动类型记录头衔待遇。

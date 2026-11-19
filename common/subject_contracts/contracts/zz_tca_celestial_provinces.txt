@@ -14,6 +14,15 @@ celestial_provinces = {
 			is_landless_ruler = no
 		}
 	}
+	can_be_changed = {
+		trigger_if = {
+			limit = { scope:subject = { tca_road_contract_managed_trigger = yes } }
+			custom_tooltip = {
+				text = tca_road_contract_separate_titles_tt
+				scope:subject = { tca_road_contract_can_change_trigger = yes }
+			}
+		}
+	}
 	obligation_levels = {
 		celestial_province_standard = {
 			default = yes
@@ -201,57 +210,13 @@ celestial_provinces = {
 			}
 
 			is_valid = {
-				# Vassal has to be landed and direct vassal of the top liege, or a vassal of another military governor
 				custom_tooltip = {
 					text = liege_is_not_military_desc
-					scope:liege = {
-						trigger_if = {
-							limit = {
-								this != top_liege
-							}
-							vassal_contract_has_flag = celestial_military_appointment
-						}
-					}
+					scope:subject = { tca_province_contract_military_liege_trigger = yes }
 				}
-				trigger_if = {
-					limit = {
-						scope:subject = {
-							liege = top_liege
-						}
-					}
-					# There can only be a limited number of militaries at a time
-					custom_tooltip = {
-						text = celestial_province_military_amount_desc
-						OR = {
-							scope:subject.liege = {
-								any_vassal = {
-									count < celestial_province_military_max_value
-									vassal_contract_has_flag = celestial_province_military
-
-									# We don't care about vassals two steps down in tier (for AI)
-									trigger_if = {
-										limit = {
-											liege = {
-												is_ai = yes
-												highest_held_title_tier = tier_hegemony
-											}
-										}
-										highest_held_title_tier >= tier_kingdom
-									}
-									trigger_if = {
-										limit = {
-											liege = {
-												is_ai = yes
-												highest_held_title_tier = tier_empire
-											}
-										}
-										highest_held_title_tier >= tier_duchy
-									}
-								}
-							}
-							scope:subject = { vassal_contract_has_flag = celestial_province_military }
-						}
-					}
+				custom_tooltip = {
+					text = celestial_province_military_amount_desc
+					scope:subject = { tca_province_contract_military_quota_trigger = yes }
 				}
 			}
 
@@ -366,55 +331,28 @@ celestial_provinces = {
 			}
 
 			is_valid = {
-				# Only available in the Expansion phase of the Dynastic Cycle
-				#situation:dynastic_cycle ?= { has_situation_top_phase_parameter = dynastic_cycle_hegemon_increased_protectorate_limit }
-				trigger_if = {
-					limit = {
-						exists = situation:dynastic_cycle
-					}
-					situation:dynastic_cycle = { has_situation_top_phase_parameter = dynastic_cycle_hegemon_increased_protectorate_limit }
-				}
-				# Only the hegemon can appoint these
-				scope:liege = {
-					highest_held_title_tier = tier_hegemony
-				}
-				# And only for high tier vassals
-				scope:subject = {
-					is_landed = yes
-					highest_held_title_tier >= tier_kingdom
-				}
-				# There can only be a limited number of protectorates at a time - Changes with the Dynastic Cycle
+				scope:subject = { tca_province_contract_protectorate_eligible_trigger = yes }
 				custom_tooltip = {
 					text = celestial_province_protectorate_amount_desc
-					OR = {
-						scope:liege = {
-							any_vassal = {
-								count < celestial_province_protectorate_max_value
-								vassal_contract_has_flag = celestial_province_protectorate
-							}
-						}
-						scope:subject = { vassal_contract_has_flag = celestial_province_protectorate }
-					}
+					scope:subject = { tca_province_contract_protectorate_quota_trigger = yes }
 				}
 			}
 
-			levies_factor = -1
+			levies_factor = 0.5
 
 			subject_modifier = {
-				prosperity_growth_factor = -0.3
-				maa_damage_mult = 0.1
+				prosperity_growth_factor = -0.2
+				monthly_control_change_when_above_baseline_mult = -0.1
+				additional_fort_level = 2
+				defender_advantage = 4
 				men_at_arms_title_cap = 1
-				men_at_arms_title_limit = 1
-				levy_reinforcement_rate = 0.2
-				monthly_merit_per_title_maa_value = 0.032
+				monthly_merit_per_title_maa_value = 0.024
 				monthly_merit_per_liege_tax = 0.3
-				domain_tax_mult = -0.2
+				domain_tax_mult = -0.3
 
 				monthly_treasury_from_military_budget_base = 1.5
-				governor_efficiency_per_martial_add = 0.005
 			}
 
-			flag = admin_ai_is_warlike
 			flag = celestial_province_protectorate
 			flag = celestial_military_appointment
 			flag = province_military

@@ -29,7 +29,22 @@
 			government_has_flag = government_uses_admin_province_obligations
 			NOT = { has_variable = admin_contract_cooldown }
 
-			trigger_if = {
+            trigger_if = {
+                limit = { tca_road_contract_managed_trigger = yes }
+                subject_contract_is_blocked_from_modification = no
+                tca_road_contract_can_change_trigger = yes
+                OR = {
+                    AND = {
+                        is_ai = yes
+                        tca_road_contract_has_ai_transition_trigger = yes
+                    }
+                    AND = {
+                        tca_uses_civil_province_contract_trigger = yes
+                        tca_province_contract_has_gain_trigger = { MARGIN = 2 }
+                    }
+                }
+            }
+            trigger_else_if = {
                 limit = { tca_uses_civil_province_contract_trigger = yes }
                 subject_contract_is_blocked_from_modification = no
                 tca_province_contract_has_gain_trigger = { MARGIN = 2 }
@@ -39,16 +54,28 @@
 		NOT = { scope:actor = { is_at_war_with = scope:recipient } }
 	}
 
-	on_accept = {
-		scope:actor = {
-			stress_and_fulfillment_impact = {
-				generous = minor_stress_impact_gain
-			}
-		}
-
-		scope:recipient = {
-			if = {
-                limit = { tca_uses_civil_province_contract_trigger = yes }
+    on_accept = {
+        save_scope_value_as = { name = tca_road_contract_changed value = yes }
+        scope:recipient = {
+            if = {
+                limit = {
+                    tca_road_contract_managed_trigger = yes
+                    is_ai = yes
+                    subject_contract_is_blocked_from_modification = no
+                    tca_road_contract_has_ai_transition_trigger = yes
+                }
+                tca_road_contract_try_ai_transition_effect = yes
+                if = {
+                    limit = { scope:tca_road_contract_changed = yes }
+                    trigger_event = tca_province_contract.1
+                }
+            }
+            else_if = {
+                limit = {
+                    tca_uses_civil_province_contract_trigger = yes
+                    subject_contract_is_blocked_from_modification = no
+                    tca_province_contract_can_change_title_trigger = yes
+                }
                 tca_province_contract_choose_effect = { MARGIN = 2 }
                 if = {
                     limit = { tca_province_contract_can_apply_choice_trigger = yes }
@@ -56,17 +83,31 @@
                     trigger_event = tca_province_contract.1
                 }
             }
-            else = { trigger_event = char_interaction.0253 }
-			set_variable = {
-				name = admin_contract_cooldown
-				value = yes
-				years = admin_contract_cooldown_value
-			}
-		}
+            else_if = {
+                limit = { tca_road_contract_managed_trigger = no }
+                trigger_event = char_interaction.0253
+            }
+            else = { save_scope_value_as = { name = tca_road_contract_changed value = no } }
 
-		# Additional Flavor Titles
-		scope:recipient = { additional_flavor_check_effect = yes }
-	}
+            if = {
+                limit = { scope:tca_road_contract_changed = yes }
+                set_variable = {
+                    name = admin_contract_cooldown
+                    value = yes
+                    years = admin_contract_cooldown_value
+                }
+                additional_flavor_check_effect = yes
+            }
+        }
+        if = {
+            limit = { scope:tca_road_contract_changed = yes }
+            scope:actor = {
+                stress_and_fulfillment_impact = {
+                    generous = minor_stress_impact_gain
+                }
+            }
+        }
+    }
 
 	ai_targets = {
 		ai_recipients = vassals

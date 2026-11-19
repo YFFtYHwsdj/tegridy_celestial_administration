@@ -1,0 +1,187 @@
+﻿# 人物作用域；以有地天朝主官的主要路头衔承接人物契约。
+tca_road_contract_managed_trigger = {
+    tca_is_landed_celestial_governor_trigger = yes
+    has_subject_contract_group = celestial_vassal
+    primary_title ?= { tca_circuit_is_road_trigger = yes }
+}
+
+# 人物契约会影响兼领头衔。持有多路或其他头衔兵士时，保全既有军队和路类型。
+tca_road_contract_can_change_trigger = {
+    save_temporary_scope_as = tca_road_contract_governor
+    any_held_title = { count < 2 tca_circuit_is_road_trigger = yes }
+    NOT = {
+        any_held_title = {
+            NOT = { this = scope:tca_road_contract_governor.primary_title }
+            any_owned_title_maa_regiment = { count >= 1 }
+        }
+    }
+}
+
+# 人物作用域；原生及脚本改约入口共用，非路级人物沿用原选档条件。
+tca_province_contract_can_change_title_trigger = {
+    trigger_if = {
+        limit = { tca_road_contract_managed_trigger = yes }
+        tca_road_contract_can_change_trigger = yes
+    }
+}
+
+# 改约窗口的所选义务列表。普通脚本改约无需传递此列表。
+tca_road_contract_selected_trigger = {
+    any_in_list = {
+        list = changed_obligations
+        save_temporary_scope_as = tca_road_contract_selected_obligation
+        scope:tca_road_contract_selected_obligation.vassal_contract_type = vassal_contract:celestial_provinces
+    }
+}
+
+# 批复待决请求时复核选中的路及当前兼领；非行省变更沿用原来的结算。
+tca_road_contract_pending_request_safe_trigger = {
+    trigger_if = {
+        limit = { tca_road_contract_selected_trigger = yes }
+        tca_province_contract_can_change_title_trigger = yes
+        trigger_if = {
+            limit = { exists = scope:tca_road_contract_requested_title }
+            primary_title = scope:tca_road_contract_requested_title
+        }
+    }
+}
+
+# 人物作用域；按实际辖属找接壤县。仍在本辖的县也可能位于路的法理范围外。
+tca_road_contract_actual_frontier_trigger = {
+    save_temporary_scope_as = tca_road_contract_governor
+    any_sub_realm_county = {
+        any_neighboring_county = { holder ?= { NOT = { top_liege = scope:tca_road_contract_governor.top_liege } } }
+    }
+}
+
+# 人物作用域；相邻法理王国的实际领地归属，包含法理王国头衔尚未创建的情况。
+tca_road_contract_legal_frontier_trigger = {
+    save_temporary_scope_as = tca_road_contract_governor
+    primary_title ?= {
+        any_title_to_title_neighboring_kingdom = {
+            any_de_jure_county = { holder ?= { NOT = { top_liege = scope:tca_road_contract_governor.top_liege } } }
+        }
+    }
+}
+
+tca_road_contract_full_regiments_trigger = {
+    primary_title ?= { any_owned_title_maa_regiment = { count >= 3 } }
+}
+
+# 文武转换与降编等待主官脱离战事、外调兵士归建；手动降编沿用原生窗口。
+tca_road_contract_can_reduce_troops_trigger = {
+    is_at_war = no
+    primary_title ?= {
+        save_temporary_scope_as = tca_road_contract_troop_title
+        NOT = {
+            any_owned_title_maa_regiment = {
+                regiment_controlling_title ?= { NOT = { this = scope:tca_road_contract_troop_title } }
+            }
+        }
+    }
+}
+
+# 人物作用域；战略改约优先于文官内部按首府改约。
+tca_road_contract_wants_military_trigger = {
+    trigger_if = {
+        limit = { tca_uses_civil_province_contract_trigger = yes }
+        tca_road_contract_actual_frontier_trigger = yes
+    }
+    trigger_else = {
+        vassal_contract_has_flag = celestial_province_protectorate
+        tca_road_contract_reversion_chance > 0
+        tca_road_contract_can_reduce_troops_trigger = yes
+        OR = {
+            tca_road_contract_actual_frontier_trigger = yes
+            tca_road_contract_legal_frontier_trigger = yes
+        }
+    }
+    tca_province_contract_military_liege_trigger = yes
+    tca_province_contract_military_quota_trigger = yes
+}
+
+tca_road_contract_wants_protectorate_trigger = {
+    vassal_contract_has_flag = celestial_province_military
+    ai_has_warlike_personality = yes
+    tca_road_contract_full_regiments_trigger = yes
+    tca_province_contract_protectorate_eligible_trigger = yes
+    tca_province_contract_protectorate_quota_trigger = yes
+    OR = {
+        tca_road_contract_actual_frontier_trigger = yes
+        tca_road_contract_legal_frontier_trigger = yes
+    }
+}
+
+tca_road_contract_wants_civil_trigger = {
+    vassal_contract_has_flag = celestial_military_appointment
+    tca_road_contract_can_reduce_troops_trigger = yes
+    NOR = {
+        tca_road_contract_actual_frontier_trigger = yes
+        tca_road_contract_legal_frontier_trigger = yes
+    }
+}
+
+tca_road_contract_has_ai_transition_trigger = {
+    tca_road_contract_can_change_trigger = yes
+    OR = {
+        tca_road_contract_wants_civil_trigger = yes
+        tca_road_contract_wants_military_trigger = yes
+        tca_road_contract_wants_protectorate_trigger = yes
+    }
+}
+
+# 人物作用域；供原生契约选档和 AI 调用，沿用原版直属资格与名额口径。
+tca_province_contract_military_liege_trigger = {
+    liege ?= {
+        OR = {
+            this = top_liege
+            vassal_contract_has_flag = celestial_military_appointment
+        }
+    }
+}
+
+tca_province_contract_military_quota_trigger = {
+    OR = {
+        NOT = { liege = top_liege }
+        vassal_contract_has_flag = celestial_province_military
+        liege ?= {
+            any_vassal = {
+                count < celestial_province_military_max_value
+                vassal_contract_has_flag = celestial_province_military
+                trigger_if = {
+                    limit = { liege = { is_ai = yes highest_held_title_tier = tier_hegemony } }
+                    highest_held_title_tier >= tier_kingdom
+                }
+                trigger_if = {
+                    limit = { liege = { is_ai = yes highest_held_title_tier = tier_empire } }
+                    highest_held_title_tier >= tier_duchy
+                }
+            }
+        }
+    }
+}
+
+tca_province_contract_protectorate_eligible_trigger = {
+    is_landed = yes
+    highest_held_title_tier >= tier_kingdom
+    liege ?= { highest_held_title_tier = tier_hegemony }
+    trigger_if = {
+        limit = {
+            tca_road_contract_managed_trigger = no
+            exists = situation:dynastic_cycle
+        }
+        situation:dynastic_cycle = { has_situation_top_phase_parameter = dynastic_cycle_hegemon_increased_protectorate_limit }
+    }
+}
+
+tca_province_contract_protectorate_quota_trigger = {
+    OR = {
+        vassal_contract_has_flag = celestial_province_protectorate
+        liege ?= {
+            any_vassal = {
+                count < celestial_province_protectorate_max_value
+                vassal_contract_has_flag = celestial_province_protectorate
+            }
+        }
+    }
+}

@@ -1,41 +1,50 @@
-﻿change_province_metropolitan_effect = {
-	if = {
-		limit = {
-			NOT = { scope:province_change_recipient ?= { tca_province_contract_petition_recipient_trigger = yes } }
-		}
-		custom_tooltip = change_province_metropolitan_effect.no_scope
-	}
-	else = {
-		scope:province_change_recipient = {
-			vassal_contract_set_obligation_level = {
-				type = celestial_provinces
-				level = 2
-			}
-			hidden_effect = {
-				set_vassal_contract_modification_blocked = yes
-				add_realm_law_skip_effects = celestial_appointment_succession_law
-			}
-		}
-	}
+﻿# 派系承诺的落档内联于原版效果。候选资格在选人时检查，兑现时再次核对。
+change_province_metropolitan_effect = {
+    tca_province_contract_apply_petition_effect = {
+        LEVEL = 2 LAW = celestial_appointment_succession_law TOOLTIP = change_province_metropolitan_effect.no_scope
+    }
 }
 
 change_province_industrial_effect = {
-	if = {
-		limit = {
-			NOT = { scope:province_change_recipient ?= { tca_province_contract_petition_recipient_trigger = yes } }
-		}
-		custom_tooltip = change_province_industrial_effect.no_scope
-	}
-	else = {
-		scope:province_change_recipient = {
-			vassal_contract_set_obligation_level = {
-				type = celestial_provinces
-				level = 1
-			}
-			hidden_effect = {
-				set_vassal_contract_modification_blocked = yes
-				add_realm_law_skip_effects = celestial_appointment_succession_law
-			}
-		}
-	}
+    tca_province_contract_apply_petition_effect = {
+        LEVEL = 1 LAW = celestial_appointment_succession_law TOOLTIP = change_province_industrial_effect.no_scope
+    }
+}
+
+change_province_military_effect = {
+    tca_province_contract_apply_petition_effect = {
+        LEVEL = 3 LAW = celestial_military_appointment_succession_law TOOLTIP = change_province_military_effect.no_scope
+    }
+}
+
+change_province_protectorate_effect = {
+    tca_province_contract_apply_petition_effect = {
+        LEVEL = 4 LAW = celestial_military_appointment_succession_law TOOLTIP = change_province_protectorate_effect.no_scope
+    }
+}
+
+# LEVEL 是目标档位；LAW 是原版对应任命法。确认落档才执行原版锁约与补法。
+# scope:province_change_recipient 为受益人，scope:petitioner 为请愿人。
+tca_province_contract_apply_petition_effect = {
+    if = {
+        limit = {
+            NOT = { scope:province_change_recipient ?= { tca_province_contract_petition_recipient_trigger = yes } }
+        }
+        custom_tooltip = $TOOLTIP$
+    }
+    else = {
+        scope:province_change_recipient = {
+            tca_road_contract_apply_effect = { LEVEL = $LEVEL$ }
+            if = {
+                limit = { scope:tca_road_contract_changed = yes }
+                hidden_effect = {
+                    set_vassal_contract_modification_blocked = yes
+                    if = {
+                        limit = { NOT = { has_realm_law = $LAW$ } }
+                        add_realm_law_skip_effects = $LAW$
+                    }
+                }
+            }
+        }
+    }
 }

@@ -122,3 +122,136 @@ tca_province_contract_test.2 = {
         remove_character_flag = tca_test_tca_province_contract_test_case_failed
     }
 }
+
+# 借用尚无军团的两浙路，核对府制请愿与实际 AI 改约的裁军、返款和持久路类型。
+tca_province_contract_test.3 = {
+    type = character_event
+    hidden = yes
+    immediate = {
+        debug_log = "TCA_TEST BEGIN tca_province_contract_test.3 tca_test_province_contract_disband"
+        remove_character_flag = tca_test_tca_province_contract_test_case_failed
+        if = {
+            limit = {
+                debug_only = yes
+                is_ai = yes
+                title:k_liangzhe ?= {
+                    any_owned_title_maa_regiment = { count = 0 }
+                    var:tca_circuit_kind ?= 1
+                    holder ?= {
+                        primary_title = title:k_liangzhe
+                        liege = root
+                        is_ai = yes
+                        is_at_war = no
+                        NOT = { has_variable = admin_contract_cooldown }
+                        vassal_contract_has_flag = celestial_province_standard
+                        has_realm_law = celestial_appointment_succession_law
+                        subject_contract_is_blocked_from_modification = no
+                        tca_province_contract_can_be_prefecture_trigger = yes
+                    }
+                }
+            }
+            title:k_liangzhe.holder = {
+                save_scope_as = province_change_recipient
+                save_scope_value_as = { name = tca_test_province_contract_cash value = treasury }
+                vassal_contract_set_obligation_level = { type = celestial_provinces level = 3 }
+                create_maa_regiment = { type = bowmen title = title:k_liangzhe size = 2 check_can_recruit = no }
+            }
+            title:k_liangzhe = { tca_circuit_sync_kind_effect = yes }
+            if = {
+                limit = {
+                    scope:province_change_recipient = { vassal_contract_has_flag = celestial_province_military }
+                    title:k_liangzhe = { any_owned_title_maa_regiment = { count = 1 maa_size = 2 } }
+                }
+                change_province_metropolitan_effect = yes
+                if = {
+                    limit = {
+                        scope:province_change_recipient = {
+                            vassal_contract_has_flag = celestial_province_metropolitan
+                            treasury = { value = scope:tca_test_province_contract_cash add = 10 }
+                        }
+                        title:k_liangzhe = { any_owned_title_maa_regiment = { count = 0 } var:tca_circuit_kind = 1 }
+                    }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_province_contract_disband 1"
+                }
+                else = {
+                    add_character_flag = tca_test_tca_province_contract_test_case_failed
+                    debug_log = "TCA_TEST CHECK_FAIL tca_test_province_contract_disband 1"
+                }
+
+                # 同一测试局运行原生 AI 改约互动，核对内地都护转文、再次结算和冷却。
+                scope:province_change_recipient = {
+                    set_vassal_contract_modification_blocked = no
+                    vassal_contract_set_obligation_level = { type = celestial_provinces level = 4 }
+                    create_maa_regiment = { type = bowmen title = title:k_liangzhe size = 1 check_can_recruit = no }
+                    save_scope_value_as = { name = tca_test_province_contract_ai_cash value = treasury }
+                }
+                title:k_liangzhe = { tca_circuit_sync_kind_effect = yes }
+                if = {
+                    limit = {
+                        scope:province_change_recipient = {
+                            vassal_contract_has_flag = celestial_province_protectorate
+                            tca_road_contract_can_change_trigger = yes
+                        }
+                    }
+                    run_interaction = {
+                        interaction = ai_only_liege_modify_vassal_contract_admin_province_interaction
+                        actor = root
+                        recipient = scope:province_change_recipient
+                        redirect = no
+                        send_threshold = accept
+                    }
+                }
+                if = {
+                    limit = {
+                        scope:province_change_recipient = {
+                            vassal_contract_has_flag = celestial_civil_appointment
+                            has_variable = admin_contract_cooldown
+                            treasury = { value = scope:tca_test_province_contract_ai_cash add = 5 }
+                        }
+                        title:k_liangzhe = { any_owned_title_maa_regiment = { count = 0 } var:tca_circuit_kind = 1 }
+                    }
+                    debug_log = "TCA_TEST CHECK_PASS tca_test_province_contract_disband 2"
+                }
+                else = {
+                    add_character_flag = tca_test_tca_province_contract_test_case_failed
+                    debug_log = "TCA_TEST CHECK_FAIL tca_test_province_contract_disband 2"
+                }
+                if = {
+                    limit = { has_character_flag = tca_test_tca_province_contract_test_case_failed }
+                    debug_log = "TCA_TEST FAIL tca_test_province_contract_disband"
+                    if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_failed add = 1 } }
+                }
+                else = {
+                    debug_log = "TCA_TEST PASS tca_test_province_contract_disband"
+                    if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_passed add = 1 } }
+                }
+            }
+            else = {
+                debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_province_contract_disband"
+                if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+            }
+            title:k_liangzhe = {
+                every_owned_title_maa_regiment = { destroy_maa_regiment = yes }
+                set_variable = { name = tca_circuit_kind value = 1 }
+            }
+            scope:province_change_recipient = {
+                vassal_contract_set_obligation_level = { type = celestial_provinces level = 0 }
+                set_vassal_contract_modification_blocked = no
+                remove_variable = admin_contract_cooldown
+                if = {
+                    limit = { NOT = { has_realm_law = celestial_appointment_succession_law } }
+                    add_realm_law_skip_effects = celestial_appointment_succession_law
+                }
+                if = {
+                    limit = { treasury > scope:tca_test_province_contract_cash }
+                    remove_treasury = { value = treasury subtract = scope:tca_test_province_contract_cash }
+                }
+            }
+        }
+        else = {
+            debug_log = "TCA_TEST PRECONDITION_FAIL tca_test_province_contract_disband"
+            if = { limit = { has_character_flag = tca_test_suite_running } change_variable = { name = tca_test_suite_skipped add = 1 } }
+        }
+        remove_character_flag = tca_test_tca_province_contract_test_case_failed
+    }
+}

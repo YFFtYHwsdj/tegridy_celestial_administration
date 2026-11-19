@@ -1,0 +1,102 @@
+﻿# 人物作用域；LEVEL 为已选定的天朝行省档位，可传数字或原生义务作用域。
+# 输出 scope:tca_road_contract_changed。先冻结旧档和返款；原生落档成功后才裁军、返款及同步路类型。
+# 非目标路沿用原生设置，由各入口保留原有任命法处理。
+tca_road_contract_apply_effect = {
+    save_scope_value_as = { name = tca_road_contract_changed value = no }
+    if = {
+        limit = { tca_road_contract_managed_trigger = yes }
+        if = {
+            limit = { tca_road_contract_can_change_trigger = yes }
+            save_scope_value_as = { name = tca_road_contract_old_level value = vassal_contract_obligation_level:celestial_provinces }
+            primary_title = { save_scope_as = tca_road_contract_title }
+            save_scope_value_as = { name = tca_road_contract_refund value = 0 }
+            if = {
+                limit = { vassal_contract_has_flag = celestial_military_appointment }
+                save_scope_value_as = { name = tca_road_contract_refund value = scope:tca_road_contract_title.tca_road_contract_disband_refund }
+            }
+            vassal_contract_set_obligation_level = { type = celestial_provinces level = $LEVEL$ }
+            if = {
+                limit = { vassal_contract_obligation_level:celestial_provinces != scope:tca_road_contract_old_level }
+                save_scope_value_as = { name = tca_road_contract_changed value = yes }
+                if = {
+                    limit = { vassal_contract_has_flag = celestial_civil_appointment }
+                    if = {
+                        limit = { scope:tca_road_contract_old_level >= 3 }
+                        if = {
+                            limit = { scope:tca_road_contract_refund > 0 }
+                            custom_tooltip = tca_road_contract_disband_tt
+                            add_treasury = scope:tca_road_contract_refund
+                        }
+                        hidden_effect = {
+                            scope:tca_road_contract_title = {
+                                every_owned_title_maa_regiment = { destroy_maa_regiment = yes }
+                            }
+                        }
+                    }
+                    # 先覆盖旧军事类型，防止同步时将此次正式的文官契约误作补授失败。
+                    scope:tca_road_contract_title = { set_variable = { name = tca_circuit_kind value = 1 } }
+                    if = {
+                        limit = {
+                            NOT = { has_realm_law = celestial_appointment_succession_law }
+                            NOT = { vassal_contract_has_flag = locked_to_partition }
+                        }
+                        add_realm_law_skip_effects = celestial_appointment_succession_law
+                    }
+                }
+                else_if = {
+                    limit = {
+                        vassal_contract_has_flag = celestial_military_appointment
+                        NOT = { has_realm_law = celestial_military_appointment_succession_law }
+                        NOT = { vassal_contract_has_flag = locked_to_partition }
+                    }
+                    add_realm_law_skip_effects = celestial_military_appointment_succession_law
+                }
+                hidden_effect = { scope:tca_road_contract_title = { tca_circuit_sync_kind_effect = yes } }
+            }
+        }
+    }
+    else_if = {
+        limit = { has_subject_contract_group = celestial_vassal }
+        save_scope_value_as = { name = tca_road_contract_old_level value = vassal_contract_obligation_level:celestial_provinces }
+        vassal_contract_set_obligation_level = { type = celestial_provinces level = $LEVEL$ }
+        if = {
+            limit = { vassal_contract_obligation_level:celestial_provinces != scope:tca_road_contract_old_level }
+            save_scope_value_as = { name = tca_road_contract_changed value = yes }
+        }
+    }
+}
+
+# 人物作用域；AI 只抽一次武制内部改约，文武转换在领主互动的正常冷却内决定。
+tca_road_contract_try_ai_transition_effect = {
+    save_scope_value_as = { name = tca_road_contract_changed value = no }
+    if = {
+        limit = { tca_road_contract_wants_civil_trigger = yes }
+        tca_province_contract_choose_effect = { MARGIN = 0 }
+        # 民政内部平分可留原档；从军事转入文官时用州承接平分。
+        if = {
+            limit = { scope:tca_province_contract_choice < 0 }
+            save_scope_value_as = { name = tca_province_contract_choice value = 0 }
+        }
+        tca_road_contract_apply_effect = { LEVEL = scope:tca_province_contract_choice }
+    }
+    else_if = {
+        limit = { tca_road_contract_wants_military_trigger = yes }
+        if = {
+            limit = { tca_uses_civil_province_contract_trigger = yes }
+            tca_road_contract_apply_effect = { LEVEL = 3 }
+        }
+        else = {
+            random = {
+                chance = tca_road_contract_reversion_chance
+                tca_road_contract_apply_effect = { LEVEL = 3 }
+            }
+        }
+    }
+    else_if = {
+        limit = { tca_road_contract_wants_protectorate_trigger = yes }
+        random = {
+            chance = tca_road_contract_promotion_chance
+            tca_road_contract_apply_effect = { LEVEL = 4 }
+        }
+    }
+}

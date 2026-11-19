@@ -20,7 +20,7 @@ class OfficialContractAccessTests(unittest.TestCase):
         self.assertIn('remove_variable = tca_office_budget_requested_office', accepting)
 
     def test_request_override_preserves_native_behavior(self):
-        # 仅新增授权检查和接受后的保存，费用、选项、冷却及AI接受逻辑逐token保持原版。
+        # 仅放宽授权、保存经费及转发行省改约，费用、选项、冷却及AI接受逻辑保持原版。
         key = 'admin_vassal_modify_vassal_contract_interaction'
         native = definitions((ROOT / 'tools/baselines/admin_vassal_modify_vassal_contract_interaction.txt').read_text(encoding='utf-8-sig'))[key]
         actual = definitions((ROOT / 'common/character_interactions/zz_tca_official_request_contract_interactions.txt').read_text(encoding='utf-8-sig'))[key]
@@ -33,6 +33,53 @@ class OfficialContractAccessTests(unittest.TestCase):
             self.assertEqual(len(matches), 1, addition)
             start = matches[0]
             actual = actual[:start] + actual[start + len(sequence):]
+        setter = 'vassal_contract_set_obligation_level = { type = scope:obligation.vassal_contract_type level = scope:obligation }'
+        forward = (
+            'if = { limit = { scope:obligation.vassal_contract_type = vassal_contract:celestial_provinces } '
+            'tca_road_contract_apply_effect = { LEVEL = scope:obligation } } '
+            f'else = {{ {setter} }}'
+        )
+        sequence = tokens(forward)
+        matches = [i for i in range(len(actual)) if actual[i:i + len(sequence)] == sequence]
+        self.assertEqual(len(matches), 1)
+        start = matches[0]
+        actual = actual[:start] + tokens(setter) + actual[start + len(sequence):]
+        desc = 'desc = admin_vassal_modify_vassal_contract_interaction_desc'
+        warning = (
+            f'desc = {{ {desc} triggered_desc = {{ trigger = {{ scope:puppet_or_actor = {{ '
+            'tca_road_contract_managed_trigger = yes vassal_contract_has_flag = celestial_military_appointment '
+            'primary_title ?= { any_owned_title_maa_regiment = { count >= 1 } } '
+            '} } desc = tca_road_contract_disband_warning } }'
+        )
+        sequence = tokens(warning)
+        matches = [i for i in range(len(actual)) if actual[i:i + len(sequence)] == sequence]
+        self.assertEqual(len(matches), 1)
+        start = matches[0]
+        actual = actual[:start] + tokens(desc) + actual[start + len(sequence):]
+        on_send = tokens(
+            'on_send = { scope:puppet_or_actor = { if = { limit = { '
+            'tca_road_contract_managed_trigger = yes tca_road_contract_selected_trigger = yes '
+            '} primary_title = { save_scope_as = tca_road_contract_requested_title } } } }'
+        )
+        wrapper = tokens(
+            'on_accept = { if = { limit = { scope:puppet_or_actor = { '
+            'tca_road_contract_pending_request_safe_trigger = yes } }'
+        )
+        on_decline = tokens('on_decline = {')
+        rejected = tokens(
+            '} else = { scope:puppet_or_actor = { send_interface_message = { '
+            'type = msg_vassal_contract_change title = tca_road_contract_request_lapsed '
+            'right_icon = scope:recipient } } } }'
+        )
+        start = actual.index('on_accept') - len(on_send)
+        self.assertEqual(actual[start:start + len(on_send) + len(wrapper)], on_send + wrapper)
+        end = actual.index('on_decline')
+        self.assertEqual(actual[end - len(rejected):end + len(on_decline)], rejected + on_decline)
+        actual = (
+            actual[:start] + tokens('on_accept = {') +
+            actual[start + len(on_send) + len(wrapper):end - len(rejected)] +
+            tokens('}') + actual[end:]
+        )
         self.assertEqual(actual, native)
 
     def test_both_accept_paths_record_office_budget(self):
