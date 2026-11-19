@@ -113,6 +113,54 @@ tca_court_on_departure_effect = {
         }
     }
 }
+# 雇主作用域；刷新只添加当前档，离任立即移除。原生首府限定随雇主迁都转移。
+tca_judicial_control_clear_effect = {
+    remove_character_modifier = tca_judicial_control_terrible_modifier
+    remove_character_modifier = tca_judicial_control_poor_modifier
+    remove_character_modifier = tca_judicial_control_average_modifier
+    remove_character_modifier = tca_judicial_control_good_modifier
+    remove_character_modifier = tca_judicial_control_excellent_modifier
+}
+
+# MODIFIER为当前称职度档的人物修正；同档无需重挂。
+tca_judicial_control_apply_effect = {
+    if = {
+        limit = { NOT = { has_character_modifier = $MODIFIER$ } }
+        tca_judicial_control_clear_effect = yes
+        add_character_modifier = { modifier = $MODIFIER$ }
+    }
+}
+
+# 员工作用域，OWNER为当前雇主；按原生称职档匹配雇主的首府修正。
+tca_judicial_control_update_effect = {
+    if = {
+        limit = { aptitude:tca_judicial_advisor_court_position = 4 }
+        $OWNER$ = { tca_judicial_control_apply_effect = { MODIFIER = tca_judicial_control_excellent_modifier } }
+    }
+    else_if = {
+        limit = { aptitude:tca_judicial_advisor_court_position = 3 }
+        $OWNER$ = { tca_judicial_control_apply_effect = { MODIFIER = tca_judicial_control_good_modifier } }
+    }
+    else_if = {
+        limit = { aptitude:tca_judicial_advisor_court_position = 2 }
+        $OWNER$ = { tca_judicial_control_apply_effect = { MODIFIER = tca_judicial_control_average_modifier } }
+    }
+    else_if = {
+        limit = { aptitude:tca_judicial_advisor_court_position = 1 }
+        $OWNER$ = { tca_judicial_control_apply_effect = { MODIFIER = tca_judicial_control_poor_modifier } }
+    }
+    else = { $OWNER$ = { tca_judicial_control_apply_effect = { MODIFIER = tca_judicial_control_terrible_modifier } } }
+}
+
+# 雇主作用域；开局／季度补齐既有职位及称职度变化。
+tca_judicial_control_refresh_effect = {
+    if = {
+        limit = { tca_civil_office_valid_trigger = yes employs_court_position = tca_judicial_advisor_court_position }
+        court_position:tca_judicial_advisor_court_position = { tca_judicial_control_update_effect = { OWNER = prev } }
+    }
+    else = { tca_judicial_control_clear_effect = yes }
+}
+
 # 雇主作用域，scope:target_liege须是当前雇主。候选存于tca_court_candidates。
 # 参数来自目录；最高分名单保留所有同分者后随机，不截取前三或依赖列表排序同分顺序。
 tca_court_fill_position_effect = {
@@ -195,6 +243,7 @@ tca_court_quarterly_fill_effect = {
             limit = { government_has_flag = government_is_celestial }
             # 先按现行层级／军制清理旧档或改制后失格军职，释放锁与磨勘期后再收集候选。
             tca_military_validate_office_after_government_change_effect = yes
+            if = { limit = { employs_court_position = tca_judicial_advisor_court_position } tca_judicial_control_refresh_effect = yes }
             tca_court_visit_positions_effect = { VISITOR = tca_court_snapshot_position_effect }
             if = { limit = { tca_court_next_vacancy_value > 0 } add_to_list = tca_court_vacant_offices }
         }

@@ -1,5 +1,5 @@
 ﻿# 文武任务AI只读雇主与scope:employee；按需求、称职度、性格和实际付款资源统一评估。
-# 无对象先返回-100；付不起返回-1000；正收益不足以负担工作机会成本时映射-100，越过原生停止线。
+# 无对象先返回-100；付不起返回-1000；收益不足时通常映射-100，越过原生停止线。
 # 任务状态均由原生员工回调维护；同一员工只持一项差遣，不把其他员工任务费加回。
 tca_court_task_ai_six_month_cost = { value = monthly_court_position_task_cost multiply = 6 }
 tca_court_task_ai_projected_balance = {
@@ -80,11 +80,18 @@ tca_court_explain_statutes_demand = {
     else_if = { limit = { any_held_county = { is_landless_type_title = no is_noble_family_title = no popular_opinion < { value = 15 add = scope:liege.tca_court_explain_statutes_active_bonus } } } value = 50 }
 
 }
+# 县作用域；以引擎当前基准计算任务可恢复的缺口，包含司法参军常驻等基准修正。
+tca_court_control_deficit = {
+    value = county_control_baseline
+    subtract = county_control
+}
+
+# 雇主作用域；最高缺口决定需求，已在执行时允许越过启动门槛继续恢复。
 tca_court_review_sentences_demand = {
     value = 0
-    if = { limit = { any_held_county = { is_landless_type_title = no is_noble_family_title = no county_control < 60 } } value = 180 }
-    else_if = { limit = { any_held_county = { is_landless_type_title = no is_noble_family_title = no county_control < 85 } } value = 120 }
-    else_if = { limit = { scope:employee ?= { has_variable = tca_court_restoring_control } any_held_county = { is_landless_type_title = no is_noble_family_title = no county_control < 95 } } value = 70 }
+    if = { limit = { any_held_county = { is_landless_type_title = no is_noble_family_title = no tca_court_control_deficit >= 15 } } value = 180 }
+    else_if = { limit = { any_held_county = { is_landless_type_title = no is_noble_family_title = no tca_court_control_deficit >= 5 } } value = 120 }
+    else_if = { limit = { scope:employee ?= { has_variable = tca_court_restoring_control } any_held_county = { is_landless_type_title = no is_noble_family_title = no tca_court_control_deficit > 2 } } value = 70 }
 
 }
 tca_court_organize_office_demand = {
@@ -192,9 +199,12 @@ tca_court_explain_statutes_raw_score = {
 }
 tca_court_explain_statutes_ai_score = {
     value = -100
-    if = { limit = { tca_court_explain_statutes_demand > 0 }
-        if = { limit = { tca_court_task_ai_budget_penalty <= -1000 } value = -1000 }
-        else_if = { limit = { tca_court_explain_statutes_raw_score > 0 } value = tca_court_explain_statutes_raw_score }
+    if = { limit = { tca_court_explain_statutes_demand > 0 tca_court_task_ai_budget_penalty <= -1000 } value = -1000 }
+    else_if = { limit = { tca_court_explain_statutes_raw_score > 0 } value = tca_court_explain_statutes_raw_score }
+    # 已在办且同职有正收益任务时，留在原生停止线之上，供同轮换派。
+    else_if = {
+        limit = { scope:employee ?= { has_variable = tca_court_hearing_petitions } tca_court_task_ai_projected_balance > 0 tca_court_review_sentences_raw_score > 0 }
+        value = 0
     }
 }
 tca_court_review_sentences_raw_score = {
@@ -206,9 +216,11 @@ tca_court_review_sentences_raw_score = {
 }
 tca_court_review_sentences_ai_score = {
     value = -100
-    if = { limit = { tca_court_review_sentences_demand > 0 }
-        if = { limit = { tca_court_task_ai_budget_penalty <= -1000 } value = -1000 }
-        else_if = { limit = { tca_court_review_sentences_raw_score > 0 } value = tca_court_review_sentences_raw_score }
+    if = { limit = { tca_court_review_sentences_demand > 0 tca_court_task_ai_budget_penalty <= -1000 } value = -1000 }
+    else_if = { limit = { tca_court_review_sentences_raw_score > 0 } value = tca_court_review_sentences_raw_score }
+    else_if = {
+        limit = { scope:employee ?= { has_variable = tca_court_restoring_control } tca_court_task_ai_projected_balance > 0 tca_court_explain_statutes_raw_score > 0 }
+        value = 0
     }
 }
 tca_court_organize_office_raw_score = {

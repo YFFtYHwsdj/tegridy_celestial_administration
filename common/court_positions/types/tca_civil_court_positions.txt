@@ -151,10 +151,14 @@ tca_judicial_advisor_court_position = {
     valid_position = { tca_civil_office_valid_trigger = yes }
     is_shown_character = { scope:employee = { tca_court_member_of_office_trigger = { OWNER = scope:liege } court_position_employee_shown_trigger = yes } }
     valid_character = { scope:employee = { tca_judicial_advisor_validity_trigger = yes } }
-    on_court_position_received = { tca_court_on_received_effect = yes }
-    on_court_position_revoked = { tca_court_on_departure_effect = yes }
-    on_court_position_invalidated = { tca_court_on_departure_effect = yes }
-    on_court_position_vacated = { tca_court_on_departure_effect = yes }
+    on_court_position_received = {
+        tca_court_on_received_effect = yes
+        # 等任命事务结算后再读取在职称职度及重算雇主修正。
+        scope:liege = { trigger_event = { id = tca_judicial_control.1 days = 1 } }
+    }
+    on_court_position_revoked = { tca_court_on_departure_effect = yes scope:liege = { tca_judicial_control_clear_effect = yes } }
+    on_court_position_invalidated = { tca_court_on_departure_effect = yes scope:liege = { tca_judicial_control_clear_effect = yes } }
+    on_court_position_vacated = { tca_court_on_departure_effect = yes scope:liege = { tca_judicial_control_clear_effect = yes } }
     salary = {
         gold = { value = 0 if = { limit = { scope:liege = { has_treasury = no } } add = tca_court_salary_1 } }
         treasury = { value = 0 if = { limit = { scope:liege = { has_treasury = yes } } add = tca_court_salary_1 } }
@@ -163,14 +167,6 @@ tca_judicial_advisor_court_position = {
     received_salary = { gold = { value = tca_court_salary_1 } round = no }
     revoke_cost = { influence = { value = tca_minor_court_position_influence_revoke_cost if = { limit = { free_court_position_revoke_trigger = { POS = tca_judicial_advisor } } multiply = 0 } } }
     modifier = { monthly_merit = 1.5 }
-
-    scaling_employer_modifiers = {
-        terrible = { popular_opinion_add = 1 }
-        poor = { popular_opinion_add = 2 }
-        average = { popular_opinion_add = 3 }
-        good = { popular_opinion_add = 4 }
-        excellent = { popular_opinion_add = 5 }
-    }
 
     ai_position_score = { value = 0 }
     ai_candidate_score = { value = 0 }
